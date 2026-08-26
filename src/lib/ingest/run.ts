@@ -1,11 +1,16 @@
 import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
-import { fetchText, sleep } from "./fetch";
+import { fetchPdf, fetchText, sleep } from "./fetch";
 import { extractLinks, extractArticle } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
-import { fetchRobots, robotsAllows, robotsCrawlDelay } from "./robots";
+import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
+import { discoverFromSitemaps } from "./sitemap";
+import { extractPdf } from "../documents/extractPdf";
+import { saveNativePdf } from "../documents/pdf";
+import { urlHash } from "../hash";
+import { renderHtml } from "./render";
 
 // Usage:
 //   npm run ingest                 -> priority-1 institutions (allowed/delayed only)
@@ -24,13 +29,17 @@ const UA = "InstitutionalIntelligenceBot";
 const MIN_DELAY_MS = 1000; // politeness floor even when robots is silent
 
 async function ingestInstitution(
-  inst: { id: string; name: string; researchUrl: string; rssUrl: string | null; language: string; crawlDelay: number | null },
+  inst: { id: string; name: string; researchUrl: string; rssUrl: string | null; sitemapUrl: string | null; language: string; crawlDelay: number | null; requiresRender: boolean },
   perLimit: number,
 ) {
   const origin = new URL(inst.researchUrl).origin;
 
   // --- Runtime robots.txt compliance check (authoritative) ---
   const robotsTxt = await fetchRobots(origin);
+  if (robotsTxt === null) {
+    console.log(`  ${inst.name.padEnd(26)} PAUSE · robots unavailable and no valid 24h cache`);
+    return 0;
+  }
   if (robotsTxt && !robotsAllows(robotsTxt, UA, new URL(inst.researchUrl).pathname)) {
     console.log(`  ${inst.name.padEnd(26)} SKIP · robots disallows research path`);
     return 0;
@@ -40,7 +49,7 @@ async function ingestInstitution(
 
   const allowsUrl = (u: string) => {
     try {
-      return !robotsTxt || robotsAllows(robotsTxt, UA, new URL(u).pathname);
+      return robotsAllows(robotsTxt, UA, new URL(u).pathname);
     } catch {
       return false;
     }
@@ -48,6 +57,7 @@ async function ingestInstitution(
 
   let created = 0, dup = 0, empty = 0, blocked = 0;
   const raws: RawArticle[] = [];
+  const nativePdfs = new Map<string, Buffer>();
 
   // 1) RSS first when configured (and allowed).
   if (inst.rssUrl && allowsUrl(inst.rssUrl)) {
@@ -66,17 +76,83 @@ async function ingestInstitution(
     } catch { /* fall through to HTML */ }
   }
 
-  // 2) HTML listing → per-article extraction, each URL robots-checked.
+  // 2) Sitemap/Sitemap Index discovery, including native research PDFs.
   if (raws.length === 0) {
-    const listHtml = await fetchText(inst.researchUrl);
+    const sitemapSeeds = [
+      ...robotsSitemaps(robotsTxt),
+      ...(inst.sitemapUrl ? [inst.sitemapUrl] : []),
+      `${origin}/sitemap.xml`,
+    ];
+    const candidates = await discoverFromSitemaps(sitemapSeeds, inst.researchUrl, {
+      limit: perLimit,
+      allows: allowsUrl,
+    });
+    for (const candidate of candidates) {
+      if (!allowsUrl(candidate.url)) { blocked++; continue; }
+      await sleep(delayMs);
+      if (/\.pdf(?:$|\?)/i.test(candidate.url)) {
+        const pdf = await fetchPdf(candidate.url);
+        if (!pdf) continue;
+        try {
+          const extracted = await extractPdf(pdf);
+          const filename = decodeURIComponent(new URL(candidate.url).pathname.split("/").pop() || "Research report")
+            .replace(/\.pdf$/i, "")
+            .replace(/[-_]+/g, " ")
+            .trim();
+          raws.push({
+            title: filename || "Institutional research report",
+            text: extracted.text,
+            sourceUrl: candidate.url,
+            author: null,
+            publishedAt: candidate.lastModified || new Date(),
+            segments: [{ heading: null, text: extracted.text }],
+          });
+          nativePdfs.set(candidate.url, pdf);
+        } catch {
+          empty++;
+        }
+      } else {
+        let artHtml = await fetchText(candidate.url);
+        if (!artHtml && inst.requiresRender) artHtml = await renderHtml(candidate.url);
+        if (!artHtml) continue;
+        let article = extractArticle(artHtml);
+        if (article.text.length < 400 && inst.requiresRender) {
+          const rendered = await renderHtml(candidate.url);
+          if (rendered) article = extractArticle(rendered);
+        }
+        raws.push({
+          title: article.title,
+          text: article.text,
+          sourceUrl: candidate.url,
+          author: article.author,
+          publishedAt: article.publishedAt || candidate.lastModified || new Date(),
+          segments: article.segments,
+          strict: true,
+        });
+      }
+    }
+  }
+
+  // 3) HTML listing → per-article extraction, each URL robots-checked.
+  if (raws.length === 0) {
+    let listHtml = await fetchText(inst.researchUrl);
+    let links = listHtml ? extractLinks(listHtml, inst.researchUrl).slice(0, perLimit) : [];
+    if (links.length === 0 && inst.requiresRender) {
+      listHtml = await renderHtml(inst.researchUrl);
+      links = listHtml ? extractLinks(listHtml, inst.researchUrl).slice(0, perLimit) : [];
+    }
     if (listHtml) {
-      const links = extractLinks(listHtml, inst.researchUrl).slice(0, perLimit);
       for (const link of links) {
         if (!allowsUrl(link.url)) { blocked++; continue; }
         await sleep(delayMs);
-        const artHtml = await fetchText(link.url);
+        let artHtml = await fetchText(link.url);
+        if (!artHtml && inst.requiresRender) artHtml = await renderHtml(link.url);
         if (!artHtml) continue;
-        const a = extractArticle(artHtml);
+        let a = extractArticle(artHtml);
+        if (a.text.length < 400 && inst.requiresRender) {
+          const rendered = await renderHtml(link.url);
+          if (rendered) a = extractArticle(rendered);
+        }
         raws.push({
           title: a.title || link.title,
           text: a.text,
@@ -92,12 +168,29 @@ async function ingestInstitution(
 
   for (const r of raws) {
     const res = await persistArticle(inst.id, inst.name, r);
-    if (res === "created") created++;
+    if (res === "created") {
+      created++;
+      const native = nativePdfs.get(r.sourceUrl);
+      if (native) {
+        const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
+        if (article) await saveNativePdf(article.id, r.sourceUrl, native);
+      }
+    }
     else if (res === "duplicate") dup++;
     else empty++;
   }
   const note = `delay ${delayMs}ms${robotsDelaySec ? " (robots)" : ""}${blocked ? ` · ${blocked} url blocked` : ""}`;
   console.log(`  ${inst.name.padEnd(26)} +${created} created · ${dup} dup · ${empty} empty · ${note}`);
+  console.log(JSON.stringify({
+    event: "ingest.source.complete",
+    institution: inst.name,
+    discovered: raws.length,
+    created,
+    duplicate: dup,
+    empty,
+    robotsBlocked: blocked,
+    delayMs,
+  }));
   return created;
 }
 
@@ -117,7 +210,7 @@ async function main() {
   const institutions = await prisma.institution.findMany({
     where,
     orderBy: { priority: "asc" },
-    select: { id: true, name: true, researchUrl: true, rssUrl: true, language: true, crawlDelay: true },
+    select: { id: true, name: true, researchUrl: true, rssUrl: true, sitemapUrl: true, language: true, crawlDelay: true, requiresRender: true },
   });
 
   if (slug) {

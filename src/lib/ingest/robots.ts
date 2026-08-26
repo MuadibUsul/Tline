@@ -1,4 +1,7 @@
-import { fetchText } from "./fetch";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fetchResource } from "./fetch";
 
 // Minimal but spec-faithful robots.txt evaluation (Google-style longest-match).
 // Supports User-agent grouping, Allow/Disallow with * and $ wildcards, Crawl-delay.
@@ -89,12 +92,87 @@ export function robotsCrawlDelay(text: string, ua: string): number | undefined {
   return selectGroup(parseRobots(text), ua)?.crawlDelay;
 }
 
-const robotsCache = new Map<string, string | null>();
+export function robotsSitemaps(text: string): string[] {
+  return text.split(/\r?\n/)
+    .map((line) => line.replace(/#.*$/, "").trim())
+    .filter((line) => /^sitemap\s*:/i.test(line))
+    .map((line) => line.slice(line.indexOf(":") + 1).trim())
+    .filter((value) => /^https?:\/\//i.test(value));
+}
 
-/** Fetch (and cache) robots.txt for an origin. null = fetch failed/unreachable. */
+const robotsCache = new Map<string, string | null>();
+const TTL_MS = 24 * 60 * 60 * 1000;
+const cacheDir = path.resolve(process.env.ROBOTS_CACHE_ROOT || path.join(process.cwd(), "data", "cache", "robots"));
+
+interface RobotsCacheEntry {
+  origin: string;
+  fetchedAt: string;
+  text: string;
+  etag: string | null;
+  lastModified: string | null;
+}
+
+function cachePath(origin: string) {
+  return path.join(cacheDir, createHash("sha256").update(origin).digest("hex") + ".json");
+}
+
+async function readCached(origin: string): Promise<RobotsCacheEntry | null> {
+  try {
+    const parsed = JSON.parse(await readFile(cachePath(origin), "utf8")) as RobotsCacheEntry;
+    return parsed.origin === origin && typeof parsed.text === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCached(entry: RobotsCacheEntry) {
+  await mkdir(cacheDir, { recursive: true });
+  await writeFile(cachePath(entry.origin), JSON.stringify(entry), "utf8");
+}
+
+/** Fetch robots once per process; a disk entry is valid as last-known-good for 24 hours. */
 export async function fetchRobots(origin: string): Promise<string | null> {
   if (robotsCache.has(origin)) return robotsCache.get(origin)!;
-  const txt = await fetchText(`${origin}/robots.txt`, 12000);
-  robotsCache.set(origin, txt);
-  return txt;
+  const cached = await readCached(origin);
+  const age = cached ? Date.now() - new Date(cached.fetchedAt).getTime() : Infinity;
+  if (cached && age <= TTL_MS) {
+    robotsCache.set(origin, cached.text);
+    return cached.text;
+  }
+
+  const result = await fetchResource(`${origin}/robots.txt`, 12000, cached ?? undefined);
+  if (result.status === 304 && cached) {
+    const fresh = { ...cached, fetchedAt: new Date().toISOString() };
+    await writeCached(fresh);
+    robotsCache.set(origin, fresh.text);
+    return fresh.text;
+  }
+  if (result.ok && result.body && /text|plain|octet-stream/i.test(result.contentType || "text/plain")) {
+    const entry: RobotsCacheEntry = {
+      origin,
+      fetchedAt: new Date().toISOString(),
+      text: result.body.toString("utf8"),
+      etag: result.etag,
+      lastModified: result.lastModified,
+    };
+    await writeCached(entry);
+    robotsCache.set(origin, entry.text);
+    return entry.text;
+  }
+  if (result.status === 404 || result.status === 410) {
+    const entry: RobotsCacheEntry = {
+      origin,
+      fetchedAt: new Date().toISOString(),
+      text: "",
+      etag: result.etag,
+      lastModified: result.lastModified,
+    };
+    await writeCached(entry);
+    robotsCache.set(origin, "");
+    return "";
+  }
+
+  // A stale entry is deliberately not used: no valid LKG means pause this origin.
+  robotsCache.set(origin, null);
+  return null;
 }

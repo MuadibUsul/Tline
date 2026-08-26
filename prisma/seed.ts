@@ -13,6 +13,9 @@ interface InstSeed {
   priority: number;
   updateFreq?: string;
   language: string;
+  rssUrl?: string;
+  sitemapUrl?: string;
+  requiresRender?: boolean;
 }
 
 interface Policy { policy: string; crawlDelay: number | null }
@@ -44,6 +47,9 @@ async function main() {
         priority: i.priority,
         updateFreq: i.updateFreq ?? null,
         language: i.language,
+        rssUrl: i.rssUrl ?? null,
+        sitemapUrl: i.sitemapUrl ?? null,
+        requiresRender: i.requiresRender ?? false,
         crawlPolicy,
         crawlDelay,
       },
@@ -53,6 +59,9 @@ async function main() {
         rating: i.rating,
         authorityScore: i.authorityScore,
         priority: i.priority,
+        rssUrl: i.rssUrl ?? null,
+        sitemapUrl: i.sitemapUrl ?? null,
+        requiresRender: i.requiresRender ?? false,
         crawlPolicy,
         crawlDelay,
       },

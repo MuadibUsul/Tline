@@ -26,6 +26,7 @@ model Institution {
   language       String   @default("en")
   crawlPolicy    String   @default("allowed") // allowed | delayed | blocked | manual (from robots audit)
   crawlDelay     Int? // seconds; from robots Crawl-delay, honored by the crawler
+  requiresRender Boolean  @default(false) // explicit opt-in for public JS-rendered pages
   createdAt      DateTime @default(now())
 
   articles  Article[]

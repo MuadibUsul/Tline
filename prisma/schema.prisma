@@ -43,7 +43,7 @@ model Article {
   urlHash        String   @unique
   titleHash      String
   contentHash    String
-  rawText        String? // full cleaned body, kept for (re)parsing — never shown in full
+  rawText        String? // canonical cleaned English body; access is permission-controlled
   createdAt      DateTime @default(now())
 
   institution    Institution   @relation(fields: [institutionId], references: [id])

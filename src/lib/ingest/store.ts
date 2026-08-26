@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import { urlHash, titleHash, contentHash } from "../hash";
 import { parseArticle } from "./parseLLM";
-import { isJunk, looksLikeArticle } from "./extract";
+import { isJunk, looksLikeArticle, type Segment } from "./extract";
 import { ASSETS } from "../assets";
 
 export interface RawArticle {
@@ -11,6 +11,7 @@ export interface RawArticle {
   author?: string | null;
   publishedAt: Date;
   language?: string;
+  segments?: Segment[];
   strict?: boolean; // true for HTML-extracted pages → enforce the full article check
 }
 
@@ -64,7 +65,7 @@ export async function persistArticle(
     title: raw.title,
     text,
     publishedAt: raw.publishedAt.toISOString(),
-  });
+  }, raw.segments);
 
   const tickers = await assetIdMap();
 
@@ -79,6 +80,7 @@ export async function persistArticle(
       urlHash: uHash,
       titleHash: tHash,
       contentHash: cHash,
+      rawText: text,
       analysis: {
         create: {
           summary: parsed.summary,
@@ -89,6 +91,7 @@ export async function persistArticle(
           importanceScore: parsed.importanceScore,
           confidence: parsed.confidence,
           model: parsed.model,
+          promptVersion: parsed.promptVersion,
           reviewStatus: parsed.reviewStatus,
         },
       },

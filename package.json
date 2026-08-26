@@ -7,10 +7,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "tsx --test src/**/*.test.ts",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "ingest": "tsx src/lib/ingest/run.ts",
+    "reparse": "tsx prisma/reparse.ts",
     "consensus": "tsx src/lib/ingest/recompute.ts",
     "alerts": "tsx prisma/demo-user.ts",
     "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo.ts && tsx prisma/demo-user.ts"

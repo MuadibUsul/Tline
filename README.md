@@ -8,8 +8,11 @@ research from major financial institutions, structures every article into signal
 (asset · direction · target · confidence), and aggregates them into an
 **authority-weighted, time-decayed Institutional Consensus score (0–100)** per asset.
 
-This is the Phase-1 slice of the [full product blueprint](#) — see `全球机构免费研究源清单_64家.xlsx`
+This is the Phase-1 slice of the [master product plan](./plan20260827.md) — see `全球机构免费研究源清单_64家.xlsx`
 for the 64-source universe (15 flagged as phase-1 priority).
+
+Execution source of truth: [`plan20260827.md`](./plan20260827.md). Technical architecture and
+implementation boundaries: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ## Quick start
 
@@ -95,8 +98,7 @@ src/lib/ingest/           fetch, extract, parseLLM, store, run, recompute
 src/app/                  Next.js App Router pages + components
 ```
 
-## Roadmap (next)
+## Roadmap
 
-- **Phase 2 (complete):** ✅ Watchlist, ✅ Alerts, ✅ AI Research, ✅ Target-history + view-change chains, ✅ Auth + interactive mutations.
-- **Phase 3 (next):** forecast accuracy, institution ranking/score, historical consensus, Consensus Index, public API. Auth is MVP-grade (signed cookie) — swap for Auth.js/OAuth for production.
-- **Phase 3:** forecast accuracy, institution ranking, historical consensus, Consensus Index, public API.
+The maintained milestone sequence, acceptance gates, bilingual-content policy, PDF contract,
+and page matrix live in [`plan20260827.md`](./plan20260827.md).

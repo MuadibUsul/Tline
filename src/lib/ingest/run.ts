@@ -3,7 +3,7 @@ import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchText, sleep } from "./fetch";
 import { extractLinks, extractArticle } from "./extract";
-import { ensureAssets, persistArticle } from "./store";
+import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay } from "./robots";
 
@@ -47,7 +47,7 @@ async function ingestInstitution(
   };
 
   let created = 0, dup = 0, empty = 0, blocked = 0;
-  const raws: { title: string; text: string; sourceUrl: string; author: string | null; publishedAt: Date; strict?: boolean }[] = [];
+  const raws: RawArticle[] = [];
 
   // 1) RSS first when configured (and allowed).
   if (inst.rssUrl && allowsUrl(inst.rssUrl)) {
@@ -83,6 +83,7 @@ async function ingestInstitution(
           sourceUrl: link.url,
           author: a.author,
           publishedAt: a.publishedAt || new Date(),
+          segments: a.segments,
           strict: true, // HTML-extracted → enforce the full article check
         });
       }

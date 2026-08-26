@@ -13,7 +13,11 @@ export default async function InstitutionsPage() {
 
   const Row = (i: (typeof insts)[number]) => (
     <Link key={i.id} href={`/institution/${i.slug}`} className="r">
-      <span className="inst">{i.name} <span className="stars" style={{ fontSize: 11 }}>{"★".repeat(i.rating)}</span></span>
+      <span className="inst">{i.name} <span className="stars" style={{ fontSize: 11 }}>{"★".repeat(i.rating)}</span>
+        <span className={`chip ${i.crawlPolicy === "allowed" ? "bull" : i.crawlPolicy === "delayed" ? "neu" : i.crawlPolicy === "blocked" ? "bear" : "gray"}`} style={{ marginLeft: 8 }}>
+          {i.crawlPolicy}
+        </span>
+      </span>
       <span className="n" style={{ color: "var(--muted)" }}>{i._count.articles}</span>
     </Link>
   );

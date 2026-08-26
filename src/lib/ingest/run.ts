@@ -8,7 +8,7 @@ import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
 import { extractPdf } from "../documents/extractPdf";
-import { saveNativePdf } from "../documents/pdf";
+import { generateArticleDocuments, saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { renderHtml } from "./render";
 
@@ -170,10 +170,15 @@ async function ingestInstitution(
     const res = await persistArticle(inst.id, inst.name, r);
     if (res === "created") {
       created++;
+      const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
       const native = nativePdfs.get(r.sourceUrl);
-      if (native) {
-        const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
-        if (article) await saveNativePdf(article.id, r.sourceUrl, native);
+      if (native && article) await saveNativePdf(article.id, r.sourceUrl, native);
+      if (article) {
+        try {
+          await generateArticleDocuments(article.id);
+        } catch (error) {
+          console.error(`  document generation failed for ${r.sourceUrl}`, error);
+        }
       }
     }
     else if (res === "duplicate") dup++;

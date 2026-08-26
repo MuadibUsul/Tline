@@ -2,6 +2,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { getLLMProvider } from "../src/lib/llm/provider";
 import { translateAndPersist } from "../src/lib/translation/translate";
+import { generateArticleDocuments } from "../src/lib/documents/pdf";
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -36,6 +37,7 @@ async function main() {
   for (const article of candidates) {
     try {
       const result = await translateAndPersist(article.id, provider);
+      await generateArticleDocuments(article.id);
       if (result.translation.status === "reviewed") translated++;
       else needsReview++;
       console.log(`  ${result.translation.status === "reviewed" ? "OK  " : "HOLD"} ${article.id} · ${article.title}`);

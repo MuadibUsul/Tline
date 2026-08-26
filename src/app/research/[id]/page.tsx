@@ -76,18 +76,26 @@ export default async function ResearchPage({ params }: { params: { id: string } 
         </section>
       )}
 
-      {(translation || a.documents.length > 0) && (
-        <section className="blk">
-          <div className="section-t">Bilingual Research · 双语研报</div>
-          {translation && (
-            <div style={{ marginBottom: 14 }}>
-              <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
-                中文译文 · {translation.status} · {translation.provider}/{translation.model}
-              </div>
-              <h2 style={{ fontSize: 20, marginBottom: 8 }}>{translation.title}</h2>
-              <p className="prose" style={{ whiteSpace: "pre-wrap" }}>{translation.text}</p>
+      <section className="blk">
+        <div className="section-t">Bilingual Research · 双语研报</div>
+        {translation ? (
+          <div style={{ marginBottom: 22 }}>
+            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
+              中文译文 · {translation.status} · quality {translation.qualityScore?.toFixed(2) ?? "—"} · {translation.provider}/{translation.model}
             </div>
-          )}
+            <h2 style={{ fontSize: 20, marginBottom: 8 }}>{translation.title}</h2>
+            <div className="prose article-body">{translation.text}</div>
+          </div>
+        ) : (
+          <div className="empty-state" style={{ marginBottom: 18 }}>中文译文正在等待翻译与质量复核。</div>
+        )}
+        {a.rawText && (
+          <details className="article-original">
+            <summary>English original · 完整英文原文</summary>
+            <div className="prose article-body">{a.rawText}</div>
+          </details>
+        )}
+        {a.documents.length > 0 ? (
           <div className="act">
             {a.documents.map((document) => (
               <a key={document.id} href={`/api/documents/${document.id}`} className={`minibtn ${document.kind === "translation_pdf" ? "p" : ""}`}>
@@ -95,8 +103,8 @@ export default async function ResearchPage({ params }: { params: { id: string } 
               </a>
             ))}
           </div>
-        </section>
-      )}
+        ) : <div className="mono" style={{ color: "var(--muted)", fontSize: 11, marginTop: 14 }}>PDF generation pending</div>}
+      </section>
 
       <section style={{ paddingTop: 24 }}>
         <div className="mono" style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>

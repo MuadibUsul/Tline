@@ -17,7 +17,7 @@
     "documents": "tsx prisma/documents.ts",
     "consensus": "tsx src/lib/ingest/recompute.ts",
     "alerts": "tsx prisma/demo-user.ts",
-    "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo.ts && tsx prisma/demo-user.ts"
+    "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo.ts && tsx prisma/demo-user.ts && tsx prisma/documents.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -26,7 +26,7 @@ export default async function ConsensusPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.ticker}>
-                  <td className="inst"><Link href={`/asset/${r.ticker}`}>{r.name}</Link></td>
+                  <td className="inst"><Link href={`/consensus/${r.ticker}`}>{r.name}</Link></td>
                   <td className="mono-cell" style={{ color: "var(--muted)" }}>{r.cls}</td>
                   <td className="mono-cell" style={{ fontWeight: 700, color: TONE[r.tone] }}>{r.score}</td>
                   <td><span className={`chip ${r.tone}`}>{r.label}</span></td>

@@ -192,7 +192,13 @@ export async function getInstitutionView(slug: string) {
 export async function getResearchView(id: string) {
   return prisma.article.findUnique({
     where: { id },
-    include: { institution: true, analysis: true, articleAssets: { include: { asset: true } } },
+    include: {
+      institution: true,
+      analysis: true,
+      articleAssets: { include: { asset: true } },
+      documents: { where: { status: "ready" }, orderBy: { createdAt: "asc" } },
+      translations: { where: { locale: "zh-CN" }, take: 1 },
+    },
   });
 }
 

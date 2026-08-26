@@ -14,6 +14,7 @@
     "ingest": "tsx src/lib/ingest/run.ts",
     "reparse": "tsx prisma/reparse.ts",
     "translate": "tsx prisma/translate.ts",
+    "documents": "tsx prisma/documents.ts",
     "consensus": "tsx src/lib/ingest/recompute.ts",
     "alerts": "tsx prisma/demo-user.ts",
     "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo.ts && tsx prisma/demo-user.ts"
@@ -22,16 +23,21 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "@prisma/client": "^5.22.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
     "next": "^14.2.15",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.2.108",
+    "pdfkit": "^0.20.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@types/node": "^20.16.5",
+    "@types/pdfkit": "^0.17.6",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "prisma": "^5.22.0",

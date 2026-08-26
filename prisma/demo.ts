@@ -145,6 +145,12 @@ const ARTICLES: Demo[] = [
   },
 ];
 
+const REVIEWED_DEMO_TRANSLATION = {
+  sourceUrl: "https://www.goldmansachs.com/insights/gold-outlook-2026",
+  title: "黄金：鉴于财政风险与央行需求，将12个月目标价上调至$5,000",
+  text: "我们坚定看多黄金，并将目标价从$4,800上调至$5,000。持续的财政风险、实际收益率下降以及创纪录的央行需求构成了有利背景。展望2026年，我们认为黄金作为投资组合对冲工具具有显著上行空间，且对此判断抱有较高信心。",
+};
+
 // Fabricated trend so the UI shows believable 1D / 7D / 30D deltas.
 const TREND: Record<string, { d1: number; d7: number; d30: number }> = {
   XAUUSD: { d1: 4, d7: 11, d30: 19 },
@@ -182,6 +188,54 @@ async function main() {
       });
       created++;
     }
+  }
+
+  // One manually reviewed bilingual fixture exercises the full translation/PDF UI
+  // without pretending that demo text came from a live model.
+  const translatedArticle = await prisma.article.findUnique({
+    where: { urlHash: (await import("../src/lib/hash")).urlHash(REVIEWED_DEMO_TRANSLATION.sourceUrl) },
+    include: { segments: { orderBy: { position: "asc" } } },
+  });
+  if (translatedArticle) {
+    const sourceSegment = translatedArticle.segments[0] ?? await prisma.articleSegment.create({
+      data: {
+        articleId: translatedArticle.id,
+        position: 0,
+        heading: null,
+        text: translatedArticle.rawText ?? "",
+      },
+    });
+    const translation = await prisma.articleTranslation.upsert({
+      where: { articleId_locale: { articleId: translatedArticle.id, locale: "zh-CN" } },
+      create: {
+        articleId: translatedArticle.id,
+        locale: "zh-CN",
+        title: REVIEWED_DEMO_TRANSLATION.title,
+        text: REVIEWED_DEMO_TRANSLATION.text,
+        provider: "human",
+        model: "reviewed-demo-fixture",
+        promptVersion: "manual-v1",
+        glossaryVersion: "finance-zh-cn-v1",
+        status: "reviewed",
+        qualityScore: 1,
+      },
+      update: {
+        title: REVIEWED_DEMO_TRANSLATION.title,
+        text: REVIEWED_DEMO_TRANSLATION.text,
+        status: "reviewed",
+        qualityScore: 1,
+      },
+    });
+    await prisma.articleTranslationSegment.deleteMany({ where: { translationId: translation.id } });
+    await prisma.articleTranslationSegment.create({
+      data: {
+        translationId: translation.id,
+        sourceSegmentId: sourceSegment.id,
+        position: 0,
+        heading: null,
+        text: REVIEWED_DEMO_TRANSLATION.text,
+      },
+    });
   }
 
   // Build consensus history with a light trend for featured assets.

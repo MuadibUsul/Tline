@@ -18,6 +18,7 @@ export default async function ResearchPage({ params }: { params: { id: string } 
   const keyArgs = parseJson<string[]>(an?.keyArguments, []);
   const risks = parseJson<string[]>(an?.risks, []);
   const date = new Date(a.publishedAt).toISOString().slice(0, 10);
+  const translation = a.translations[0];
 
   return (
     <main className="wrap" style={{ maxWidth: 820 }}>
@@ -72,6 +73,28 @@ export default async function ResearchPage({ params }: { params: { id: string } 
         <section className="blk">
           <div className="section-t">AI Trading Interpretation</div>
           <p className="prose">{an.interpretation}</p>
+        </section>
+      )}
+
+      {(translation || a.documents.length > 0) && (
+        <section className="blk">
+          <div className="section-t">Bilingual Research · 双语研报</div>
+          {translation && (
+            <div style={{ marginBottom: 14 }}>
+              <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
+                中文译文 · {translation.status} · {translation.provider}/{translation.model}
+              </div>
+              <h2 style={{ fontSize: 20, marginBottom: 8 }}>{translation.title}</h2>
+              <p className="prose" style={{ whiteSpace: "pre-wrap" }}>{translation.text}</p>
+            </div>
+          )}
+          <div className="act">
+            {a.documents.map((document) => (
+              <a key={document.id} href={`/api/documents/${document.id}`} className={`minibtn ${document.kind === "translation_pdf" ? "p" : ""}`}>
+                {document.kind === "translation_pdf" ? "下载中文 PDF" : document.kind === "source_native" ? "下载机构原始 PDF" : "Download English PDF"}
+              </a>
+            ))}
+          </div>
         </section>
       )}
 

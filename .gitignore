@@ -8,3 +8,4 @@ _seed.json
 next-env.d.ts
 *.tsbuildinfo
 .DS_Store
+storage/

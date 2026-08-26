@@ -1,0 +1,188 @@
+// Institutional Intelligence — Phase 1 schema (SQLite dev).
+// Swap datasource to postgresql + add pgvector columns for production search.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Institution {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  name           String
+  country        String?
+  homepage       String?
+  researchUrl    String
+  rssUrl         String?
+  sitemapUrl     String?
+  rating         Int      @default(4) // stars 3..5 from the source list
+  authorityScore Float    @default(0.85) // 0..1 weight used by the consensus engine
+  priority       Int      @default(3) // 1 = phase-1 high-value source
+  updateFreq     String? // annual estimate from the source list
+  language       String   @default("en")
+  crawlPolicy    String   @default("allowed") // allowed | delayed | blocked | manual (from robots audit)
+  crawlDelay     Int? // seconds; from robots Crawl-delay, honored by the crawler
+  createdAt      DateTime @default(now())
+
+  articles       Article[]
+  forecasts      Forecast[]
+}
+
+model Article {
+  id             String   @id @default(cuid())
+  institutionId  String
+  title          String
+  author         String?
+  publishedAt    DateTime
+  sourceUrl      String
+  language       String   @default("en")
+  urlHash        String   @unique
+  titleHash      String
+  contentHash    String
+  rawText        String? // full cleaned body, kept for (re)parsing — never shown in full
+  createdAt      DateTime @default(now())
+
+  institution    Institution   @relation(fields: [institutionId], references: [id])
+  analysis       Analysis?
+  articleAssets  ArticleAsset[]
+
+  @@index([institutionId, publishedAt])
+  @@index([titleHash])
+  @@index([contentHash])
+}
+
+model Analysis {
+  id              String   @id @default(cuid())
+  articleId       String   @unique
+  summary         String
+  keyArguments    String   @default("[]") // JSON string
+  keyNumbers      String   @default("[]") // JSON string [{label,value}]
+  risks           String   @default("[]") // JSON string
+  interpretation  String? // AI trading interpretation
+  importanceScore Float    @default(0.5)
+  confidence      Float    @default(0.6)
+  model           String   @default("mock-rules-v1")
+  promptVersion   String   @default("v1")
+  reviewStatus    String   @default("ok") // ok | needs_review
+  createdAt       DateTime @default(now())
+
+  article         Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+model Asset {
+  id          String   @id @default(cuid())
+  ticker      String   @unique
+  name        String
+  assetClass  String   // equity | rate | fx | commodity | crypto | macro
+  aliases     String   @default("[]") // JSON string of match terms
+
+  articleAssets    ArticleAsset[]
+  forecasts        Forecast[]
+  consensusHistory ConsensusHistory[]
+}
+
+model ArticleAsset {
+  id             String   @id @default(cuid())
+  articleId      String
+  assetId        String
+  direction      Int // -2 strong bear .. +2 strong bull
+  target         Float?
+  previousTarget Float?
+  timeHorizon    String? // 1W | 1M | 3M | 12M
+  confidence     Float    @default(0.6)
+  createdAt      DateTime @default(now())
+
+  article        Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  asset          Asset    @relation(fields: [assetId], references: [id])
+
+  @@unique([articleId, assetId])
+  @@index([assetId, direction])
+}
+
+model Forecast {
+  id             String   @id @default(cuid())
+  institutionId  String
+  assetId        String
+  forecastDate   DateTime
+  targetDate     DateTime?
+  targetValue    Float?
+  metric         String?
+
+  institution    Institution @relation(fields: [institutionId], references: [id])
+  asset          Asset       @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, forecastDate])
+}
+
+model ConsensusHistory {
+  id               String   @id @default(cuid())
+  assetId          String
+  timestamp        DateTime @default(now())
+  consensusScore   Int // 0..100
+  institutionCount Int
+  bullishCount     Int
+  neutralCount     Int
+  bearishCount     Int
+
+  asset            Asset    @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, timestamp])
+}
+
+// ---- User side (Phase 2). Refs to assets/institutions are scalar (ticker/slug). ----
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  tier      String   @default("pro") // free | pro | trader | professional
+  createdAt DateTime @default(now())
+
+  watchlist WatchlistItem[]
+  rules     AlertRule[]
+}
+
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // asset | institution
+  refId     String // asset ticker or institution slug
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, refId])
+}
+
+model AlertRule {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  type        String // CONSENSUS_ABOVE | CONSENSUS_BELOW | CONSENSUS_DROP_24H | CONSENSUS_RISE_24H
+  assetTicker String? // scope to one asset (null = any featured asset)
+  threshold   Float
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events      AlertEvent[]
+
+  @@index([userId, active])
+}
+
+model AlertEvent {
+  id        String   @id @default(cuid())
+  ruleId    String
+  firedAt   DateTime @default(now())
+  message   String
+  assetTicker String?
+  score     Int?
+
+  rule      AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId, firedAt])
+}

@@ -1,0 +1,642 @@
+[
+  {
+    "slug": "ing",
+    "name": "ING THINK",
+    "researchUrl": "https://think.ing.com/articles/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "750–1,050",
+    "language": "en"
+  },
+  {
+    "slug": "saxo",
+    "name": "Saxo Bank",
+    "researchUrl": "https://www.home.saxo/insights",
+    "rating": 3,
+    "authorityScore": 0.7,
+    "priority": 1,
+    "updateFreq": "700–1,000",
+    "language": "en"
+  },
+  {
+    "slug": "scotiabank",
+    "name": "Scotiabank Economics",
+    "researchUrl": "https://www.scotiabank.com/ca/en/about/economics/economics-publications.html",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "550–800",
+    "language": "en"
+  },
+  {
+    "slug": "ubs",
+    "name": "UBS CIO",
+    "researchUrl": "https://www.ubs.com/global/en/wealthmanagement/insights/chief-investment-office/house-view.html",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 1,
+    "updateFreq": "350–550",
+    "language": "en"
+  },
+  {
+    "slug": "uob",
+    "name": "UOB Research",
+    "researchUrl": "https://www.uobgroup.com/research/index.page",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "300–450",
+    "language": "en"
+  },
+  {
+    "slug": "ocbc",
+    "name": "OCBC Research",
+    "researchUrl": "https://www.ocbc.com/group/research/index",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "250–400",
+    "language": "en"
+  },
+  {
+    "slug": "dbs",
+    "name": "DBS Insights / CIO",
+    "researchUrl": "https://www.dbs.com/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "220–380",
+    "language": "en"
+  },
+  {
+    "slug": "rbc",
+    "name": "RBC Economics",
+    "researchUrl": "https://thoughtleadership.rbc.com/economics/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "180–320",
+    "language": "en"
+  },
+  {
+    "slug": "charles-schwab",
+    "name": "Charles Schwab",
+    "researchUrl": "https://www.schwab.com/learn/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "180–300",
+    "language": "en"
+  },
+  {
+    "slug": "blackrock",
+    "name": "BlackRock",
+    "researchUrl": "https://www.blackrock.com/us/individual/insights",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 1,
+    "updateFreq": "150–280",
+    "language": "en"
+  },
+  {
+    "slug": "j-p-morgan",
+    "name": "J.P. Morgan",
+    "researchUrl": "https://www.jpmorgan.com/insights",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 1,
+    "updateFreq": "140–240",
+    "language": "en"
+  },
+  {
+    "slug": "goldman-sachs",
+    "name": "Goldman Sachs",
+    "researchUrl": "https://www.goldmansachs.com/insights",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 1,
+    "updateFreq": "120–220",
+    "language": "en"
+  },
+  {
+    "slug": "morgan-stanley",
+    "name": "Morgan Stanley",
+    "researchUrl": "https://www.morganstanley.com/insights",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 1,
+    "updateFreq": "120–220",
+    "language": "en"
+  },
+  {
+    "slug": "pictet",
+    "name": "Pictet",
+    "researchUrl": "https://www.pictet.com/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "110–190",
+    "language": "en"
+  },
+  {
+    "slug": "bmo",
+    "name": "BMO Capital Markets",
+    "researchUrl": "https://capitalmarkets.bmo.com/en/insights/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "100–180",
+    "language": "en"
+  },
+  {
+    "slug": "td",
+    "name": "TD Economics / TD Securities",
+    "researchUrl": "https://economics.td.com/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "100–180",
+    "language": "en"
+  },
+  {
+    "slug": "cibc",
+    "name": "CIBC Capital Markets",
+    "researchUrl": "https://cibccm.com/en/insights/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "95–170",
+    "language": "en"
+  },
+  {
+    "slug": "rabobank",
+    "name": "Rabobank / RaboResearch",
+    "researchUrl": "https://www.rabobank.com/knowledge",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "90–180",
+    "language": "en"
+  },
+  {
+    "slug": "schroders",
+    "name": "Schroders",
+    "researchUrl": "https://www.schroders.com/en/insights/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "90–165",
+    "language": "en"
+  },
+  {
+    "slug": "amundi",
+    "name": "Amundi",
+    "researchUrl": "https://research-center.amundi.com/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "85–160",
+    "language": "en"
+  },
+  {
+    "slug": "franklin",
+    "name": "Franklin Templeton",
+    "researchUrl": "https://www.franklintempleton.com/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "85–160",
+    "language": "en"
+  },
+  {
+    "slug": "invesco",
+    "name": "Invesco",
+    "researchUrl": "https://www.invesco.com/us/en/insights.html",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "85–160",
+    "language": "en"
+  },
+  {
+    "slug": "janus",
+    "name": "Janus Henderson",
+    "researchUrl": "https://www.janushenderson.com/en-us/advisor/insights/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "85–160",
+    "language": "en"
+  },
+  {
+    "slug": "fidelity",
+    "name": "Fidelity International",
+    "researchUrl": "https://www.fidelityinternational.com/editorial/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "75–145",
+    "language": "en"
+  },
+  {
+    "slug": "pgim",
+    "name": "PGIM",
+    "researchUrl": "https://www.pgim.com/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "75–145",
+    "language": "en"
+  },
+  {
+    "slug": "pimco",
+    "name": "PIMCO",
+    "researchUrl": "https://www.pimco.com/us/en/insights",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 3,
+    "updateFreq": "70–140",
+    "language": "en"
+  },
+  {
+    "slug": "man",
+    "name": "Man Group / Man Institute",
+    "researchUrl": "https://www.man.com/maninstitute",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "70–130",
+    "language": "en"
+  },
+  {
+    "slug": "abn",
+    "name": "ABN AMRO Research",
+    "researchUrl": "https://www.abnamro.com/research/en/",
+    "rating": 3,
+    "authorityScore": 0.7,
+    "priority": 3,
+    "updateFreq": "70–130",
+    "language": "en"
+  },
+  {
+    "slug": "seb",
+    "name": "SEB",
+    "researchUrl": "https://sebgroup.com/our-offering/research-and-strategy",
+    "rating": 3,
+    "authorityScore": 0.7,
+    "priority": 3,
+    "updateFreq": "70–130",
+    "language": "en"
+  },
+  {
+    "slug": "nordea",
+    "name": "Nordea",
+    "researchUrl": "https://www.nordea.com/en/news-and-insights",
+    "rating": 3,
+    "authorityScore": 0.7,
+    "priority": 3,
+    "updateFreq": "70–130",
+    "language": "en"
+  },
+  {
+    "slug": "danske",
+    "name": "Danske Bank",
+    "researchUrl": "https://danskebank.com/news-and-insights/research",
+    "rating": 3,
+    "authorityScore": 0.7,
+    "priority": 3,
+    "updateFreq": "65–125",
+    "language": "en"
+  },
+  {
+    "slug": "anz",
+    "name": "ANZ Research",
+    "researchUrl": "https://www.anz.com.au/about-us/economic-and-market-research/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "65–125",
+    "language": "en"
+  },
+  {
+    "slug": "westpac",
+    "name": "Westpac / Westpac IQ",
+    "researchUrl": "https://www.westpaciq.com.au/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "65–125",
+    "language": "en"
+  },
+  {
+    "slug": "nab-markets",
+    "name": "NAB Markets",
+    "researchUrl": "https://business.nab.com.au/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "65–125",
+    "language": "en"
+  },
+  {
+    "slug": "commonwealth",
+    "name": "Commonwealth Bank",
+    "researchUrl": "https://www.commbank.com.au/articles/economy.html",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "60–110",
+    "language": "en"
+  },
+  {
+    "slug": "mufg",
+    "name": "MUFG",
+    "researchUrl": "https://www.bk.mufg.jp/global/research/index.html",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "55–110",
+    "language": "en"
+  },
+  {
+    "slug": "hsbc",
+    "name": "HSBC",
+    "researchUrl": "https://www.hsbc.com/insights",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 3,
+    "updateFreq": "55–110",
+    "language": "en"
+  },
+  {
+    "slug": "bnp",
+    "name": "BNP Paribas",
+    "researchUrl": "https://economic-research.bnpparibas.com/",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 3,
+    "updateFreq": "55–110",
+    "language": "en"
+  },
+  {
+    "slug": "standard",
+    "name": "Standard Chartered",
+    "researchUrl": "https://www.sc.com/en/global-research/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "50–100",
+    "language": "en"
+  },
+  {
+    "slug": "macquarie",
+    "name": "Macquarie",
+    "researchUrl": "https://www.macquarie.com/us/en/insights.html",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "50–100",
+    "language": "en"
+  },
+  {
+    "slug": "commerzbank",
+    "name": "Commerzbank",
+    "researchUrl": "https://www.commerzbank.com/group/newsroom/publications/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "50–100",
+    "language": "en"
+  },
+  {
+    "slug": "state-street",
+    "name": "State Street",
+    "researchUrl": "https://www.ssga.com/us/en/institutional/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "50–100",
+    "language": "en"
+  },
+  {
+    "slug": "julius",
+    "name": "Julius Baer",
+    "researchUrl": "https://www.juliusbaer.com/en/insights/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "50–100",
+    "language": "en"
+  },
+  {
+    "slug": "aqr",
+    "name": "AQR",
+    "researchUrl": "https://www.aqr.com/Insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "45–90",
+    "language": "en"
+  },
+  {
+    "slug": "nomura",
+    "name": "Nomura Connects",
+    "researchUrl": "https://www.nomuraconnects.com/articles",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 1,
+    "updateFreq": "40–90",
+    "language": "en"
+  },
+  {
+    "slug": "neuberger-berman",
+    "name": "Neuberger Berman",
+    "researchUrl": "https://www.nb.com/en/global/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "40–90",
+    "language": "en"
+  },
+  {
+    "slug": "wellington-management",
+    "name": "Wellington Management",
+    "researchUrl": "https://www.wellington.com/en/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "40–90",
+    "language": "en"
+  },
+  {
+    "slug": "mizuho",
+    "name": "Mizuho",
+    "researchUrl": "https://www.mizuho-fg.com/company/activity/onethinktank/research/index.html",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "35–75",
+    "language": "en"
+  },
+  {
+    "slug": "barclays",
+    "name": "Barclays",
+    "researchUrl": "https://www.ib.barclays/our-insights/",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 3,
+    "updateFreq": "30–75",
+    "language": "en"
+  },
+  {
+    "slug": "deutsche",
+    "name": "Deutsche Bank",
+    "researchUrl": "https://www.db.com/what-we-do/research/",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 3,
+    "updateFreq": "30–70",
+    "language": "en"
+  },
+  {
+    "slug": "soci-t-g-n-rale",
+    "name": "Société Générale",
+    "researchUrl": "https://wholesale.banking.societegenerale.com/en/insights/",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 3,
+    "updateFreq": "30–70",
+    "language": "en"
+  },
+  {
+    "slug": "cr-dit-cib",
+    "name": "Crédit Agricole CIB",
+    "researchUrl": "https://www.ca-cib.com/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "30–70",
+    "language": "en"
+  },
+  {
+    "slug": "unicredit",
+    "name": "UniCredit",
+    "researchUrl": "https://www.unicreditgroup.eu/en/economics-research.html",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "30–65",
+    "language": "en"
+  },
+  {
+    "slug": "intesa",
+    "name": "Intesa Sanpaolo",
+    "researchUrl": "https://group.intesasanpaolo.com/en/research",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "30–65",
+    "language": "en"
+  },
+  {
+    "slug": "daiwa",
+    "name": "Daiwa",
+    "researchUrl": "https://www.dir.co.jp/english/research/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "30–65",
+    "language": "en"
+  },
+  {
+    "slug": "smbc",
+    "name": "SMBC",
+    "researchUrl": "https://www.smbcgroup.com/emea/insights/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "30–65",
+    "language": "en"
+  },
+  {
+    "slug": "swedbank",
+    "name": "Swedbank",
+    "researchUrl": "https://www.swedbank-research.com/",
+    "rating": 3,
+    "authorityScore": 0.7,
+    "priority": 3,
+    "updateFreq": "30–65",
+    "language": "en"
+  },
+  {
+    "slug": "lloyds",
+    "name": "Lloyds Bank",
+    "researchUrl": "https://www.lloydsbankinggroup.com/insights.html",
+    "rating": 3,
+    "authorityScore": 0.7,
+    "priority": 3,
+    "updateFreq": "30–60",
+    "language": "en"
+  },
+  {
+    "slug": "santander",
+    "name": "Santander",
+    "researchUrl": "https://www.santander.com/en/press-room/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "25–60",
+    "language": "en"
+  },
+  {
+    "slug": "apollo",
+    "name": "Apollo",
+    "researchUrl": "https://www.apollo.com/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "25–60",
+    "language": "en"
+  },
+  {
+    "slug": "kkr",
+    "name": "KKR",
+    "researchUrl": "https://www.kkr.com/insights",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "25–60",
+    "language": "en"
+  },
+  {
+    "slug": "natixis",
+    "name": "Natixis",
+    "researchUrl": "https://research.natixis.com/",
+    "rating": 4,
+    "authorityScore": 0.85,
+    "priority": 3,
+    "updateFreq": "25–55",
+    "language": "en"
+  },
+  {
+    "slug": "citi",
+    "name": "Citi",
+    "researchUrl": "https://www.citigroup.com/global/insights",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 3,
+    "updateFreq": "20–55",
+    "language": "en"
+  },
+  {
+    "slug": "of-america",
+    "name": "Bank of America",
+    "researchUrl": "https://www.bofainstitute.com/insights",
+    "rating": 5,
+    "authorityScore": 1.0,
+    "priority": 3,
+    "updateFreq": "20–55",
+    "language": "en"
+  }
+]

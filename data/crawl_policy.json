@@ -1,0 +1,386 @@
+{
+  "ing": {
+    "name": "ING THINK",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "saxo": {
+    "name": "Saxo Bank",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "scotiabank": {
+    "name": "Scotiabank Economics",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "ubs": {
+    "name": "UBS CIO",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "uob": {
+    "name": "UOB Research",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "ocbc": {
+    "name": "OCBC Research",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "dbs": {
+    "name": "DBS Insights / CIO",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "rbc": {
+    "name": "RBC Economics",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "charles-schwab": {
+    "name": "Charles Schwab",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "blackrock": {
+    "name": "BlackRock",
+    "policy": "manual",
+    "crawlDelay": null,
+    "verdict": "无法确认 · 需人工复核"
+  },
+  "j-p-morgan": {
+    "name": "J.P. Morgan",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "goldman-sachs": {
+    "name": "Goldman Sachs",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "morgan-stanley": {
+    "name": "Morgan Stanley",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "pictet": {
+    "name": "Pictet",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "bmo": {
+    "name": "BMO Capital Markets",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "td": {
+    "name": "TD Economics / TD Securities",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集（无 robots 限制）"
+  },
+  "cibc": {
+    "name": "CIBC Capital Markets",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集（无 robots 限制）"
+  },
+  "rabobank": {
+    "name": "Rabobank / RaboResearch",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集（无 robots 限制）"
+  },
+  "schroders": {
+    "name": "Schroders",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "amundi": {
+    "name": "Amundi",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "franklin": {
+    "name": "Franklin Templeton",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "invesco": {
+    "name": "Invesco",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "janus": {
+    "name": "Janus Henderson",
+    "policy": "blocked",
+    "crawlDelay": null,
+    "verdict": "禁止采集该路径（robots）"
+  },
+  "fidelity": {
+    "name": "Fidelity International",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "pgim": {
+    "name": "PGIM",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "pimco": {
+    "name": "PIMCO",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "man": {
+    "name": "Man Group / Man Institute",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "abn": {
+    "name": "ABN AMRO Research",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "seb": {
+    "name": "SEB",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "nordea": {
+    "name": "Nordea",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "danske": {
+    "name": "Danske Bank",
+    "policy": "delayed",
+    "crawlDelay": 5,
+    "verdict": "可采集 · 遵守 Crawl-delay 5s"
+  },
+  "anz": {
+    "name": "ANZ Research",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "westpac": {
+    "name": "Westpac / Westpac IQ",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "nab-markets": {
+    "name": "NAB Markets",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集（无 robots 限制）"
+  },
+  "commonwealth": {
+    "name": "Commonwealth Bank",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "mufg": {
+    "name": "MUFG",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "hsbc": {
+    "name": "HSBC",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "bnp": {
+    "name": "BNP Paribas",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "standard": {
+    "name": "Standard Chartered",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "macquarie": {
+    "name": "Macquarie",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "commerzbank": {
+    "name": "Commerzbank",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "state-street": {
+    "name": "State Street",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "julius": {
+    "name": "Julius Baer",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "aqr": {
+    "name": "AQR",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "nomura": {
+    "name": "Nomura Connects",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集（无 robots 限制）"
+  },
+  "neuberger-berman": {
+    "name": "Neuberger Berman",
+    "policy": "manual",
+    "crawlDelay": null,
+    "verdict": "无法确认 · 需人工复核"
+  },
+  "wellington-management": {
+    "name": "Wellington Management",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "mizuho": {
+    "name": "Mizuho",
+    "policy": "manual",
+    "crawlDelay": null,
+    "verdict": "无法确认 · 需人工复核"
+  },
+  "barclays": {
+    "name": "Barclays",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "deutsche": {
+    "name": "Deutsche Bank",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "soci-t-g-n-rale": {
+    "name": "Société Générale",
+    "policy": "delayed",
+    "crawlDelay": 10,
+    "verdict": "可采集 · 遵守 Crawl-delay 10s"
+  },
+  "cr-dit-cib": {
+    "name": "Crédit Agricole CIB",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "unicredit": {
+    "name": "UniCredit",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "intesa": {
+    "name": "Intesa Sanpaolo",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "daiwa": {
+    "name": "Daiwa",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "smbc": {
+    "name": "SMBC",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集（无 robots 限制）"
+  },
+  "swedbank": {
+    "name": "Swedbank",
+    "policy": "delayed",
+    "crawlDelay": 10,
+    "verdict": "可采集 · 遵守 Crawl-delay 10s"
+  },
+  "lloyds": {
+    "name": "Lloyds Bank",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "santander": {
+    "name": "Santander",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "apollo": {
+    "name": "Apollo",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "kkr": {
+    "name": "KKR",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集"
+  },
+  "natixis": {
+    "name": "Natixis",
+    "policy": "allowed",
+    "crawlDelay": null,
+    "verdict": "可采集（无 robots 限制）"
+  },
+  "citi": {
+    "name": "Citi",
+    "policy": "delayed",
+    "crawlDelay": 5,
+    "verdict": "可采集 · WAF 限流(需控频)"
+  },
+  "of-america": {
+    "name": "Bank of America",
+    "policy": "manual",
+    "crawlDelay": null,
+    "verdict": "无法确认 · 需人工复核"
+  }
+}

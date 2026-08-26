@@ -1,0 +1,29 @@
+{
+  "version": "finance-zh-cn-v1",
+  "terms": {
+    "basis point": "基点",
+    "basis points": "基点",
+    "bps": "个基点",
+    "earnings per share": "每股收益",
+    "free cash flow": "自由现金流",
+    "forward guidance": "前瞻指引",
+    "hawkish": "偏鹰派",
+    "dovish": "偏鸽派",
+    "overweight": "超配",
+    "underweight": "低配",
+    "outperform": "跑赢大盘",
+    "underperform": "跑输大盘",
+    "price target": "目标价",
+    "target price": "目标价",
+    "upside": "上行空间",
+    "downside": "下行风险",
+    "year over year": "同比",
+    "quarter over quarter": "环比",
+    "fiscal year": "财年",
+    "soft landing": "软着陆",
+    "hard landing": "硬着陆",
+    "real yield": "实际收益率",
+    "terminal rate": "终端利率",
+    "risk premium": "风险溢价"
+  }
+}

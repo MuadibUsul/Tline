@@ -13,6 +13,7 @@
     "db:studio": "prisma studio",
     "ingest": "tsx src/lib/ingest/run.ts",
     "reparse": "tsx prisma/reparse.ts",
+    "translate": "tsx prisma/translate.ts",
     "consensus": "tsx src/lib/ingest/recompute.ts",
     "alerts": "tsx prisma/demo-user.ts",
     "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo.ts && tsx prisma/demo-user.ts"

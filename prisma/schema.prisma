@@ -28,27 +28,30 @@ model Institution {
   crawlDelay     Int? // seconds; from robots Crawl-delay, honored by the crawler
   createdAt      DateTime @default(now())
 
-  articles       Article[]
-  forecasts      Forecast[]
+  articles  Article[]
+  forecasts Forecast[]
 }
 
 model Article {
-  id             String   @id @default(cuid())
-  institutionId  String
-  title          String
-  author         String?
-  publishedAt    DateTime
-  sourceUrl      String
-  language       String   @default("en")
-  urlHash        String   @unique
-  titleHash      String
-  contentHash    String
-  rawText        String? // canonical cleaned English body; access is permission-controlled
-  createdAt      DateTime @default(now())
+  id            String   @id @default(cuid())
+  institutionId String
+  title         String
+  author        String?
+  publishedAt   DateTime
+  sourceUrl     String
+  language      String   @default("en")
+  urlHash       String   @unique
+  titleHash     String
+  contentHash   String
+  rawText       String? // canonical cleaned English body; access is permission-controlled
+  createdAt     DateTime @default(now())
 
-  institution    Institution   @relation(fields: [institutionId], references: [id])
-  analysis       Analysis?
-  articleAssets  ArticleAsset[]
+  institution   Institution          @relation(fields: [institutionId], references: [id])
+  analysis      Analysis?
+  articleAssets ArticleAsset[]
+  segments      ArticleSegment[]
+  translations  ArticleTranslation[]
+  documents     ArticleDocument[]
 
   @@index([institutionId, publishedAt])
   @@index([titleHash])
@@ -65,20 +68,97 @@ model Analysis {
   interpretation  String? // AI trading interpretation
   importanceScore Float    @default(0.5)
   confidence      Float    @default(0.6)
+  provider        String   @default("local")
   model           String   @default("mock-rules-v1")
   promptVersion   String   @default("v1")
   reviewStatus    String   @default("ok") // ok | needs_review
   createdAt       DateTime @default(now())
 
-  article         Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+model ArticleSegment {
+  id        String  @id @default(cuid())
+  articleId String
+  position  Int
+  heading   String?
+  text      String
+
+  article            Article                     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  translatedSegments ArticleTranslationSegment[]
+
+  @@unique([articleId, position])
+  @@index([articleId])
+}
+
+model ArticleTranslation {
+  id              String   @id @default(cuid())
+  articleId       String
+  locale          String   @default("zh-CN")
+  title           String
+  text            String
+  provider        String
+  model           String
+  promptVersion   String
+  glossaryVersion String
+  status          String   @default("translated") // translated | reviewed | needs_review
+  qualityScore    Float?
+  translatedAt    DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  article   Article                     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  segments  ArticleTranslationSegment[]
+  documents ArticleDocument[]
+
+  @@unique([articleId, locale])
+  @@index([status, translatedAt])
+}
+
+model ArticleTranslationSegment {
+  id              String  @id @default(cuid())
+  translationId   String
+  sourceSegmentId String
+  position        Int
+  heading         String?
+  text            String
+
+  translation   ArticleTranslation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  sourceSegment ArticleSegment     @relation(fields: [sourceSegmentId], references: [id], onDelete: Cascade)
+
+  @@unique([translationId, position])
+  @@index([sourceSegmentId])
+}
+
+model ArticleDocument {
+  id            String   @id @default(cuid())
+  articleId     String
+  translationId String?
+  kind          String // source_native | original_pdf | translation_pdf
+  locale        String
+  storageKey    String
+  contentHash   String?
+  mimeType      String   @default("application/pdf")
+  pageCount     Int?
+  byteSize      Int?
+  sourceUrl     String?
+  status        String   @default("pending") // pending | processing | ready | failed
+  error         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  article     Article             @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  translation ArticleTranslation? @relation(fields: [translationId], references: [id], onDelete: SetNull)
+
+  @@unique([articleId, kind, locale])
+  @@index([status, createdAt])
 }
 
 model Asset {
-  id          String   @id @default(cuid())
-  ticker      String   @unique
-  name        String
-  assetClass  String   // equity | rate | fx | commodity | crypto | macro
-  aliases     String   @default("[]") // JSON string of match terms
+  id         String @id @default(cuid())
+  ticker     String @unique
+  name       String
+  assetClass String // equity | rate | fx | commodity | crypto | macro
+  aliases    String @default("[]") // JSON string of match terms
 
   articleAssets    ArticleAsset[]
   forecasts        Forecast[]
@@ -96,24 +176,24 @@ model ArticleAsset {
   confidence     Float    @default(0.6)
   createdAt      DateTime @default(now())
 
-  article        Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  asset          Asset    @relation(fields: [assetId], references: [id])
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id])
 
   @@unique([articleId, assetId])
   @@index([assetId, direction])
 }
 
 model Forecast {
-  id             String   @id @default(cuid())
-  institutionId  String
-  assetId        String
-  forecastDate   DateTime
-  targetDate     DateTime?
-  targetValue    Float?
-  metric         String?
+  id            String    @id @default(cuid())
+  institutionId String
+  assetId       String
+  forecastDate  DateTime
+  targetDate    DateTime?
+  targetValue   Float?
+  metric        String?
 
-  institution    Institution @relation(fields: [institutionId], references: [id])
-  asset          Asset       @relation(fields: [assetId], references: [id])
+  institution Institution @relation(fields: [institutionId], references: [id])
+  asset       Asset       @relation(fields: [assetId], references: [id])
 
   @@index([assetId, forecastDate])
 }
@@ -128,7 +208,7 @@ model ConsensusHistory {
   neutralCount     Int
   bearishCount     Int
 
-  asset            Asset    @relation(fields: [assetId], references: [id])
+  asset Asset @relation(fields: [assetId], references: [id])
 
   @@index([assetId, timestamp])
 }
@@ -153,7 +233,7 @@ model WatchlistItem {
   refId     String // asset ticker or institution slug
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, kind, refId])
 }
@@ -168,21 +248,21 @@ model AlertRule {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events      AlertEvent[]
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events AlertEvent[]
 
   @@index([userId, active])
 }
 
 model AlertEvent {
-  id        String   @id @default(cuid())
-  ruleId    String
-  firedAt   DateTime @default(now())
-  message   String
+  id          String   @id @default(cuid())
+  ruleId      String
+  firedAt     DateTime @default(now())
+  message     String
   assetTicker String?
-  score     Int?
+  score       Int?
 
-  rule      AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
   @@index([ruleId, firedAt])
 }

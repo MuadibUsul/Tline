@@ -1,4 +1,5 @@
 import { ASSETS, DIRECTION, type DirectionKey } from "../assets";
+import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider";
 import type { Segment } from "./extract";
 
 export interface ParsedAsset {
@@ -21,6 +22,7 @@ export interface ParsedArticle {
   assets: ParsedAsset[];
   unresolvedTickers: string[];
   needsLLM: boolean;
+  provider: string;
   model: string;
   promptVersion: string;
   reviewStatus: "ok" | "needs_review";
@@ -164,6 +166,7 @@ export function heuristicParse(input: ParseInput, segments: Segment[] = []): Par
     assets,
     unresolvedTickers,
     needsLLM,
+    provider: "local",
     model: "heuristic-segments-v2",
     promptVersion: "v2",
     reviewStatus: needsLLM ? "needs_review" : "ok",
@@ -182,7 +185,7 @@ Return ONLY valid JSON matching this shape:
 Use tickers only from this list where applicable: ${ASSETS.map((a) => a.ticker).join(", ")}.
 Summary must be your own words, never a verbatim copy. If unsure about an asset, omit it.`;
 
-function coerce(json: any): ParsedArticle | null {
+function coerce(json: any, provider: string, model: string): ParsedArticle | null {
   if (!json || typeof json !== "object") return null;
   const dirMap: Record<string, number> = {
     strong_bull: 2, bull: 1, neutral: 0, bear: -1, strong_bear: -2,
@@ -212,37 +215,26 @@ function coerce(json: any): ParsedArticle | null {
     assets,
     unresolvedTickers: [],
     needsLLM: false,
-    model: process.env.LLM_MODEL || "claude-sonnet-5",
+    provider,
+    model,
     promptVersion: "v2",
     reviewStatus: "ok",
   };
 }
 
-async function realParse(input: ParseInput): Promise<ParsedArticle | null> {
-  let Anthropic: any;
-  try {
-    ({ default: Anthropic } = await import("@anthropic-ai/sdk"));
-  } catch {
-    return null; // SDK not installed
-  }
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+async function realParse(input: ParseInput, provider: LLMProvider): Promise<ParsedArticle | null> {
   const user = `INSTITUTION: ${input.institution}\nPUBLISHED: ${input.publishedAt}\nTITLE: ${input.title}\n\nARTICLE:\n${input.text.slice(0, 12000)}`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await client.messages.create({
-        model: process.env.LLM_MODEL || "claude-sonnet-5",
-        max_tokens: 1500,
+      const result = await completeJSON<unknown>(provider, {
         system: SYSTEM,
-        messages: [{ role: "user", content: user }],
+        user,
+        maxTokens: 1500,
       });
-      const raw = res.content?.[0]?.type === "text" ? res.content[0].text : "";
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) {
-        const parsed = coerce(JSON.parse(match[0]));
-        if (parsed) return parsed;
-      }
-    } catch (e) {
-      // fall through to retry / mock
+      const parsed = coerce(result.value, result.meta.provider, result.meta.model);
+      if (parsed) return parsed;
+    } catch {
+      // Fall through to retry, then preserve the safe heuristic result.
     }
   }
   return null;
@@ -251,8 +243,9 @@ async function realParse(input: ParseInput): Promise<ParsedArticle | null> {
 /** Parse heuristically first; spend an LLM call only on unresolved assets. */
 export async function parseArticle(input: ParseInput, segments: Segment[] = []): Promise<ParsedArticle> {
   const heuristic = heuristicParse(input, segments);
-  if (process.env.ANTHROPIC_API_KEY && heuristic.needsLLM) {
-    const real = await realParse(input);
+  const provider = getLLMProvider();
+  if (provider && heuristic.needsLLM) {
+    const real = await realParse(input, provider);
     if (real) return real;
     heuristic.reviewStatus = "needs_review";
     heuristic.model = "heuristic-fallback";

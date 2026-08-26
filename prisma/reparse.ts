@@ -5,8 +5,8 @@ import { parseArticle } from "../src/lib/ingest/parseLLM";
 const flag = (name: string) => process.argv.includes(`--${name}`);
 
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY && !flag("heuristic")) {
-    console.log("No supported LLM key configured. Set ANTHROPIC_API_KEY or pass --heuristic.");
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !flag("heuristic")) {
+    console.log("No supported LLM key configured. Set ANTHROPIC_API_KEY / OPENAI_API_KEY or pass --heuristic.");
     return;
   }
 
@@ -65,6 +65,7 @@ async function main() {
             interpretation: parsed.interpretation,
             importanceScore: parsed.importanceScore,
             confidence: parsed.confidence,
+            provider: parsed.provider,
             model: parsed.model,
             promptVersion: parsed.promptVersion,
             reviewStatus: parsed.reviewStatus,
@@ -77,6 +78,7 @@ async function main() {
             interpretation: parsed.interpretation,
             importanceScore: parsed.importanceScore,
             confidence: parsed.confidence,
+            provider: parsed.provider,
             model: parsed.model,
             promptVersion: parsed.promptVersion,
             reviewStatus: parsed.reviewStatus,

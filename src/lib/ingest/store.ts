@@ -90,10 +90,18 @@ export async function persistArticle(
           interpretation: parsed.interpretation,
           importanceScore: parsed.importanceScore,
           confidence: parsed.confidence,
+          provider: parsed.provider,
           model: parsed.model,
           promptVersion: parsed.promptVersion,
           reviewStatus: parsed.reviewStatus,
         },
+      },
+      segments: {
+        create: (raw.segments?.length ? raw.segments : [{ heading: null, text }]).map((segment, position) => ({
+          position,
+          heading: segment.heading,
+          text: segment.text,
+        })),
       },
       articleAssets: {
         create: parsed.assets

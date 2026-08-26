@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { ASSETS, directionLabel } from "./assets";
 import { computeConsensus } from "./consensus";
+import { getLLMProvider } from "./llm/provider";
 
 // AI Research — answers over the STRUCTURED DB first, never a web search.
 // Deterministic intent router; optional LLM synthesis layered on the retrieved evidence.
@@ -249,21 +250,18 @@ async function keywordFallback(q: string, days: number): Promise<Answer> {
 
 // Optional LLM synthesis over the retrieved evidence (never a web search).
 async function synthesize(query: string, base: Answer): Promise<Answer> {
-  if (!process.env.ANTHROPIC_API_KEY || base.rows.length === 0) return base;
-  let Anthropic: any;
-  try { ({ default: Anthropic } = await import("@anthropic-ai/sdk")); } catch { return base; }
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const provider = getLLMProvider();
+  if (!provider || base.rows.length === 0) return base;
   const evidence = base.rows
     .map((r, i) => `[${i + 1}] ${r.institution}: ${r.text}${r.detail ? ` (${r.detail})` : ""}`)
     .join("\n");
   try {
-    const res = await client.messages.create({
-      model: process.env.LLM_MODEL || "claude-sonnet-5",
-      max_tokens: 400,
+    const result = await provider.complete({
+      maxTokens: 400,
       system: "You summarize institutional views using ONLY the provided evidence lines. Never invent numbers or institutions. Cite with [n]. Answer in the user's language, 2-4 sentences.",
-      messages: [{ role: "user", content: `QUESTION: ${query}\n\nEVIDENCE:\n${evidence}` }],
+      user: `QUESTION: ${query}\n\nEVIDENCE:\n${evidence}`,
     });
-    const txt = res.content?.[0]?.type === "text" ? res.content[0].text.trim() : "";
+    const txt = result.text.trim();
     if (txt) return { ...base, summary: txt, usedLLM: true };
   } catch { /* keep structured summary */ }
   return base;

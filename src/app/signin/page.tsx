@@ -9,22 +9,26 @@ export default async function SignInPage({ searchParams }: { searchParams: { nex
   const user = await getSessionUser();
   if (user) redirect(searchParams.next || "/watchlist");
   const next = searchParams.next || "/watchlist";
+  const demoAuthEnabled = process.env.NODE_ENV !== "production" || process.env.ALLOW_INSECURE_DEMO_AUTH === "true";
 
   return (
     <main className="wrap" style={{ maxWidth: 460 }}>
       <div className="page-head" style={{ borderBottom: "none" }}>
         <div className="eyebrow">Account</div>
         <h1>Sign in</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>
-          No password — your email just identifies your watchlist &amp; alerts. (MVP session.)
-        </p>
+        <p className="sub" style={{ color: "var(--muted)" }}>{demoAuthEnabled
+          ? "Preview sign-in identifies your watchlist and alerts without a password."
+          : "Account sign-in is unavailable until the production OAuth provider is configured."}</p>
       </div>
 
       {searchParams.error === "email" && (
         <p className="chip bear" style={{ display: "inline-block" }}>Enter a valid email.</p>
       )}
+      {searchParams.error === "disabled" && (
+        <p className="chip bear" style={{ display: "inline-block" }}>Preview sign-in is disabled in production.</p>
+      )}
 
-      <form action={doSignIn} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {demoAuthEnabled && <><form action={doSignIn} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <input type="hidden" name="next" value={next} />
         <label className="field">
           <span>Email</span>
@@ -42,7 +46,7 @@ export default async function SignInPage({ searchParams }: { searchParams: { nex
         <input type="hidden" name="name" value="Demo Trader" />
         <input type="hidden" name="next" value={next} />
         <button type="submit" className="minibtn" style={{ padding: "8px 14px" }}>Continue as demo →</button>
-      </form>
+      </form></>}
     </main>
   );
 }

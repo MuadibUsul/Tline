@@ -13,6 +13,8 @@ for the 64-source universe (15 flagged as phase-1 priority).
 
 Execution source of truth: [`plan20260827.md`](./plan20260827.md). Technical architecture and
 implementation boundaries: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+Production containers, PostgreSQL migrations, health checks, scheduler, and backup boundaries:
+[`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
 ## Quick start
 

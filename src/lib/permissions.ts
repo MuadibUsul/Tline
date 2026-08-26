@@ -11,6 +11,7 @@ export type PermissionAction =
 export interface PermissionUser {
   id: string;
   tier: string;
+  role?: string;
 }
 
 /** Single authorization boundary. The commercial tier matrix is intentionally deferred. */
@@ -27,6 +28,6 @@ export function can(user: PermissionUser | null, action: PermissionAction): bool
     case "api.use":
       return user?.tier === "professional";
     case "admin.review":
-      return false;
+      return user?.role === "reviewer" || user?.role === "admin";
   }
 }

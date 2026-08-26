@@ -5,8 +5,7 @@ import PDFKit from "pdfkit";
 import { PDFDocument as PDFLibDocument } from "pdf-lib";
 import { prisma } from "../db";
 import { writePrivateFile } from "./storage";
-
-const MAX_NATIVE_PDF_BYTES = 50 * 1024 * 1024;
+import { assertSafeSourcePdf } from "./pdfSafety";
 
 export interface DocumentSegment {
   heading: string | null;
@@ -28,11 +27,13 @@ function fontCandidates(locale: ArticlePdfInput["locale"], bold: boolean) {
     return [
       bold ? process.env.PDF_FONT_ZH_BOLD : process.env.PDF_FONT_ZH,
       bold ? "C:\\Windows\\Fonts\\msyhbd.ttc" : "C:\\Windows\\Fonts\\msyh.ttc",
+      bold ? "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" : "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ];
   }
   return [
     bold ? process.env.PDF_FONT_EN_BOLD : process.env.PDF_FONT_EN,
     bold ? "C:\\Windows\\Fonts\\arialbd.ttf" : "C:\\Windows\\Fonts\\arial.ttf",
+    bold ? "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" : "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
   ];
 }
 
@@ -44,6 +45,7 @@ function configureFonts(doc: PDFKit.PDFDocument, locale: ArticlePdfInput["locale
   }
   const collectionFont = (font: string | undefined, isBold: boolean) => {
     if (!font?.toLowerCase().endsWith(".ttc")) return undefined;
+    if (font.includes("NotoSansCJK")) return isBold ? "NotoSansCJKsc-Bold" : "NotoSansCJKsc-Regular";
     return isBold
       ? process.env.PDF_FONT_ZH_BOLD_FAMILY || "MicrosoftYaHei-Bold"
       : process.env.PDF_FONT_ZH_FAMILY || "MicrosoftYaHei";
@@ -230,8 +232,7 @@ export async function generateArticleDocuments(articleId: string) {
 
 /** Persist a PDF fetched only after the ingestion layer has approved the URL. */
 export async function saveNativePdf(articleId: string, sourceUrl: string, buffer: Buffer) {
-  if (buffer.byteLength > MAX_NATIVE_PDF_BYTES) throw new Error("Native PDF exceeds the 50 MB limit.");
-  if (!buffer.subarray(0, 1024).includes(Buffer.from("%PDF-"))) throw new Error("Downloaded file is not a PDF.");
+  assertSafeSourcePdf(buffer);
   const loaded = await PDFLibDocument.load(buffer, { ignoreEncryption: true });
   const storageKey = path.posix.join("articles", articleId, "source-native-en.pdf");
   await writePrivateFile(storageKey, buffer);

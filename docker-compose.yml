@@ -1,0 +1,74 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tline
+      POSTGRES_USER: tline
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tline -d tline"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://tline:${POSTGRES_PASSWORD}@db:5432/tline
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
+      ALLOW_INSECURE_DEMO_AUTH: ${ALLOW_INSECURE_DEMO_AUTH:-false}
+      DOCUMENT_STORAGE_DRIVER: ${DOCUMENT_STORAGE_DRIVER:-local}
+      DOCUMENT_STORAGE_ROOT: /app/storage
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_PREFIX: ${S3_PREFIX:-tline}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - document-storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  scheduler:
+    build: .
+    restart: unless-stopped
+    command: ["sh", "-c", "npm run env:check:production && npm run scheduler"]
+    environment:
+      DATABASE_URL: postgresql://tline:${POSTGRES_PASSWORD}@db:5432/tline
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
+      DOCUMENT_STORAGE_DRIVER: ${DOCUMENT_STORAGE_DRIVER:-local}
+      DOCUMENT_STORAGE_ROOT: /app/storage
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_PREFIX: ${S3_PREFIX:-tline}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      INGEST_INTERVAL_MS: ${INGEST_INTERVAL_MS:-21600000}
+      INGEST_ARTICLE_LIMIT: ${INGEST_ARTICLE_LIMIT:-6}
+      JOB_RETRY_LIMIT: ${JOB_RETRY_LIMIT:-3}
+      JOB_RETRY_DELAY_MS: ${JOB_RETRY_DELAY_MS:-60000}
+      JOB_FAILURE_WEBHOOK_URL: ${JOB_FAILURE_WEBHOOK_URL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - document-storage:/app/storage
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  document-storage:

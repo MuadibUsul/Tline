@@ -221,10 +221,12 @@ model User {
   email     String   @unique
   name      String?
   tier      String   @default("pro") // free | pro | trader | professional
+  role      String   @default("member") // member | reviewer | admin; independent of commercial tier
   createdAt DateTime @default(now())
 
   watchlist WatchlistItem[]
   rules     AlertRule[]
+  auditLogs AuditLog[]
 }
 
 model WatchlistItem {
@@ -266,4 +268,34 @@ model AlertEvent {
   rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
   @@index([ruleId, firedAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   String   @default("{}")
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+}
+
+model JobRun {
+  id         String    @id @default(cuid())
+  name       String
+  status     String    @default("running") // running | succeeded | failed
+  attempt    Int       @default(1)
+  parameters String    @default("{}")
+  metrics    String    @default("{}")
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([name, startedAt])
+  @@index([status, startedAt])
 }

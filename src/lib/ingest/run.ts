@@ -11,6 +11,7 @@ import { extractPdf } from "../documents/extractPdf";
 import { generateArticleDocuments, saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { renderHtml } from "./render";
+import { runTrackedJob } from "../jobs";
 
 // Usage:
 //   npm run ingest                 -> priority-1 institutions (allowed/delayed only)
@@ -199,7 +200,7 @@ async function ingestInstitution(
   return created;
 }
 
-async function main() {
+async function executeIngest() {
   await ensureAssets();
   const perLimit = Number(arg("limit") || 6);
   const slug = arg("slug");
@@ -222,8 +223,7 @@ async function main() {
     const exists = await prisma.institution.findUnique({ where: { slug }, select: { crawlPolicy: true, name: true } });
     if (exists && !["allowed", "delayed"].includes(exists.crawlPolicy)) {
       console.log(`Refusing to crawl "${exists.name}" — crawlPolicy=${exists.crawlPolicy} (robots blocked / needs manual review).`);
-      await prisma.$disconnect();
-      return;
+      return { institutions: 0, articlesCreated: 0, consensusSnapshots: 0, refused: true };
     }
   }
 
@@ -233,6 +233,15 @@ async function main() {
 
   const snaps = await snapshotAll();
   console.log(`\nDone. ${total} new articles · ${snaps} consensus snapshots.`);
+  return { institutions: institutions.length, articlesCreated: total, consensusSnapshots: snaps, refused: false };
+}
+
+async function main() {
+  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), all: flag("all") };
+  await runTrackedJob("ingest", parameters, async () => {
+    const metrics = await executeIngest();
+    return { result: undefined, metrics };
+  }, Math.max(1, Number(arg("attempt") || 1)));
   await prisma.$disconnect();
 }
 

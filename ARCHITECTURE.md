@@ -348,7 +348,7 @@ model ArticleDocument {
 }
 ```
 
-MVP 使用配置的本地私有目录；生产环境切换到 S3 兼容对象存储。业务代码只依赖 `DocumentStorage` 的 put/get/delete 接口。文件名和 storage key 使用内部 ID，不直接信任来源文件名。
+MVP 使用配置的本地私有目录；生产环境可切换到 S3 兼容对象存储。业务代码只依赖 `DocumentStorage` 的 put/get/exists/signedDownloadUrl 接口。文件名和 storage key 使用内部 ID，不直接信任来源文件名。S3 下载在权限检查后签发 30–900 秒 URL，不暴露永久公共地址。
 
 原始 PDF 以 SHA-256 保证字节级完整性；对外下载使用 `Content-Disposition: attachment`。上传存储前检查 PDF 签名、文件大小、加密状态、嵌入附件和潜在活动内容，原文件与用于解析的安全副本分离。
 
@@ -373,6 +373,14 @@ function can(user: User | null, permission: Permission): boolean;
 `article.raw.read` 表示读取采集后的英文事实源。所有文章都必须生成可交付的原文 PDF；具体用户范围后续通过权限矩阵配置，页面和下载路由不得自行硬编码 tier。
 
 核心功能阶段只实现统一权限入口和受控下载链路，不锁定 free/pro/trader/professional 的具体矩阵。产品功能稳定后再通过集中配置分配各 tier 权限，无需修改页面或下载逻辑。
+
+### 7.10 生产运行边界
+
+- 开发环境继续使用 SQLite；生产通过由主 schema 生成的 PostgreSQL schema 和受版本控制的初始迁移部署。
+- Web、PostgreSQL 和单实例 scheduler 可由 Docker Compose 启动；`/api/health` 同时检查数据库与存储适配器。
+- 每次采集写入 `JobRun`，记录参数、尝试次数、结果指标和错误；scheduler 提供有限重试、线性退避及可选失败 webhook。
+- `User.role`（member/reviewer/admin）与商业 `tier` 分离；用户写操作进入 `AuditLog`。
+- 邮箱直登只用于预览，生产默认关闭；正式 OAuth 供应商由产品方确认后接入。
 
 ## 8. 数据与一致性
 

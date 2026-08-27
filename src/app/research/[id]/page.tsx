@@ -10,6 +10,23 @@ function parseJson<T>(s: string | undefined, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }
 }
 
+function ArticleBody({ segments, fallback }: {
+  segments: { id: string; heading: string | null; text: string }[];
+  fallback: string;
+}) {
+  const sections = segments.length ? segments : [{ id: "fallback", heading: null, text: fallback }];
+  return (
+    <div className="prose article-sections">
+      {sections.map((segment) => (
+        <section className="article-section" key={segment.id}>
+          {segment.heading && <h3>{segment.heading}</h3>}
+          <div className="article-body">{segment.text}</div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export default async function ResearchPage({ params }: { params: { id: string } }) {
   const a = await getResearchView(params.id);
   if (!a) notFound();
@@ -84,7 +101,7 @@ export default async function ResearchPage({ params }: { params: { id: string } 
               中文译文 · {translation.status} · quality {translation.qualityScore?.toFixed(2) ?? "—"} · {translation.provider}/{translation.model}
             </div>
             <h2 style={{ fontSize: 20, marginBottom: 8 }}>{translation.title}</h2>
-            <div className="prose article-body">{translation.text}</div>
+            <ArticleBody segments={translation.segments} fallback={translation.text} />
           </div>
         ) : (
           <div className="empty-state" style={{ marginBottom: 18 }}>中文译文正在等待翻译与质量复核。</div>
@@ -92,7 +109,7 @@ export default async function ResearchPage({ params }: { params: { id: string } 
         {a.rawText && (
           <details className="article-original">
             <summary>English original · 完整英文原文</summary>
-            <div className="prose article-body">{a.rawText}</div>
+            <ArticleBody segments={a.segments} fallback={a.rawText} />
           </details>
         )}
         {a.documents.length > 0 ? (

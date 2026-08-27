@@ -196,8 +196,13 @@ export async function getResearchView(id: string) {
       institution: true,
       analysis: true,
       articleAssets: { include: { asset: true } },
+      segments: { orderBy: { position: "asc" } },
       documents: { where: { status: "ready" }, orderBy: { createdAt: "asc" } },
-      translations: { where: { locale: "zh-CN" }, take: 1 },
+      translations: {
+        where: { locale: "zh-CN" },
+        take: 1,
+        include: { segments: { orderBy: { position: "asc" } } },
+      },
     },
   });
 }

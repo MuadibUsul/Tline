@@ -73,7 +73,7 @@
   {
     "slug": "rbc",
     "name": "RBC Economics",
-    "researchUrl": "https://thoughtleadership.rbc.com/economics/",
+    "researchUrl": "https://www.rbc.com/en/economics/canadian-analysis/",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 1,
@@ -103,7 +103,7 @@
   {
     "slug": "j-p-morgan",
     "name": "J.P. Morgan",
-    "researchUrl": "https://www.jpmorgan.com/insights",
+    "researchUrl": "https://www.jpmorgan.com/insights/global-research",
     "rating": 5,
     "authorityScore": 1.0,
     "priority": 1,

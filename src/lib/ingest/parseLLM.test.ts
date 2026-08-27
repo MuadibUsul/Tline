@@ -61,3 +61,10 @@ test("does not treat years or ordinary dollar amounts as price targets", () => {
   assert.equal(parsed.assets[0]?.target, null);
   assert.equal(parsed.assets[0]?.previousTarget, null);
 });
+
+test("does not assign another commodity's target to the detected asset", () => {
+  const text = "We remain bullish on copper as supply tightens. The price of aluminum is forecasted to reach $3,800 per metric ton.";
+  const parsed = heuristicParse(input("Metals Outlook: Copper, Steel and Aluminum", text));
+  assert.equal(parsed.assets[0]?.ticker, "COPPER");
+  assert.equal(parsed.assets[0]?.target, null);
+});

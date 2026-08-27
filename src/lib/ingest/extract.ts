@@ -66,10 +66,15 @@ export function extractPdfLinks(html: string, baseUrl: string): string[] {
 // Boilerplate containers to drop wholesale before reading body text.
 const STRIP = "script,style,noscript,nav,header,footer,aside,form,svg,button,iframe," +
   "[role=navigation],[role=banner],[role=contentinfo],[role=search],[aria-hidden=true]," +
-  "[class*=nav],[class*=menu],[class*=header],[class*=footer],[class*=cookie]," +
-  "[class*=consent],[class*=subscribe],[class*=breadcrumb],[class*=social]," +
-  "[class*=share],[class*=related],[class*=sidebar],[class*=promo],[class*=banner]," +
-  "[class*=skip],[id*=nav],[id*=menu],[id*=footer],[id*=header],[id*=cookie]";
+  "div[class*=nav],section[class*=nav],div[class*=menu],section[class*=menu]," +
+  "div[class*=header],section[class*=header],div[class*=footer],section[class*=footer]," +
+  "div[class*=cookie],section[class*=cookie],div[class*=consent],section[class*=consent]," +
+  "div[class*=subscribe],section[class*=subscribe],div[class*=breadcrumb],section[class*=breadcrumb]," +
+  "div[class*=social],section[class*=social],div[class*=share],section[class*=share]," +
+  "div[class*=related],section[class*=related],div[class*=sidebar],section[class*=sidebar]," +
+  "div[class*=promo],section[class*=promo],div[class*=banner],section[class*=banner]," +
+  "div[class*=skip],section[class*=skip],div[id*=nav],section[id*=nav],div[id*=menu],section[id*=menu]," +
+  "div[id*=footer],section[id*=footer],div[id*=header],section[id*=header],div[id*=cookie],section[id*=cookie]";
 
 export interface Segment { heading: string | null; text: string }
 
@@ -86,17 +91,23 @@ export function inferPublicationDate(...values: Array<string | null | undefined>
   const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
   for (const value of values) {
     if (!value) continue;
-    const calendar = value.match(/(20\d{2})[-_/](0?[1-9]|1[0-2])[-_/](0?[1-9]|[12]\d|3[01])(?!\d)/);
+    let input = value;
+    try { input = decodeURIComponent(value); } catch { /* keep the original value */ }
+    const calendar = input.match(/(20\d{2})[-_/](0?[1-9]|1[0-2])[-_/](0?[1-9]|[12]\d|3[01])(?!\d)/);
     if (calendar) {
       const date = new Date(Date.UTC(Number(calendar[1]), Number(calendar[2]) - 1, Number(calendar[3])));
       if (!isNaN(date.getTime())) return date;
     }
-    const quarter = value.match(/(?:q([1-4])|([1-4])q)[\s_-]*(?:20)?(\d{2})(?!\d)/i);
+    const quarter = input.match(/(?:q([1-4])|([1-4])q)[\s_-]*(?:20)?(\d{2})(?!\d)/i);
     if (quarter) return new Date(Date.UTC(2000 + Number(quarter[3]), (Number(quarter[1] || quarter[2]) - 1) * 3, 1));
-    const compact = value.match(/(?:^|[-_/])(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(20\d{2})(?!\d)/);
+    const compact = input.match(/(?:^|[-_/\s])(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(20\d{2})(?!\d)/);
     if (compact) return new Date(Date.UTC(Number(compact[3]), Number(compact[2]) - 1, Number(compact[1])));
-    const named = value.match(new RegExp(`(?:${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])[-_\\s]+(20\\d{2})`, "i"));
+    const shortCompact = input.match(/(?:^|[-_/\s])(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(\d{2})(?!\d)/);
+    if (shortCompact) return new Date(Date.UTC(2000 + Number(shortCompact[3]), Number(shortCompact[2]) - 1, Number(shortCompact[1])));
+    const named = input.match(new RegExp(`(?:${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])[-_\\s]+(20\\d{2})`, "i"));
     if (named) return new Date(Date.UTC(Number(named[2]), months.indexOf(named[0].match(/[a-z]+/i)![0].toLowerCase()), Number(named[1])));
+    const dayNamed = input.match(new RegExp(`(0?[1-9]|[12]\\d|3[01])[-_\\s]+(${months.join("|")})[-_\\s]+(20\\d{2})`, "i"));
+    if (dayNamed) return new Date(Date.UTC(Number(dayNamed[3]), months.indexOf(dayNamed[2].toLowerCase()), Number(dayNamed[1])));
   }
   return null;
 }
@@ -113,7 +124,9 @@ function parsePublicationDate(value: string): Date | null {
 /** Extract a clean title + body text (+ heading-delimited segments) from an article page. */
 export function extractArticle(html: string): ExtractedArticle {
   const $ = cheerio.load(html);
-  $(STRIP).remove();
+  $(STRIP).each((_, element) => {
+    if ($(element).find("main,article,[itemprop=articleBody]").length === 0) $(element).remove();
+  });
 
   const title = (
     $('meta[property="og:title"]').attr("content") ||
@@ -186,7 +199,7 @@ export function extractArticle(html: string): ExtractedArticle {
  */
 /** Menu/nav dumps concatenate link labels into very long space-free tokens. */
 export function isJunk(text: string): boolean {
-  const tokens = text.split(/\s+/).filter(Boolean);
+  const tokens = text.split(/\s+/).filter((token) => token && !/^https?:\/\//i.test(token));
   if (tokens.length < 8) return false;
   const longest = tokens.reduce((m, t) => Math.max(m, t.length), 0);
   if (longest > 45) return true;

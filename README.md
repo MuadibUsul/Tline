@@ -51,7 +51,8 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Ingestion pipeline** (`src/lib/ingest/`): RSS, Sitemap/Sitemap Index, native PDF and
   HTML-listing discovery; research-path/date quality gates; three-hash dedup; source-run status;
   structured persistence and per-source failure isolation. Live validation covers complete HTML
-  articles from ING/UBS and embedded native research PDFs from Scotiabank Economics.
+  articles from ING, UBS, J.P. Morgan, RBC, Saxo, Nomura and Pictet, plus native research PDFs
+  from Scotiabank and OCBC.
 - **Robots compliance (strict)**: `scripts/robots_audit.py` audits all 64 sources' robots.txt
   → `64机构爬虫合规评估.xlsx` + `data/crawl_policy.json` (allowed/delayed/blocked/manual +
   Crawl-delay). The crawler (`run.ts`) only touches `allowed`/`delayed` institutions, and

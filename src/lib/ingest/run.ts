@@ -1,7 +1,7 @@
 import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
-import { fetchPdf, fetchText, sleep } from "./fetch";
+import { fetchPdf, fetchText, lastFetchStatus, sleep } from "./fetch";
 import { extractLinks, extractArticle, extractPdfLinks, inferPublicationDate, looksLikeArticle } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
@@ -85,17 +85,24 @@ async function ingestInstitution(
     select: { id: true },
   }));
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
+    let staged = false;
     for (const pdfUrl of extractPdfLinks(html, pageUrl)) {
+      if (raws.length >= perLimit) break;
       if (!allowsUrl(pdfUrl) || await knownUrl(pdfUrl)) continue;
       await sleep(delayMs);
       const pdf = await fetchPdf(pdfUrl);
       if (!pdf) continue;
       try {
         const extracted = await extractPdf(pdf);
-        const date = publishedAt || inferPublicationDate(pdfUrl, pageUrl, title);
+        const date = publishedAt || inferPublicationDate(pdfUrl, pageUrl, title, extracted.text.slice(0, 1000));
         if (!date || !extracted.text.trim()) continue;
+        const filename = decodeURIComponent(new URL(pdfUrl).pathname.split("/").pop() || "Research report")
+          .replace(/\.pdf$/i, "")
+          .replace(/[-_]+/g, " ")
+          .trim();
+        const documentTitle = title && !/^(?:research|insights?|publications?|reports?)$/i.test(title.trim()) ? title : filename;
         stage({
-          title: title || decodeURIComponent(new URL(pdfUrl).pathname.split("/").pop() || "Research report").replace(/\.pdf$/i, ""),
+          title: documentTitle,
           text: extracted.text,
           sourceUrl: pdfUrl,
           author: null,
@@ -103,10 +110,10 @@ async function ingestInstitution(
           segments: [{ heading: null, text: extracted.text }],
         });
         nativePdfs.set(pdfUrl, pdf);
-        return true;
+        staged = true;
       } catch { /* try another PDF link */ }
     }
-    return false;
+    return staged;
   };
 
   // 1) RSS first when configured (and allowed).
@@ -271,6 +278,10 @@ async function ingestInstitution(
           strict: true, // HTML-extracted → enforce the full article check
         });
       }
+      if (raws.length === 0) {
+        const listing = extractArticle(listHtml);
+        await stageEmbeddedPdf(listHtml, inst.researchUrl, listing.title, listing.publishedAt);
+      }
     }
   }
 
@@ -304,6 +315,10 @@ async function ingestInstitution(
     robotsBlocked: blocked,
     delayMs,
   }));
+  const accessStatus = lastFetchStatus(inst.researchUrl);
+  if (raws.length === 0 && accessStatus && [401, 403, 429].includes(accessStatus)) {
+    return finish("paused", `research endpoint HTTP ${accessStatus}; access wall not bypassed`, created);
+  }
   return finish("succeeded", `${raws.length} discovered · ${created} created · ${dup} duplicate · ${empty} empty · ${blocked} blocked`, created);
 }
 

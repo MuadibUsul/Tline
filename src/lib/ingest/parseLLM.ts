@@ -110,7 +110,11 @@ function candidatesFor(input: ParseInput): Candidate[] {
 }
 
 function parsedAsset(candidate: Candidate, text: string, direction: ReturnType<typeof detectDirection>): ParsedAsset {
-  const { target, previous } = extractTargets(text);
+  const localEvidence = text
+    .split(/\n+|(?<=[.!?])\s+/)
+    .filter((part) => candidate.a.aliases.some((alias) => aliasHit(part.toLowerCase(), alias)))
+    .join("\n");
+  const { target, previous } = extractTargets(localEvidence);
   return {
     ticker: candidate.a.ticker,
     direction: direction.dir,

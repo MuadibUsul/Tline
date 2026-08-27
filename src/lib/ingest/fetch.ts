@@ -5,6 +5,11 @@ import path from "node:path";
 const UA =
   "InstitutionalIntelligenceBot/0.1 (+respectful research aggregator; contact: ops@globalintel.io)";
 const textCacheDir = path.resolve(process.env.HTTP_CACHE_ROOT || path.join(process.cwd(), "data", "cache", "http"));
+const lastStatuses = new Map<string, number>();
+
+export function lastFetchStatus(url: string): number | undefined {
+  return lastStatuses.get(url);
+}
 
 export interface FetchResult {
   ok: boolean;
@@ -35,6 +40,7 @@ export async function fetchResource(
       signal: ctrl.signal,
       redirect: "follow",
     });
+    lastStatuses.set(url, res.status);
     return {
       ok: res.ok || res.status === 304,
       status: res.status,
@@ -45,6 +51,7 @@ export async function fetchResource(
       retryAfter: res.headers.get("retry-after"),
     };
   } catch {
+    lastStatuses.set(url, 0);
     return { ok: false, status: 0, body: null, contentType: "", etag: null, lastModified: null, retryAfter: null };
   } finally {
     clearTimeout(t);

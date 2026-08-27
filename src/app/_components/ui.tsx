@@ -1,19 +1,16 @@
 import Link from "next/link";
 import { directionLabel } from "@/lib/assets";
+import { relativeTime, tr, type Locale } from "@/lib/i18n";
 
-export function relTime(d: Date): string {
-  const s = (Date.now() - new Date(d).getTime()) / 1000;
-  if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m`;
-  if (s < 86400) return `${Math.round(s / 3600)}h`;
-  return `${Math.round(s / 86400)}d`;
-}
+export const relTime = (d: Date, locale: Locale = "en") => relativeTime(d, locale);
 
-export function DirChip({ direction, showLabel = true }: { direction: number; showLabel?: boolean }) {
+export function DirChip({ direction, locale = "en", showLabel = true }: { direction: number; locale?: Locale; showLabel?: boolean }) {
   const d = directionLabel(direction);
   const arrow = d.tone === "bull" ? "▲" : d.tone === "bear" ? "▼" : "◆";
+  const label = d.tone === "bull" ? tr(locale, d.label, "看多") : d.tone === "bear" ? tr(locale, d.label, "看空") : tr(locale, d.label, "中性");
   return (
     <span className={`chip ${d.tone}`}>
-      {arrow}{showLabel ? ` ${d.label}` : ""}
+      {arrow}{showLabel ? ` ${label}` : ""}
     </span>
   );
 }
@@ -32,19 +29,20 @@ type FeedArticle = {
   sourceUrl: string;
   institution: { name: string; slug: string };
   analysis: { summary: string } | null;
+  translations?: { title: string }[];
   articleAssets: { direction: number; target: number | null; previousTarget: number | null; asset: { ticker: string; name: string } }[];
 };
 
-export function FeedCard({ a }: { a: FeedArticle }) {
+export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale }) {
   const primary = a.articleAssets[0];
   const dir = primary?.direction ?? 0;
   return (
     <article className="fcard">
       <div className="top">
-        <b>{a.institution.name}</b> · <span>{relTime(a.publishedAt)}</span>
-        <span style={{ marginLeft: "auto" }}><DirChip direction={dir} /></span>
+        <b>{a.institution.name}</b> · <span>{relTime(a.publishedAt, locale)}</span>
+        <span style={{ marginLeft: "auto" }}><DirChip direction={dir} locale={locale} /></span>
       </div>
-      <h3 className="ttl"><Link href={`/research/${a.id}`}>{a.title}</Link></h3>
+      <h3 className="ttl"><Link href={`/research/${a.id}`}>{locale === "zh-CN" ? a.translations?.[0]?.title ?? a.title : a.title}</Link></h3>
       <div className="tags">
         {a.articleAssets.slice(0, 4).map((aa) => (
           <Link key={aa.asset.ticker} href={`/asset/${aa.asset.ticker}`} className="chip gray">{aa.asset.ticker}</Link>
@@ -53,16 +51,16 @@ export function FeedCard({ a }: { a: FeedArticle }) {
       {(primary?.target || primary?.previousTarget) && (
         <div className="kv">
           {primary.previousTarget && primary.target && (
-            <div><span>Target</span><b>${primary.previousTarget.toLocaleString()} → ${primary.target.toLocaleString()}</b></div>
+            <div><span>{tr(locale, "Target", "目标价")}</span><b>${primary.previousTarget.toLocaleString()} → ${primary.target.toLocaleString()}</b></div>
           )}
           {primary.target && !primary.previousTarget && (
-            <div><span>Target</span><b>${primary.target.toLocaleString()}</b></div>
+            <div><span>{tr(locale, "Target", "目标价")}</span><b>${primary.target.toLocaleString()}</b></div>
           )}
         </div>
       )}
       <div className="act">
-        <Link href={`/research/${a.id}`} className="minibtn p">查看分析 · Analysis</Link>
-        <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn">官网原文 ↗</a>
+        <Link href={`/research/${a.id}`} className="minibtn p">{tr(locale, "View analysis", "查看分析")}</Link>
+        <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Official source ↗", "官网原文 ↗")}</a>
       </div>
     </article>
   );

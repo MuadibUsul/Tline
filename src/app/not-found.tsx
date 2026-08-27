@@ -1,12 +1,14 @@
 import Link from "next/link";
+import { getLocale, tr } from "@/lib/i18n";
 
 export default function NotFound() {
+  const locale = getLocale();
   return (
     <main className="wrap system-state">
       <div className="eyebrow">404</div>
-      <h1>Nothing is stored at this address.</h1>
-      <p>The research item may not exist or may no longer be available to this account.</p>
-      <Link className="minibtn p" href="/research">Browse research</Link>
+      <h1>{tr(locale, "Nothing is stored at this address.", "此地址没有可用内容。")}</h1>
+      <p>{tr(locale, "The research item may not exist or may no longer be available to this account.", "该研报可能不存在，或此账户已无法访问。")}</p>
+      <Link className="minibtn p" href="/research">{tr(locale, "Browse research", "浏览研报")}</Link>
     </main>
   );
 }

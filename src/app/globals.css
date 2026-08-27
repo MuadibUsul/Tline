@@ -51,7 +51,21 @@ h1,h2,h3,h4{margin:0;text-wrap:balance}
 .nav a:hover{color:var(--ink)}
 .nav a.active{color:var(--accent-ink)}
 .topbar .sp{flex:1}
-@media(max-width:720px){.nav{display:none}}
+.language-toggle{display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;background:var(--panel)}
+.language-toggle button{border:0;border-right:1px solid var(--border);padding:5px 7px;background:transparent;color:var(--muted);font:600 10px var(--mono);cursor:pointer}
+.language-toggle button:last-child{border-right:0}
+.language-toggle button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.language-toggle button:active{transform:scale(.97)}
+.lang-en,.lang-zh{display:none}
+html[lang="en"] .lang-en{display:contents}
+html[lang="zh-CN"] .lang-zh{display:contents}
+@media(max-width:720px){
+  .nav{display:none}
+  .topbar .inner{gap:7px}
+  .topbar .mono{display:none}
+  .brand-name,.control-label{display:none}
+  .brand{gap:5px}
+}
 
 /* generic */
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}

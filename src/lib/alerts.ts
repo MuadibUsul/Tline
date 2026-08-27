@@ -11,13 +11,14 @@ export type AlertType =
   | "CONSENSUS_DROP_24H"
   | "CONSENSUS_RISE_24H";
 
-export function describeRule(r: { type: string; assetTicker: string | null; threshold: number }): string {
-  const scope = r.assetTicker ?? "any featured asset";
+export function describeRule(r: { type: string; assetTicker: string | null; threshold: number }, locale = "en"): string {
+  const zh = locale === "zh-CN";
+  const scope = r.assetTicker ?? (zh ? "任一精选资产" : "any featured asset");
   switch (r.type) {
-    case "CONSENSUS_ABOVE": return `${scope} consensus ≥ ${r.threshold}`;
-    case "CONSENSUS_BELOW": return `${scope} consensus ≤ ${r.threshold}`;
-    case "CONSENSUS_DROP_24H": return `${scope} consensus drops ≥ ${r.threshold} in 24h`;
-    case "CONSENSUS_RISE_24H": return `${scope} consensus rises ≥ ${r.threshold} in 24h`;
+    case "CONSENSUS_ABOVE": return `${scope}${zh ? "共识" : " consensus"} ≥ ${r.threshold}`;
+    case "CONSENSUS_BELOW": return `${scope}${zh ? "共识" : " consensus"} ≤ ${r.threshold}`;
+    case "CONSENSUS_DROP_24H": return zh ? `${scope} 24小时共识下降 ≥ ${r.threshold}` : `${scope} consensus drops ≥ ${r.threshold} in 24h`;
+    case "CONSENSUS_RISE_24H": return zh ? `${scope} 24小时共识上升 ≥ ${r.threshold}` : `${scope} consensus rises ≥ ${r.threshold} in 24h`;
     default: return `${scope} · ${r.type}`;
   }
 }

@@ -2,12 +2,14 @@ import Link from "next/link";
 import { featuredConsensus, latestFeed, mostActive, viewChanges } from "@/lib/queries";
 import { FeedCard, Delta } from "./_components/ui";
 import SearchBox from "./_components/SearchBox";
+import { getLocale, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
 
 export default async function Home() {
+  const locale = getLocale();
   const [cards, feed, active, changes] = await Promise.all([
     featuredConsensus(),
     latestFeed(8),
@@ -18,14 +20,14 @@ export default async function Home() {
   return (
     <main className="wrap">
       <section className="hero">
-        <div className="eyebrow">Global Institutional Intelligence</div>
-        <h1>Track what the world&apos;s leading<br />institutions <em>think.</em></h1>
-        <p className="sub">把全球金融机构每天产生的 Research，转换成可比较、可追踪、可检索的 Signal。</p>
-        <SearchBox />
+        <div className="eyebrow">{tr(locale, "Global Institutional Intelligence", "全球机构情报")}</div>
+        <h1>{locale === "zh-CN" ? <>追踪全球顶尖<br />机构的<em>观点。</em></> : <>Track what the world&apos;s leading<br />institutions <em>think.</em></>}</h1>
+        <p className="sub">{tr(locale, "Turn the research produced daily by global financial institutions into comparable, trackable and searchable signals.", "把全球金融机构每天产生的研报，转换成可比较、可追踪、可检索的信号。")}</p>
+        <SearchBox placeholder={tr(locale, "Search Goldman, Gold, Nvidia, Fed…", "搜索高盛、黄金、英伟达、美联储……")} ariaLabel={tr(locale, "Ask institutional research", "查询机构研报")} />
       </section>
 
       <section className="blk">
-        <div className="section-t">Market Consensus</div>
+        <div className="section-t">{tr(locale, "Market Consensus", "市场共识")}</div>
         <div className="ctiles">
           {cards.map((c) => (
             <Link key={c.ticker} href={`/asset/${c.ticker}`} className="ctile">
@@ -33,7 +35,7 @@ export default async function Home() {
               <div className="s tnum">
                 {c.score}
                 <span className={`dir ${c.tone === "bull" ? "up" : c.tone === "bear" ? "down" : "flat"}`}>
-                  {c.tone === "bull" ? "↑" : c.tone === "bear" ? "↓" : "→"} {c.label}
+                  {c.tone === "bull" ? "↑" : c.tone === "bear" ? "↓" : "→"} {c.tone === "bull" ? tr(locale, c.label, "看多") : c.tone === "bear" ? tr(locale, c.label, "看空") : tr(locale, c.label, "中性")}
                 </span>
               </div>
               <div className="bar"><i style={{ width: `${c.score}%`, background: TONE[c.tone] }} /></div>
@@ -44,20 +46,20 @@ export default async function Home() {
               </div>
             </Link>
           ))}
-          {cards.length === 0 && <p className="mono" style={{ color: "var(--muted)" }}>No data yet — run <code>npm run setup</code>.</p>}
+          {cards.length === 0 && <p className="mono" style={{ color: "var(--muted)" }}>{tr(locale, "No market data yet.", "暂无市场数据。")}</p>}
         </div>
       </section>
 
       <div className="grid-main">
         <div>
-          <div className="section-t">Latest Institutional Views</div>
+          <div className="section-t">{tr(locale, "Latest Institutional Views", "最新机构观点")}</div>
           <div className="feed">
-            {feed.map((a) => <FeedCard key={a.id} a={a} />)}
+            {feed.map((a) => <FeedCard key={a.id} a={a} locale={locale} />)}
           </div>
         </div>
         <div>
           <div className="side-block">
-            <div className="section-t">Largest View Changes · 24h</div>
+            <div className="section-t">{tr(locale, "Largest View Changes · 24h", "最大观点变化 · 24小时")}</div>
             <div className="rowlist">
               {changes.map((c) => (
                 <Link key={c.ticker} href={`/asset/${c.ticker}`} className="r" style={{ textDecoration: "none" }}>
@@ -69,7 +71,7 @@ export default async function Home() {
             </div>
           </div>
           <div className="side-block">
-            <div className="section-t">Most Active · 30d</div>
+            <div className="section-t">{tr(locale, "Most Active · 30d", "最活跃机构 · 30天")}</div>
             <div className="rowlist">
               {active.map((x) => (
                 <Link key={x.inst.id} href={`/institution/${x.inst.slug}`} className="r">
@@ -80,7 +82,7 @@ export default async function Home() {
             </div>
           </div>
           <div className="side-block">
-            <div className="section-t">Trending Topics</div>
+            <div className="section-t">{tr(locale, "Trending Topics", "热门话题")}</div>
             <div className="tag-row">
               {["Fed", "AI Capex", "Nvidia", "Gold", "Oil", "USD", "Treasuries", "China"].map((t) => (
                 <span key={t} className="chip gray">{t}</span>

@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { computeConsensus } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
+import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
-function TrendChart({ points, ticker }: { points: { timestamp: Date; consensusScore: number }[]; ticker: string }) {
+function TrendChart({ points, ticker, locale }: { points: { timestamp: Date; consensusScore: number }[]; ticker: string; locale: Locale }) {
   const width = 900;
   const height = 280;
   const pad = 34;
@@ -19,8 +20,8 @@ function TrendChart({ points, ticker }: { points: { timestamp: Date; consensusSc
   return (
     <div className="trend-chart">
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="trend-title trend-desc">
-        <title id="trend-title">{`${ticker} institutional consensus trend`}</title>
-        <desc id="trend-desc">Consensus score from 0 to 100 across the selected period.</desc>
+        <title id="trend-title">{tr(locale, `${ticker} institutional consensus trend`, `${ticker} 机构共识趋势`)}</title>
+        <desc id="trend-desc">{tr(locale, "Consensus score from 0 to 100 across the selected period.", "所选时段内 0 至 100 的共识评分。")}</desc>
         {[0, 25, 50, 75, 100].map((score) => (
           <g key={score}>
             <line x1={pad} x2={width - pad} y1={y(score)} y2={y(score)} stroke="var(--border)" strokeDasharray={score === 50 ? "5 5" : undefined} />
@@ -45,6 +46,7 @@ export default async function ConsensusTrendPage({
   params: { ticker: string };
   searchParams: { range?: string };
 }) {
+  const locale = getLocale();
   const asset = await prisma.asset.findUnique({ where: { ticker: params.ticker.toUpperCase() } });
   if (!asset) notFound();
   const ranges: Record<string, number> = { "1m": 31, "3m": 93, "1y": 366 };
@@ -61,37 +63,37 @@ export default async function ConsensusTrendPage({
     where: { articleAssets: { some: { assetId: asset.id } } },
     orderBy: { publishedAt: "desc" },
     take: 6,
-    include: { institution: true },
+    include: { institution: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } } },
   });
 
   return (
     <main className="wrap">
       <div className="page-head">
-        <div className="eyebrow">Consensus Index · {asset.ticker}</div>
+        <div className="eyebrow">{tr(locale, "Consensus Index", "共识指数")} · {asset.ticker}</div>
         <div className="big-score">
           <h1>{asset.name}</h1>
           {current && <span className="num">{current.score}</span>}
         </div>
         <div className="deltas">
           <span>{selected.toUpperCase()} <b className={change && change > 0 ? "up" : change && change < 0 ? "down" : "flat"}>{change === null ? "—" : `${change > 0 ? "+" : ""}${change}`}</b></span>
-          <span>{current?.institutionCount ?? 0} institutions</span>
+          <span>{tr(locale, `${current?.institutionCount ?? 0} institutions`, `${current?.institutionCount ?? 0} 家机构`)}</span>
         </div>
       </div>
 
       <section className="blk">
-        <div className="range-tabs" aria-label="Trend range">
+        <div className="range-tabs" aria-label={tr(locale, "Trend range", "趋势范围")}>
           {Object.keys(ranges).map((range) => <Link key={range} href={`/consensus/${asset.ticker}?range=${range}`} className={range === selected ? "active" : ""}>{range.toUpperCase()}</Link>)}
         </div>
-        {points.length ? <TrendChart points={points} ticker={asset.ticker} /> : <div className="empty-state">No consensus history in this range yet.</div>}
+        {points.length ? <TrendChart points={points} ticker={asset.ticker} locale={locale} /> : <div className="empty-state">{tr(locale, "No consensus history in this range yet.", "该范围内暂无共识历史。")}</div>}
       </section>
 
       <section style={{ paddingTop: 26 }}>
-        <div className="section-t">Related Research</div>
+        <div className="section-t">{tr(locale, "Related Research", "相关研报")}</div>
         <div className="rowlist">
           {articles.map((article) => (
             <Link key={article.id} href={`/research/${article.id}`}>
-              <span><b>{article.institution.name}</b> · {article.title}</span>
-              <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{article.publishedAt.toISOString().slice(0, 10)}</span>
+              <span><b>{article.institution.name}</b> · {locale === "zh-CN" ? article.translations[0]?.title ?? article.title : article.title}</span>
+              <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{formatDate(article.publishedAt, locale)}</span>
             </Link>
           ))}
         </div>

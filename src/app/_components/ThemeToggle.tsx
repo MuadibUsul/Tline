@@ -1,6 +1,6 @@
 "use client";
 
-export default function ThemeToggle() {
+export default function ThemeToggle({ label, ariaLabel }: { label: string; ariaLabel: string }) {
   function toggle() {
     const r = document.documentElement;
     const cur = r.getAttribute("data-theme");
@@ -15,9 +15,9 @@ export default function ThemeToggle() {
       type="button"
       onClick={toggle}
       className="minibtn"
-      aria-label="Toggle theme"
+      aria-label={ariaLabel}
     >
-      ◐ Theme
+      ◐ <span className="control-label">{label}</span>
     </button>
   );
 }

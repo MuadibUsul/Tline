@@ -3,10 +3,12 @@ import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DEMO_EMAIL } from "@/lib/user";
 import { formalAuthLabel, isFormalAuthConfigured } from "@/lib/auth-config";
+import { getLocale, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export default async function SignInPage({ searchParams }: { searchParams: { next?: string; error?: string } }) {
+  const locale = getLocale();
   const next = searchParams.next?.startsWith("/") && !searchParams.next.startsWith("//") ? searchParams.next : "/watchlist";
   const user = await getSessionUser();
   if (user) redirect(next);
@@ -16,42 +18,42 @@ export default async function SignInPage({ searchParams }: { searchParams: { nex
   return (
     <main className="wrap" style={{ maxWidth: 460 }}>
       <div className="page-head" style={{ borderBottom: "none" }}>
-        <div className="eyebrow">Account</div>
-        <h1>Sign in</h1>
+        <div className="eyebrow">{tr(locale, "Account", "账户")}</div>
+        <h1>{tr(locale, "Sign in", "登录")}</h1>
         <p className="sub" style={{ color: "var(--muted)" }}>{demoAuthEnabled
-          ? "Preview sign-in identifies your watchlist and alerts without a password."
+          ? tr(locale, "Preview sign-in identifies your watchlist and alerts without a password.", "预览登录无需密码，用于识别你的关注列表和提醒。")
           : formalAuth
-            ? `Continue with ${formalAuthLabel()} to access your account.`
-          : "Account sign-in is unavailable until the production OAuth provider is configured."}</p>
+            ? tr(locale, `Continue with ${formalAuthLabel()} to access your account.`, `使用 ${formalAuthLabel()} 继续访问账户。`)
+          : tr(locale, "Account sign-in is unavailable until the production OAuth provider is configured.", "配置生产 OAuth 提供商后方可使用账户登录。")}</p>
       </div>
 
       {searchParams.error === "email" && (
-        <p className="chip bear" style={{ display: "inline-block" }}>Enter a valid email.</p>
+        <p className="chip bear" style={{ display: "inline-block" }}>{tr(locale, "Enter a valid email.", "请输入有效的电子邮箱。")}</p>
       )}
       {searchParams.error === "disabled" && (
-        <p className="chip bear" style={{ display: "inline-block" }}>Preview sign-in is disabled in production.</p>
+        <p className="chip bear" style={{ display: "inline-block" }}>{tr(locale, "Preview sign-in is disabled in production.", "生产环境已禁用预览登录。")}</p>
       )}
 
-      {formalAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={`/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`}>Continue with {formalAuthLabel()} →</a>}
+      {formalAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={`/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`}>{tr(locale, `Continue with ${formalAuthLabel()}`, `使用 ${formalAuthLabel()} 继续`)} →</a>}
 
       {demoAuthEnabled && <><form action={doSignIn} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <input type="hidden" name="next" value={next} />
         <label className="field">
-          <span>Email</span>
+          <span>{tr(locale, "Email", "电子邮箱")}</span>
           <input name="email" type="email" required placeholder="you@fund.com" />
         </label>
         <label className="field">
-          <span>Name (optional)</span>
+          <span>{tr(locale, "Name (optional)", "姓名（可选）")}</span>
           <input name="name" type="text" placeholder="Jane Trader" />
         </label>
-        <button type="submit" className="minibtn p" style={{ padding: "9px 14px", justifyContent: "center" }}>Continue →</button>
+        <button type="submit" className="minibtn p" style={{ padding: "9px 14px", justifyContent: "center" }}>{tr(locale, "Continue", "继续")} →</button>
       </form>
 
       <form action={doSignIn} style={{ marginTop: 14, textAlign: "center" }}>
         <input type="hidden" name="email" value={DEMO_EMAIL} />
         <input type="hidden" name="name" value="Demo Trader" />
         <input type="hidden" name="next" value={next} />
-        <button type="submit" className="minibtn" style={{ padding: "8px 14px" }}>Continue as demo →</button>
+        <button type="submit" className="minibtn" style={{ padding: "8px 14px" }}>{tr(locale, "Continue as demo", "以演示用户继续")} →</button>
       </form></>}
     </main>
   );

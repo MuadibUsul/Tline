@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function SearchBox({ initial = "", autoFocus = false }: { initial?: string; autoFocus?: boolean }) {
+export default function SearchBox({ initial = "", autoFocus = false, placeholder, ariaLabel }: { initial?: string; autoFocus?: boolean; placeholder: string; ariaLabel: string }) {
   const router = useRouter();
   const [q, setQ] = useState(initial);
   return (
@@ -19,12 +19,12 @@ export default function SearchBox({ initial = "", autoFocus = false }: { initial
         value={q}
         onChange={(e) => setQ(e.target.value)}
         autoFocus={autoFocus}
-        placeholder="Search Goldman, Gold, Nvidia, Fed…"
+        placeholder={placeholder}
         style={{
           border: "none", outline: "none", background: "transparent",
           font: "inherit", color: "var(--ink)", flex: 1, minWidth: 0,
         }}
-        aria-label="Ask institutional research"
+        aria-label={ariaLabel}
       />
     </form>
   );

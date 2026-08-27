@@ -44,6 +44,7 @@ export async function latestFeed(limit = 8) {
     include: {
       institution: true,
       analysis: true,
+      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
       articleAssets: { include: { asset: true } },
     },
   });
@@ -97,7 +98,7 @@ export async function getAssetView(ticker: string) {
     where: { articleAssets: { some: { assetId: asset.id } } },
     orderBy: { publishedAt: "desc" },
     take: 8,
-    include: { institution: true, analysis: true, articleAssets: { include: { asset: true } } },
+    include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } }, articleAssets: { include: { asset: true } } },
   });
   return { asset, consensus: c, d1, d7, d30, dist, articles };
 }
@@ -162,7 +163,7 @@ export async function getInstitutionView(slug: string) {
   const articles = await prisma.article.findMany({
     where: { institutionId: inst.id, publishedAt: { gte: since } },
     orderBy: { publishedAt: "desc" },
-    include: { analysis: true, articleAssets: { include: { asset: true } } },
+    include: { analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } }, articleAssets: { include: { asset: true } } },
   });
   // Current views = latest direction per asset.
   const views = new Map<string, { ticker: string; name: string; direction: number; target: number | null; when: Date }>();

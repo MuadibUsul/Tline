@@ -2,6 +2,6 @@
 
 import { signOut } from "next-auth/react";
 
-export default function OAuthSignOutButton() {
-  return <button type="button" className="minibtn" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>;
+export default function OAuthSignOutButton({ label }: { label: string }) {
+  return <button type="button" className="minibtn" onClick={() => signOut({ callbackUrl: "/" })}>{label}</button>;
 }

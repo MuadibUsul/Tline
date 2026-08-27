@@ -6,17 +6,23 @@ import { getSessionUser } from "@/lib/auth";
 import { doSignOut } from "./actions";
 import { isFormalAuthConfigured } from "@/lib/auth-config";
 import OAuthSignOutButton from "./_components/OAuthSignOutButton";
+import LanguageToggle from "./_components/LanguageToggle";
+import { getLocale, tr } from "@/lib/i18n";
 
-export const metadata: Metadata = {
-  title: "Institutional Intelligence",
-  description: "Turn institutional research into actionable signal.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = getLocale();
+  return {
+    title: tr(locale, "Institutional Intelligence", "全球机构情报"),
+    description: tr(locale, "Turn institutional research into actionable signal.", "将全球机构研究转化为可执行信号。"),
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   const formalAuth = isFormalAuthConfigured();
+  const locale = getLocale();
   return (
-    <html lang="en">
+    <html lang={locale}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -29,39 +35,40 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="topbar">
           <div className="wrap inner">
             <Link href="/" className="brand">
-              <span className="glyph">II</span> Institutional&nbsp;Intelligence
+              <span className="glyph">II</span> <span className="brand-name">Institutional&nbsp;Intelligence</span>
             </Link>
             <nav className="nav">
-              <Link href="/">Home</Link>
-              <Link href="/markets">Markets</Link>
-              <Link href="/institutions">Institutions</Link>
-              <Link href="/research">Research</Link>
-              <Link href="/search">AI Search</Link>
-              <Link href="/consensus">Consensus</Link>
-              <Link href="/watchlist">Watchlist</Link>
-              <Link href="/alerts">Alerts</Link>
+              <Link href="/">{tr(locale, "Home", "首页")}</Link>
+              <Link href="/markets">{tr(locale, "Markets", "市场")}</Link>
+              <Link href="/institutions">{tr(locale, "Institutions", "机构")}</Link>
+              <Link href="/research">{tr(locale, "Research", "研报")}</Link>
+              <Link href="/search">{tr(locale, "AI Search", "AI 搜索")}</Link>
+              <Link href="/consensus">{tr(locale, "Consensus", "共识")}</Link>
+              <Link href="/watchlist">{tr(locale, "Watchlist", "关注")}</Link>
+              <Link href="/alerts">{tr(locale, "Alerts", "提醒")}</Link>
             </nav>
             <div className="sp" />
             {user && formalAuth ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>{user.email}</span>
-                <OAuthSignOutButton />
+                <OAuthSignOutButton label={tr(locale, "Sign out", "退出")} />
               </div>
             ) : user ? (
               <form action={doSignOut} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>{user.email}</span>
-                <button type="submit" className="minibtn">Sign out</button>
+                <button type="submit" className="minibtn">{tr(locale, "Sign out", "退出")}</button>
               </form>
             ) : (
-              <Link href="/signin" className="minibtn">Sign in</Link>
+              <Link href="/signin" className="minibtn">{tr(locale, "Sign in", "登录")}</Link>
             )}
-            <ThemeToggle />
+            <LanguageToggle locale={locale} />
+            <ThemeToggle label={tr(locale, "Theme", "主题")} ariaLabel={tr(locale, "Toggle theme", "切换主题")} />
           </div>
         </div>
         {children}
         <footer className="footer wrap">
-          <span>Research → Data → Consensus → Signal</span>
-          <span>Phase-1 · verified public research</span>
+          <span>{tr(locale, "Research → Data → Consensus → Signal", "研报 → 数据 → 共识 → 信号")}</span>
+          <span>{tr(locale, "Phase-1 · verified public research", "第一阶段 · 已验证公开研究")}</span>
         </footer>
       </body>
     </html>

@@ -422,10 +422,10 @@ raw   = Σ(authorityWeight × timeDecay × direction) / Σ(authorityWeight × ti
 score = (raw + 2) / 4 × 100
 ```
 
-- 只使用最近 90 天的数据。
+- 只使用滚动最近 24 小时内发布的研报观点；窗口外观点不得参与当前共识。
 - 每个机构对同一资产只保留最新观点。
 - `direction ∈ {-2,-1,0,1,2}`。
-- 时间衰减为 `exp(-ageDays/31)`。
+- 24 小时窗口内仍使用 `exp(-ageDays/31)` 做轻微时效加权。
 - 快照写入 `ConsensusHistory`，驱动趋势和 Alerts。
 
 解析为 unresolved 的资产不写 `ArticleAsset`，因此不会污染 Consensus。

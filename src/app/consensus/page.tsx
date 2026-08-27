@@ -20,7 +20,7 @@ export default async function ConsensusPage() {
   return (
     <main className="wrap">
       <div className="page-head"><div className="eyebrow">{tr(locale, "Institutional Consensus Engine", "机构共识引擎")}</div><h1>{tr(locale, "Consensus", "共识")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Authority-weighted, time-decayed direction across all covered assets (0–100).", "基于机构权威度加权并按时间衰减，计算所有覆盖资产的方向评分（0–100）。")}</p></div>
+        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Authority-weighted direction from research published in the rolling last 24 hours (0–100).", "仅使用滚动最近24小时内发布的研报观点，按机构权威度加权计算方向评分（0–100）。")}</p></div>
       <section style={{ paddingTop: 22 }}>
         <div className="tbl-wrap">
           <table>

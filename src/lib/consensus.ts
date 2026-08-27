@@ -1,10 +1,12 @@
 import { prisma } from "./db";
 import { directionLabel } from "./assets";
 
-const WINDOW_DAYS = 90;
-// Exponential decay: exp(-age/TAU). TAU≈31 fits the blueprint anchors
-// (7d≈0.80, 30d≈0.39, 90d≈0.06).
+export const CONSENSUS_WINDOW_HOURS = 24;
 const TAU = 31;
+
+export function consensusSince(now = new Date()): Date {
+  return new Date(now.getTime() - CONSENSUS_WINDOW_HOURS * 36e5);
+}
 
 export function decayFor(ageDays: number): number {
   return Math.exp(-Math.max(0, ageDays) / TAU);
@@ -37,9 +39,10 @@ export interface ConsensusResult {
 
 /** Compute the current institutional consensus for one asset. */
 export async function computeConsensus(assetId: string): Promise<ConsensusResult | null> {
-  const since = new Date(Date.now() - WINDOW_DAYS * 864e5);
+  const now = new Date();
+  const since = consensusSince(now);
   const rows = await prisma.articleAsset.findMany({
-    where: { assetId, article: { publishedAt: { gte: since } } },
+    where: { assetId, article: { publishedAt: { gte: since, lte: now } } },
     include: { article: { include: { institution: true } } },
     orderBy: { article: { publishedAt: "desc" } },
   });
@@ -60,7 +63,7 @@ export async function computeConsensus(assetId: string): Promise<ConsensusResult
   const contributors: Contributor[] = [];
 
   for (const r of latest.values()) {
-    const ageDays = (Date.now() - r.article.publishedAt.getTime()) / 864e5;
+    const ageDays = (now.getTime() - r.article.publishedAt.getTime()) / 864e5;
     const w = r.article.institution.authorityScore;
     const d = decayFor(ageDays);
     num += w * d * r.direction;

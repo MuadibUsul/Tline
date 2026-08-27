@@ -43,9 +43,10 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Site-wide fuzzy search**: the home search instantly ranks institutions, assets and
   English/Chinese research content. It supports aliases, partial terms and common typos,
   with keyboard navigation and no separate search page or LLM dependency.
-- **Consensus engine** (`src/lib/consensus.ts`): `raw = Σ(wᵢ·dᵢ·dirᵢ)/Σ(wᵢ·dᵢ)` → `score = (raw+2)/4×100`.
-  Weight = institution authority (5★=1.0 / 4★=0.85 / 3★=0.7); decay = `exp(-ageDays/31)`
-  (7d≈0.80, 30d≈0.39). Snapshots to `consensus_history` drive the 1D/7D/30D deltas.
+- **Consensus engine** (`src/lib/consensus.ts`): only research published in the rolling
+  last 24 hours is eligible. `raw = Σ(wᵢ·dᵢ·dirᵢ)/Σ(wᵢ·dᵢ)` → `score = (raw+2)/4×100`;
+  authority weighting and within-window recency decay remain. Snapshots to
+  `consensus_history` drive the 1D/7D/30D deltas.
 - **Ingestion pipeline** (`src/lib/ingest/`): RSS, Sitemap/Sitemap Index, native PDF and
   HTML-listing discovery; research-path/date quality gates; three-hash dedup; source-run status;
   structured persistence and per-source failure isolation. Live validation currently contains

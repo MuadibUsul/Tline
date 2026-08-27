@@ -27,7 +27,7 @@ export default async function Home() {
       </section>
 
       <section className="blk">
-        <div className="section-t">{tr(locale, "Market Consensus", "市场共识")}</div>
+        <div className="section-t">{tr(locale, "Market Consensus · last 24h", "市场共识 · 最近24小时")}</div>
         <div className="ctiles">
           {cards.map((c) => (
             <Link key={c.ticker} href={`/asset/${c.ticker}`} className="ctile">

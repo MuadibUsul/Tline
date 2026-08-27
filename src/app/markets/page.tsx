@@ -14,7 +14,7 @@ export default async function MarketsPage() {
 
   return (
     <main className="wrap">
-      <div className="page-head"><div className="eyebrow">{tr(locale, "Markets", "市场")}</div><h1>{tr(locale, "Markets", "市场")}</h1></div>
+      <div className="page-head"><div className="eyebrow">{tr(locale, "Markets", "市场")}</div><h1>{tr(locale, "Markets", "市场")}</h1><p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Consensus uses research published in the rolling last 24 hours only.", "市场共识仅使用滚动最近24小时内发布的研报观点。")}</p></div>
       {CLASSES.map((cls) => {
         const group = scored.filter((x) => x.a.assetClass === cls);
         if (group.length === 0) return null;

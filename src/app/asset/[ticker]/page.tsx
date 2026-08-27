@@ -10,27 +10,29 @@ export const dynamic = "force-dynamic";
 export default async function AssetPage({ params }: { params: { ticker: string } }) {
   const locale = getLocale();
   const data = await getAssetView(params.ticker);
-  if (!data || !data.consensus) notFound();
+  if (!data) notFound();
   const { asset, consensus, d1, d7, d30, dist, articles } = data;
   const timeline = (await getAssetTimeline(asset.id)).filter((t) => t.hasTargetMove || t.hasDirFlip);
-  const toneColor = consensus!.tone === "bull" ? "var(--bull)" : consensus!.tone === "bear" ? "var(--bear)" : "var(--neu)";
+  const toneColor = consensus?.tone === "bull" ? "var(--bull)" : consensus?.tone === "bear" ? "var(--bear)" : "var(--neu)";
 
   return (
     <main className="wrap">
       <div className="page-head">
-        <div className="eyebrow">{tr(locale, "Institutional Consensus", "机构共识")} · {asset.assetClass}</div>
+        <div className="eyebrow">{tr(locale, "Institutional Consensus · last 24h", "机构共识 · 最近24小时")} · {asset.assetClass}</div>
         <h1>{asset.name}</h1>
-        <div className="big-score">
-          <span className="num" style={{ color: toneColor }}>{consensus!.score}</span>
-          <span className="mono" style={{ color: "var(--muted)" }}>/ 100</span>
-          <span className={`chip ${consensus!.tone}`}>{consensus!.tone === "bull" ? tr(locale, consensus!.label, "看多") : consensus!.tone === "bear" ? tr(locale, consensus!.label, "看空") : tr(locale, consensus!.label, "中性")}</span>
-        </div>
-        <div className="deltas">
-          <span>1D <Delta v={d1} /></span>
-          <span>7D <Delta v={d7} /></span>
-          <span>30D <Delta v={d30} /></span>
-          <span style={{ color: "var(--faint)" }}>{tr(locale, `${consensus!.institutionCount} institutions`, `${consensus!.institutionCount} 家机构`)} · {consensus!.bullishCount}↑ {consensus!.neutralCount}→ {consensus!.bearishCount}↓</span>
-        </div>
+        {consensus ? <>
+          <div className="big-score">
+            <span className="num" style={{ color: toneColor }}>{consensus.score}</span>
+            <span className="mono" style={{ color: "var(--muted)" }}>/ 100</span>
+            <span className={`chip ${consensus.tone}`}>{consensus.tone === "bull" ? tr(locale, consensus.label, "看多") : consensus.tone === "bear" ? tr(locale, consensus.label, "看空") : tr(locale, consensus.label, "中性")}</span>
+          </div>
+          <div className="deltas">
+            <span>1D <Delta v={d1} /></span>
+            <span>7D <Delta v={d7} /></span>
+            <span>30D <Delta v={d30} /></span>
+            <span style={{ color: "var(--faint)" }}>{tr(locale, `${consensus.institutionCount} institutions`, `${consensus.institutionCount} 家机构`)} · {consensus.bullishCount}↑ {consensus.neutralCount}→ {consensus.bearishCount}↓</span>
+          </div>
+        </> : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No institutional view was published for this asset in the last 24 hours.", "最近24小时内没有机构发布该资产的观点。")}</p>}
         <form action={addWatch} style={{ alignSelf: "flex-start" }}>
           <input type="hidden" name="kind" value="asset" />
           <input type="hidden" name="refId" value={asset.ticker} />
@@ -39,13 +41,13 @@ export default async function AssetPage({ params }: { params: { ticker: string }
         </form>
       </div>
 
-      <section className="blk">
-        <div className="section-t">{tr(locale, "Institutional Views", "机构观点")}</div>
+      {consensus && <section className="blk">
+        <div className="section-t">{tr(locale, "Institutional Views · last 24h", "机构观点 · 最近24小时")}</div>
         <div className="tbl-wrap">
           <table>
             <thead><tr><th>{tr(locale, "Institution", "机构")}</th><th>{tr(locale, "Direction", "方向")}</th><th>{tr(locale, "Target", "目标价")}</th><th>{tr(locale, "Previous", "此前")}</th><th>{tr(locale, "Updated", "更新于")}</th></tr></thead>
             <tbody>
-              {consensus!.contributors.map((c, i) => (
+              {consensus.contributors.map((c, i) => (
                 <tr key={i}>
                   <td className="inst"><Link href={`/institution/${c.slug}`}>{c.institutionName}</Link></td>
                   <td><DirChip direction={c.direction} locale={locale} showLabel={false} /></td>
@@ -57,7 +59,7 @@ export default async function AssetPage({ params }: { params: { ticker: string }
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
       {timeline.length > 0 && (
         <section className="blk">

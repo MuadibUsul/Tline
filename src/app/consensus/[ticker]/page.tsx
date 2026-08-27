@@ -69,7 +69,7 @@ export default async function ConsensusTrendPage({
   return (
     <main className="wrap">
       <div className="page-head">
-        <div className="eyebrow">{tr(locale, "Consensus Index", "共识指数")} · {asset.ticker}</div>
+        <div className="eyebrow">{tr(locale, "Consensus Index · rolling 24h", "共识指数 · 滚动24小时")} · {asset.ticker}</div>
         <div className="big-score">
           <h1>{asset.name}</h1>
           {current && <span className="num">{current.score}</span>}
@@ -78,6 +78,7 @@ export default async function ConsensusTrendPage({
           <span>{selected.toUpperCase()} <b className={change && change > 0 ? "up" : change && change < 0 ? "down" : "flat"}>{change === null ? "—" : `${change > 0 ? "+" : ""}${change}`}</b></span>
           <span>{tr(locale, `${current?.institutionCount ?? 0} institutions`, `${current?.institutionCount ?? 0} 家机构`)}</span>
         </div>
+        {!current && <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No institutional view was published for this asset in the last 24 hours.", "最近24小时内没有机构发布该资产的观点。")}</p>}
       </div>
 
       <section className="blk">

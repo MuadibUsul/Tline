@@ -2,7 +2,7 @@ import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchPdf, fetchText, lastFetchStatus, sleep } from "./fetch";
-import { extractLinks, extractArticle, extractPdfLinks, inferPublicationDate, looksLikeArticle } from "./extract";
+import { extractLinks, extractArticle, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
@@ -71,11 +71,12 @@ async function ingestInstitution(
     }
   };
 
-  let created = 0, dup = 0, empty = 0, blocked = 0;
+  let created = 0, dup = 0, empty = 0, blocked = 0, nativeRejected = 0;
   const raws: RawArticle[] = [];
   const nativePdfs = new Map<string, Buffer>();
   const candidateLimit = Math.min(40, Math.max(12, perLimit * 4));
   const stage = (raw: RawArticle) => {
+    if (isNaN(raw.publishedAt.getTime()) || raw.publishedAt.getTime() > Date.now() + 864e5) { empty++; return false; }
     if (raw.strict && !looksLikeArticle(raw.title, raw.text)) { empty++; return false; }
     raws.push(raw);
     return true;
@@ -94,23 +95,31 @@ async function ingestInstitution(
       if (!pdf) continue;
       try {
         const extracted = await extractPdf(pdf);
-        const date = publishedAt || inferPublicationDate(pdfUrl, pageUrl, title, extracted.text.slice(0, 1000));
+        const date = inferPublicationDate(pdfUrl, extracted.text.slice(0, 1000)) || publishedAt || inferPublicationDate(pageUrl, title);
         if (!date || !extracted.text.trim()) continue;
         const filename = decodeURIComponent(new URL(pdfUrl).pathname.split("/").pop() || "Research report")
           .replace(/\.pdf$/i, "")
+          .replace(/(?:[a-z]{0,2})?20\d{6}[a-z]?$/i, "")
           .replace(/[-_]+/g, " ")
+          .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+          .replace(/([a-z])([A-Z])/g, "$1 $2")
           .trim();
-        const documentTitle = title && !/^(?:research|insights?|publications?|reports?)$/i.test(title.trim()) ? title : filename;
-        stage({
+        const pageLabel = title.split(/[;|]/).at(-1)?.trim() || title;
+        const documentTitle = title && !/^(?:research|insights?|publications?|reports?)$/i.test(pageLabel) ? title : filename;
+        if (!looksLikeResearchTopic(documentTitle, extracted.text)) continue;
+        const accepted = stage({
           title: documentTitle,
           text: extracted.text,
           sourceUrl: pdfUrl,
           author: null,
           publishedAt: date,
           segments: [{ heading: null, text: extracted.text }],
+          strict: true,
         });
-        nativePdfs.set(pdfUrl, pdf);
-        staged = true;
+        if (accepted) {
+          nativePdfs.set(pdfUrl, pdf);
+          staged = true;
+        }
       } catch { /* try another PDF link */ }
     }
     return staged;
@@ -131,6 +140,7 @@ async function ingestInstitution(
           const extracted = await extractPdf(pdf);
           const publishedAt = (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
           if (!publishedAt || isNaN(publishedAt.getTime())) { empty++; continue; }
+          if (!looksLikeResearchTopic(item.title || "", extracted.text)) { empty++; continue; }
           stage({
             title: item.title || "Institutional research report",
             text: extracted.text,
@@ -196,6 +206,7 @@ async function ingestInstitution(
             .trim();
           const publishedAt = candidate.lastModified || inferPublicationDate(candidate.url, filename);
           if (!publishedAt) { empty++; continue; }
+          if (!looksLikeResearchTopic(filename, extracted.text)) { empty++; continue; }
           stage({
             title: filename || "Institutional research report",
             text: extracted.text,
@@ -291,7 +302,14 @@ async function ingestInstitution(
       created++;
       const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
       const native = nativePdfs.get(r.sourceUrl);
-      if (native && article) await saveNativePdf(article.id, r.sourceUrl, native);
+      if (native && article) {
+        try {
+          await saveNativePdf(article.id, r.sourceUrl, native);
+        } catch (error) {
+          nativeRejected++;
+          console.warn(`  native PDF rejected for ${r.sourceUrl}: ${String(error)}`);
+        }
+      }
       if (article) {
         try {
           await generateArticleDocuments(article.id);
@@ -303,7 +321,7 @@ async function ingestInstitution(
     else if (res === "duplicate") dup++;
     else empty++;
   }
-  const note = `delay ${delayMs}ms${robotsDelaySec ? " (robots)" : ""}${blocked ? ` · ${blocked} url blocked` : ""}`;
+  const note = `delay ${delayMs}ms${robotsDelaySec ? " (robots)" : ""}${blocked ? ` · ${blocked} url blocked` : ""}${nativeRejected ? ` · ${nativeRejected} native PDF rejected` : ""}`;
   console.log(`  ${inst.name.padEnd(26)} +${created} created · ${dup} dup · ${empty} empty · ${note}`);
   console.log(JSON.stringify({
     event: "ingest.source.complete",
@@ -313,13 +331,14 @@ async function ingestInstitution(
     duplicate: dup,
     empty,
     robotsBlocked: blocked,
+    nativePdfRejected: nativeRejected,
     delayMs,
   }));
   const accessStatus = lastFetchStatus(inst.researchUrl);
   if (raws.length === 0 && accessStatus && [401, 403, 429].includes(accessStatus)) {
     return finish("paused", `research endpoint HTTP ${accessStatus}; access wall not bypassed`, created);
   }
-  return finish("succeeded", `${raws.length} discovered · ${created} created · ${dup} duplicate · ${empty} empty · ${blocked} blocked`, created);
+  return finish("succeeded", `${raws.length} discovered · ${created} created · ${dup} duplicate · ${empty} empty · ${blocked} blocked · ${nativeRejected} native PDF rejected`, created);
 }
 
 async function executeIngest() {

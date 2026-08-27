@@ -42,7 +42,7 @@ const RESEARCH_PATH = /(?:^|\/)(?:insights?|research|outlooks?|markets?|econom(?
 const NON_RESEARCH_PATH = /(?:^|\/)(?:about|careers?|contact|events?|help|legal|newsroom|privacy|products?|services?|solutions?|responsibility(?:-impact)?|sustainability|governance|investors?|shareholders?|policies?|annual-reports?)(?:\/|[-_.]|$)/i;
 const COMMON_SOURCE_PARTS = new Set([
   "about", "global", "en", "us", "uk", "www", "index", "home", "html", "htm",
-  "insight", "insights", "research", "report", "reports", "publication", "publications", "market", "markets",
+  "insight", "insights", "research", "report", "reports", "publication", "publications", "market", "markets", "news",
 ]);
 
 /** Rank sitemap URLs against the configured research section; non-positive means reject. */
@@ -60,7 +60,8 @@ export function sitemapArticleRelevance(raw: string, sourceUrl: string): number 
     const sourceDirectory = sourcePath.replace(/\/[^/]*\.[a-z0-9]+$/i, "");
     const underSection = sourceDirectory.length > 1 && path.startsWith(`${sourceDirectory}/`);
     const sourceParts = sourcePath.split(/[^a-z0-9]+/).filter((part) => part.length > 3 && !COMMON_SOURCE_PARTS.has(part));
-    const sharedParts = sourceParts.filter((part) => path.includes(part)).length;
+    const candidateParts = new Set(path.split(/[^a-z0-9]+/).filter(Boolean));
+    const sharedParts = sourceParts.filter((part) => candidateParts.has(part)).length;
     const researchPath = RESEARCH_PATH.test(path);
 
     const slug = path.split("/").filter(Boolean).pop() ?? "";

@@ -6,7 +6,7 @@ export interface CandidateLink {
 }
 
 // URL path segments that are almost never a research article.
-const DENY = /(\/about|\/contact|\/careers?|\/privacy|\/terms|\/cookie|\/sitemap|\/login|\/register|\/subscribe|\/faq|frequently-asked|\/values|\/purpose|\/leadership|foreign-direct|industries-we-serve|global-corporate|investors?-shareholders?|shareholder|\/media\/|\/events?|presentations?|sustainability|responsibility|\/framework|advisory|\/solutions|\/banking|\/legal|\/disclaimer|\/help|\/support|\/team|\/people|\/awards|\/glossary)/i;
+const DENY = /(\/about|\/contact|\/careers?|\/privacy|\/terms|\/cookie|\/sitemap|\/login|\/register|\/subscribe|\/faq|frequently-asked|\/values|\/purpose|\/leadership|foreign-direct|industries-we-serve|global-corporate|\/investors?(?:\/|$)|investors?-shareholders?|shareholder|\/media\/|\/events?|presentations?|sustainability|responsibility|modern-slavery|code-of-conduct|\/framework|advisory|\/solutions|\/banking|\/legal|\/disclaimer|\/help|\/support|\/team|\/people|\/awards|\/glossary)/i;
 
 // A link that looks like an actual article: a date in the path, or a long slug.
 function looksLikeArticleUrl(path: string): boolean {
@@ -21,9 +21,10 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
   const $ = cheerio.load(html);
   const base = new URL(baseUrl);
   const basePath = base.pathname.replace(/\/$/, "").replace(/\.html?$/i, "");
-  const out = new Map<string, string>();
+  const out = new Map<string, { title: string; underSection: boolean; date: number; research: boolean }>();
 
   $("a[href]").each((_, el) => {
+    if ($(el).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]").length) return;
     const href = $(el).attr("href") || "";
     const text = $(el).text().replace(/\s+/g, " ").trim();
     if (text.length < 28 || text.length > 180) return; // headline-length text only
@@ -37,14 +38,27 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
     const path = abs.pathname;
     if (/\.(pdf|jpe?g|png|gif|zip|xlsx?|docx?|pptx?)$/i.test(path)) return;
     // Must be under the research section OR clearly article-shaped.
-    const underSection = basePath.length > 1 && path.startsWith(basePath);
+    const underSection = basePath.length > 1 && (path === basePath || path.startsWith(`${basePath}/`));
     if (DENY.test(underSection ? path.slice(basePath.length) : path)) return;
     if (!underSection && !looksLikeArticleUrl(path)) return;
     const key = abs.href.split("#")[0].split("?")[0];
-    if (!out.has(key) && key !== baseUrl.replace(/\/$/, "")) out.set(key, text);
+    if (!out.has(key) && key !== baseUrl.replace(/\/$/, "")) {
+      const yearMonth = key.match(/(20\d{2})[-_/](0?[1-9]|1[0-2])(?:[-_/]|$)/);
+      out.set(key, {
+        title: text,
+        underSection,
+        date: inferPublicationDate(key, text)?.getTime()
+          ?? (yearMonth ? Date.UTC(Number(yearMonth[1]), Number(yearMonth[2]) - 1, 1) : 0),
+        research: /\b(?:outlook|markets?|econom(?:y|ics?)|investment|credit|research|strategy|forecast)\b/i.test(`${path} ${text}`),
+      });
+    }
   });
 
-  return [...out.entries()].map(([url, title]) => ({ url, title })).slice(0, 12);
+  return [...out.entries()]
+    .map(([url, value]) => ({ url, ...value }))
+    .sort((a, b) => Number(b.underSection) - Number(a.underSection) || b.date - a.date || Number(b.research) - Number(a.research))
+    .slice(0, 12)
+    .map(({ url, title }) => ({ url, title }));
 }
 
 /** Find same-origin native PDFs embedded by an otherwise body-less article page. */
@@ -53,11 +67,12 @@ export function extractPdfLinks(html: string, baseUrl: string): string[] {
   const base = new URL(baseUrl);
   const out = new Set<string>();
   $("a[href],iframe[src],embed[src],object[data]").each((_, element) => {
+    if ($(element).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]").length) return;
     const raw = $(element).attr("href") || $(element).attr("src") || $(element).attr("data");
     if (!raw) return;
     try {
       const url = new URL(raw, base);
-      if (url.origin === base.origin && /\.pdf(?:$|\?)/i.test(url.href)) out.add(url.href.split("#")[0]);
+      if (url.origin === base.origin && /\.pdf(?:$|\?)/i.test(url.href) && !DENY.test(url.pathname)) out.add(url.href.split("#")[0]);
     } catch { /* invalid link */ }
   });
   return [...out];
@@ -73,6 +88,7 @@ const STRIP = "script,style,noscript,nav,header,footer,aside,form,svg,button,ifr
   "div[class*=social],section[class*=social],div[class*=share],section[class*=share]," +
   "div[class*=related],section[class*=related],div[class*=sidebar],section[class*=sidebar]," +
   "div[class*=promo],section[class*=promo],div[class*=banner],section[class*=banner]," +
+  "div[class*=menu-content],div[class*=apollo-l1-info],div[class*=apollo-featured-info],div[class*=featured-content-info]," +
   "div[class*=skip],section[class*=skip],div[id*=nav],section[id*=nav],div[id*=menu],section[id*=menu]," +
   "div[id*=footer],section[id*=footer],div[id*=header],section[id*=header],div[id*=cookie],section[id*=cookie]";
 
@@ -93,6 +109,8 @@ export function inferPublicationDate(...values: Array<string | null | undefined>
     if (!value) continue;
     let input = value;
     try { input = decodeURIComponent(value); } catch { /* keep the original value */ }
+    const compactCalendar = input.match(/(?:^|\D)(20\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)/);
+    if (compactCalendar) return new Date(Date.UTC(Number(compactCalendar[1]), Number(compactCalendar[2]) - 1, Number(compactCalendar[3])));
     const calendar = input.match(/(20\d{2})[-_/](0?[1-9]|1[0-2])[-_/](0?[1-9]|[12]\d|3[01])(?!\d)/);
     if (calendar) {
       const date = new Date(Date.UTC(Number(calendar[1]), Number(calendar[2]) - 1, Number(calendar[3])));
@@ -133,7 +151,7 @@ export function extractArticle(html: string): ExtractedArticle {
     $("h1").first().text() ||
     $("title").text() ||
     ""
-  ).replace(/\s+/g, " ").replace(/\s*[|–—-]\s*[^|–—-]{0,40}$/, "").trim();
+  ).replace(/\s+/g, " ").replace(/\s+[|–—-]\s+[^|–—-]{0,40}$/, "").trim();
 
   const author =
     $('meta[name="author"]').attr("content") ||
@@ -207,12 +225,47 @@ export function isJunk(text: string): boolean {
   return jammed > 0.06;
 }
 
+/** Reject pages whose extracted "body" is really only the publisher's legal footer. */
+export function isDisclaimerOnly(text: string): boolean {
+  const markers = [
+    /for informational purposes only/i,
+    /does not constitute (?:an )?offer/i,
+    /past (?:investment )?performance/i,
+    /a word about risk/i,
+    /without (?:prior )?notice/i,
+    /no representation (?:is|has been) made/i,
+    /should not be considered as investment advice/i,
+    /no part of this material may be reproduced/i,
+  ];
+  const hits = markers.filter((marker) => marker.test(text)).length;
+  if (hits < 4) return false;
+  const paragraphs = text.split(/\n\s*\n/).filter(Boolean);
+  const legalChars = paragraphs
+    .filter((paragraph) => markers.some((marker) => marker.test(paragraph)))
+    .reduce((sum, paragraph) => sum + paragraph.length, 0);
+  return legalChars / Math.max(text.length, 1) >= 0.65;
+}
+
+/** Topic gate for PDFs discovered without an explicit article page. */
+export function looksLikeResearchTopic(title: string, text: string): boolean {
+  const sample = `${title}\n${text.slice(0, 4000)}`;
+  const signals = [
+    /\bresearch\b/i, /\boutlook\b/i, /\bmarkets?\b/i, /\beconom(?:y|ic|ics)\b/i,
+    /\binvest(?:ment|ing|or)\b/i, /\bportfolio\b/i, /\bassets?\b/i, /\bequit(?:y|ies)\b/i,
+    /\bbonds?\b/i, /\byields?\b/i, /\binflation\b/i, /\bcommodit(?:y|ies)\b/i,
+    /\bcurrenc(?:y|ies)\b/i, /\bforex\b/i, /\bmonetary\b/i, /\bgdp\b/i,
+    /\bearnings\b/i, /\bvaluation\b/i, /\bforecast\b/i,
+  ];
+  return signals.filter((signal) => signal.test(sample)).length >= 2;
+}
+
 /** Strict article check for extracted HTML content. */
 export function looksLikeArticle(title: string, text: string): boolean {
-  if (!title || text.length < 400) return false;
+  if (!title || text.length < 1200) return false;
   const tokens = text.split(/\s+/).filter(Boolean);
   if (tokens.length < 60) return false;
   if (isJunk(text)) return false;
+  if (isDisclaimerOnly(text)) return false;
   const sentences = (text.match(/[.!?。！？]/g) || []).length;
   return sentences >= 4;
 }

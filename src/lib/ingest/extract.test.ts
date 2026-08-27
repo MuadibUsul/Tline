@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractArticle, extractLinks, extractPdfLinks, inferPublicationDate, looksLikeArticle } from "./extract";
+import { extractArticle, extractLinks, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic } from "./extract";
 
 test("extracts an embedded publisher date and conservative URL date hints", () => {
   const article = extractArticle(`<html><head><title>CIO Insights 4Q24 | Bank</title></head><body>
@@ -10,11 +10,14 @@ test("extracts an embedded publisher date and conservative URL date hints", () =
   assert.equal(article.publishedAt?.toISOString().slice(0, 10), "2024-09-30");
   assert.equal(inferPublicationDate("cio-insights-4q24")?.toISOString().slice(0, 10), "2024-10-01");
   assert.equal(inferPublicationDate("market-view-2026-08-20")?.toISOString().slice(0, 10), "2026-08-20");
+  assert.equal(inferPublicationDate("/insights/2026/08/market-outlook"), null);
   assert.equal(inferPublicationDate("latest-26082026.html")?.toISOString().slice(0, 10), "2026-08-26");
   assert.equal(inferPublicationDate("scotia-flash.-august-23--2026-.html")?.toISOString().slice(0, 10), "2026-08-23");
   assert.equal(inferPublicationDate("DTO%20270826.pdf")?.toISOString().slice(0, 10), "2026-08-27");
   assert.equal(inferPublicationDate("Weekly%20Macro%20View%2024%20August%202026.pdf")?.toISOString().slice(0, 10), "2026-08-24");
+  assert.equal(inferPublicationDate("economic_monthly_ASEANIndiaau20260820e.pdf")?.toISOString().slice(0, 10), "2026-08-20");
   assert.equal(inferPublicationDate("market-view-latest"), null);
+  assert.equal(extractArticle(`<title>Daily: Navigating higher long-end yields | UBS</title><main><p>${"Bond markets remain volatile. ".repeat(20)}</p></main>`).title, "Daily: Navigating higher long-end yields");
 });
 
 test("does not truncate a long article body", () => {
@@ -29,6 +32,30 @@ test("does not reject prose because it contains a long source URL", () => {
   assert.equal(looksLikeArticle("Monthly economic outlook", prose), true);
 });
 
+test("rejects legal disclosures presented as the article body", () => {
+  const disclosure = [
+    "This material is being provided for informational purposes only and does not constitute an offer to sell any investment product.",
+    "Past investment performance is not reflective of future results and no representation is made that these views are correct.",
+    "A word about risk: All investments contain risk and may lose value. Market and liquidity conditions can change without prior notice.",
+    "This material should not be considered as investment advice. No part of this material may be reproduced without express permission.",
+  ].join("\n\n").repeat(4);
+  assert.equal(looksLikeArticle("Market outlook", disclosure), false);
+
+  const research = `${"Growth is moderating while inflation is easing. Bond valuations now compensate investors for duration risk. Policy normalization should remain gradual. Portfolio diversification remains important. ".repeat(35)}\n\n${disclosure}`;
+  assert.equal(looksLikeArticle("Market outlook", research), true);
+});
+
+test("distinguishes investment research PDFs from operational vendor notices", () => {
+  assert.equal(looksLikeResearchTopic(
+    "Global bond outlook",
+    "Economic growth is slowing as inflation moderates. Bond yields and market valuations now offer investors better portfolio opportunities.",
+  ), true);
+  assert.equal(looksLikeResearchTopic(
+    "ERP and TMS vendor newsletter",
+    "File upload specifications will change. Vendors should migrate customer payment files to the new XML interface before the technical deadline.",
+  ), false);
+});
+
 test("keeps semantic content when body and main class names mention cookie or nav", () => {
   const prose = "Market demand remains strong. Revenue growth accelerated this quarter. Margins remain resilient. Risks are concentrated in supply constraints. ".repeat(18);
   const article = extractArticle(`<html><head><title>Semiconductor outlook</title></head><body class="cookie-disclaimer-accepted"><div class="page-content ad-banner-color"><main class="nav-modifiers-tabs"><article><h1>Semiconductor outlook</h1><p>${prose}</p></article></main></div></body></html>`);
@@ -38,8 +65,14 @@ test("keeps semantic content when body and main class names mention cookie or na
 
 test("discovers nested article pages and embedded same-origin PDFs", () => {
   const base = "https://bank.example/about/economics/publications.html";
-  const html = `<a href="/about/economics/publications/post.daily.august-26-2026.html">A sufficiently descriptive daily research publication</a>
-    <iframe src="/documents/report.pdf"></iframe><a href="https://cdn.example/report.pdf">external PDF</a>`;
-  assert.equal(extractLinks(html, base)[0]?.url, "https://bank.example/about/economics/publications/post.daily.august-26-2026.html");
+  const html = `<a href="/about/economics/publications/2025/market-review-from-last-year">A sufficiently descriptive older research publication</a>
+    <a href="/about/economics/publications/post.daily.august-26-2026.html">A sufficiently descriptive daily research publication</a>
+    <a href="/about/economics/publications-news/gir">A long headline must not make a sibling path look like the configured section</a>
+    <footer><a href="/investors/credit-ratings-fixed-income/">A sufficiently descriptive investor-relations footer link</a></footer>
+    <iframe src="/documents/report.pdf"></iframe><footer><a href="/documents/modern-slavery-statement.pdf">Modern slavery statement</a></footer><a href="https://cdn.example/report.pdf">external PDF</a>`;
+  assert.deepEqual(extractLinks(html, base).map((link) => link.url), [
+    "https://bank.example/about/economics/publications/post.daily.august-26-2026.html",
+    "https://bank.example/about/economics/publications/2025/market-review-from-last-year",
+  ]);
   assert.deepEqual(extractPdfLinks(html, base), ["https://bank.example/documents/report.pdf"]);
 });

@@ -27,4 +27,8 @@ test("accepts research articles and rejects unrelated sitemap pages", () => {
   assert.equal(sitemapArticleRelevance("https://www.ubs.com/global/en/sustainability/esg-publications-policies.html", source), 0);
   assert.equal(sitemapArticleRelevance("https://www.ubs.com/ca/fr/a-propos/responsabilite/publications-code-ethique.html", source), 0);
   assert.equal(sitemapArticleRelevance(source, source), 0);
+  assert.equal(sitemapArticleRelevance(
+    "https://www.nordea.com/en/doc/nordea-erp-tms-newsletter-june-2026-0.pdf",
+    "https://www.nordea.com/en/news-and-insights",
+  ), 0);
 });

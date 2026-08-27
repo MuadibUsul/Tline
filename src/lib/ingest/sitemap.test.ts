@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseSitemap } from "./sitemap";
+import { parseSitemap, sitemapArticleRelevance } from "./sitemap";
 
 test("parses sitemap indexes and URL lastmod values", () => {
   const index = parseSitemap(`<?xml version="1.0"?><sitemapindex>
@@ -14,4 +14,15 @@ test("parses sitemap indexes and URL lastmod values", () => {
   </urlset>`);
   assert.equal(urls.urls.length, 2);
   assert.equal(urls.urls[0].lastModified?.toISOString().slice(0, 10), "2026-08-26");
+});
+
+test("accepts research articles and rejects unrelated sitemap pages", () => {
+  const source = "https://www.ubs.com/global/en/wealthmanagement/insights/chief-investment-office/house-view.html";
+  assert.ok(sitemapArticleRelevance(
+    "https://www.ubs.com/global/en/wealthmanagement/insights/chief-investment-office/market-outlook-august-2026.html",
+    source,
+  ) > 0);
+  assert.equal(sitemapArticleRelevance("https://www.ubs.com/global/de.html", source), 0);
+  assert.equal(sitemapArticleRelevance("https://www.ubs.com/global/en/about-us.html", source), 0);
+  assert.equal(sitemapArticleRelevance(source, source), 0);
 });

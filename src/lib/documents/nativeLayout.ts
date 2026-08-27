@@ -108,6 +108,9 @@ export async function storeTranslatedNativePdf(
     throw new Error("Ready native source PDF not found for this article.");
   }
   const storageKey = path.posix.join("articles", articleId, "translation_pdf-zh-CN.pdf");
+  const existing = await prisma.articleDocument.findUnique({
+    where: { articleId_kind_locale: { articleId, kind: "translation_pdf", locale: "zh-CN" } },
+  });
   try {
     const source = await readPrivateFile(native.storageKey);
     const result = await createTranslatedNativePdf(source, blocks);
@@ -139,6 +142,13 @@ export async function storeTranslatedNativePdf(
       },
     });
   } catch (error) {
+    if (existing?.status === "ready") {
+      await prisma.articleDocument.update({
+        where: { id: existing.id },
+        data: { error: `Native-layout fallback: ${String(error).slice(0, 900)}` },
+      });
+      throw error;
+    }
     await prisma.articleDocument.upsert({
       where: { articleId_kind_locale: { articleId, kind: "translation_pdf", locale: "zh-CN" } },
       create: {

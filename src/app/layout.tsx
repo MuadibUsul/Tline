@@ -4,6 +4,8 @@ import Link from "next/link";
 import ThemeToggle from "./_components/ThemeToggle";
 import { getSessionUser } from "@/lib/auth";
 import { doSignOut } from "./actions";
+import { isFormalAuthConfigured } from "@/lib/auth-config";
+import OAuthSignOutButton from "./_components/OAuthSignOutButton";
 
 export const metadata: Metadata = {
   title: "Institutional Intelligence",
@@ -12,6 +14,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
+  const formalAuth = isFormalAuthConfigured();
   return (
     <html lang="en">
       <head>
@@ -39,7 +42,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/alerts">Alerts</Link>
             </nav>
             <div className="sp" />
-            {user ? (
+            {user && formalAuth ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>{user.email}</span>
+                <OAuthSignOutButton />
+              </div>
+            ) : user ? (
               <form action={doSignOut} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>{user.email}</span>
                 <button type="submit" className="minibtn">Sign out</button>

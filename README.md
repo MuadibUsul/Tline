@@ -34,12 +34,12 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Core pages**, all reading live data: Home (Market Consensus + Feed),
   `/asset/[ticker]`, `/institution/[slug]`, `/research/[id]`, plus `/markets`,
   `/institutions`, `/consensus` indexes.
-- **Auth + interactive Watchlist/Alerts (Phase 2)**: cookie-session auth (`src/lib/auth.ts`,
-  no passwords — email identifies the user; `AUTH_SECRET` signs the cookie). `/watchlist`
-  and `/alerts` are gated and fully interactive via **Server Actions** (`src/app/actions.ts`):
+- **Auth + interactive Watchlist/Alerts**: production supports database-backed Auth.js OAuth
+  with Microsoft Entra ID or Google; local development retains an explicitly gated demo sign-in.
+  `/watchlist` and `/alerts` are gated and interactive via **Server Actions** (`src/app/actions.ts`):
   ＋Watch / remove on asset & institution pages, create / toggle / delete alert rules
   (evaluated immediately). Consensus rules: `CONSENSUS_ABOVE` / `BELOW` / `DROP_24H` /
-  `RISE_24H`, 12h de-dup — see `src/lib/alerts.ts`. `/signin` offers "continue as demo".
+  `RISE_24H`, 12h de-dup — see `src/lib/alerts.ts`. Roles and commercial tiers are independent.
 - **AI Research (Phase 2)**: `/search` answers natural-language questions **over the
   structured DB, never a web search** (`src/lib/research.ts`). A deterministic intent
   router (`TARGET_CHANGES` / `WHY_DIRECTION` / `WHO_CHANGED` / `CONSENSUS_LEVEL` /
@@ -48,8 +48,9 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Consensus engine** (`src/lib/consensus.ts`): `raw = Σ(wᵢ·dᵢ·dirᵢ)/Σ(wᵢ·dᵢ)` → `score = (raw+2)/4×100`.
   Weight = institution authority (5★=1.0 / 4★=0.85 / 3★=0.7); decay = `exp(-ageDays/31)`
   (7d≈0.80, 30d≈0.39). Snapshots to `consensus_history` drive the 1D/7D/30D deltas.
-- **Ingestion pipeline** (`src/lib/ingest/`): Source-Adapter fetch (RSS → HTML listing),
-  three-hash dedup (url / title / content), pluggable LLM parser, structured persist.
+- **Ingestion pipeline** (`src/lib/ingest/`): RSS, Sitemap/Sitemap Index, native PDF and
+  HTML-listing discovery; research-path/date quality gates; three-hash dedup; source-run status;
+  structured persistence and per-source failure isolation.
 - **Robots compliance (strict)**: `scripts/robots_audit.py` audits all 64 sources' robots.txt
   → `64机构爬虫合规评估.xlsx` + `data/crawl_policy.json` (allowed/delayed/blocked/manual +
   Crawl-delay). The crawler (`run.ts`) only touches `allowed`/`delayed` institutions, and
@@ -62,9 +63,14 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
   (`isJunk`/`looksLikeArticle`, enforced in `store.ts`), word-boundary alias matching, and
   scored+capped asset tagging (`parseLLM.ts`). Accurate per-asset direction needs the real
   LLM parser (set `ANTHROPIC_API_KEY`).
-- **Pluggable parser** (`src/lib/ingest/parseLLM.ts`): deterministic keyword parser by default
-  (no key needed). Set `ANTHROPIC_API_KEY` in `.env` to switch to the real LLM parser
-  (schema-validated, retries, falls back to `needs_review`).
+- **Bilingual documents**: permanent clean English text and reviewed Chinese translations in
+  the database, plus private English/Chinese PDFs. Native source PDFs remain byte-identical;
+  their Chinese versions preserve page structure where quality checks allow it.
+- **Pluggable LLM boundary** (`src/lib/llm/`): deterministic parser without a key; Anthropic or
+  OpenAI for parsing, translation, correction and independent review when configured.
+- **Forecast accuracy foundation**: supported horizons become pending forecasts, CSV price
+  observations settle against one vendor source, and `/institution/[slug]/accuracy` discloses
+  directional accuracy and target error. Publishing scores waits for a licensed price feed.
 
 ## Commands
 
@@ -75,6 +81,10 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 | `python scripts/robots_audit.py` | Re-audit robots.txt for all 64 → Excel + `data/crawl_policy.json` |
 | `npm run ingest` | Live-crawl compliant priority-1 sources (`-- --slug=ubs`, `-- --all`, `-- --limit=3`); blocked/manual are refused |
 | `npm run consensus` | Recompute + snapshot all asset consensus, then evaluate alerts |
+| `npm run translate` | Translate/review pending articles and build ready bilingual PDFs |
+| `npm run documents` | Rebuild article PDF assets |
+| `npm run forecasts` | Sync supported forecast horizons and settle due observations |
+| `npm run prices:import -- --file=prices.csv --source=vendor` | Import `ticker,timestamp,value` observations |
 | `npm run alerts` | Seed/refresh the demo user's watchlist + rules and fire alerts |
 
 > **Live ingest note:** many institutional sites are JS-rendered or bot-walled, so the
@@ -86,17 +96,16 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 | Blueprint | MVP | Why |
 |---|---|---|
 | Python crawler worker | All-TypeScript | One language, one `npm run` |
-| PostgreSQL + pgvector | Prisma + SQLite | Zero infra; swap `datasource` for prod |
+| PostgreSQL + pgvector | SQLite locally, PostgreSQL 16 in production | Zero-infra development; versioned production migrations; pgvector only when needed |
 | Real LLM parse | Mock parser default, real when key set | Pipeline runs with no API key |
 
 ## Layout
 
 ```
-prisma/schema.prisma      data model (institutions, articles, analyses, assets,
-                          article_assets, forecasts, consensus_history)
+prisma/schema.prisma      application data model; generated PostgreSQL schema + migrations
 data/institutions.json    64 sources derived from the source-list xlsx
-src/lib/                  db, hash, assets, consensus, queries
-src/lib/ingest/           fetch, extract, parseLLM, store, run, recompute
+src/lib/                  auth, storage, documents, translation, forecast, consensus, queries
+src/lib/ingest/           fetch, robots, sitemap, extract, parse, store, jobs
 src/app/                  Next.js App Router pages + components
 ```
 

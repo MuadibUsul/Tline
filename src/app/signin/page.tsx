@@ -2,14 +2,16 @@ import { doSignIn } from "@/app/actions";
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DEMO_EMAIL } from "@/lib/user";
+import { formalAuthLabel, isFormalAuthConfigured } from "@/lib/auth-config";
 
 export const dynamic = "force-dynamic";
 
 export default async function SignInPage({ searchParams }: { searchParams: { next?: string; error?: string } }) {
+  const next = searchParams.next?.startsWith("/") && !searchParams.next.startsWith("//") ? searchParams.next : "/watchlist";
   const user = await getSessionUser();
-  if (user) redirect(searchParams.next || "/watchlist");
-  const next = searchParams.next || "/watchlist";
-  const demoAuthEnabled = process.env.NODE_ENV !== "production" || process.env.ALLOW_INSECURE_DEMO_AUTH === "true";
+  if (user) redirect(next);
+  const formalAuth = isFormalAuthConfigured();
+  const demoAuthEnabled = !formalAuth && (process.env.NODE_ENV !== "production" || process.env.ALLOW_INSECURE_DEMO_AUTH === "true");
 
   return (
     <main className="wrap" style={{ maxWidth: 460 }}>
@@ -18,6 +20,8 @@ export default async function SignInPage({ searchParams }: { searchParams: { nex
         <h1>Sign in</h1>
         <p className="sub" style={{ color: "var(--muted)" }}>{demoAuthEnabled
           ? "Preview sign-in identifies your watchlist and alerts without a password."
+          : formalAuth
+            ? `Continue with ${formalAuthLabel()} to access your account.`
           : "Account sign-in is unavailable until the production OAuth provider is configured."}</p>
       </div>
 
@@ -27,6 +31,8 @@ export default async function SignInPage({ searchParams }: { searchParams: { nex
       {searchParams.error === "disabled" && (
         <p className="chip bear" style={{ display: "inline-block" }}>Preview sign-in is disabled in production.</p>
       )}
+
+      {formalAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={`/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`}>Continue with {formalAuthLabel()} →</a>}
 
       {demoAuthEnabled && <><form action={doSignIn} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <input type="hidden" name="next" value={next} />

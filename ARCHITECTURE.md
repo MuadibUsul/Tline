@@ -380,7 +380,7 @@ function can(user: User | null, permission: Permission): boolean;
 - Web、PostgreSQL 和单实例 scheduler 可由 Docker Compose 启动；`/api/health` 同时检查数据库与存储适配器。
 - 每次采集写入 `JobRun`，记录参数、尝试次数、结果指标和错误；scheduler 提供有限重试、线性退避及可选失败 webhook。
 - `User.role`（member/reviewer/admin）与商业 `tier` 分离；用户写操作进入 `AuditLog`。
-- 邮箱直登只用于预览，生产默认关闭；正式 OAuth 供应商由产品方确认后接入。
+- 邮箱直登只用于预览，生产默认关闭；正式数据库会话 OAuth 已支持 Microsoft Entra ID 与 Google，部署时通过环境变量选择其一。
 
 ## 8. 数据与一致性
 
@@ -448,7 +448,7 @@ MVP 先使用结构化任务日志，每个来源至少输出：
 - created、duplicate、empty 数量
 - 最近错误类别和耗时
 
-暂不建立复杂任务表。进入长期定时采集后，再为 Institution 增加最近尝试、最近成功、连续失败和错误摘要，或引入独立 CrawlRun 表。
+每次后台任务写入 `JobRun`，每个 Institution 保存最近尝试、状态、说明和最近成功时间。当前不建立逐 URL 的复杂任务表；只有排障与吞吐压力证明必要时再增加。
 
 失败应隔离到单个机构或 URL，不能中断全部机构任务。重复执行必须保持幂等。
 
@@ -486,7 +486,7 @@ MVP 先使用结构化任务日志，每个来源至少输出：
 
 - 采集任务拆为独立 Worker。
 - 只有当单机调度无法满足吞吐、重试或隔离要求时才引入队列。
-- Auth.js/OAuth 和 tier gate 在真实用户或计费接入前完成。
+- 真实 OAuth 凭据和 tier 权限矩阵在公开部署或计费接入前配置。
 
 ## 14. 实施顺序
 
@@ -499,7 +499,7 @@ MVP 先使用结构化任务日志，每个来源至少输出：
 7. 增加 robots 缓存、last-known-good 和来源级结构化日志。
 8. 为确实需要渲染的来源加入 Playwright。
 9. 实现按解析器、模型、提示词和术语库版本重解析/重译/重建 PDF。
-10. 再进入 Consensus 趋势、Forecast Accuracy、PostgreSQL 和生产部署。
+10. 接通有授权的生产价格源，运行 Forecast Accuracy 结算并校准 Institution Score。
 
 ## 15. 已确认与待确认
 

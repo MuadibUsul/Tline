@@ -128,6 +128,7 @@ td.inst{color:var(--ink);font-weight:600}
 .rowlist a:last-child,.rowlist div.r:last-child{border-bottom:none}
 .rowlist a:hover{background:var(--panel-2)}
 .rowlist .n{font-family:var(--mono);font-weight:600}
+.source-status{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .tag-row{display:flex;flex-wrap:wrap;gap:7px}
 
 /* page header for asset/institution */

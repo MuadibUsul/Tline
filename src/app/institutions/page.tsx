@@ -18,7 +18,13 @@ export default async function InstitutionsPage() {
           {i.crawlPolicy}
         </span>
       </span>
-      <span className="n" style={{ color: "var(--muted)" }}>{i._count.articles}</span>
+      <span className="source-status">
+        {i.lastCrawlStatus && <span
+          className={`chip ${i.lastCrawlStatus === "succeeded" ? "bull" : i.lastCrawlStatus === "failed" || i.lastCrawlStatus === "refused" ? "bear" : "neu"}`}
+          title={[i.lastCrawlAt?.toISOString(), i.lastCrawlMessage].filter(Boolean).join(" · ")}
+        >{i.lastCrawlStatus}</span>}
+        <span className="n" style={{ color: "var(--muted)" }}>{i._count.articles}</span>
+      </span>
     </Link>
   );
 

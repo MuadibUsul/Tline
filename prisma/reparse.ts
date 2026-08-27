@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { parseArticle } from "../src/lib/ingest/parseLLM";
+import { syncForecastsForArticle } from "../src/lib/forecast";
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
 
@@ -97,6 +98,7 @@ async function main() {
           },
         })),
       ]);
+      await syncForecastsForArticle(article.id);
       updated++;
       console.log(`  OK   ${article.id} · ${article.title}`);
     } catch (error) {

@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "./db";
+import { getServerSession } from "next-auth";
+import { authOptions, isFormalAuthConfigured } from "./auth-config";
 
 // Lightweight signed-cookie session. No passwords — email identifies the user.
 // MVP-grade: fine for a demo with no sensitive data; swap for Auth.js in production.
@@ -34,6 +36,10 @@ function readToken(token: string): { uid: string; email: string } | null {
 
 /** Current user from the session cookie, or null. Safe to call in RSC + actions. */
 export async function getSessionUser() {
+  if (isFormalAuthConfigured()) {
+    const session = await getServerSession(authOptions);
+    return session?.user?.email ? prisma.user.findUnique({ where: { email: session.user.email } }) : null;
+  }
   const raw = cookies().get(COOKIE)?.value;
   if (!raw) return null;
   const claim = readToken(raw);
@@ -46,4 +52,5 @@ export const SESSION_COOKIE_OPTS = {
   sameSite: "lax" as const,
   path: "/",
   maxAge: MAX_AGE,
+  secure: process.env.NODE_ENV === "production",
 };

@@ -12,6 +12,10 @@ function str(fd: FormData, key: string): string {
   return (fd.get(key)?.toString() ?? "").trim();
 }
 
+function localPath(value: string, fallback: string) {
+  return value.startsWith("/") && !value.startsWith("//") ? value : fallback;
+}
+
 // ---- auth ----
 export async function doSignIn(fd: FormData) {
   if (process.env.NODE_ENV === "production" && process.env.ALLOW_INSECURE_DEMO_AUTH !== "true") {
@@ -27,7 +31,7 @@ export async function doSignIn(fd: FormData) {
   });
   await writeAudit({ actorId: user.id, action: "auth.sign_in" });
   cookies().set(COOKIE, makeToken(user), SESSION_COOKIE_OPTS);
-  redirect(str(fd, "next") || "/watchlist");
+  redirect(localPath(str(fd, "next"), "/watchlist"));
 }
 
 export async function doSignOut() {

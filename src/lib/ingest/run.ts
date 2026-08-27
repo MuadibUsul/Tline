@@ -2,7 +2,7 @@ import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchPdf, fetchText, sleep } from "./fetch";
-import { extractLinks, extractArticle } from "./extract";
+import { extractLinks, extractArticle, inferPublicationDate } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
@@ -33,17 +33,32 @@ async function ingestInstitution(
   inst: { id: string; name: string; researchUrl: string; rssUrl: string | null; sitemapUrl: string | null; language: string; crawlDelay: number | null; requiresRender: boolean },
   perLimit: number,
 ) {
+  await prisma.institution.update({
+    where: { id: inst.id },
+    data: { lastCrawlAt: new Date(), lastCrawlStatus: "running", lastCrawlMessage: null },
+  });
+  const finish = async (status: "succeeded" | "paused" | "refused", message: string, created: number) => {
+    await prisma.institution.update({
+      where: { id: inst.id },
+      data: {
+        lastCrawlStatus: status,
+        lastCrawlMessage: message.slice(0, 1000),
+        ...(status === "succeeded" ? { lastSuccessAt: new Date() } : {}),
+      },
+    });
+    return created;
+  };
   const origin = new URL(inst.researchUrl).origin;
 
   // --- Runtime robots.txt compliance check (authoritative) ---
   const robotsTxt = await fetchRobots(origin);
   if (robotsTxt === null) {
     console.log(`  ${inst.name.padEnd(26)} PAUSE · robots unavailable and no valid 24h cache`);
-    return 0;
+    return finish("paused", "robots unavailable and no valid 24h cache", 0);
   }
   if (robotsTxt && !robotsAllows(robotsTxt, UA, new URL(inst.researchUrl).pathname)) {
     console.log(`  ${inst.name.padEnd(26)} SKIP · robots disallows research path`);
-    return 0;
+    return finish("refused", "robots disallows research path", 0);
   }
   const robotsDelaySec = robotsTxt ? robotsCrawlDelay(robotsTxt, UA) : undefined;
   const delayMs = Math.max(MIN_DELAY_MS, (robotsDelaySec ?? inst.crawlDelay ?? 0) * 1000);
@@ -65,13 +80,44 @@ async function ingestInstitution(
     try {
       const feed = await rss.parseURL(inst.rssUrl);
       for (const item of (feed.items || []).slice(0, perLimit)) {
-        if (!item.link) continue;
+        if (!item.link || !allowsUrl(item.link)) continue;
+        await sleep(delayMs);
+        if (/\.pdf(?:$|\?)/i.test(item.link)) {
+          const pdf = await fetchPdf(item.link);
+          if (!pdf) continue;
+          const extracted = await extractPdf(pdf);
+          const publishedAt = (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
+          if (!publishedAt || isNaN(publishedAt.getTime())) { empty++; continue; }
+          raws.push({
+            title: item.title || "Institutional research report",
+            text: extracted.text,
+            sourceUrl: item.link,
+            author: item.creator || null,
+            publishedAt,
+            segments: [{ heading: null, text: extracted.text }],
+            strict: true,
+          });
+          nativePdfs.set(item.link, pdf);
+          continue;
+        }
+        let html = await fetchText(item.link);
+        if (!html && inst.requiresRender) html = await renderHtml(item.link);
+        if (!html) continue;
+        let article = extractArticle(html);
+        if (article.text.length < 400 && inst.requiresRender) {
+          const rendered = await renderHtml(item.link);
+          if (rendered) article = extractArticle(rendered);
+        }
+        const publishedAt = article.publishedAt || (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
+        if (!publishedAt || isNaN(publishedAt.getTime())) { empty++; continue; }
         raws.push({
-          title: item.title || "",
-          text: (item.contentSnippet || item.content || item.title || "").toString(),
+          title: article.title || item.title || "",
+          text: article.text,
           sourceUrl: item.link,
-          author: item.creator || null,
-          publishedAt: item.isoDate ? new Date(item.isoDate) : new Date(),
+          author: article.author || item.creator || null,
+          publishedAt,
+          segments: article.segments,
+          strict: true,
         });
       }
     } catch { /* fall through to HTML */ }
@@ -100,12 +146,14 @@ async function ingestInstitution(
             .replace(/\.pdf$/i, "")
             .replace(/[-_]+/g, " ")
             .trim();
+          const publishedAt = candidate.lastModified || inferPublicationDate(candidate.url, filename);
+          if (!publishedAt) { empty++; continue; }
           raws.push({
             title: filename || "Institutional research report",
             text: extracted.text,
             sourceUrl: candidate.url,
             author: null,
-            publishedAt: candidate.lastModified || new Date(),
+            publishedAt,
             segments: [{ heading: null, text: extracted.text }],
           });
           nativePdfs.set(candidate.url, pdf);
@@ -121,12 +169,14 @@ async function ingestInstitution(
           const rendered = await renderHtml(candidate.url);
           if (rendered) article = extractArticle(rendered);
         }
+        const publishedAt = article.publishedAt || candidate.lastModified || inferPublicationDate(candidate.url, article.title);
+        if (!publishedAt) { empty++; continue; }
         raws.push({
           title: article.title,
           text: article.text,
           sourceUrl: candidate.url,
           author: article.author,
-          publishedAt: article.publishedAt || candidate.lastModified || new Date(),
+          publishedAt,
           segments: article.segments,
           strict: true,
         });
@@ -154,12 +204,14 @@ async function ingestInstitution(
           const rendered = await renderHtml(link.url);
           if (rendered) a = extractArticle(rendered);
         }
+        const publishedAt = a.publishedAt || inferPublicationDate(link.url, a.title || link.title);
+        if (!publishedAt) { empty++; continue; }
         raws.push({
           title: a.title || link.title,
           text: a.text,
           sourceUrl: link.url,
           author: a.author,
-          publishedAt: a.publishedAt || new Date(),
+          publishedAt,
           segments: a.segments,
           strict: true, // HTML-extracted → enforce the full article check
         });
@@ -197,7 +249,7 @@ async function ingestInstitution(
     robotsBlocked: blocked,
     delayMs,
   }));
-  return created;
+  return finish("succeeded", `${raws.length} discovered · ${created} created · ${dup} duplicate · ${empty} empty · ${blocked} blocked`, created);
 }
 
 async function executeIngest() {
@@ -220,20 +272,36 @@ async function executeIngest() {
   });
 
   if (slug) {
-    const exists = await prisma.institution.findUnique({ where: { slug }, select: { crawlPolicy: true, name: true } });
+    const exists = await prisma.institution.findUnique({ where: { slug }, select: { id: true, crawlPolicy: true, name: true } });
     if (exists && !["allowed", "delayed"].includes(exists.crawlPolicy)) {
       console.log(`Refusing to crawl "${exists.name}" — crawlPolicy=${exists.crawlPolicy} (robots blocked / needs manual review).`);
+      await prisma.institution.update({
+        where: { id: exists.id },
+        data: { lastCrawlAt: new Date(), lastCrawlStatus: "refused", lastCrawlMessage: `crawlPolicy=${exists.crawlPolicy}` },
+      });
       return { institutions: 0, articlesCreated: 0, consensusSnapshots: 0, refused: true };
     }
   }
 
   console.log(`Ingesting ${institutions.length} compliant institution(s), up to ${perLimit} articles each…`);
   let total = 0;
-  for (const inst of institutions) total += await ingestInstitution(inst, perLimit);
+  let failedSources = 0;
+  for (const inst of institutions) {
+    try {
+      total += await ingestInstitution(inst, perLimit);
+    } catch (error) {
+      failedSources++;
+      await prisma.institution.update({
+        where: { id: inst.id },
+        data: { lastCrawlStatus: "failed", lastCrawlMessage: String(error).slice(0, 1000) },
+      });
+      console.error(JSON.stringify({ event: "ingest.source.failed", institution: inst.name, error: String(error) }));
+    }
+  }
 
   const snaps = await snapshotAll();
   console.log(`\nDone. ${total} new articles · ${snaps} consensus snapshots.`);
-  return { institutions: institutions.length, articlesCreated: total, consensusSnapshots: snaps, refused: false };
+  return { institutions: institutions.length, failedSources, articlesCreated: total, consensusSnapshots: snaps, refused: false };
 }
 
 async function main() {

@@ -65,6 +65,30 @@ export interface ExtractedArticle {
   publishedAt: Date | null;
 }
 
+/** Conservative date inference for URLs/titles that carry an explicit calendar date or quarter. */
+export function inferPublicationDate(...values: Array<string | null | undefined>): Date | null {
+  for (const value of values) {
+    if (!value) continue;
+    const calendar = value.match(/(20\d{2})[-_/](0?[1-9]|1[0-2])[-_/](0?[1-9]|[12]\d|3[01])(?!\d)/);
+    if (calendar) {
+      const date = new Date(Date.UTC(Number(calendar[1]), Number(calendar[2]) - 1, Number(calendar[3])));
+      if (!isNaN(date.getTime())) return date;
+    }
+    const quarter = value.match(/(?:q([1-4])|([1-4])q)[\s_-]*(?:20)?(\d{2})(?!\d)/i);
+    if (quarter) return new Date(Date.UTC(2000 + Number(quarter[3]), (Number(quarter[1] || quarter[2]) - 1) * 3, 1));
+  }
+  return null;
+}
+
+function parsePublicationDate(value: string): Date | null {
+  const parsed = new Date(value);
+  if (isNaN(parsed.getTime())) return null;
+  if (!/[T:]|(?:Z|[+-]\d\d:?\d\d)$/i.test(value)) {
+    return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
+  }
+  return parsed;
+}
+
 /** Extract a clean title + body text (+ heading-delimited segments) from an article page. */
 export function extractArticle(html: string): ExtractedArticle {
   const $ = cheerio.load(html);
@@ -87,8 +111,9 @@ export function extractArticle(html: string): ExtractedArticle {
     $("time[datetime]").attr("datetime") ||
     $('meta[name="date"]').attr("content") ||
     $('meta[itemprop="datePublished"]').attr("content") ||
+    html.match(/"(?:datePublished|PublishedDate)"\s*:\s*"([^"\\]+)"/i)?.[1] ||
     "";
-  const publishedAt = dateStr ? new Date(dateStr) : null;
+  const publishedAt = dateStr ? parsePublicationDate(dateStr) : null;
 
   // Pick the densest container by PARAGRAPH text (menus have lots of text but few <p>).
   let bestEl: any = null;
@@ -129,7 +154,7 @@ export function extractArticle(html: string): ExtractedArticle {
     text,
     segments,
     author: author?.slice(0, 120) || null,
-    publishedAt: publishedAt && !isNaN(publishedAt.getTime()) ? publishedAt : null,
+    publishedAt,
   };
 }
 
@@ -148,7 +173,7 @@ export function isJunk(text: string): boolean {
   return jammed > 0.06;
 }
 
-/** Strict article check for HTML-extracted content (RSS snippets are exempt). */
+/** Strict article check for extracted HTML content. */
 export function looksLikeArticle(title: string, text: string): boolean {
   if (!title || text.length < 400) return false;
   const tokens = text.split(/\s+/).filter(Boolean);

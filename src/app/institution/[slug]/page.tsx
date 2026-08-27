@@ -24,6 +24,7 @@ export default async function InstitutionPage({ params }: { params: { slug: stri
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <a href={inst.researchUrl} target="_blank" rel="noopener noreferrer" className="minibtn">Research homepage ↗</a>
+          <Link href={`/institution/${inst.slug}/accuracy`} className="minibtn">Forecast accuracy</Link>
           <form action={addWatch}>
             <input type="hidden" name="kind" value="institution" />
             <input type="hidden" name="refId" value={inst.slug} />

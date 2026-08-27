@@ -56,7 +56,20 @@ The application depends only on the `DocumentStorage` interface. It includes loc
 
 ## Authentication boundary
 
-The current email-only session is a preview mechanism. It is disabled in production unless `ALLOW_INSECURE_DEMO_AUTH=true` is explicitly set. Keep that flag false on public deployments; select and configure the formal OAuth provider before account launch. Roles (`member`, `reviewer`, `admin`) are separate from future commercial tiers, and state-changing user actions are written to `AuditLog`.
+The email-only session is a preview mechanism and is disabled in production unless `ALLOW_INSECURE_DEMO_AUTH=true` is explicitly set. Formal database-backed OAuth supports `AUTH_PROVIDER=azure-ad` or `google`; configure its client ID/secret, `NEXTAUTH_URL`, and optionally `AUTH_ALLOWED_EMAIL_DOMAINS`. Keep preview auth disabled on public deployments. Roles (`member`, `reviewer`, `admin`) are separate from future commercial tiers, and state-changing user actions are written to `AuditLog`.
+
+Register `${NEXTAUTH_URL}/api/auth/callback/azure-ad` for Microsoft Entra ID or `${NEXTAUTH_URL}/api/auth/callback/google` for Google. Only one provider is enabled per deployment by the current configuration.
+
+## Forecast settlement
+
+Import licensed end-of-day observations as `ticker,timestamp,value`, then run settlement:
+
+```bash
+npm run prices:import -- --file=/private/path/prices.csv --source=vendor-name
+npm run forecasts
+```
+
+The settlement job uses observations from the same named source at forecast start and target, rejects gaps beyond `PRICE_SETTLEMENT_TOLERANCE_DAYS` (default 7), and leaves unmatched forecasts pending. The CSV importer is an operational boundary, not a market-data license or downloader.
 
 ## Operational checks
 

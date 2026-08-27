@@ -3,6 +3,7 @@ import { prisma } from "../src/lib/db";
 import { getLLMProvider } from "../src/lib/llm/provider";
 import { translateAndPersist } from "../src/lib/translation/translate";
 import { generateArticleDocuments } from "../src/lib/documents/pdf";
+import { translateNativeDocument } from "../src/lib/documents/extractPdf";
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -34,10 +35,27 @@ async function main() {
   let translated = 0;
   let needsReview = 0;
   let failed = 0;
+  let nativeLayouts = 0;
+  let nativeFallbacks = 0;
   for (const article of candidates) {
     try {
       const result = await translateAndPersist(article.id, provider);
       await generateArticleDocuments(article.id);
+      if (result.translation.status === "reviewed") {
+        const native = await prisma.articleDocument.findFirst({
+          where: { articleId: article.id, kind: "source_native", status: "ready" },
+          select: { id: true },
+        });
+        if (native) {
+          try {
+            await translateNativeDocument(article.id, result.translation.id, native.id, provider);
+            nativeLayouts++;
+          } catch (error) {
+            nativeFallbacks++;
+            console.warn(`  LAYOUT FALLBACK ${article.id} · standard Chinese PDF retained`, error);
+          }
+        }
+      }
       if (result.translation.status === "reviewed") translated++;
       else needsReview++;
       console.log(`  ${result.translation.status === "reviewed" ? "OK  " : "HOLD"} ${article.id} · ${article.title}`);
@@ -46,7 +64,7 @@ async function main() {
       console.error(`  FAIL ${article.id} · ${article.title}`, error);
     }
   }
-  console.log(`Translation complete: ${translated} reviewed · ${needsReview} needs review · ${failed} failed.`);
+  console.log(`Translation complete: ${translated} reviewed · ${needsReview} needs review · ${failed} failed · ${nativeLayouts} native layouts · ${nativeFallbacks} layout fallbacks.`);
 }
 
 main()

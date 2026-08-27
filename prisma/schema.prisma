@@ -11,23 +11,27 @@ datasource db {
 }
 
 model Institution {
-  id             String   @id @default(cuid())
-  slug           String   @unique
-  name           String
-  country        String?
-  homepage       String?
-  researchUrl    String
-  rssUrl         String?
-  sitemapUrl     String?
-  rating         Int      @default(4) // stars 3..5 from the source list
-  authorityScore Float    @default(0.85) // 0..1 weight used by the consensus engine
-  priority       Int      @default(3) // 1 = phase-1 high-value source
-  updateFreq     String? // annual estimate from the source list
-  language       String   @default("en")
-  crawlPolicy    String   @default("allowed") // allowed | delayed | blocked | manual (from robots audit)
-  crawlDelay     Int? // seconds; from robots Crawl-delay, honored by the crawler
-  requiresRender Boolean  @default(false) // explicit opt-in for public JS-rendered pages
-  createdAt      DateTime @default(now())
+  id               String    @id @default(cuid())
+  slug             String    @unique
+  name             String
+  country          String?
+  homepage         String?
+  researchUrl      String
+  rssUrl           String?
+  sitemapUrl       String?
+  rating           Int       @default(4) // stars 3..5 from the source list
+  authorityScore   Float     @default(0.85) // 0..1 weight used by the consensus engine
+  priority         Int       @default(3) // 1 = phase-1 high-value source
+  updateFreq       String? // annual estimate from the source list
+  language         String    @default("en")
+  crawlPolicy      String    @default("allowed") // allowed | delayed | blocked | manual (from robots audit)
+  crawlDelay       Int? // seconds; from robots Crawl-delay, honored by the crawler
+  requiresRender   Boolean   @default(false) // explicit opt-in for public JS-rendered pages
+  lastCrawlAt      DateTime?
+  lastCrawlStatus  String? // running | succeeded | paused | refused | failed
+  lastCrawlMessage String?
+  lastSuccessAt    DateTime?
+  createdAt        DateTime  @default(now())
 
   articles  Article[]
   forecasts Forecast[]
@@ -161,9 +165,10 @@ model Asset {
   assetClass String // equity | rate | fx | commodity | crypto | macro
   aliases    String @default("[]") // JSON string of match terms
 
-  articleAssets    ArticleAsset[]
-  forecasts        Forecast[]
-  consensusHistory ConsensusHistory[]
+  articleAssets     ArticleAsset[]
+  forecasts         Forecast[]
+  consensusHistory  ConsensusHistory[]
+  priceObservations PriceObservation[]
 }
 
 model ArticleAsset {
@@ -177,26 +182,55 @@ model ArticleAsset {
   confidence     Float    @default(0.6)
   createdAt      DateTime @default(now())
 
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  asset   Asset   @relation(fields: [assetId], references: [id])
+  article  Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  asset    Asset     @relation(fields: [assetId], references: [id])
+  forecast Forecast?
 
   @@unique([articleId, assetId])
   @@index([assetId, direction])
 }
 
 model Forecast {
-  id            String    @id @default(cuid())
-  institutionId String
-  assetId       String
-  forecastDate  DateTime
-  targetDate    DateTime?
-  targetValue   Float?
-  metric        String?
+  id               String    @id @default(cuid())
+  institutionId    String
+  assetId          String
+  articleAssetId   String?   @unique
+  forecastDate     DateTime
+  targetDate       DateTime?
+  targetValue      Float?
+  metric           String?
+  direction        Int?
+  status           String    @default("pending") // pending | settled
+  baseValue        Float?
+  actualValue      Float?
+  absoluteError    Float?
+  percentageError  Float?
+  directionCorrect Boolean?
+  settlementSource String?
+  settledAt        DateTime?
 
-  institution Institution @relation(fields: [institutionId], references: [id])
-  asset       Asset       @relation(fields: [assetId], references: [id])
+  institution  Institution   @relation(fields: [institutionId], references: [id])
+  asset        Asset         @relation(fields: [assetId], references: [id])
+  articleAsset ArticleAsset? @relation(fields: [articleAssetId], references: [id], onDelete: Cascade)
 
   @@index([assetId, forecastDate])
+  @@index([institutionId, status])
+  @@index([status, targetDate])
+}
+
+model PriceObservation {
+  id        String   @id @default(cuid())
+  assetId   String
+  timestamp DateTime
+  value     Float
+  source    String
+  sourceRef String?
+  createdAt DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, timestamp, source])
+  @@index([assetId, timestamp])
 }
 
 model ConsensusHistory {
@@ -217,16 +251,63 @@ model ConsensusHistory {
 // ---- User side (Phase 2). Refs to assets/institutions are scalar (ticker/slug). ----
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  tier      String   @default("pro") // free | pro | trader | professional
-  role      String   @default("member") // member | reviewer | admin; independent of commercial tier
-  createdAt DateTime @default(now())
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  tier          String    @default("free") // matrix is configured later
+  role          String    @default("member") // member | reviewer | admin; independent of commercial tier
+  createdAt     DateTime  @default(now())
 
   watchlist WatchlistItem[]
   rules     AlertRule[]
   auditLogs AuditLog[]
+  accounts  Account[]
+  sessions  Session[]
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  expires_in         Int?
+  ext_expires_in     Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+  oauth_token        String?
+  oauth_token_secret String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model WatchlistItem {

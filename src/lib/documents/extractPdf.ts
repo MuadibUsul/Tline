@@ -3,6 +3,7 @@ import { validateTranslation } from "../translation/quality";
 import { readPrivateFile } from "./storage";
 import { storeTranslatedNativePdf, type TranslatedPdfBlock } from "./nativeLayout";
 import { prisma } from "../db";
+import glossary from "../../../data/financial_glossary.zh-CN.json";
 
 export interface PdfSourceBlock extends TranslatedPdfBlock {
   id: string;
@@ -52,24 +53,32 @@ interface BlockResponse {
 }
 
 async function translateBatch(provider: LLMProvider, blocks: PdfSourceBlock[]) {
-  const response = await completeJSON<BlockResponse>(provider, {
-    system: `Translate institutional financial research from English to professional Simplified Chinese.
+  const request = async (issues: string[] = []) => {
+    const response = await completeJSON<BlockResponse>(provider, {
+      system: `Translate institutional financial research from English to professional Simplified Chinese.
 Translate every supplied text block completely. Preserve numbers, currencies, percentages, basis points,
 dates, tickers, modality, and block IDs. Do not summarize or add analysis.
 Return ONLY JSON: {"blocks":[{"id":string,"text":string}]}.`,
-    user: JSON.stringify({ blocks: blocks.map((block) => ({ id: block.id, text: block.sourceText })) }),
-    maxTokens: 5000,
-  });
-  const rows = Array.isArray(response.value.blocks) ? response.value.blocks : [];
-  const byId = new Map(rows
-    .filter((row): row is { id: string; text: string } => typeof row.id === "string" && typeof row.text === "string" && Boolean(row.text.trim()))
-    .map((row) => [row.id, row.text.trim()]));
+      user: JSON.stringify({ glossary, correction_issues: issues, blocks: blocks.map((block) => ({ id: block.id, text: block.sourceText })) }),
+      maxTokens: 5000,
+    });
+    const rows = Array.isArray(response.value.blocks) ? response.value.blocks : [];
+    return new Map(rows
+      .filter((row): row is { id: string; text: string } => typeof row.id === "string" && typeof row.text === "string" && Boolean(row.text.trim()))
+      .map((row) => [row.id, row.text.trim()]));
+  };
+  let byId = await request();
   if (byId.size !== blocks.length || blocks.some((block) => !byId.has(block.id))) {
     throw new Error("Native PDF translation omitted or duplicated text blocks.");
   }
   const source = blocks.map((block) => block.sourceText).join("\n");
-  const translated = blocks.map((block) => byId.get(block.id)!).join("\n");
-  const quality = validateTranslation(source, translated, blocks.length, byId.size);
+  let translated = blocks.map((block) => byId.get(block.id)!).join("\n");
+  let quality = validateTranslation(source, translated, blocks.length, byId.size);
+  if (!quality.passed) {
+    byId = await request(quality.issues.map((issue) => issue.message));
+    translated = blocks.map((block) => byId.get(block.id) ?? "").join("\n");
+    quality = validateTranslation(source, translated, blocks.length, byId.size);
+  }
   if (!quality.passed) {
     throw new Error("Native PDF translation failed integrity checks: " + quality.issues.map((issue) => issue.message).join(" "));
   }
@@ -88,6 +97,7 @@ export async function translateNativeDocument(
     throw new Error("Ready native source PDF not found for this article.");
   }
   const extracted = await extractPdf(await readPrivateFile(native.storageKey));
+  if (extracted.blocks.length === 0) throw new Error("Native PDF has no extractable text blocks; OCR is required.");
   const translated: TranslatedPdfBlock[] = [];
   for (let index = 0; index < extracted.blocks.length; index += 40) {
     translated.push(...await translateBatch(provider, extracted.blocks.slice(index, index + 40)));

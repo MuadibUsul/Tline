@@ -1,6 +1,7 @@
 import { gunzipSync } from "node:zlib";
 import * as cheerio from "cheerio";
 import { fetchResource } from "./fetch";
+import { inferPublicationDate } from "./extract";
 
 export interface SitemapCandidate {
   url: string;
@@ -37,6 +38,41 @@ function allowedArticleUrl(raw: string, source: URL) {
   }
 }
 
+const RESEARCH_PATH = /(?:^|\/)(?:insights?|research|outlooks?|markets?|econom(?:y|ics?)|strateg(?:y|ies|ic)|investment|views?|reports?|publications?|analysis|thought-leadership)(?:\/|[-_.]|$)/i;
+const NON_RESEARCH_PATH = /(?:^|\/)(?:about|careers?|contact|events?|help|legal|newsroom|privacy|products?|services?|solutions?|sustainability)(?:\/|$)/i;
+const COMMON_SOURCE_PARTS = new Set(["global", "en", "us", "uk", "www", "index", "home", "html", "htm"]);
+
+/** Rank sitemap URLs against the configured research section; non-positive means reject. */
+export function sitemapArticleRelevance(raw: string, sourceUrl: string): number {
+  try {
+    const candidate = new URL(raw);
+    const source = new URL(sourceUrl);
+    if (!allowedArticleUrl(raw, source)) return 0;
+
+    const path = decodeURIComponent(candidate.pathname).toLowerCase().replace(/\/$/, "");
+    const sourcePath = decodeURIComponent(source.pathname).toLowerCase().replace(/\/$/, "");
+    if (!path || path === sourcePath) return 0;
+    if (NON_RESEARCH_PATH.test(path)) return 0;
+
+    const sourceDirectory = sourcePath.replace(/\/[^/]*\.[a-z0-9]+$/i, "");
+    const underSection = sourceDirectory.length > 1 && path.startsWith(`${sourceDirectory}/`);
+    const sourceParts = sourcePath.split(/[^a-z0-9]+/).filter((part) => part.length > 3 && !COMMON_SOURCE_PARTS.has(part));
+    const sharedParts = sourceParts.filter((part) => path.includes(part)).length;
+    const researchPath = RESEARCH_PATH.test(path);
+
+    const slug = path.split("/").filter(Boolean).pop() ?? "";
+    const articleShaped = /\.pdf$/i.test(path)
+      || /\/20\d\d(?:\/|-)/.test(path)
+      || (slug.length >= 16 && (slug.match(/-/g) || []).length >= 2)
+      || (underSection && path.split("/").length > sourceDirectory.split("/").length);
+    if ((!underSection && !researchPath && sharedParts === 0) || !articleShaped) return 0;
+
+    return (underSection ? 4 : 0) + (researchPath ? 2 : 0) + Math.min(sharedParts, 2) + (/\.pdf$/i.test(path) ? 1 : 0);
+  } catch {
+    return 0;
+  }
+}
+
 async function fetchSitemap(url: string) {
   const result = await fetchResource(url, 20000);
   if (!result.ok || !result.body) return null;
@@ -68,7 +104,7 @@ export async function discoverFromSitemaps(
     }
   });
   const visited = new Set<string>();
-  const candidates = new Map<string, SitemapCandidate>();
+  const candidates = new Map<string, SitemapCandidate & { relevance: number }>();
 
   while (queue.length && visited.size < maxSitemaps) {
     const sitemapUrl = queue.shift()!;
@@ -81,17 +117,20 @@ export async function discoverFromSitemaps(
       if (!visited.has(index) && (options.allows?.(index) ?? true) && queue.length + visited.size < maxSitemaps) queue.push(index);
     }
     for (const candidate of parsed.urls) {
-      if (!allowedArticleUrl(candidate.url, source)) continue;
-      if (candidate.lastModified && candidate.lastModified < since) continue;
+      const relevance = sitemapArticleRelevance(candidate.url, sourceUrl);
+      if (relevance <= 0) continue;
+      const dateHint = candidate.lastModified || inferPublicationDate(candidate.url);
+      if (dateHint && dateHint < since) continue;
       const clean = candidate.url.split("#")[0];
       const existing = candidates.get(clean);
       if (!existing || (candidate.lastModified?.getTime() ?? 0) > (existing.lastModified?.getTime() ?? 0)) {
-        candidates.set(clean, { ...candidate, url: clean });
+        candidates.set(clean, { ...candidate, url: clean, relevance });
       }
     }
   }
 
   return [...candidates.values()]
-    .sort((a, b) => (b.lastModified?.getTime() ?? 0) - (a.lastModified?.getTime() ?? 0))
-    .slice(0, limit);
+    .sort((a, b) => b.relevance - a.relevance || (b.lastModified?.getTime() ?? 0) - (a.lastModified?.getTime() ?? 0))
+    .slice(0, limit)
+    .map(({ relevance: _, ...candidate }) => candidate);
 }

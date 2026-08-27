@@ -3,6 +3,7 @@ import { urlHash, titleHash, contentHash } from "../hash";
 import { parseArticle } from "./parseLLM";
 import { isJunk, looksLikeArticle, type Segment } from "./extract";
 import { ASSETS } from "../assets";
+import { syncForecastsForArticle } from "../forecast";
 
 export interface RawArticle {
   title: string;
@@ -46,7 +47,7 @@ export async function persistArticle(
   const text = raw.text?.trim() || "";
   if (!raw.title || text.length < 120) return "empty";
   // Cleaning gate: reject nav/menu dumps always; enforce the full article
-  // check for HTML-extracted pages (RSS snippets are shorter but clean).
+  // check for extracted HTML pages.
   if (isJunk(text)) return "empty";
   if (raw.strict && !looksLikeArticle(raw.title, text)) return "empty";
 
@@ -69,7 +70,7 @@ export async function persistArticle(
 
   const tickers = await assetIdMap();
 
-  await prisma.article.create({
+  const article = await prisma.article.create({
     data: {
       institutionId,
       title: raw.title,
@@ -117,5 +118,6 @@ export async function persistArticle(
       },
     },
   });
+  await syncForecastsForArticle(article.id);
   return "created";
 }

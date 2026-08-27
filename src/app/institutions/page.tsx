@@ -1,41 +1,76 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
+import { relTime } from "@/app/_components/ui";
+import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
-export default async function InstitutionsPage() {
-  const locale = getLocale();
-  const insts = await prisma.institution.findMany({
-    orderBy: [{ priority: "asc" }, { name: "asc" }],
-    include: { _count: { select: { articles: true } } },
-  });
-  const p1 = insts.filter((i) => i.priority === 1);
-  const rest = insts.filter((i) => i.priority !== 1);
+const TYPE_ZH: Record<string, string> = {
+  forecast: "预测", target: "目标", direction: "方向", conditional: "条件观点",
+  risk: "风险", rationale: "逻辑", market_impact: "市场影响",
+};
 
-  const Row = (i: (typeof insts)[number]) => (
-    <Link key={i.id} href={`/institution/${i.slug}`} className="r">
-      <span className="inst">{i.name} <span className="stars" style={{ fontSize: 11 }}>{"★".repeat(i.rating)}</span>
-        <span className={`chip ${i.crawlPolicy === "allowed" ? "bull" : i.crawlPolicy === "delayed" ? "neu" : i.crawlPolicy === "blocked" ? "bear" : "gray"}`} style={{ marginLeft: 8 }}>
-          {tr(locale, i.crawlPolicy, ({ allowed: "允许", delayed: "延迟", blocked: "禁止" } as Record<string, string>)[i.crawlPolicy] ?? "未知")}
-        </span>
-      </span>
-      <span className="source-status">
-        {i.lastCrawlStatus && <span
-          className={`chip ${i.lastCrawlStatus === "succeeded" ? "bull" : i.lastCrawlStatus === "failed" || i.lastCrawlStatus === "refused" ? "bear" : "neu"}`}
-          title={[i.lastCrawlAt?.toISOString(), i.lastCrawlMessage].filter(Boolean).join(" · ")}
-        >{tr(locale, i.lastCrawlStatus, ({ succeeded: "成功", failed: "失败", refused: "拒绝", running: "运行中" } as Record<string, string>)[i.lastCrawlStatus] ?? i.lastCrawlStatus)}</span>}
-        <span className="n" style={{ color: "var(--muted)" }}>{i._count.articles}</span>
-      </span>
-    </Link>
-  );
+function directionLabel(direction: string, locale: Locale) {
+  if (locale === "en") return direction;
+  return ({ bullish: "看多", bearish: "看空", neutral: "中性", conditional: "条件性" } as Record<string, string>)[direction] ?? direction;
+}
+
+export default async function ViewsPage({ searchParams }: { searchParams: { page?: string } }) {
+  const locale = getLocale();
+  const page = Math.max(1, Number(searchParams.page) || 1);
+  const take = 50;
+  const [views, total] = await Promise.all([
+    prisma.atomicView.findMany({
+      orderBy: [{ article: { publishedAt: "desc" } }, { articleId: "desc" }, { position: "asc" }],
+      skip: (page - 1) * take,
+      take,
+      include: { article: { include: { institution: true } } },
+    }),
+    prisma.atomicView.count(),
+  ]);
+  const pages = Math.max(1, Math.ceil(total / take));
 
   return (
-    <main className="wrap">
-      <div className="page-head"><div className="eyebrow">{tr(locale, "Sources", "数据源")}</div><h1>{tr(locale, "Institutions", "机构")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, `${insts.length} public research sources · 15 phase-1 priority.`, `${insts.length} 个公开研报来源 · 15 个第一阶段优先来源。`)}</p></div>
-      <section className="blk"><div className="section-t">{tr(locale, "Phase-1 Priority (weight-heavy)", "第一阶段优先来源（高权重）")}</div><div className="rowlist">{p1.map(Row)}</div></section>
-      <section style={{ paddingTop: 26 }}><div className="section-t">{tr(locale, "All other sources", "其他全部来源")}</div><div className="rowlist">{rest.map(Row)}</div></section>
+    <main className="wrap view-stream-wrap">
+      <div className="page-head">
+        <div className="eyebrow">{tr(locale, "Institutional Wire", "机构短讯")}</div>
+        <h1>{tr(locale, "Views", "观点")}</h1>
+        <p className="sub">{tr(locale, `${total} evidence-backed atomic views, newest first.`, `共 ${total} 条可追溯原子观点，按发布时间倒序排列。`)}</p>
+      </div>
+
+      <section className="view-flash-list" aria-label={tr(locale, "Latest institutional views", "最新机构观点")}>
+        {views.map((view) => {
+          const tone = view.direction === "bullish" ? "bull" : view.direction === "bearish" ? "bear" : "neu";
+          const copy = locale === "zh-CN" ? view.viewZh : view.viewEn;
+          return (
+            <article className="view-flash" key={view.id}>
+              <time dateTime={view.article.publishedAt.toISOString()} title={formatDate(view.article.publishedAt, locale)}>{relTime(view.article.publishedAt, locale)}</time>
+              <div className="view-flash-main">
+                <div className="view-flash-meta">
+                  <Link href={`/institution/${view.article.institution.slug}`}>{view.article.institution.name}</Link>
+                  <span className={`chip ${tone}`}>{directionLabel(view.direction, locale)}</span>
+                  <span className="chip gray">{locale === "zh-CN" ? TYPE_ZH[view.type] ?? view.type : view.type.replace("_", " ")}</span>
+                  {view.assetTicker ? <Link href={`/asset/${view.assetTicker}`} className="chip acc">{view.asset} · {view.assetTicker}</Link> : <span className="chip acc">{view.asset}</span>}
+                  <span className="view-horizon">{view.timeHorizon}</span>
+                </div>
+                <h2><Link href={`/research/${view.articleId}`}>{copy}</Link></h2>
+                <div className="view-flash-foot">
+                  {view.value && <b>{view.value}</b>}
+                  <span>{view.topic}</span><span>{"★".repeat(view.importance)}</span>
+                  <details><summary>{tr(locale, "Evidence", "原文依据")}</summary><blockquote>{view.sourceQuote}</blockquote></details>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+        {views.length === 0 && <div className="empty-state">{tr(locale, "No atomic views have been extracted yet.", "暂未提取出原子观点。")}</div>}
+      </section>
+
+      {pages > 1 && <nav className="pagination" aria-label={tr(locale, "View pages", "观点分页")}>
+        {page > 1 && <Link href={`/institutions?page=${page - 1}`}>← {tr(locale, "Previous", "上一页")}</Link>}
+        <span>{tr(locale, `Page ${page} / ${pages}`, `第 ${page} / ${pages} 页`)}</span>
+        {page < pages && <Link href={`/institutions?page=${page + 1}`}>{tr(locale, "Next", "下一页")} →</Link>}
+      </nav>}
     </main>
   );
 }

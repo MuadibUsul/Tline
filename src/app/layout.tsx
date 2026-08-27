@@ -40,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <nav className="nav">
               <Link href="/">{tr(locale, "Home", "首页")}</Link>
               <Link href="/markets">{tr(locale, "Markets", "市场")}</Link>
-              <Link href="/institutions">{tr(locale, "Institutions", "机构")}</Link>
+              <Link href="/institutions">{tr(locale, "Views", "观点")}</Link>
               <Link href="/research">{tr(locale, "Research", "研报")}</Link>
               <Link href="/consensus">{tr(locale, "Consensus", "共识")}</Link>
               <Link href="/watchlist">{tr(locale, "Monitoring", "监控")}</Link>

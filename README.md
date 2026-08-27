@@ -73,6 +73,9 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Evidence-backed atomic views**: configured LLMs decompose a report into bilingual,
   independently searchable views. Every row must retain a direct quote found in the stored source;
   unsupported numbers, invalid labels, duplicates and weakened conditional language are rejected.
+- **Explainable view ranking**: `/institutions` is an institutional-view wire ranked strictly by
+  seven-day asset/topic heat (including active official events and cross-institution coverage),
+  then institution authority/rating, then exponential freshness. Each row exposes the components.
 - **Forecast accuracy foundation**: supported horizons become pending forecasts, CSV price
   observations settle against one vendor source, and `/institution/[slug]/accuracy` discloses
   directional accuracy and target error. Publishing scores waits for a licensed price feed.

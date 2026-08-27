@@ -48,6 +48,17 @@ function preservesModality(quote: string, view: string, condition: string | null
   return true;
 }
 
+export function supportedAtomicTicker(ticker: string | null, evidence: string): string | null {
+  if (!ticker) return null;
+  const definition = ASSETS.find((asset) => asset.ticker === ticker.toUpperCase());
+  if (!definition) return null;
+  const text = normalized(evidence).toLocaleLowerCase();
+  const aliases = definition.ticker === "FED" ? ["fed", "fomc", "federal reserve", "powell", "warsh", "美联储"] : definition.aliases;
+  return aliases.some((alias) => /[^\x00-\x7f]/.test(alias)
+    ? text.includes(alias.toLocaleLowerCase())
+    : new RegExp(`(?:^|[^a-z0-9])${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9]|$)`, "i").test(text)) ? definition.ticker : null;
+}
+
 /** Keep only evidence-backed views. Invalid enum values, invented quotes and unsupported numbers are dropped. */
 export function validateAtomicViews(value: unknown, sourceText: string): ParsedAtomicView[] {
   if (!Array.isArray(value)) return [];
@@ -89,7 +100,7 @@ export function validateAtomicViews(value: unknown, sourceText: string): ParsedA
       viewEn, viewZh,
       type: type as ParsedAtomicView["type"],
       asset,
-      assetTicker: requestedTicker && tickers.has(requestedTicker) ? requestedTicker : null,
+      assetTicker: requestedTicker && tickers.has(requestedTicker) ? supportedAtomicTicker(requestedTicker, `${asset} ${topic} ${viewEn} ${sourceQuote}`) : null,
       topic,
       direction: direction as ParsedAtomicView["direction"],
       timeHorizon,

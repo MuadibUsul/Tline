@@ -40,3 +40,8 @@ test("drops a view that turns qualified language into certainty", () => {
   };
   assert.deepEqual(validateAtomicViews([qualified], qualified.source_quote), []);
 });
+
+test("does not label another central bank as the Federal Reserve", () => {
+  const boc = { ...valid, asset: "Bank of Canada policy", asset_ticker: "FED", topic: "central bank", view_en: "The Bank of Canada is expected to hold rates.", view_zh: "加拿大央行预计将维持利率不变。", value: null, source_quote: "The Bank of Canada is expected to hold rates." };
+  assert.equal(validateAtomicViews([boc], boc.source_quote)[0]?.assetTicker, null);
+});

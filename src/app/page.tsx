@@ -23,7 +23,7 @@ export default async function Home() {
         <div className="eyebrow">{tr(locale, "Global Institutional Intelligence", "全球机构情报")}</div>
         <h1>{locale === "zh-CN" ? <>追踪全球顶尖<br />机构的<em>观点。</em></> : <>Track what the world&apos;s leading<br />institutions <em>think.</em></>}</h1>
         <p className="sub">{tr(locale, "Turn the research produced daily by global financial institutions into comparable, trackable and searchable signals.", "把全球金融机构每天产生的研报，转换成可比较、可追踪、可检索的信号。")}</p>
-        <SearchBox placeholder={tr(locale, "Search Goldman, Gold, Nvidia, Fed…", "搜索高盛、黄金、英伟达、美联储……")} ariaLabel={tr(locale, "Ask institutional research", "查询机构研报")} />
+        <SearchBox locale={locale} placeholder={tr(locale, "Search institutions, assets and research…", "搜索机构、资产和研报……")} ariaLabel={tr(locale, "Search the site", "全站搜索")} />
       </section>
 
       <section className="blk">

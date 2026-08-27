@@ -40,11 +40,9 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
   ＋Watch / remove on asset & institution pages, create / toggle / delete alert rules
   (evaluated immediately). Consensus rules: `CONSENSUS_ABOVE` / `BELOW` / `DROP_24H` /
   `RISE_24H`, 12h de-dup — see `src/lib/alerts.ts`. Roles and commercial tiers are independent.
-- **AI Research (Phase 2)**: `/search` answers natural-language questions **over the
-  structured DB, never a web search** (`src/lib/research.ts`). A deterministic intent
-  router (`TARGET_CHANGES` / `WHY_DIRECTION` / `WHO_CHANGED` / `CONSENSUS_LEVEL` /
-  keyword) retrieves evidence with source citations; when `ANTHROPIC_API_KEY` is set,
-  an LLM synthesizes the summary from that evidence only. Bilingual (CN/EN) queries.
+- **Site-wide fuzzy search**: the home search instantly ranks institutions, assets and
+  English/Chinese research content. It supports aliases, partial terms and common typos,
+  with keyboard navigation and no separate search page or LLM dependency.
 - **Consensus engine** (`src/lib/consensus.ts`): `raw = Σ(wᵢ·dᵢ·dirᵢ)/Σ(wᵢ·dᵢ)` → `score = (raw+2)/4×100`.
   Weight = institution authority (5★=1.0 / 4★=0.85 / 3★=0.7); decay = `exp(-ageDays/31)`
   (7d≈0.80, 30d≈0.39). Snapshots to `consensus_history` drive the 1D/7D/30D deltas.

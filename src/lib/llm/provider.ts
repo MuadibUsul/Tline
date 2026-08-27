@@ -58,15 +58,48 @@ class OpenAIProvider implements LLMProvider {
   }
 }
 
+class DeepSeekProvider implements LLMProvider {
+  readonly name = "deepseek";
+  readonly model = process.env.DEEPSEEK_MODEL || process.env.LLM_MODEL || "deepseek-v4-flash";
+
+  async complete(input: CompletionInput): Promise<CompletionResult> {
+    const baseUrl = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [
+          { role: "system", content: input.system },
+          { role: "user", content: input.user },
+        ],
+        max_tokens: input.maxTokens ?? 1800,
+        thinking: { type: "disabled" },
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!response.ok) {
+      throw new Error(`DeepSeek request failed (${response.status}): ${(await response.text()).slice(0, 500)}`);
+    }
+    const data = await response.json() as { choices?: { message?: { content?: string } }[] };
+    const text = data.choices?.[0]?.message?.content?.trim() || "";
+    if (!text) throw new Error("DeepSeek returned an empty completion.");
+    return { text, provider: this.name, model: this.model };
+  }
+}
+
 export function getLLMProvider(preferred = process.env.LLM_PROVIDER): LLMProvider | null {
-  const order = preferred?.toLowerCase() === "openai"
-    ? ["openai", "anthropic"]
-    : preferred?.toLowerCase() === "anthropic"
-      ? ["anthropic", "openai"]
-      : ["anthropic", "openai"];
+  const requested = preferred?.toLowerCase();
+  const order = requested && ["anthropic", "openai", "deepseek"].includes(requested)
+    ? [requested, ...["anthropic", "openai", "deepseek"].filter((name) => name !== requested)]
+    : ["anthropic", "openai", "deepseek"];
   for (const name of order) {
     if (name === "anthropic" && process.env.ANTHROPIC_API_KEY) return new AnthropicProvider();
     if (name === "openai" && process.env.OPENAI_API_KEY) return new OpenAIProvider();
+    if (name === "deepseek" && process.env.DEEPSEEK_API_KEY) return new DeepSeekProvider();
   }
   return null;
 }

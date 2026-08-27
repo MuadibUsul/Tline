@@ -13,6 +13,14 @@ test("accepts a translation that preserves numbers, bps and tickers", () => {
   assert.deepEqual(result.issues, []);
 });
 
+test("treats translated month names as the same numeric month", () => {
+  const result = validateTranslation(
+    "Rates were cut in August after guidance issued in June and April.",
+    "继6月和4月发布指引后，央行于8月降息。",
+  );
+  assert.equal(result.passed, true);
+});
+
 test("rejects missing or invented numbers", () => {
   const result = validateTranslation(
     "The target rises from $4,700 to $4,900.",

@@ -14,7 +14,7 @@ const flag = (name: string) => process.argv.includes(`--${name}`);
 async function main() {
   const provider = getLLMProvider(process.env.TRANSLATION_PROVIDER);
   if (!provider) {
-    console.log("No translation provider configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.");
+    console.log("No translation provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY or DEEPSEEK_API_KEY.");
     return;
   }
   const articleId = arg("id");

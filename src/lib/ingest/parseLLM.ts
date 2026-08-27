@@ -180,7 +180,7 @@ export function heuristicParse(input: ParseInput, segments: Segment[] = []): Par
 /** Backward-compatible name for callers/tests outside the ingestion pipeline. */
 export const mockParse = heuristicParse;
 
-// -------- Real LLM parser (Anthropic) --------
+// -------- Real LLM parser (configured provider) --------
 const SYSTEM = `You extract structured investment signals from a public institutional research article.
 Return ONLY valid JSON matching this shape:
 {"summary":string,"key_arguments":string[],"key_numbers":[{"label":string,"value":string}],"risks":string[],

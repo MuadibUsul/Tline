@@ -69,8 +69,8 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Bilingual documents**: permanent clean English text and reviewed Chinese translations in
   the database, plus private English/Chinese PDFs. Native source PDFs remain byte-identical;
   their Chinese versions preserve page structure where quality checks allow it.
-- **Pluggable LLM boundary** (`src/lib/llm/`): deterministic parser without a key; Anthropic or
-  OpenAI for parsing, translation, correction and independent review when configured.
+- **Pluggable LLM boundary** (`src/lib/llm/`): deterministic parser without a key; Anthropic,
+  OpenAI or DeepSeek for parsing, translation, correction and review when configured.
 - **Forecast accuracy foundation**: supported horizons become pending forecasts, CSV price
   observations settle against one vendor source, and `/institution/[slug]/accuracy` discloses
   directional accuracy and target error. Publishing scores waits for a licensed price feed.

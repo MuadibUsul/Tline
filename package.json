@@ -24,7 +24,7 @@
     "scheduler": "node scripts/scheduler.mjs",
     "env:check": "node scripts/validate-env.mjs",
     "env:check:production": "node scripts/validate-env.mjs --production",
-    "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo.ts && tsx prisma/demo-user.ts && tsx prisma/documents.ts"
+    "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo-user.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -39,8 +39,11 @@ function allowedArticleUrl(raw: string, source: URL) {
 }
 
 const RESEARCH_PATH = /(?:^|\/)(?:insights?|research|outlooks?|markets?|econom(?:y|ics?)|strateg(?:y|ies|ic)|investment|views?|reports?|publications?|analysis|thought-leadership)(?:\/|[-_.]|$)/i;
-const NON_RESEARCH_PATH = /(?:^|\/)(?:about|careers?|contact|events?|help|legal|newsroom|privacy|products?|services?|solutions?|sustainability)(?:\/|$)/i;
-const COMMON_SOURCE_PARTS = new Set(["global", "en", "us", "uk", "www", "index", "home", "html", "htm"]);
+const NON_RESEARCH_PATH = /(?:^|\/)(?:about|careers?|contact|events?|help|legal|newsroom|privacy|products?|services?|solutions?|responsibility(?:-impact)?|sustainability|governance|investors?|shareholders?|policies?|annual-reports?)(?:\/|[-_.]|$)/i;
+const COMMON_SOURCE_PARTS = new Set([
+  "about", "global", "en", "us", "uk", "www", "index", "home", "html", "htm",
+  "insight", "insights", "research", "report", "reports", "publication", "publications", "market", "markets",
+]);
 
 /** Rank sitemap URLs against the configured research section; non-positive means reject. */
 export function sitemapArticleRelevance(raw: string, sourceUrl: string): number {
@@ -65,7 +68,7 @@ export function sitemapArticleRelevance(raw: string, sourceUrl: string): number 
       || /\/20\d\d(?:\/|-)/.test(path)
       || (slug.length >= 16 && (slug.match(/-/g) || []).length >= 2)
       || (underSection && path.split("/").length > sourceDirectory.split("/").length);
-    if ((!underSection && !researchPath && sharedParts === 0) || !articleShaped) return 0;
+    if ((!underSection && sharedParts === 0) || !articleShaped) return 0;
 
     return (underSection ? 4 : 0) + (researchPath ? 2 : 0) + Math.min(sharedParts, 2) + (/\.pdf$/i.test(path) ? 1 : 0);
   } catch {
@@ -104,7 +107,7 @@ export async function discoverFromSitemaps(
     }
   });
   const visited = new Set<string>();
-  const candidates = new Map<string, SitemapCandidate & { relevance: number }>();
+  const candidates = new Map<string, SitemapCandidate & { relevance: number; sortDate: number }>();
 
   while (queue.length && visited.size < maxSitemaps) {
     const sitemapUrl = queue.shift()!;
@@ -124,13 +127,13 @@ export async function discoverFromSitemaps(
       const clean = candidate.url.split("#")[0];
       const existing = candidates.get(clean);
       if (!existing || (candidate.lastModified?.getTime() ?? 0) > (existing.lastModified?.getTime() ?? 0)) {
-        candidates.set(clean, { ...candidate, url: clean, relevance });
+        candidates.set(clean, { ...candidate, url: clean, relevance, sortDate: dateHint?.getTime() ?? 0 });
       }
     }
   }
 
   return [...candidates.values()]
-    .sort((a, b) => b.relevance - a.relevance || (b.lastModified?.getTime() ?? 0) - (a.lastModified?.getTime() ?? 0))
+    .sort((a, b) => b.relevance - a.relevance || b.sortDate - a.sortDate)
     .slice(0, limit)
-    .map(({ relevance: _, ...candidate }) => candidate);
+    .map(({ relevance: _, sortDate: __, ...candidate }) => candidate);
 }

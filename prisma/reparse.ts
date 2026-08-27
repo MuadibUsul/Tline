@@ -20,6 +20,7 @@ async function main() {
       rawText: true,
       publishedAt: true,
       institution: { select: { name: true } },
+      segments: { select: { heading: true, text: true }, orderBy: { position: "asc" } },
       analysis: { select: { reviewStatus: true } },
     },
     orderBy: { publishedAt: "desc" },
@@ -39,13 +40,10 @@ async function main() {
         title: article.title,
         text: article.rawText!,
         publishedAt: article.publishedAt.toISOString(),
-      });
+      }, article.segments);
 
-      // Never erase an existing valid signal with another unresolved fallback.
       if (parsed.needsLLM) {
         unresolved++;
-        console.log(`  HOLD ${article.id} · ${article.title}`);
-        continue;
       }
 
       const uniqueSignals = [...new Map(
@@ -100,7 +98,7 @@ async function main() {
       ]);
       await syncForecastsForArticle(article.id);
       updated++;
-      console.log(`  OK   ${article.id} · ${article.title}`);
+      console.log(`  ${parsed.needsLLM ? "HOLD" : "OK  "} ${article.id} · ${article.title}`);
     } catch (error) {
       failed++;
       console.error(`  FAIL ${article.id} · ${article.title}`, error);

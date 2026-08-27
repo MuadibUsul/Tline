@@ -23,7 +23,7 @@ npm install
 cp .env.example .env          # SQLite by default, zero infra
 npm run db:push               # create the schema
 npm run db:seed               # 64 institutions + asset dictionary
-npx tsx prisma/demo.ts        # realistic demo research so the UI has data
+npm run ingest -- --slug=ing --limit=3  # ingest verified public research
 npm run dev                   # http://localhost:3000
 ```
 
@@ -50,7 +50,8 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
   (7d≈0.80, 30d≈0.39). Snapshots to `consensus_history` drive the 1D/7D/30D deltas.
 - **Ingestion pipeline** (`src/lib/ingest/`): RSS, Sitemap/Sitemap Index, native PDF and
   HTML-listing discovery; research-path/date quality gates; three-hash dedup; source-run status;
-  structured persistence and per-source failure isolation.
+  structured persistence and per-source failure isolation. Live validation covers complete HTML
+  articles from ING/UBS and embedded native research PDFs from Scotiabank Economics.
 - **Robots compliance (strict)**: `scripts/robots_audit.py` audits all 64 sources' robots.txt
   → `64机构爬虫合规评估.xlsx` + `data/crawl_policy.json` (allowed/delayed/blocked/manual +
   Crawl-delay). The crawler (`run.ts`) only touches `allowed`/`delayed` institutions, and
@@ -87,8 +88,8 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 | `npm run prices:import -- --file=prices.csv --source=vendor` | Import `ticker,timestamp,value` observations |
 | `npm run alerts` | Seed/refresh the demo user's watchlist + rules and fire alerts |
 
-> **Live ingest note:** many institutional sites are JS-rendered or bot-walled, so the
-> generic HTML adapter is best-effort per source. The demo seed guarantees a populated UI.
+> **Live ingest note:** the application does not seed synthetic research. A source appears
+> only after its public article passes URL, publication-date, full-body and document checks.
 > Per-institution `rssUrl`/`sitemapUrl` + tuned selectors are the natural next step.
 
 ## Deviations from the blueprint (deliberate, for a runnable MVP)

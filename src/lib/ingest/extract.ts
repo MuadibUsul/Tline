@@ -20,7 +20,7 @@ function looksLikeArticleUrl(path: string): boolean {
 export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
   const $ = cheerio.load(html);
   const base = new URL(baseUrl);
-  const basePath = base.pathname.replace(/\/$/, "");
+  const basePath = base.pathname.replace(/\/$/, "").replace(/\.html?$/i, "");
   const out = new Map<string, string>();
 
   $("a[href]").each((_, el) => {
@@ -36,15 +36,31 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
     if (abs.host !== base.host) return; // same institution only
     const path = abs.pathname;
     if (/\.(pdf|jpe?g|png|gif|zip|xlsx?|docx?|pptx?)$/i.test(path)) return;
-    if (DENY.test(path)) return;
     // Must be under the research section OR clearly article-shaped.
     const underSection = basePath.length > 1 && path.startsWith(basePath);
+    if (DENY.test(underSection ? path.slice(basePath.length) : path)) return;
     if (!underSection && !looksLikeArticleUrl(path)) return;
     const key = abs.href.split("#")[0].split("?")[0];
     if (!out.has(key) && key !== baseUrl.replace(/\/$/, "")) out.set(key, text);
   });
 
   return [...out.entries()].map(([url, title]) => ({ url, title })).slice(0, 12);
+}
+
+/** Find same-origin native PDFs embedded by an otherwise body-less article page. */
+export function extractPdfLinks(html: string, baseUrl: string): string[] {
+  const $ = cheerio.load(html);
+  const base = new URL(baseUrl);
+  const out = new Set<string>();
+  $("a[href],iframe[src],embed[src],object[data]").each((_, element) => {
+    const raw = $(element).attr("href") || $(element).attr("src") || $(element).attr("data");
+    if (!raw) return;
+    try {
+      const url = new URL(raw, base);
+      if (url.origin === base.origin && /\.pdf(?:$|\?)/i.test(url.href)) out.add(url.href.split("#")[0]);
+    } catch { /* invalid link */ }
+  });
+  return [...out];
 }
 
 // Boilerplate containers to drop wholesale before reading body text.
@@ -67,6 +83,7 @@ export interface ExtractedArticle {
 
 /** Conservative date inference for URLs/titles that carry an explicit calendar date or quarter. */
 export function inferPublicationDate(...values: Array<string | null | undefined>): Date | null {
+  const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
   for (const value of values) {
     if (!value) continue;
     const calendar = value.match(/(20\d{2})[-_/](0?[1-9]|1[0-2])[-_/](0?[1-9]|[12]\d|3[01])(?!\d)/);
@@ -76,6 +93,10 @@ export function inferPublicationDate(...values: Array<string | null | undefined>
     }
     const quarter = value.match(/(?:q([1-4])|([1-4])q)[\s_-]*(?:20)?(\d{2})(?!\d)/i);
     if (quarter) return new Date(Date.UTC(2000 + Number(quarter[3]), (Number(quarter[1] || quarter[2]) - 1) * 3, 1));
+    const compact = value.match(/(?:^|[-_/])(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(20\d{2})(?!\d)/);
+    if (compact) return new Date(Date.UTC(Number(compact[3]), Number(compact[2]) - 1, Number(compact[1])));
+    const named = value.match(new RegExp(`(?:${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])[-_\\s]+(20\\d{2})`, "i"));
+    if (named) return new Date(Date.UTC(Number(named[2]), months.indexOf(named[0].match(/[a-z]+/i)![0].toLowerCase()), Number(named[1])));
   }
   return null;
 }
@@ -147,7 +168,7 @@ export function extractArticle(html: string): ExtractedArticle {
     if (paras.length) segments.push({ heading: null, text: paras.join("\n\n") });
   }
 
-  const text = segments.map((s) => s.text).join("\n\n").slice(0, 16000);
+  const text = segments.map((s) => s.text).join("\n\n");
 
   return {
     title,

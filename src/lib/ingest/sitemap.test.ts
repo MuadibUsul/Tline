@@ -24,5 +24,7 @@ test("accepts research articles and rejects unrelated sitemap pages", () => {
   ) > 0);
   assert.equal(sitemapArticleRelevance("https://www.ubs.com/global/de.html", source), 0);
   assert.equal(sitemapArticleRelevance("https://www.ubs.com/global/en/about-us.html", source), 0);
+  assert.equal(sitemapArticleRelevance("https://www.ubs.com/global/en/sustainability/esg-publications-policies.html", source), 0);
+  assert.equal(sitemapArticleRelevance("https://www.ubs.com/ca/fr/a-propos/responsabilite/publications-code-ethique.html", source), 0);
   assert.equal(sitemapArticleRelevance(source, source), 0);
 });

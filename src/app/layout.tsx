@@ -61,7 +61,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {children}
         <footer className="footer wrap">
           <span>Research → Data → Consensus → Signal</span>
-          <span>Phase-1 MVP · demo data</span>
+          <span>Phase-1 · verified public research</span>
         </footer>
       </body>
     </html>

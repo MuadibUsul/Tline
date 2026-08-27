@@ -38,7 +38,7 @@ test("without headings only assigns the main asset", () => {
   assert.deepEqual(parsed.unresolvedTickers, ["WTI"]);
 });
 
-test("single-asset demo articles keep a deterministic signal", () => {
+test("single-asset articles keep a deterministic signal", () => {
   const text = "We raise our gold target from $4,700 to $4,900. A bullish setup persists as demand for bullion stays strong.";
   const parsed = heuristicParse(input("Gold: lifting target to $4,900", text));
   assert.equal(parsed.assets[0]?.ticker, "XAUUSD");
@@ -54,3 +54,10 @@ test("a mention without directional evidence is not neutral", () => {
   assert.deepEqual(parsed.unresolvedTickers, ["XAUUSD"]);
 });
 
+test("does not treat years or ordinary dollar amounts as price targets", () => {
+  const text = "AI capex may reach $100bn in 2027. We remain bullish on semiconductors, while a scenario sees costs move from $100 to $230.";
+  const parsed = heuristicParse(input("Semiconductor outlook", text));
+  assert.equal(parsed.assets[0]?.ticker, "SOX");
+  assert.equal(parsed.assets[0]?.target, null);
+  assert.equal(parsed.assets[0]?.previousTarget, null);
+});

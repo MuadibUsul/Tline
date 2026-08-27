@@ -2,7 +2,7 @@ import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchPdf, fetchText, sleep } from "./fetch";
-import { extractLinks, extractArticle, inferPublicationDate } from "./extract";
+import { extractLinks, extractArticle, extractPdfLinks, inferPublicationDate, looksLikeArticle } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
@@ -74,13 +74,49 @@ async function ingestInstitution(
   let created = 0, dup = 0, empty = 0, blocked = 0;
   const raws: RawArticle[] = [];
   const nativePdfs = new Map<string, Buffer>();
+  const candidateLimit = Math.min(40, Math.max(12, perLimit * 4));
+  const stage = (raw: RawArticle) => {
+    if (raw.strict && !looksLikeArticle(raw.title, raw.text)) { empty++; return false; }
+    raws.push(raw);
+    return true;
+  };
+  const knownUrl = async (url: string) => Boolean(await prisma.article.findUnique({
+    where: { urlHash: urlHash(url) },
+    select: { id: true },
+  }));
+  const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
+    for (const pdfUrl of extractPdfLinks(html, pageUrl)) {
+      if (!allowsUrl(pdfUrl) || await knownUrl(pdfUrl)) continue;
+      await sleep(delayMs);
+      const pdf = await fetchPdf(pdfUrl);
+      if (!pdf) continue;
+      try {
+        const extracted = await extractPdf(pdf);
+        const date = publishedAt || inferPublicationDate(pdfUrl, pageUrl, title);
+        if (!date || !extracted.text.trim()) continue;
+        stage({
+          title: title || decodeURIComponent(new URL(pdfUrl).pathname.split("/").pop() || "Research report").replace(/\.pdf$/i, ""),
+          text: extracted.text,
+          sourceUrl: pdfUrl,
+          author: null,
+          publishedAt: date,
+          segments: [{ heading: null, text: extracted.text }],
+        });
+        nativePdfs.set(pdfUrl, pdf);
+        return true;
+      } catch { /* try another PDF link */ }
+    }
+    return false;
+  };
 
   // 1) RSS first when configured (and allowed).
   if (inst.rssUrl && allowsUrl(inst.rssUrl)) {
     try {
       const feed = await rss.parseURL(inst.rssUrl);
-      for (const item of (feed.items || []).slice(0, perLimit)) {
+      for (const item of (feed.items || []).slice(0, candidateLimit)) {
+        if (raws.length >= perLimit) break;
         if (!item.link || !allowsUrl(item.link)) continue;
+        if (await knownUrl(item.link)) { dup++; continue; }
         await sleep(delayMs);
         if (/\.pdf(?:$|\?)/i.test(item.link)) {
           const pdf = await fetchPdf(item.link);
@@ -88,7 +124,7 @@ async function ingestInstitution(
           const extracted = await extractPdf(pdf);
           const publishedAt = (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
           if (!publishedAt || isNaN(publishedAt.getTime())) { empty++; continue; }
-          raws.push({
+          stage({
             title: item.title || "Institutional research report",
             text: extracted.text,
             sourceUrl: item.link,
@@ -106,11 +142,14 @@ async function ingestInstitution(
         let article = extractArticle(html);
         if (article.text.length < 400 && inst.requiresRender) {
           const rendered = await renderHtml(item.link);
-          if (rendered) article = extractArticle(rendered);
+          if (rendered) {
+            html = rendered;
+            article = extractArticle(rendered);
+          }
         }
         const publishedAt = article.publishedAt || (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
         if (!publishedAt || isNaN(publishedAt.getTime())) { empty++; continue; }
-        raws.push({
+        stage({
           title: article.title || item.title || "",
           text: article.text,
           sourceUrl: item.link,
@@ -131,11 +170,13 @@ async function ingestInstitution(
       `${origin}/sitemap.xml`,
     ];
     const candidates = await discoverFromSitemaps(sitemapSeeds, inst.researchUrl, {
-      limit: perLimit,
+      limit: candidateLimit,
       allows: allowsUrl,
     });
     for (const candidate of candidates) {
+      if (raws.length >= perLimit) break;
       if (!allowsUrl(candidate.url)) { blocked++; continue; }
+      if (await knownUrl(candidate.url)) { dup++; continue; }
       await sleep(delayMs);
       if (/\.pdf(?:$|\?)/i.test(candidate.url)) {
         const pdf = await fetchPdf(candidate.url);
@@ -148,7 +189,7 @@ async function ingestInstitution(
             .trim();
           const publishedAt = candidate.lastModified || inferPublicationDate(candidate.url, filename);
           if (!publishedAt) { empty++; continue; }
-          raws.push({
+          stage({
             title: filename || "Institutional research report",
             text: extracted.text,
             sourceUrl: candidate.url,
@@ -167,11 +208,17 @@ async function ingestInstitution(
         let article = extractArticle(artHtml);
         if (article.text.length < 400 && inst.requiresRender) {
           const rendered = await renderHtml(candidate.url);
-          if (rendered) article = extractArticle(rendered);
+          if (rendered) {
+            artHtml = rendered;
+            article = extractArticle(rendered);
+          }
         }
-        const publishedAt = article.publishedAt || candidate.lastModified || inferPublicationDate(candidate.url, article.title);
-        if (!publishedAt) { empty++; continue; }
-        raws.push({
+        const publishedAt = inferPublicationDate(candidate.url, article.title) || article.publishedAt || candidate.lastModified;
+        if (!publishedAt || !looksLikeArticle(article.title, article.text)) {
+          if (!await stageEmbeddedPdf(artHtml, candidate.url, article.title, publishedAt)) empty++;
+          continue;
+        }
+        stage({
           title: article.title,
           text: article.text,
           sourceUrl: candidate.url,
@@ -187,14 +234,16 @@ async function ingestInstitution(
   // 3) HTML listing → per-article extraction, each URL robots-checked.
   if (raws.length === 0) {
     let listHtml = await fetchText(inst.researchUrl);
-    let links = listHtml ? extractLinks(listHtml, inst.researchUrl).slice(0, perLimit) : [];
+    let links = listHtml ? extractLinks(listHtml, inst.researchUrl) : [];
     if (links.length === 0 && inst.requiresRender) {
       listHtml = await renderHtml(inst.researchUrl);
-      links = listHtml ? extractLinks(listHtml, inst.researchUrl).slice(0, perLimit) : [];
+      links = listHtml ? extractLinks(listHtml, inst.researchUrl) : [];
     }
     if (listHtml) {
       for (const link of links) {
+        if (raws.length >= perLimit) break;
         if (!allowsUrl(link.url)) { blocked++; continue; }
+        if (await knownUrl(link.url)) { dup++; continue; }
         await sleep(delayMs);
         let artHtml = await fetchText(link.url);
         if (!artHtml && inst.requiresRender) artHtml = await renderHtml(link.url);
@@ -202,11 +251,17 @@ async function ingestInstitution(
         let a = extractArticle(artHtml);
         if (a.text.length < 400 && inst.requiresRender) {
           const rendered = await renderHtml(link.url);
-          if (rendered) a = extractArticle(rendered);
+          if (rendered) {
+            artHtml = rendered;
+            a = extractArticle(rendered);
+          }
         }
-        const publishedAt = a.publishedAt || inferPublicationDate(link.url, a.title || link.title);
-        if (!publishedAt) { empty++; continue; }
-        raws.push({
+        const publishedAt = inferPublicationDate(link.url, a.title || link.title) || a.publishedAt;
+        if (!publishedAt || !looksLikeArticle(a.title || link.title, a.text)) {
+          if (!await stageEmbeddedPdf(artHtml, link.url, a.title || link.title, publishedAt)) empty++;
+          continue;
+        }
+        stage({
           title: a.title || link.title,
           text: a.text,
           sourceUrl: link.url,

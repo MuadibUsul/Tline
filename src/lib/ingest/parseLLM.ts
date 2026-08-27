@@ -73,17 +73,17 @@ function detectDirection(text: string): { dir: number; conf: number; explicit: b
   return { dir, conf, explicit: net !== 0 || neutral };
 }
 
-/** Pull "$4,800" / "5,000" style targets near an asset mention (best-effort). */
+/** Extract only explicit target/forecast prices; ordinary amounts and years are not targets. */
 function extractTargets(text: string): { target: number | null; previous: number | null } {
-  const m = [...text.matchAll(/\$?\s?([0-9][0-9,]{2,7})(?:\.\d+)?/g)]
-    .map((x) => Number(x[1].replace(/,/g, "")))
-    .filter((n) => n >= 10 && n <= 200000);
-  // Look for an explicit "X -> Y" revision.
-  const rev = text.match(/\$?\s?([0-9][0-9,]{2,7})\s*(?:->|→|to|from)\s*\$?\s?([0-9][0-9,]{2,7})/i);
+  const number = "([0-9][0-9,]{1,7}(?:\\.\\d+)?)";
+  const rev = text.match(new RegExp(`(?:target|forecast|price objective)[^.\\n]{0,60}?from\\s*\\$?\\s*${number}\\s*(?:to|->|→)\\s*\\$?\\s*${number}`, "i"));
   if (rev) {
     return { previous: Number(rev[1].replace(/,/g, "")), target: Number(rev[2].replace(/,/g, "")) };
   }
-  return { target: m.length ? m[m.length - 1] : null, previous: null };
+  const explicit = [...text.matchAll(new RegExp(`(?:target|forecast|price objective)[^.\\n]{0,60}?\\$\\s*${number}`, "gi"))]
+    .map((match) => Number(match[1].replace(/,/g, "")))
+    .filter((value) => value >= 1 && value <= 200000);
+  return { target: explicit.at(-1) ?? null, previous: null };
 }
 
 interface Candidate {

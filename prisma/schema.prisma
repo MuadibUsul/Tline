@@ -57,20 +57,60 @@ model Article {
   segments      ArticleSegment[]
   translations  ArticleTranslation[]
   documents     ArticleDocument[]
+  atomicViews   AtomicView[]
 
   @@index([institutionId, publishedAt])
   @@index([titleHash])
   @@index([contentHash])
 }
 
+model AtomicView {
+  id            String   @id @default(cuid())
+  articleId     String
+  position      Int
+  viewEn        String
+  viewZh        String
+  type          String // forecast | target | direction | conditional | risk | rationale | market_impact
+  asset         String
+  assetTicker   String?
+  topic         String
+  direction     String // bullish | bearish | neutral | conditional
+  timeHorizon   String
+  value         String?
+  conditionEn   String?
+  conditionZh   String?
+  rationaleEn   String?
+  rationaleZh   String?
+  confidence    String // high | medium | low
+  importance    Int // 1..5
+  sourceQuote   String
+  provider      String
+  model         String
+  promptVersion String
+  reviewStatus  String   @default("ok")
+  createdAt     DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, position])
+  @@index([assetTicker, direction])
+  @@index([type, importance])
+  @@index([topic])
+}
+
 model Analysis {
   id              String   @id @default(cuid())
   articleId       String   @unique
   summary         String
+  summaryZh       String?
   keyArguments    String   @default("[]") // JSON string
+  keyArgumentsZh  String   @default("[]")
   keyNumbers      String   @default("[]") // JSON string [{label,value}]
+  keyNumbersZh    String   @default("[]")
   risks           String   @default("[]") // JSON string
+  risksZh         String   @default("[]")
   interpretation  String? // AI trading interpretation
+  interpretationZh String?
   importanceScore Float    @default(0.5)
   confidence      Float    @default(0.6)
   provider        String   @default("local")
@@ -313,8 +353,8 @@ model VerificationToken {
 model WatchlistItem {
   id        String   @id @default(cuid())
   userId    String
-  kind      String // asset | institution
-  refId     String // asset ticker or institution slug
+  kind      String // asset | institution | theme
+  refId     String // asset ticker, institution slug, or theme keyword
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -326,8 +366,10 @@ model AlertRule {
   id          String   @id @default(cuid())
   userId      String
   name        String
-  type        String // CONSENSUS_ABOVE | CONSENSUS_BELOW | CONSENSUS_DROP_24H | CONSENSUS_RISE_24H
-  assetTicker String? // scope to one asset (null = any featured asset)
+  type        String // consensus threshold/change | NEW_RESEARCH
+  scopeKind   String   @default("asset") // asset | institution | theme | market
+  scopeRef    String? // ticker, institution slug, or theme keyword
+  assetTicker String? // legacy compatibility; new rules use scopeKind/scopeRef
   threshold   Float
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -336,6 +378,7 @@ model AlertRule {
   events AlertEvent[]
 
   @@index([userId, active])
+  @@index([scopeKind, scopeRef])
 }
 
 model AlertEvent {
@@ -343,12 +386,14 @@ model AlertEvent {
   ruleId      String
   firedAt     DateTime @default(now())
   message     String
+  targetId    String? // article or other source object that caused the event
   assetTicker String?
   score       Int?
 
   rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
   @@index([ruleId, firedAt])
+  @@index([ruleId, targetId])
 }
 
 model AuditLog {

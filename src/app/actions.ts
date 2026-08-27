@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { COOKIE, makeToken, getSessionUser, SESSION_COOKIE_OPTS } from "@/lib/auth";
-import { evaluateRules } from "@/lib/alerts";
+import { describeRule, evaluateRules } from "@/lib/alerts";
 import { writeAudit } from "@/lib/audit";
 
 function str(fd: FormData, key: string): string {
@@ -45,9 +45,14 @@ export async function doSignOut() {
 export async function addWatch(fd: FormData) {
   const user = await getSessionUser();
   const kind = str(fd, "kind");
-  const refId = str(fd, "refId");
+  let refId = str(fd, "refId");
   if (!user) redirect(`/signin?next=${encodeURIComponent(str(fd, "back") || "/watchlist")}`);
-  if (!kind || !refId) return;
+  if (!(["asset", "institution", "theme"] as string[]).includes(kind) || !refId || refId.length > 80) return;
+  if (kind === "asset") {
+    refId = refId.toUpperCase();
+    if (!await prisma.asset.findUnique({ where: { ticker: refId }, select: { id: true } })) return;
+  }
+  if (kind === "institution" && !await prisma.institution.findUnique({ where: { slug: refId }, select: { id: true } })) return;
   const item = await prisma.watchlistItem.upsert({
     where: { userId_kind_refId: { userId: user!.id, kind, refId } },
     create: { userId: user!.id, kind, refId },
@@ -72,27 +77,41 @@ export async function removeWatch(fd: FormData) {
 // ---- alert rules ----
 export async function createRule(fd: FormData) {
   const user = await getSessionUser();
-  if (!user) redirect("/signin?next=/alerts");
+  if (!user) redirect("/signin?next=/watchlist");
   const type = str(fd, "type");
-  const ticker = str(fd, "assetTicker");
-  const threshold = Number(str(fd, "threshold"));
-  if (!type || Number.isNaN(threshold)) return;
-  const label: Record<string, string> = {
-    CONSENSUS_ABOVE: "above", CONSENSUS_BELOW: "below",
-    CONSENSUS_DROP_24H: "drops", CONSENSUS_RISE_24H: "rises",
-  };
+  const legacyTicker = str(fd, "assetTicker").toUpperCase();
+  const scopeKind = str(fd, "scopeKind") || (legacyTicker ? "asset" : "market");
+  let scopeRef = str(fd, "scopeRef") || legacyTicker;
+  const threshold = Number(str(fd, "threshold") || 0);
+  const consensusTypes = ["CONSENSUS_ABOVE", "CONSENSUS_BELOW", "CONSENSUS_DROP_24H", "CONSENSUS_RISE_24H"];
+  if (![...consensusTypes, "NEW_RESEARCH"].includes(type) || !["asset", "institution", "theme", "market"].includes(scopeKind)) return;
+  if (consensusTypes.includes(type) && !["asset", "market"].includes(scopeKind)) return;
+  if (type === "NEW_RESEARCH" && !["asset", "institution", "theme"].includes(scopeKind)) return;
+  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) return;
+  if (scopeKind !== "market" && (!scopeRef || scopeRef.length > 80)) return;
+  if (scopeKind === "asset") {
+    scopeRef = scopeRef.toUpperCase();
+    if (!await prisma.asset.findUnique({ where: { ticker: scopeRef }, select: { id: true } })) return;
+  }
+  if (scopeKind === "institution" && !await prisma.institution.findUnique({ where: { slug: scopeRef }, select: { id: true } })) return;
+  const ruleShape = { type, threshold, scopeKind, scopeRef: scopeRef || null, assetTicker: scopeKind === "asset" ? scopeRef : null };
   const rule = await prisma.alertRule.create({
     data: {
       userId: user!.id,
-      name: `${ticker || "Any"} consensus ${label[type] ?? type} ${threshold}`,
-      type,
-      assetTicker: ticker || null,
-      threshold,
+      name: describeRule(ruleShape),
+      ...ruleShape,
     },
   });
+  if (scopeKind !== "market" && scopeRef) {
+    await prisma.watchlistItem.upsert({
+      where: { userId_kind_refId: { userId: user!.id, kind: scopeKind, refId: scopeRef } },
+      create: { userId: user!.id, kind: scopeKind, refId: scopeRef },
+      update: {},
+    });
+  }
   await writeAudit({ actorId: user!.id, action: "alert.create", targetType: "alert_rule", targetId: rule.id });
   await evaluateRules();
-  revalidatePath("/alerts");
+  revalidatePath("/watchlist");
 }
 
 export async function toggleRule(fd: FormData) {
@@ -104,7 +123,7 @@ export async function toggleRule(fd: FormData) {
     await prisma.alertRule.update({ where: { id }, data: { active: !rule.active } });
     await writeAudit({ actorId: user!.id, action: "alert.toggle", targetType: "alert_rule", targetId: id, metadata: { active: !rule.active } });
   }
-  revalidatePath("/alerts");
+  revalidatePath("/watchlist");
 }
 
 export async function deleteRule(fd: FormData) {
@@ -113,5 +132,5 @@ export async function deleteRule(fd: FormData) {
   const id = str(fd, "id");
   const deleted = await prisma.alertRule.deleteMany({ where: { id, userId: user!.id } });
   if (deleted.count) await writeAudit({ actorId: user!.id, action: "alert.delete", targetType: "alert_rule", targetId: id });
-  revalidatePath("/alerts");
+  revalidatePath("/watchlist");
 }

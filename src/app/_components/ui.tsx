@@ -29,7 +29,7 @@ type FeedArticle = {
   publishedAt: Date;
   sourceUrl: string;
   institution: { name: string; slug: string };
-  analysis: { summary: string } | null;
+  analysis: { summary: string; summaryZh?: string | null } | null;
   translations?: { title: string; text?: string }[];
   articleAssets: { direction: number; target: number | null; previousTarget: number | null; asset: { ticker: string; name: string } }[];
 };
@@ -78,7 +78,7 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
   const translation = a.translations?.[0];
   const title = locale === "zh-CN" ? translation?.title ?? a.title : a.title;
   const preview = shortPreview(locale === "zh-CN"
-    ? translation?.text ?? a.analysis?.summary ?? a.rawText
+    ? translation?.text ?? a.analysis?.summaryZh ?? a.analysis?.summary ?? a.rawText
     : a.analysis?.summary ?? a.rawText);
 
   return (

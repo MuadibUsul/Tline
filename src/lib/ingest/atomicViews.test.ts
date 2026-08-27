@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { validateAtomicViews } from "./atomicViews";
+
+const valid = {
+  view_en: "Test Bank expects gold to reach $5,000 by year-end.",
+  view_zh: "测试银行预计黄金将在年底前达到5,000美元。",
+  type: "target", asset: "Gold", asset_ticker: "XAUUSD", topic: "precious metals",
+  direction: "bullish", time_horizon: "year-end 2026", value: "$5,000",
+  condition_en: null, condition_zh: null, rationale_en: null, rationale_zh: null,
+  confidence: "high", importance: 5,
+  source_quote: "We expect gold to reach $5,000 by year-end 2026.",
+};
+
+test("accepts an atomic view with a direct supporting quote", () => {
+  const result = validateAtomicViews([valid], "Outlook\nWe expect gold to reach $5,000 by year-end 2026. Demand remains firm.");
+  assert.equal(result.length, 1);
+  assert.equal(result[0].assetTicker, "XAUUSD");
+});
+
+test("drops views whose source quote was invented", () => {
+  assert.deepEqual(validateAtomicViews([valid], "Gold demand remains firm."), []);
+});
+
+test("drops values containing a number unsupported by the quote", () => {
+  const altered = { ...valid, value: "$6,000" };
+  assert.deepEqual(validateAtomicViews([altered], valid.source_quote), []);
+});
+
+test("deduplicates identical views and rejects invalid labels", () => {
+  const bad = { ...valid, direction: "very_bullish" };
+  assert.equal(validateAtomicViews([valid, { ...valid }, bad], valid.source_quote).length, 1);
+});
+
+test("drops a view that turns qualified language into certainty", () => {
+  const qualified = {
+    ...valid,
+    view_en: "Test Bank says gold will reach $5,000 by year-end.",
+    source_quote: "Gold is likely to reach $5,000 by year-end.",
+  };
+  assert.deepEqual(validateAtomicViews([qualified], qualified.source_quote), []);
+});

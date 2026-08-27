@@ -4,6 +4,8 @@ import { parseArticle } from "../src/lib/ingest/parseLLM";
 import { syncForecastsForArticle } from "../src/lib/forecast";
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
+const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
+const limit = limitArg ? Math.max(1, Number(limitArg.split("=")[1]) || 1) : undefined;
 
 async function main() {
   if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.DEEPSEEK_API_KEY && !flag("heuristic")) {
@@ -25,7 +27,7 @@ async function main() {
     },
     orderBy: { publishedAt: "desc" },
   });
-  const candidates = rows.filter((row) => all || row.analysis?.reviewStatus === "needs_review");
+  const candidates = rows.filter((row) => all || row.analysis?.reviewStatus === "needs_review").slice(0, limit);
   const assets = await prisma.asset.findMany({ select: { id: true, ticker: true } });
   const assetIds = new Map(assets.map((asset) => [asset.ticker, asset.id]));
 
@@ -58,10 +60,15 @@ async function main() {
           create: {
             articleId: article.id,
             summary: parsed.summary,
+            summaryZh: parsed.summaryZh,
             keyArguments: JSON.stringify(parsed.keyArguments),
+            keyArgumentsZh: JSON.stringify(parsed.keyArgumentsZh),
             keyNumbers: JSON.stringify(parsed.keyNumbers),
+            keyNumbersZh: JSON.stringify(parsed.keyNumbersZh),
             risks: JSON.stringify(parsed.risks),
+            risksZh: JSON.stringify(parsed.risksZh),
             interpretation: parsed.interpretation,
+            interpretationZh: parsed.interpretationZh,
             importanceScore: parsed.importanceScore,
             confidence: parsed.confidence,
             provider: parsed.provider,
@@ -71,10 +78,15 @@ async function main() {
           },
           update: {
             summary: parsed.summary,
+            summaryZh: parsed.summaryZh,
             keyArguments: JSON.stringify(parsed.keyArguments),
+            keyArgumentsZh: JSON.stringify(parsed.keyArgumentsZh),
             keyNumbers: JSON.stringify(parsed.keyNumbers),
+            keyNumbersZh: JSON.stringify(parsed.keyNumbersZh),
             risks: JSON.stringify(parsed.risks),
+            risksZh: JSON.stringify(parsed.risksZh),
             interpretation: parsed.interpretation,
+            interpretationZh: parsed.interpretationZh,
             importanceScore: parsed.importanceScore,
             confidence: parsed.confidence,
             provider: parsed.provider,
@@ -84,6 +96,7 @@ async function main() {
           },
         }),
         prisma.articleAsset.deleteMany({ where: { articleId: article.id } }),
+        prisma.atomicView.deleteMany({ where: { articleId: article.id } }),
         ...uniqueSignals.map((signal) => prisma.articleAsset.create({
           data: {
             articleId: article.id,
@@ -93,6 +106,32 @@ async function main() {
             previousTarget: signal.previousTarget ?? null,
             timeHorizon: signal.timeHorizon ?? null,
             confidence: signal.confidence,
+          },
+        })),
+        ...parsed.atomicViews.map((view, position) => prisma.atomicView.create({
+          data: {
+            articleId: article.id,
+            position,
+            viewEn: view.viewEn,
+            viewZh: view.viewZh,
+            type: view.type,
+            asset: view.asset,
+            assetTicker: view.assetTicker,
+            topic: view.topic,
+            direction: view.direction,
+            timeHorizon: view.timeHorizon,
+            value: view.value,
+            conditionEn: view.conditionEn,
+            conditionZh: view.conditionZh,
+            rationaleEn: view.rationaleEn,
+            rationaleZh: view.rationaleZh,
+            confidence: view.confidence,
+            importance: view.importance,
+            sourceQuote: view.sourceQuote,
+            provider: parsed.provider,
+            model: parsed.model,
+            promptVersion: parsed.promptVersion,
+            reviewStatus: parsed.reviewStatus,
           },
         })),
       ]);

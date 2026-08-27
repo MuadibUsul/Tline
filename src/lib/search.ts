@@ -180,9 +180,10 @@ export async function searchSite(query: string, limit = 12): Promise<SearchResul
         rawText: true,
         publishedAt: true,
         institution: { select: { name: true, slug: true } },
-        analysis: { select: { summary: true } },
+        analysis: { select: { summary: true, summaryZh: true } },
         translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } },
         articleAssets: { select: { asset: { select: { ticker: true, name: true, aliases: true } } } },
+        atomicViews: { select: { viewEn: true, viewZh: true, asset: true, assetTicker: true, topic: true, type: true, direction: true, timeHorizon: true, value: true } },
       },
     }),
   ]);
@@ -221,6 +222,7 @@ export async function searchSite(query: string, limit = 12): Promise<SearchResul
         ...parseAliases(asset.aliases),
         ...(ASSETS.find((definition) => definition.ticker === asset.ticker)?.aliases ?? []),
       ]);
+      const atomicText = article.atomicViews.flatMap((view) => [view.viewEn, view.viewZh, view.asset, view.assetTicker ?? "", view.topic, view.type, view.direction, view.timeHorizon, view.value ?? ""]);
       return {
         result: {
           id: article.id,
@@ -228,15 +230,15 @@ export async function searchSite(query: string, limit = 12): Promise<SearchResul
           title,
           subtitle: article.institution.name,
           snippet: snippet(useChinese
-            ? [translation?.text, translation?.title, article.analysis?.summary, article.rawText]
-            : [article.analysis?.summary, article.rawText, translation?.text], q),
+            ? [...article.atomicViews.map((view) => view.viewZh), article.analysis?.summaryZh, translation?.text, translation?.title, article.analysis?.summary, article.rawText]
+            : [...article.atomicViews.map((view) => view.viewEn), article.analysis?.summary, article.rawText, translation?.text], q),
           href: `/research/${article.id}`,
           publishedAt: article.publishedAt.toISOString(),
         },
         primary: [article.title, translation?.title ?? ""],
-        aliases: assetTerms,
+        aliases: [...assetTerms, ...article.atomicViews.flatMap((view) => [view.asset, view.assetTicker ?? "", view.topic])],
         secondary: [article.institution.name, article.institution.slug, article.author ?? ""],
-        content: [article.analysis?.summary ?? "", article.rawText ?? "", translation?.text ?? ""],
+        content: [article.analysis?.summary ?? "", article.analysis?.summaryZh ?? "", article.rawText ?? "", translation?.text ?? "", ...atomicText],
       };
     }),
   ];

@@ -1,6 +1,7 @@
 import { ASSETS, DIRECTION, type DirectionKey } from "../assets";
 import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider";
 import type { Segment } from "./extract";
+import { ATOMIC_VIEW_INSTRUCTIONS, ATOMIC_VIEW_JSON_SHAPE, ATOMIC_VIEW_PROMPT_VERSION, validateAtomicViews, type ParsedAtomicView } from "./atomicViews";
 
 export interface ParsedAsset {
   ticker: string;
@@ -13,13 +14,19 @@ export interface ParsedAsset {
 
 export interface ParsedArticle {
   summary: string;
+  summaryZh: string | null;
   keyArguments: string[];
+  keyArgumentsZh: string[];
   keyNumbers: { label: string; value: string }[];
+  keyNumbersZh: { label: string; value: string }[];
   risks: string[];
+  risksZh: string[];
   interpretation: string | null;
+  interpretationZh: string | null;
   importanceScore: number;
   confidence: number;
   assets: ParsedAsset[];
+  atomicViews: ParsedAtomicView[];
   unresolvedTickers: string[];
   needsLLM: boolean;
   provider: string;
@@ -161,13 +168,19 @@ export function heuristicParse(input: ParseInput, segments: Segment[] = []): Par
   const needsLLM = unresolvedTickers.length > 0 || assets.length === 0;
   return {
     summary,
+    summaryZh: null,
     keyArguments: [],
+    keyArgumentsZh: [],
     keyNumbers: [],
+    keyNumbersZh: [],
     risks: [],
+    risksZh: [],
     interpretation: null,
+    interpretationZh: null,
     importanceScore: Number(importance.toFixed(2)),
     confidence: assets.length ? Math.max(...assets.map((s) => s.confidence)) : 0.5,
     assets,
+    atomicViews: [],
     unresolvedTickers,
     needsLLM,
     provider: "local",
@@ -182,14 +195,16 @@ export const mockParse = heuristicParse;
 
 // -------- Real LLM parser (configured provider) --------
 const SYSTEM = `You extract structured investment signals from a public institutional research article.
+${ATOMIC_VIEW_INSTRUCTIONS}
 Return ONLY valid JSON matching this shape:
-{"summary":string,"key_arguments":string[],"key_numbers":[{"label":string,"value":string}],"risks":string[],
-"interpretation":string,"importance_score":number(0..1),"confidence":number(0..1),
-"assets":[{"ticker":string,"direction":"strong_bull"|"bull"|"neutral"|"bear"|"strong_bear","target":number|null,"previous_target":number|null,"time_horizon":string|null,"confidence":number(0..1)}]}
+{"summary_en":string,"summary_zh":string,"key_arguments_en":string[],"key_arguments_zh":string[],"key_numbers_en":[{"label":string,"value":string}],"key_numbers_zh":[{"label":string,"value":string}],"risks_en":string[],"risks_zh":string[],
+"interpretation_en":string,"interpretation_zh":string,"importance_score":number(0..1),"confidence":number(0..1),
+"assets":[{"ticker":string,"direction":"strong_bull"|"bull"|"neutral"|"bear"|"strong_bear","target":number|null,"previous_target":number|null,"time_horizon":string|null,"confidence":number(0..1)}],
+${ATOMIC_VIEW_JSON_SHAPE}}
 Use tickers only from this list where applicable: ${ASSETS.map((a) => a.ticker).join(", ")}.
-Summary must be your own words, never a verbatim copy. If unsure about an asset, omit it.`;
+English analysis fields must contain professional English; _zh fields must contain institution-grade Simplified Chinese preserving every number, unit and modality. Summaries must be your own words, never a verbatim copy. If unsure about an asset, omit it.`;
 
-function coerce(json: any, provider: string, model: string): ParsedArticle | null {
+function coerce(json: any, provider: string, model: string, sourceText: string): ParsedArticle | null {
   if (!json || typeof json !== "object") return null;
   const dirMap: Record<string, number> = {
     strong_bull: 2, bull: 1, neutral: 0, bear: -1, strong_bear: -2,
@@ -207,35 +222,44 @@ function coerce(json: any, provider: string, model: string): ParsedArticle | nul
           confidence: clamp(Number(a.confidence) || 0.6, 0, 1),
         }))
     : [];
-  if (typeof json.summary !== "string" || !json.summary) return null;
+  const summary = typeof json.summary_en === "string" ? json.summary_en : json.summary;
+  if (typeof summary !== "string" || !summary) return null;
+  const atomicViews = validateAtomicViews(json.atomic_views, sourceText);
   return {
-    summary: json.summary,
-    keyArguments: Array.isArray(json.key_arguments) ? json.key_arguments.slice(0, 8) : [],
-    keyNumbers: Array.isArray(json.key_numbers) ? json.key_numbers.slice(0, 8) : [],
-    risks: Array.isArray(json.risks) ? json.risks.slice(0, 8) : [],
-    interpretation: typeof json.interpretation === "string" ? json.interpretation : null,
+    summary,
+    summaryZh: typeof json.summary_zh === "string" ? json.summary_zh : null,
+    keyArguments: Array.isArray(json.key_arguments_en) ? json.key_arguments_en.slice(0, 8) : Array.isArray(json.key_arguments) ? json.key_arguments.slice(0, 8) : [],
+    keyArgumentsZh: Array.isArray(json.key_arguments_zh) ? json.key_arguments_zh.slice(0, 8) : [],
+    keyNumbers: Array.isArray(json.key_numbers_en) ? json.key_numbers_en.slice(0, 8) : Array.isArray(json.key_numbers) ? json.key_numbers.slice(0, 8) : [],
+    keyNumbersZh: Array.isArray(json.key_numbers_zh) ? json.key_numbers_zh.slice(0, 8) : [],
+    risks: Array.isArray(json.risks_en) ? json.risks_en.slice(0, 8) : Array.isArray(json.risks) ? json.risks.slice(0, 8) : [],
+    risksZh: Array.isArray(json.risks_zh) ? json.risks_zh.slice(0, 8) : [],
+    interpretation: typeof json.interpretation_en === "string" ? json.interpretation_en : typeof json.interpretation === "string" ? json.interpretation : null,
+    interpretationZh: typeof json.interpretation_zh === "string" ? json.interpretation_zh : null,
     importanceScore: clamp(Number(json.importance_score) || 0.5, 0, 1),
     confidence: clamp(Number(json.confidence) || 0.6, 0, 1),
     assets,
+    atomicViews,
     unresolvedTickers: [],
     needsLLM: false,
     provider,
     model,
-    promptVersion: "v2",
-    reviewStatus: "ok",
+    promptVersion: ATOMIC_VIEW_PROMPT_VERSION,
+    reviewStatus: atomicViews.length > 0 ? "ok" : "needs_review",
   };
 }
 
 async function realParse(input: ParseInput, provider: LLMProvider): Promise<ParsedArticle | null> {
-  const user = `INSTITUTION: ${input.institution}\nPUBLISHED: ${input.publishedAt}\nTITLE: ${input.title}\n\nARTICLE:\n${input.text.slice(0, 12000)}`;
+  const sourceText = input.text.slice(0, 50000);
+  const user = `INSTITUTION: ${input.institution}\nPUBLISHED: ${input.publishedAt}\nTITLE: ${input.title}\n\nARTICLE:\n${sourceText}`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const result = await completeJSON<unknown>(provider, {
         system: SYSTEM,
         user,
-        maxTokens: 1500,
+        maxTokens: 5000,
       });
-      const parsed = coerce(result.value, result.meta.provider, result.meta.model);
+      const parsed = coerce(result.value, result.meta.provider, result.meta.model, sourceText);
       if (parsed) return parsed;
     } catch {
       // Fall through to retry, then preserve the safe heuristic result.
@@ -244,11 +268,11 @@ async function realParse(input: ParseInput, provider: LLMProvider): Promise<Pars
   return null;
 }
 
-/** Parse heuristically first; spend an LLM call only on unresolved assets. */
+/** Use the configured model for evidence-backed atomic views; fall back safely to heuristics. */
 export async function parseArticle(input: ParseInput, segments: Segment[] = []): Promise<ParsedArticle> {
   const heuristic = heuristicParse(input, segments);
   const provider = getLLMProvider();
-  if (provider && heuristic.needsLLM) {
+  if (provider) {
     const real = await realParse(input, provider);
     if (real) return real;
     heuristic.reviewStatus = "needs_review";

@@ -43,8 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/institutions">{tr(locale, "Institutions", "机构")}</Link>
               <Link href="/research">{tr(locale, "Research", "研报")}</Link>
               <Link href="/consensus">{tr(locale, "Consensus", "共识")}</Link>
-              <Link href="/watchlist">{tr(locale, "Watchlist", "关注")}</Link>
-              <Link href="/alerts">{tr(locale, "Alerts", "提醒")}</Link>
+              <Link href="/watchlist">{tr(locale, "Monitoring", "监控")}</Link>
             </nav>
             <div className="sp" />
             {user && formalAuth ? (

@@ -34,12 +34,12 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Core pages**, all reading live data: Home (Market Consensus + Feed),
   `/asset/[ticker]`, `/institution/[slug]`, `/research/[id]`, plus `/markets`,
   `/institutions`, `/consensus` indexes.
-- **Auth + interactive Watchlist/Alerts**: production supports database-backed Auth.js OAuth
+- **Unified Monitoring Center**: production supports database-backed Auth.js OAuth
   with Microsoft Entra ID or Google; local development retains an explicitly gated demo sign-in.
-  `/watchlist` and `/alerts` are gated and interactive via **Server Actions** (`src/app/actions.ts`):
-  ＋Watch / remove on asset & institution pages, create / toggle / delete alert rules
+  `/watchlist` combines followed assets, institutions, trading themes, rules and recent triggers;
+  legacy `/alerts` redirects there. **Server Actions** (`src/app/actions.ts`) create / toggle / delete rules
   (evaluated immediately). Consensus rules: `CONSENSUS_ABOVE` / `BELOW` / `DROP_24H` /
-  `RISE_24H`, 12h de-dup — see `src/lib/alerts.ts`. Roles and commercial tiers are independent.
+  `RISE_24H`; new-research rules monitor an asset, institution or theme — see `src/lib/alerts.ts`.
 - **Site-wide fuzzy search**: the home search instantly ranks institutions, assets and
   English/Chinese research content. It supports aliases, partial terms and common typos,
   with keyboard navigation and no separate search page or LLM dependency.
@@ -70,6 +70,9 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
   their Chinese versions preserve page structure where quality checks allow it.
 - **Pluggable LLM boundary** (`src/lib/llm/`): deterministic parser without a key; Anthropic,
   OpenAI or DeepSeek for parsing, translation, correction and review when configured.
+- **Evidence-backed atomic views**: configured LLMs decompose a report into bilingual,
+  independently searchable views. Every row must retain a direct quote found in the stored source;
+  unsupported numbers, invalid labels, duplicates and weakened conditional language are rejected.
 - **Forecast accuracy foundation**: supported horizons become pending forecasts, CSV price
   observations settle against one vendor source, and `/institution/[slug]/accuracy` discloses
   directional accuracy and target error. Publishing scores waits for a licensed price feed.
@@ -88,6 +91,7 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 | `npm run forecasts` | Sync supported forecast horizons and settle due observations |
 | `npm run prices:import -- --file=prices.csv --source=vendor` | Import `ticker,timestamp,value` observations |
 | `npm run alerts` | Seed/refresh the demo user's watchlist + rules and fire alerts |
+| `npm run reparse -- --all --limit=1` | Re-run structured parsing and atomic-view extraction (omit `--limit` for all) |
 
 > **Live ingest note:** the application does not seed synthetic research. A source appears
 > only after its public article passes URL, publication-date, full-body and document checks.

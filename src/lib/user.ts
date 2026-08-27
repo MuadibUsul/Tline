@@ -12,13 +12,12 @@ export async function getWatchlistView(userId: string) {
     const asset = await prisma.asset.findUnique({ where: { ticker: it.refId } });
     if (!asset) continue;
     const c = await computeConsensus(asset.id);
-    if (!c) continue;
     assets.push({
       ticker: asset.ticker,
       name: asset.name,
-      score: c.score,
-      label: c.label,
-      tone: c.tone,
+      score: c?.score ?? null,
+      label: c?.label ?? null,
+      tone: c?.tone ?? null,
       d1: await consensusChange(asset.id, 1),
     });
   }
@@ -28,7 +27,8 @@ export async function getWatchlistView(userId: string) {
     ? await prisma.institution.findMany({ where: { slug: { in: instSlugs } } })
     : [];
 
-  return { assets, institutions };
+  const themes = items.filter((item) => item.kind === "theme").map((item) => item.refId);
+  return { assets, institutions, themes };
 }
 
 export async function getAlertsView(userId: string) {

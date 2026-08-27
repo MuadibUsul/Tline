@@ -28,16 +28,47 @@ function ArticleBody({ segments, fallback }: {
   );
 }
 
+function AtomicViewCard({ view, locale }: { view: {
+  id: string; viewEn: string; viewZh: string; type: string; asset: string; assetTicker: string | null;
+  topic: string; direction: string; timeHorizon: string; value: string | null; conditionEn: string | null;
+  conditionZh: string | null; rationaleEn: string | null; rationaleZh: string | null; confidence: string;
+  importance: number; sourceQuote: string;
+}; locale: "en" | "zh-CN" }) {
+  const copy = locale === "zh-CN" ? view.viewZh : view.viewEn;
+  const condition = locale === "zh-CN" ? view.conditionZh : view.conditionEn;
+  const rationale = locale === "zh-CN" ? view.rationaleZh : view.rationaleEn;
+  const tone = view.direction === "bullish" ? "bull" : view.direction === "bearish" ? "bear" : "neu";
+  return (
+    <article className="atomic-view">
+      <div className="atomic-meta">
+        <span className={`chip ${tone}`}>{view.direction}</span>
+        <span className="chip gray">{view.type}</span>
+        {view.assetTicker ? <Link href={`/asset/${view.assetTicker}`} className="chip acc">{view.asset}</Link> : <span className="chip acc">{view.asset}</span>}
+        <span>{view.timeHorizon}</span><span>{"★".repeat(view.importance)}</span>
+      </div>
+      <h3>{copy}</h3>
+      {view.value && <div className="atomic-value">{view.value}</div>}
+      {condition && <p><b>{tr(locale, "Condition", "条件")}:</b> {condition}</p>}
+      {rationale && <p><b>{tr(locale, "Rationale", "依据")}:</b> {rationale}</p>}
+      <details><summary>{tr(locale, "View supporting quote", "查看原文依据")}</summary><blockquote>{view.sourceQuote}</blockquote></details>
+    </article>
+  );
+}
+
 export default async function ResearchPage({ params }: { params: { id: string } }) {
   const locale = getLocale();
   const a = await getResearchView(params.id);
   if (!a) notFound();
   const an = a.analysis;
-  const keyNumbers = parseJson<{ label: string; value: string }[]>(an?.keyNumbers, []);
-  const keyArgs = parseJson<string[]>(an?.keyArguments, []);
-  const risks = parseJson<string[]>(an?.risks, []);
+  const keyNumbers = parseJson<{ label: string; value: string }[]>(locale === "zh-CN" ? an?.keyNumbersZh : an?.keyNumbers, []);
+  const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
+  const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
+  const summary = locale === "zh-CN" ? an?.summaryZh ?? an?.summary : an?.summary;
+  const interpretation = locale === "zh-CN" ? an?.interpretationZh ?? an?.interpretation : an?.interpretation;
   const date = formatDate(a.publishedAt, locale);
   const translation = a.translations[0];
+  const primaryViews = a.atomicViews.filter((view) => view.importance >= 4);
+  const secondaryViews = a.atomicViews.filter((view) => view.importance < 4);
   const translationStatus = translation?.status === "reviewed" ? tr(locale, "reviewed", "已复核")
     : translation?.status === "needs_review" ? tr(locale, "needs review", "待复核")
       : tr(locale, "translated", "已翻译");
@@ -56,13 +87,13 @@ export default async function ResearchPage({ params }: { params: { id: string } 
       <section className="blk">
         <div className="ai-box">
           <div className="lbl">◆ {tr(locale, "AI Summary — model-generated, not source text", "AI 摘要 — 模型生成，非原文转载")}</div>
-          <p style={{ margin: 0, color: "var(--ink-2)" }}>{an?.summary}</p>
+          <p style={{ margin: 0, color: "var(--ink-2)" }}>{summary}</p>
         </div>
       </section>
 
       {a.articleAssets.length > 0 && (
         <section className="blk">
-          <div className="section-t">{tr(locale, "Core Views", "核心观点")}</div>
+          <div className="section-t">{tr(locale, "Covered assets", "涉及资产")}</div>
           <div className="tag-row">
             {a.articleAssets.map((aa) => (
               <Link key={aa.asset.ticker} href={`/asset/${aa.asset.ticker}`} className={`chip ${aa.direction > 0 ? "bull" : aa.direction < 0 ? "bear" : "neu"}`}>
@@ -70,6 +101,16 @@ export default async function ResearchPage({ params }: { params: { id: string } 
               </Link>
             ))}
           </div>
+        </section>
+      )}
+
+      {a.atomicViews.length > 0 && (
+        <section className="blk">
+          <div className="section-t">{tr(locale, "Atomic institutional views", "机构原子观点")} · {a.atomicViews.length}</div>
+          <div className="atomic-list">
+            {(primaryViews.length ? primaryViews : secondaryViews).map((view) => <AtomicViewCard key={view.id} view={view} locale={locale} />)}
+          </div>
+          {primaryViews.length > 0 && secondaryViews.length > 0 && <details className="atomic-more"><summary>{tr(locale, `Show ${secondaryViews.length} lower-priority views`, `展开 ${secondaryViews.length} 条次要观点`)}</summary><div className="atomic-list">{secondaryViews.map((view) => <AtomicViewCard key={view.id} view={view} locale={locale} />)}</div></details>}
         </section>
       )}
 
@@ -91,10 +132,10 @@ export default async function ResearchPage({ params }: { params: { id: string } 
         </section>
       )}
 
-      {an?.interpretation && (
+      {interpretation && (
         <section className="blk">
           <div className="section-t">{tr(locale, "AI Trading Interpretation", "AI 交易解读")}</div>
-          <p className="prose">{an.interpretation}</p>
+          <p className="prose">{interpretation}</p>
         </section>
       )}
 

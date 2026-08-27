@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractArticle, extractLinks, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic } from "./extract";
+import { extractArticle, extractLinks, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 
 test("extracts an embedded publisher date and conservative URL date hints", () => {
   const article = extractArticle(`<html><head><title>CIO Insights 4Q24 | Bank</title></head><body>
@@ -54,6 +54,10 @@ test("distinguishes investment research PDFs from operational vendor notices", (
     "ERP and TMS vendor newsletter",
     "File upload specifications will change. Vendors should migrate customer payment files to the new XML interface before the technical deadline.",
   ), false);
+  assert.equal(looksLikeResearchTopic(
+    "Labour market update",
+    "Employment growth slowed as job creation weakened. Wage pressures are easing while unemployment has moved higher.",
+  ), true);
 });
 
 test("keeps semantic content when body and main class names mention cookie or nav", () => {
@@ -75,4 +79,24 @@ test("discovers nested article pages and embedded same-origin PDFs", () => {
     "https://bank.example/about/economics/publications/2025/market-review-from-last-year",
   ]);
   assert.deepEqual(extractPdfLinks(html, base), ["https://bank.example/documents/report.pdf"]);
+});
+
+test("uses a card heading when the article link is a short CTA", () => {
+  const links = extractLinks(`
+    <main><article class="research-card"><h3>Quarterly Global Investment Outlook for institutional investors</h3>
+      <a href="/research/quarterly-global-outlook.page">Read more</a></article></main>
+  `, "https://bank.example/research/index.page");
+  assert.deepEqual(links, [{
+    url: "https://bank.example/research/quarterly-global-outlook.page",
+    title: "Quarterly Global Investment Outlook for institutional investors",
+  }]);
+});
+
+test("selects newest accepted articles after all discovery channels run", () => {
+  const selected = newestByPublication([
+    { title: "pinned old", publishedAt: new Date("2023-04-01") },
+    { title: "current", publishedAt: new Date("2026-08-20") },
+    { title: "recent", publishedAt: new Date("2026-07-10") },
+  ], 2);
+  assert.deepEqual(selected.map((article) => article.title), ["current", "recent"]);
 });

@@ -20,13 +20,21 @@ function looksLikeArticleUrl(path: string): boolean {
 export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
   const $ = cheerio.load(html);
   const base = new URL(baseUrl);
-  const basePath = base.pathname.replace(/\/$/, "").replace(/\.html?$/i, "");
+  const pathname = base.pathname.replace(/\/$/, "");
+  const basePath = /\/index\.[a-z0-9]+$/i.test(pathname)
+    ? pathname.replace(/\/index\.[a-z0-9]+$/i, "")
+    : pathname.replace(/\.[a-z0-9]+$/i, "");
   const out = new Map<string, { title: string; underSection: boolean; date: number; research: boolean }>();
 
   $("a[href]").each((_, el) => {
     if ($(el).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]").length) return;
     const href = $(el).attr("href") || "";
-    const text = $(el).text().replace(/\s+/g, " ").trim();
+    let text = $(el).text().replace(/\s+/g, " ").trim();
+    if (text.length < 28) {
+      const card = $(el).closest("article,[class*=card],[class*=tile],[class*=teaser]");
+      const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim();
+      if (heading) text = heading;
+    }
     if (text.length < 28 || text.length > 180) return; // headline-length text only
     let abs: URL;
     try {
@@ -100,6 +108,10 @@ export interface ExtractedArticle {
   segments: Segment[];
   author: string | null;
   publishedAt: Date | null;
+}
+
+export function newestByPublication<T extends { publishedAt: Date }>(articles: T[], limit: number): T[] {
+  return [...articles].sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime()).slice(0, limit);
 }
 
 /** Conservative date inference for URLs/titles that carry an explicit calendar date or quarter. */
@@ -255,6 +267,7 @@ export function looksLikeResearchTopic(title: string, text: string): boolean {
     /\bbonds?\b/i, /\byields?\b/i, /\binflation\b/i, /\bcommodit(?:y|ies)\b/i,
     /\bcurrenc(?:y|ies)\b/i, /\bforex\b/i, /\bmonetary\b/i, /\bgdp\b/i,
     /\bearnings\b/i, /\bvaluation\b/i, /\bforecast\b/i,
+    /\b(?:employment|unemployment|jobs?|labou?r|wages?)\b/i,
   ];
   return signals.filter((signal) => signal.test(sample)).length >= 2;
 }

@@ -2,7 +2,7 @@ import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchPdf, fetchText, lastFetchStatus, sleep } from "./fetch";
-import { extractLinks, extractArticle, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic } from "./extract";
+import { extractLinks, extractArticle, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
@@ -74,10 +74,11 @@ async function ingestInstitution(
   let created = 0, dup = 0, empty = 0, blocked = 0, nativeRejected = 0;
   const raws: RawArticle[] = [];
   const nativePdfs = new Map<string, Buffer>();
+  const seenCandidates = new Set<string>();
   const candidateLimit = Math.min(40, Math.max(12, perLimit * 4));
   const stage = (raw: RawArticle) => {
     if (isNaN(raw.publishedAt.getTime()) || raw.publishedAt.getTime() > Date.now() + 864e5) { empty++; return false; }
-    if (raw.strict && !looksLikeArticle(raw.title, raw.text)) { empty++; return false; }
+    if (raw.strict && (!looksLikeArticle(raw.title, raw.text) || !looksLikeResearchTopic(raw.title, raw.text))) { empty++; return false; }
     raws.push(raw);
     return true;
   };
@@ -85,11 +86,17 @@ async function ingestInstitution(
     where: { urlHash: urlHash(url) },
     select: { id: true },
   }));
+  const skipCandidate = async (url: string) => {
+    const clean = url.split("#")[0];
+    if (seenCandidates.has(clean)) return true;
+    seenCandidates.add(clean);
+    if (await knownUrl(clean)) { dup++; return true; }
+    return false;
+  };
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
     let staged = false;
     for (const pdfUrl of extractPdfLinks(html, pageUrl)) {
-      if (raws.length >= perLimit) break;
-      if (!allowsUrl(pdfUrl) || await knownUrl(pdfUrl)) continue;
+      if (!allowsUrl(pdfUrl) || await skipCandidate(pdfUrl)) continue;
       await sleep(delayMs);
       const pdf = await fetchPdf(pdfUrl);
       if (!pdf) continue;
@@ -132,7 +139,7 @@ async function ingestInstitution(
       for (const item of (feed.items || []).slice(0, candidateLimit)) {
         if (raws.length >= perLimit) break;
         if (!item.link || !allowsUrl(item.link)) continue;
-        if (await knownUrl(item.link)) { dup++; continue; }
+        if (await skipCandidate(item.link)) continue;
         await sleep(delayMs);
         if (/\.pdf(?:$|\?)/i.test(item.link)) {
           const pdf = await fetchPdf(item.link);
@@ -180,7 +187,7 @@ async function ingestInstitution(
   }
 
   // 2) Sitemap/Sitemap Index discovery, including native research PDFs.
-  if (raws.length === 0) {
+  if (raws.length < perLimit) {
     const sitemapSeeds = [
       ...robotsSitemaps(robotsTxt),
       ...(inst.sitemapUrl ? [inst.sitemapUrl] : []),
@@ -193,7 +200,7 @@ async function ingestInstitution(
     for (const candidate of candidates) {
       if (raws.length >= perLimit) break;
       if (!allowsUrl(candidate.url)) { blocked++; continue; }
-      if (await knownUrl(candidate.url)) { dup++; continue; }
+      if (await skipCandidate(candidate.url)) continue;
       await sleep(delayMs);
       if (/\.pdf(?:$|\?)/i.test(candidate.url)) {
         const pdf = await fetchPdf(candidate.url);
@@ -250,7 +257,8 @@ async function ingestInstitution(
   }
 
   // 3) HTML listing → per-article extraction, each URL robots-checked.
-  if (raws.length === 0) {
+  {
+    const beforeListing = raws.length;
     let listHtml = await fetchText(inst.researchUrl);
     let links = listHtml ? extractLinks(listHtml, inst.researchUrl) : [];
     if (links.length === 0 && inst.requiresRender) {
@@ -259,9 +267,8 @@ async function ingestInstitution(
     }
     if (listHtml) {
       for (const link of links) {
-        if (raws.length >= perLimit) break;
         if (!allowsUrl(link.url)) { blocked++; continue; }
-        if (await knownUrl(link.url)) { dup++; continue; }
+        if (await skipCandidate(link.url)) continue;
         await sleep(delayMs);
         let artHtml = await fetchText(link.url);
         if (!artHtml && inst.requiresRender) artHtml = await renderHtml(link.url);
@@ -289,14 +296,15 @@ async function ingestInstitution(
           strict: true, // HTML-extracted → enforce the full article check
         });
       }
-      if (raws.length === 0) {
+      if (links.length === 0 && raws.length === beforeListing) {
         const listing = extractArticle(listHtml);
         await stageEmbeddedPdf(listHtml, inst.researchUrl, listing.title, listing.publishedAt);
       }
     }
   }
 
-  for (const r of raws) {
+  const selectedRaws = newestByPublication(raws, perLimit);
+  for (const r of selectedRaws) {
     const res = await persistArticle(inst.id, inst.name, r);
     if (res === "created") {
       created++;
@@ -326,7 +334,8 @@ async function ingestInstitution(
   console.log(JSON.stringify({
     event: "ingest.source.complete",
     institution: inst.name,
-    discovered: raws.length,
+    discovered: selectedRaws.length,
+    acceptedCandidates: raws.length,
     created,
     duplicate: dup,
     empty,
@@ -338,7 +347,7 @@ async function ingestInstitution(
   if (raws.length === 0 && accessStatus && [401, 403, 429].includes(accessStatus)) {
     return finish("paused", `research endpoint HTTP ${accessStatus}; access wall not bypassed`, created);
   }
-  return finish("succeeded", `${raws.length} discovered · ${created} created · ${dup} duplicate · ${empty} empty · ${blocked} blocked · ${nativeRejected} native PDF rejected`, created);
+  return finish("succeeded", `${selectedRaws.length} selected from ${raws.length} accepted · ${created} created · ${dup} duplicate · ${empty} empty · ${blocked} blocked · ${nativeRejected} native PDF rejected`, created);
 }
 
 async function executeIngest() {

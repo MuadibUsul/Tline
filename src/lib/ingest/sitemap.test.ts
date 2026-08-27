@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseSitemap, sitemapArticleRelevance } from "./sitemap";
+import { parseSitemap, sitemapArticleRelevance, sitemapDateHint } from "./sitemap";
 
 test("parses sitemap indexes and URL lastmod values", () => {
   const index = parseSitemap(`<?xml version="1.0"?><sitemapindex>
@@ -31,4 +31,16 @@ test("accepts research articles and rejects unrelated sitemap pages", () => {
     "https://www.nordea.com/en/doc/nordea-erp-tms-newsletter-june-2026-0.pdf",
     "https://www.nordea.com/en/news-and-insights",
   ), 0);
+  assert.equal(sitemapArticleRelevance(
+    "https://www.uobgroup.com/asean-insights/articles/investment-bright-spot.page",
+    "https://www.uobgroup.com/research/index.page",
+  ), 0);
+});
+
+test("uses publication paths before recently edited sitemap timestamps", () => {
+  const edited = new Date("2026-08-24T00:00:00Z");
+  assert.equal(
+    sitemapDateHint("https://example.com/insights/2026/02/older-report", edited)?.toISOString().slice(0, 10),
+    "2026-02-01",
+  );
 });

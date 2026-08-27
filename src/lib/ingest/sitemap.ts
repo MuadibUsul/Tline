@@ -42,6 +42,7 @@ const RESEARCH_PATH = /(?:^|\/)(?:insights?|research|outlooks?|markets?|econom(?
 const NON_RESEARCH_PATH = /(?:^|\/)(?:about|careers?|contact|events?|help|legal|newsroom|privacy|products?|services?|solutions?|responsibility(?:-impact)?|sustainability|governance|investors?|shareholders?|policies?|annual-reports?)(?:\/|[-_.]|$)/i;
 const COMMON_SOURCE_PARTS = new Set([
   "about", "global", "en", "us", "uk", "www", "index", "home", "html", "htm",
+  "page",
   "insight", "insights", "research", "report", "reports", "publication", "publications", "market", "markets", "news",
 ]);
 
@@ -75,6 +76,16 @@ export function sitemapArticleRelevance(raw: string, sourceUrl: string): number 
   } catch {
     return 0;
   }
+}
+
+/** Prefer a publication date encoded in the URL; sitemap lastmod is only an edit timestamp. */
+export function sitemapDateHint(raw: string, lastModified: Date | null): Date | null {
+  const exact = inferPublicationDate(raw);
+  if (exact) return exact;
+  let path = raw;
+  try { path = decodeURIComponent(new URL(raw).pathname); } catch { /* use raw value */ }
+  const month = path.match(/(?:^|\/)(20\d{2})\/(0?[1-9]|1[0-2])(?:\/|$)/);
+  return month ? new Date(Date.UTC(Number(month[1]), Number(month[2]) - 1, 1)) : lastModified;
 }
 
 async function fetchSitemap(url: string) {
@@ -123,7 +134,7 @@ export async function discoverFromSitemaps(
     for (const candidate of parsed.urls) {
       const relevance = sitemapArticleRelevance(candidate.url, sourceUrl);
       if (relevance <= 0) continue;
-      const dateHint = candidate.lastModified || inferPublicationDate(candidate.url);
+      const dateHint = sitemapDateHint(candidate.url, candidate.lastModified);
       if (dateHint && dateHint < since) continue;
       const clean = candidate.url.split("#")[0];
       const existing = candidates.get(clean);

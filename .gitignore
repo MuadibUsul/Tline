@@ -10,4 +10,5 @@ next-env.d.ts
 .DS_Store
 storage/
 data/cache/
+data/crawl-probe*.json
 prisma/postgresql/schema.prisma

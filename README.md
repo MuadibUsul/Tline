@@ -48,10 +48,11 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
   authority weighting and within-window recency decay remain. Snapshots to
   `consensus_history` drive the 1D/7D/30D deltas.
 - **Ingestion pipeline** (`src/lib/ingest/`): RSS, Sitemap/Sitemap Index, native PDF and
-  HTML-listing discovery; research-path/date quality gates; three-hash dedup; source-run status;
-  structured persistence and per-source failure isolation. Live validation currently contains
-  31 complete articles from 15 institutions: ING, UBS, Scotiabank, J.P. Morgan, RBC, Saxo, UOB,
-  OCBC, Nomura, Pictet, MUFG, Apollo, TD, Standard Chartered and SEB.
+  HTML-listing discovery; publisher-declared feeds; direct/embedded PDFs; static and normally
+  rendered public pages; research-path/date/full-body gates; three-hash dedup and per-source
+  failure isolation. `ingest:probe` audits all 59 policy-crawlable sources without writing
+  articles. Real ingest records `succeeded`, `empty`, `paused`, `refused` or `failed` instead
+  of treating a zero-result run as success.
 - **Robots compliance (strict)**: `scripts/robots_audit.py` audits all 64 sources' robots.txt
   → `64机构爬虫合规评估.xlsx` + `data/crawl_policy.json` (allowed/delayed/blocked/manual +
   Crawl-delay). The crawler (`run.ts`) only touches `allowed`/`delayed` institutions, and
@@ -87,7 +88,8 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 | `npm run dev` | Next.js dev server |
 | `npm run db:seed` | Load the 64 institutions + asset dictionary |
 | `python scripts/robots_audit.py` | Re-audit robots.txt for all 64 → Excel + `data/crawl_policy.json` |
-| `npm run ingest` | Live-crawl compliant priority-1 sources (`-- --slug=ubs`, `-- --all`, `-- --limit=3`); blocked/manual are refused |
+| `npm run ingest` | Live-crawl compliant sources (`-- --slug=ubs`, `-- --all`, `-- --limit=3`, `-- --resume-minutes=60`); blocked/manual are refused |
+| `npm run ingest:probe -- --sample=3 --render --output=data/crawl-probe.json` | Read-only live coverage audit with discovery, quality-gate and access-failure evidence |
 | `npm run consensus` | Recompute + snapshot all asset consensus, then evaluate alerts |
 | `npm run translate` | Translate/review pending articles and build ready bilingual PDFs |
 | `npm run documents` | Rebuild article PDF assets |
@@ -98,7 +100,9 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 
 > **Live ingest note:** the application does not seed synthetic research. A source appears
 > only after its public article passes URL, publication-date, full-body and document checks.
-> Per-institution `rssUrl`/`sitemapUrl` + tuned selectors are the natural next step.
+> A current robots/access gate can still pause a source that passed the historical spreadsheet
+> audit. The crawler never clicks consent/login gates or bypasses WAF/CAPTCHA; rerun
+> `ingest:probe` to distinguish a code regression from an external access-state change.
 
 ## Deviations from the blueprint (deliberate, for a runnable MVP)
 

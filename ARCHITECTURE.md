@@ -64,7 +64,7 @@ flowchart LR
 | 查询层 | `src/lib/queries.ts`、`research.ts` | 页面查询和结构化问答 |
 | Consensus | `src/lib/consensus.ts` | 权威加权、时间衰减、历史快照 |
 | 合规规则 | `scripts/robots_audit.py`、`ingest/robots.ts` | 离线审计与运行时 URL 判断 |
-| 发现与抓取 | `ingest/fetch.ts`、`run.ts` | RSS/HTML 入口、限速、调度 |
+| 发现与抓取 | `ingest/fetch.ts`、`probe.ts`、`run.ts` | 无副作用探测、RSS/Sitemap/HTML/PDF 入口、限速、调度 |
 | 正文提取 | `ingest/extract.ts` | 清洗、正文识别、小标题分段、质量检查 |
 | 结构化解析 | `ingest/parseLLM.ts` | 规则解析、可选 Anthropic 解析 |
 | 落库与去重 | `ingest/store.ts`、`hash.ts` | 三重 hash 去重、事务化写入 |
@@ -133,9 +133,22 @@ Playwright 仅用于正常呈现公开 JS 页面：
 
 - 不使用 stealth 插件、代理轮换或验证码识别。
 - 检测登录墙、付费墙、CAPTCHA、人机验证或 Access Denied 后停止该来源。
-- Playwright 是按机构启用的兜底，不是所有页面的默认抓取器。
+- Playwright 是静态抓取无法发现列表或正文时的公开页面兜底；每个候选仍先走静态抓取，且不会执行同意、登录或人机验证动作。
 
-### 5.5 正文提取
+### 5.5 采集控制面与“数据中台”决策
+
+当前不拆独立数据中台微服务。现有单体已经具备来源注册表、Prisma 事实库、`JobRun`、来源级状态、定时任务和结构化日志；此时再增加服务、队列和第二套部署会引入双写一致性、重试归属和运维成本，却不会提升受 robots/访问门限制的站点覆盖率。
+
+控制面直接建立在现有后端内：
+
+- `npm run ingest:probe`：对 59 个合规候选源做无副作用实时探测，输出 feed/sitemap/listing/PDF 数量、抽样通过数和失败分类。
+- `Institution.lastCrawl*`：记录 `running/succeeded/empty/paused/refused/failed`，零候选不再伪装成成功。
+- `JobRun`：记录一次全局任务的参数、尝试、耗时、结果指标和错误。
+- `GET /api/health`：返回数据库、存储、来源状态分布、24 小时内成功数和最近一次 ingest 结果。
+
+只有在单轮采集超过调度周期、需要多机并发与分布式锁、采集与产品团队独立发布，或外部消费者需要稳定的数据事件接口时再拆 Worker/队列。届时上述模块边界可直接迁出，无需改前端事实模型。
+
+### 5.6 正文提取
 
 提取顺序：
 

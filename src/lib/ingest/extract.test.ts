@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractArticle, extractLinks, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { extractArticle, extractFeedLinks, extractLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 
 test("extracts an embedded publisher date and conservative URL date hints", () => {
   const article = extractArticle(`<html><head><title>CIO Insights 4Q24 | Bank</title></head><body>
@@ -15,6 +15,8 @@ test("extracts an embedded publisher date and conservative URL date hints", () =
   assert.equal(inferPublicationDate("scotia-flash.-august-23--2026-.html")?.toISOString().slice(0, 10), "2026-08-23");
   assert.equal(inferPublicationDate("DTO%20270826.pdf")?.toISOString().slice(0, 10), "2026-08-27");
   assert.equal(inferPublicationDate("Weekly%20Macro%20View%2024%20August%202026.pdf")?.toISOString().slice(0, 10), "2026-08-24");
+  assert.equal(inferPublicationDate("/2026/business-view", "Monday 22 June")?.toISOString().slice(0, 10), "2026-06-22");
+  assert.equal(inferPublicationDate("Emerging Markets July 22, 2026")?.toISOString().slice(0, 10), "2026-07-22");
   assert.equal(inferPublicationDate("economic_monthly_ASEANIndiaau20260820e.pdf")?.toISOString().slice(0, 10), "2026-08-20");
   assert.equal(inferPublicationDate("market-view-latest"), null);
   assert.equal(extractArticle(`<title>Daily: Navigating higher long-end yields | UBS</title><main><p>${"Bond markets remain volatile. ".repeat(20)}</p></main>`).title, "Daily: Navigating higher long-end yields");
@@ -81,6 +83,22 @@ test("discovers nested article pages and embedded same-origin PDFs", () => {
   assert.deepEqual(extractPdfLinks(html, base), ["https://bank.example/documents/report.pdf"]);
 });
 
+test("discovers same-origin publisher RSS and Atom feeds", () => {
+  const html = `<link rel="alternate" type="application/rss+xml" href="/insights/feed.xml">
+    <a href="https://bank.example/research/atom.xml">Research feed</a>
+    <a href="https://feeds.vendor.example/bank.xml">External feed</a>`;
+  assert.deepEqual(extractFeedLinks(html, "https://bank.example/research"), [
+    "https://bank.example/insights/feed.xml",
+    "https://bank.example/research/atom.xml",
+  ]);
+});
+
+test("retains title and card date for direct research PDF links", () => {
+  const candidates = extractPdfCandidates(`<article><h3>Weekly Macro View</h3><time>24 August 2026</time><a href="/reports/macro.pdf">Download PDF</a></article>`, "https://bank.example/research");
+  assert.equal(candidates[0].title, "Weekly Macro View");
+  assert.equal(candidates[0].publishedAt?.toISOString().slice(0, 10), "2026-08-24");
+});
+
 test("uses a card heading when the article link is a short CTA", () => {
   const links = extractLinks(`
     <main><article class="research-card"><h3>Quarterly Global Investment Outlook for institutional investors</h3>
@@ -89,7 +107,45 @@ test("uses a card heading when the article link is a short CTA", () => {
   assert.deepEqual(links, [{
     url: "https://bank.example/research/quarterly-global-outlook.page",
     title: "Quarterly Global Investment Outlook for institutional investors",
+    publishedAt: null,
   }]);
+});
+
+test("accepts article cards with misleading contentinfo roles and long combined headlines", () => {
+  const links = extractLinks(`
+    <article role="contentinfo"><a href="/insights/2026/08/current-outlook-for-global-markets-and-investors">
+      Current outlook for global markets and investors ${"Detailed standfirst text. ".repeat(12)} 28 August 2026
+    </a></article>
+  `, "https://bank.example/insights");
+  assert.equal(links.length, 1);
+  assert.ok(links[0].title.length <= 240);
+});
+
+test("reads a visible publication date when metadata is absent", () => {
+  const article = extractArticle(`<html><head><title>Global market outlook</title></head><body><article>
+    <div class="publication-date">28 August 2026</div>
+    <p>${"Growth is slowing while inflation is easing and bond markets expect gradual policy normalization. ".repeat(20)}</p>
+  </article></body></html>`);
+  assert.equal(article.publishedAt?.toISOString().slice(0, 10), "2026-08-28");
+});
+
+test("extracts JSON publication dates and div-only client-rendered prose", () => {
+  const prose = "Growth is slowing while inflation is easing. Bond yields remain volatile and policy normalization will be gradual. ".repeat(12);
+  const article = extractArticle(`<html><head><title>Global market outlook</title></head><body><main>
+    <script type="application/json">{"publishDateStr":"April 15, 2026"}</script>
+    <div class="article-content"><div>${prose}</div></div>
+  </main></body></html>`);
+  assert.equal(article.publishedAt?.toISOString().slice(0, 10), "2026-04-15");
+  assert.match(article.text, /Bond yields remain volatile/);
+  assert.equal(looksLikeArticle(article.title, article.text), true);
+});
+
+test("keeps a publication date rendered inside stripped page chrome", () => {
+  const article = extractArticle(`<html><head><title>Global market outlook</title></head><body>
+    <header><time datetime="2026-08-14T00:00:00Z">14 August 2026</time></header>
+    <article><p>${"Growth is slowing while inflation is easing and markets expect gradual normalization. ".repeat(20)}</p></article>
+  </body></html>`);
+  assert.equal(article.publishedAt?.toISOString().slice(0, 10), "2026-08-14");
 });
 
 test("selects newest accepted articles after all discovery channels run", () => {

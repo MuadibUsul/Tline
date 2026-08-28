@@ -53,7 +53,7 @@
   {
     "slug": "ocbc",
     "name": "OCBC Research",
-    "researchUrl": "https://www.ocbc.com/group/research/index",
+    "researchUrl": "https://www.ocbc.com/group/research/index.page",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 1,
@@ -63,7 +63,7 @@
   {
     "slug": "dbs",
     "name": "DBS Insights / CIO",
-    "researchUrl": "https://www.dbs.com/insights",
+    "researchUrl": "https://www.dbs.com/insightsdirect/",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 1,
@@ -83,7 +83,7 @@
   {
     "slug": "charles-schwab",
     "name": "Charles Schwab",
-    "researchUrl": "https://www.schwab.com/learn/",
+    "researchUrl": "https://www.schwab.com/learn/topic/markets-and-economy",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -213,7 +213,7 @@
   {
     "slug": "invesco",
     "name": "Invesco",
-    "researchUrl": "https://www.invesco.com/us/en/insights.html",
+    "researchUrl": "https://www.invesco.com/us/en/insights/topic/featured-insights.html",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -293,7 +293,7 @@
   {
     "slug": "nordea",
     "name": "Nordea",
-    "researchUrl": "https://www.nordea.com/en/news-and-insights",
+    "researchUrl": "https://www.nordea.com/en/news-insights",
     "rating": 3,
     "authorityScore": 0.7,
     "priority": 3,
@@ -303,7 +303,7 @@
   {
     "slug": "danske",
     "name": "Danske Bank",
-    "researchUrl": "https://danskebank.com/news-and-insights/research",
+    "researchUrl": "https://research.danskebank.com/research/home",
     "rating": 3,
     "authorityScore": 0.7,
     "priority": 3,
@@ -313,7 +313,7 @@
   {
     "slug": "anz",
     "name": "ANZ Research",
-    "researchUrl": "https://www.anz.com.au/about-us/economic-and-market-research/",
+    "researchUrl": "https://www.anz.com.au/bluenotes/topics/anz-research/",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -343,7 +343,7 @@
   {
     "slug": "commonwealth",
     "name": "Commonwealth Bank",
-    "researchUrl": "https://www.commbank.com.au/articles/economy.html",
+    "researchUrl": "https://www.commbank.com.au/institutional/economic-insight.html",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -363,7 +363,7 @@
   {
     "slug": "hsbc",
     "name": "HSBC",
-    "researchUrl": "https://www.hsbc.com/insights",
+    "researchUrl": "https://www.business.hsbc.com/en-gb/insights",
     "rating": 5,
     "authorityScore": 1.0,
     "priority": 3,
@@ -403,7 +403,7 @@
   {
     "slug": "commerzbank",
     "name": "Commerzbank",
-    "researchUrl": "https://www.commerzbank.com/group/newsroom/publications/",
+    "researchUrl": "https://www.commerzbank.com/research-insights/",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -493,7 +493,7 @@
   {
     "slug": "deutsche",
     "name": "Deutsche Bank",
-    "researchUrl": "https://www.db.com/what-we-do/research/",
+    "researchUrl": "https://wealth.db.com/en/articles/cio-publications.html",
     "rating": 5,
     "authorityScore": 1.0,
     "priority": 3,
@@ -513,7 +513,7 @@
   {
     "slug": "cr-dit-cib",
     "name": "Crédit Agricole CIB",
-    "researchUrl": "https://www.ca-cib.com/insights",
+    "researchUrl": "https://www.ca-cib.com/en/expertise/providing-capital-markets-solutions/global-markets-research",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -533,7 +533,7 @@
   {
     "slug": "intesa",
     "name": "Intesa Sanpaolo",
-    "researchUrl": "https://group.intesasanpaolo.com/en/research",
+    "researchUrl": "https://group.intesasanpaolo.com/en/research/commodity--fx-and-rates",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -543,7 +543,7 @@
   {
     "slug": "daiwa",
     "name": "Daiwa",
-    "researchUrl": "https://www.dir.co.jp/english/research/",
+    "researchUrl": "https://www.dir.co.jp/english/research/report/analysis/index.html",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -553,7 +553,7 @@
   {
     "slug": "smbc",
     "name": "SMBC",
-    "researchUrl": "https://www.smbcgroup.com/emea/insights/",
+    "researchUrl": "https://www.smbcgroup.com/americas/analyst-reports",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,

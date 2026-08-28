@@ -33,7 +33,7 @@ docker compose ps
 
 The app starts only after environment validation and `prisma migrate deploy`. The generated PostgreSQL Prisma schema is derived from `prisma/schema.prisma`; the checked-in SQL migration is under `prisma/postgresql/migrations/`.
 
-Health: `GET /api/health` returns `200` only when the database responds and the private-storage adapter configuration initializes. Docker uses the same endpoint for readiness; storage-vendor monitoring should separately probe its service endpoint.
+Health: `GET /api/health` returns `200` only when the database responds and the private-storage adapter configuration initializes. It also exposes crawlable-source status counts, the 24-hour successful-source count, and latest ingest job metadata. Docker uses the same endpoint for readiness; storage-vendor monitoring should separately probe its service endpoint.
 
 ## Background ingestion
 
@@ -45,6 +45,14 @@ The `scheduler` service runs one robots-compliant ingestion pass at startup and 
 - `JOB_FAILURE_WEBHOOK_URL` — optional internal alert endpoint after all attempts fail.
 
 Every pass creates a `JobRun` record with parameters, final status, metrics, timestamps, and a bounded error message. Source-level results also remain available as structured process logs. Run exactly one scheduler replica unless a distributed lock is introduced.
+
+Before enabling or after changing sources, run the read-only coverage audit:
+
+```bash
+npm run ingest:probe -- --sample=3 --render --output=data/crawl-probe.json
+```
+
+`ready` means at least one sampled candidate passed date, full-body and research-topic gates; `empty` is a discovery/content mismatch; `paused` is a current robots/access/render gate; `refused` is a runtime Disallow. The report does not write articles or mutate source status.
 
 ## Documents and backups
 

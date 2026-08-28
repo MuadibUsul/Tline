@@ -1,0 +1,269 @@
+import "dotenv/config";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import Parser from "rss-parser";
+import { prisma } from "../db";
+import { extractPdf } from "../documents/extractPdf";
+import { extractArticle, extractFeedLinks, extractLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic } from "./extract";
+import { fetchPdf, fetchText, lastFetchStatus } from "./fetch";
+import { lastRenderReason, renderHtml } from "./render";
+import { fetchRobots, robotsAllows, robotsSitemaps } from "./robots";
+import { discoverFromSitemaps } from "./sitemap";
+
+const UA = "InstitutionalIntelligenceBot";
+const rss = new Parser({ timeout: 15000 });
+
+function arg(name: string): string | undefined {
+  const hit = process.argv.find((value) => value.startsWith(`--${name}=`));
+  return hit?.slice(name.length + 3);
+}
+
+const flag = (name: string) => process.argv.includes(`--${name}`);
+
+type ProbeStatus = "ready" | "empty" | "paused" | "refused" | "failed";
+
+interface ProbeResult {
+  slug: string;
+  name: string;
+  status: ProbeStatus;
+  listingStatus: number | null;
+  sitemapCandidates: number;
+  listingCandidates: number;
+  feedCandidates: number;
+  pdfCandidates: number;
+  sampled: number;
+  accepted: number;
+  rendered: boolean;
+  reason: string;
+  failures: Record<string, number>;
+  examples: Array<{ url: string; title: string; publishedAt: string }>;
+}
+
+async function probeInstitution(inst: {
+  slug: string;
+  name: string;
+  researchUrl: string;
+  sitemapUrl: string | null;
+  rssUrl: string | null;
+  requiresRender: boolean;
+}): Promise<ProbeResult> {
+  const base = {
+    slug: inst.slug,
+    name: inst.name,
+    listingStatus: null,
+    sitemapCandidates: 0,
+    listingCandidates: 0,
+    feedCandidates: 0,
+    pdfCandidates: 0,
+    sampled: 0,
+    accepted: 0,
+    rendered: false,
+    failures: {} as Record<string, number>,
+    examples: [] as ProbeResult["examples"],
+  };
+  try {
+    const source = new URL(inst.researchUrl);
+    const robots = await fetchRobots(source.origin);
+    if (robots === null) return { ...base, status: "paused", reason: "robots unavailable and no valid cache" };
+    if (!robotsAllows(robots, UA, source.pathname)) return { ...base, status: "refused", reason: "robots disallows research path" };
+    const allows = (url: string) => {
+      try {
+        const target = new URL(url);
+        return target.origin === source.origin && robotsAllows(robots, UA, target.pathname);
+      } catch { return false; }
+    };
+
+    let accessReason: string | undefined;
+    const renderPublic = async (url: string) => {
+      const renderedHtml = await renderHtml(url);
+      accessReason ??= lastRenderReason(url);
+      return renderedHtml;
+    };
+    let html = await fetchText(inst.researchUrl);
+    let listingCandidates = html ? extractLinks(html, inst.researchUrl) : [];
+    let rendered = false;
+    if (flag("render") && listingCandidates.length === 0) {
+      const renderedHtml = await renderPublic(inst.researchUrl);
+      if (renderedHtml) {
+        html = renderedHtml;
+        listingCandidates = extractLinks(renderedHtml, inst.researchUrl);
+        rendered = true;
+      }
+    }
+    const declaredSitemaps = [
+      ...robotsSitemaps(robots),
+      ...(inst.sitemapUrl ? [inst.sitemapUrl] : []),
+    ];
+    const sitemapCandidates = await discoverFromSitemaps(
+      declaredSitemaps.length || listingCandidates.length ? declaredSitemaps : [`${source.origin}/sitemap.xml`],
+      inst.researchUrl,
+      { limit: 20, maxSitemaps: 6, allows },
+    );
+
+    const feedCandidates: Array<{ url: string; title: string; publishedAt: Date | null }> = [];
+    const feeds = [...new Set([
+      ...(inst.rssUrl ? [inst.rssUrl] : []),
+      ...(html ? extractFeedLinks(html, inst.researchUrl) : []),
+    ])].filter(allows);
+    for (const feedUrl of feeds) {
+      try {
+        const xml = await fetchText(feedUrl);
+        if (!xml) continue;
+        const feed = await rss.parseString(xml);
+        for (const item of (feed.items || []).slice(0, 20)) {
+          if (!item.link || !allows(item.link)) continue;
+          const parsed = item.isoDate ? new Date(item.isoDate) : null;
+          feedCandidates.push({
+            url: item.link,
+            title: item.title || "",
+            publishedAt: parsed && !isNaN(parsed.getTime()) ? parsed : inferPublicationDate(item.link, item.title),
+          });
+        }
+      } catch { /* another discovery channel may still succeed */ }
+    }
+
+    const candidates = new Map<string, { url: string; title: string; lastModified: Date | null }>();
+    for (const candidate of feedCandidates) {
+      if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, lastModified: candidate.publishedAt });
+    }
+    // Listing pages usually represent the publisher's current editorial order; sitemaps fill gaps.
+    for (const candidate of listingCandidates) {
+      if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, lastModified: candidate.publishedAt });
+    }
+    const directPdfCandidates = html ? extractPdfCandidates(html, inst.researchUrl) : [];
+    for (const candidate of directPdfCandidates) {
+      if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, lastModified: candidate.publishedAt });
+    }
+    for (const candidate of sitemapCandidates) {
+      if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, title: "" });
+    }
+
+    const sampleLimit = Math.max(1, Number(arg("sample") || 3));
+    const examples: ProbeResult["examples"] = [];
+    const failures: Record<string, number> = {};
+    const fail = (reason: string) => { failures[reason] = (failures[reason] ?? 0) + 1; };
+    let sampled = 0;
+    for (const candidate of [...candidates.values()].slice(0, sampleLimit)) {
+      if (!allows(candidate.url)) continue;
+      sampled++;
+      if (/\.pdf(?:$|\?)/i.test(candidate.url)) {
+        const pdf = await fetchPdf(candidate.url);
+        if (!pdf) { fail("pdf_fetch"); continue; }
+        try {
+          const extracted = await extractPdf(pdf);
+          const publishedAt = inferPublicationDate(candidate.url, candidate.title) || candidate.lastModified;
+          if (!publishedAt) fail("date_missing");
+          else if (!extracted.text.trim()) fail("body_empty");
+          else if (!looksLikeResearchTopic(candidate.title, extracted.text)) fail("not_research");
+          else {
+            examples.push({ url: candidate.url, title: candidate.title || candidate.url.split("/").pop() || "PDF", publishedAt: publishedAt.toISOString() });
+          }
+        } catch { fail("pdf_invalid"); }
+        continue;
+      }
+
+      let articleHtml = await fetchText(candidate.url);
+      let article = articleHtml ? extractArticle(articleHtml) : null;
+      if (flag("render") && (!article || article.text.length < 700)) {
+        const renderedArticle = await renderPublic(candidate.url);
+        if (renderedArticle) {
+          articleHtml = renderedArticle;
+          article = extractArticle(renderedArticle);
+          rendered = true;
+        }
+      }
+      if (!article) { fail("html_fetch"); continue; }
+      if (isAccessGateText(article.text)) accessReason ??= "interactive consent or guest-access gate";
+      const publishedAt = inferPublicationDate(candidate.url, article.title || candidate.title, article.publicationDateText, article.text.slice(0, 1200)) || article.publishedAt || candidate.lastModified;
+      const articleReady = publishedAt && looksLikeArticle(article.title || candidate.title, article.text) && looksLikeResearchTopic(article.title || candidate.title, article.text);
+      if (articleReady) {
+        examples.push({ url: candidate.url, title: article.title || candidate.title, publishedAt: publishedAt.toISOString() });
+        continue;
+      }
+
+      let embeddedReady = false;
+      for (const pdfUrl of extractPdfLinks(articleHtml || "", candidate.url).slice(0, 2)) {
+        const pdf = await fetchPdf(pdfUrl);
+        if (!pdf) continue;
+        try {
+          const extracted = await extractPdf(pdf);
+          const pdfDate = inferPublicationDate(pdfUrl, candidate.title, extracted.text.slice(0, 1000)) || publishedAt;
+          if (pdfDate && extracted.text.trim() && looksLikeResearchTopic(candidate.title || article.title, extracted.text)) {
+            examples.push({ url: pdfUrl, title: article.title || candidate.title, publishedAt: pdfDate.toISOString() });
+            embeddedReady = true;
+            break;
+          }
+        } catch { /* try the next embedded PDF */ }
+      }
+      if (!embeddedReady) {
+        if (!publishedAt) fail("date_missing");
+        else if (!looksLikeArticle(article.title || candidate.title, article.text)) fail("body_gate");
+        else fail("not_research");
+      }
+    }
+
+    const listingStatus = lastFetchStatus(inst.researchUrl) ?? null;
+    const accepted = examples.length;
+    const renderReason = accessReason;
+    const status: ProbeStatus = accepted > 0 ? "ready" : (listingStatus && [401, 403, 429].includes(listingStatus)) || renderReason ? "paused" : "empty";
+    const reason = accepted > 0
+      ? `${accepted}/${sampled} sampled candidates passed full-body gates`
+      : candidates.size === 0
+        ? "no article candidates discovered"
+        : `${sampled} candidates sampled; none passed full-body/date/topic gates`;
+    return {
+      ...base,
+      status,
+      listingStatus,
+      sitemapCandidates: sitemapCandidates.length,
+      listingCandidates: listingCandidates.length,
+      feedCandidates: feedCandidates.length,
+      pdfCandidates: directPdfCandidates.length,
+      sampled,
+      accepted,
+      rendered,
+      reason: accepted > 0 ? reason : `${reason}${Object.keys(failures).length ? ` (${Object.entries(failures).map(([key, value]) => `${key}:${value}`).join(", ")})` : ""}${renderReason ? ` · ${renderReason}` : ""}`,
+      failures,
+      examples,
+    };
+  } catch (error) {
+    return { ...base, status: "failed", reason: String(error).slice(0, 500) };
+  }
+}
+
+async function main() {
+  const slug = arg("slug");
+  const institutions = await prisma.institution.findMany({
+    where: slug ? { slug } : { crawlPolicy: { in: ["allowed", "delayed"] } },
+    orderBy: [{ priority: "asc" }, { name: "asc" }],
+    select: { slug: true, name: true, researchUrl: true, rssUrl: true, sitemapUrl: true, requiresRender: true },
+  });
+  const results: ProbeResult[] = [];
+  const queue = [...institutions];
+  const worker = async () => {
+    for (let institution = queue.shift(); institution; institution = queue.shift()) {
+      const result = await probeInstitution(institution);
+      results.push(result);
+      console.log(`${result.status.padEnd(7)} ${institution.name.padEnd(28)} feed=${result.feedCandidates} sitemap=${result.sitemapCandidates} listing=${result.listingCandidates} pdf=${result.pdfCandidates} accepted=${result.accepted} · ${result.reason}`);
+    }
+  };
+  // Different institutions use different hosts; a small pool shortens audits without increasing per-host request concurrency.
+  await Promise.all(Array.from({ length: Math.min(4, institutions.length) }, worker));
+  results.sort((left, right) => left.name.localeCompare(right.name));
+  const counts = results.reduce<Record<string, number>>((summary, result) => {
+    summary[result.status] = (summary[result.status] ?? 0) + 1;
+    return summary;
+  }, {});
+  const report = { generatedAt: new Date().toISOString(), counts, results };
+  const output = arg("output");
+  if (output) await writeFile(path.resolve(output), JSON.stringify(report, null, 2), "utf8");
+  console.log(JSON.stringify({ event: "ingest.probe.complete", institutions: results.length, ...counts }));
+  await prisma.$disconnect();
+  if (results.some((result) => result.status === "failed")) process.exitCode = 1;
+}
+
+main().catch(async (error) => {
+  console.error(error);
+  await prisma.$disconnect();
+  process.exit(1);
+});

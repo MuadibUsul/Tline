@@ -3,10 +3,11 @@ import * as cheerio from "cheerio";
 export interface CandidateLink {
   url: string;
   title: string;
+  publishedAt: Date | null;
 }
 
 // URL path segments that are almost never a research article.
-const DENY = /(\/about|\/contact|\/careers?|\/privacy|\/terms|\/cookie|\/sitemap|\/login|\/register|\/subscribe|\/faq|frequently-asked|\/values|\/purpose|\/leadership|foreign-direct|industries-we-serve|global-corporate|\/investors?(?:\/|$)|investors?-shareholders?|shareholder|\/media\/|\/events?|presentations?|sustainability|responsibility|modern-slavery|code-of-conduct|\/framework|advisory|\/solutions|\/banking|\/legal|\/disclaimer|\/help|\/support|\/team|\/people|\/awards|\/glossary)/i;
+const DENY = /(\/about|\/contact|\/careers?|\/privacy|\/terms|\/cookie|\/sitemap|\/login|\/register|\/subscribe|\/faq|frequently-asked|\/values|\/purpose|\/leadership|foreign-direct|industries-we-serve|global-corporate|\/investors?(?:\/|$)|investors?-shareholders?|shareholder|\/media\/|\/events?|presentations?|modern-slavery|code-of-conduct|\/framework|advisory|\/solutions|\/banking|\/legal|\/disclaimer|\/help|\/support|\/team|\/people|\/awards|\/glossary)/i;
 
 // A link that looks like an actual article: a date in the path, or a long slug.
 function looksLikeArticleUrl(path: string): boolean {
@@ -24,10 +25,11 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
   const basePath = /\/index\.[a-z0-9]+$/i.test(pathname)
     ? pathname.replace(/\/index\.[a-z0-9]+$/i, "")
     : pathname.replace(/\.[a-z0-9]+$/i, "");
-  const out = new Map<string, { title: string; underSection: boolean; date: number; research: boolean }>();
+  const out = new Map<string, { title: string; underSection: boolean; date: number; publishedAt: Date | null; research: boolean }>();
 
   $("a[href]").each((_, el) => {
-    if ($(el).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]").length) return;
+    const chrome = $(el).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]");
+    if (chrome.length && !$(el).closest("article").length) return;
     const href = $(el).attr("href") || "";
     let text = $(el).text().replace(/\s+/g, " ").trim();
     if (text.length < 28) {
@@ -35,7 +37,8 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
       const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim();
       if (heading) text = heading;
     }
-    if (text.length < 28 || text.length > 180) return; // headline-length text only
+    if (text.length < 28 || text.length > 500) return;
+    text = text.slice(0, 240); // Some publishers append the standfirst and date inside the same anchor.
     let abs: URL;
     try {
       abs = new URL(href, base);
@@ -52,10 +55,14 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
     const key = abs.href.split("#")[0].split("?")[0];
     if (!out.has(key) && key !== baseUrl.replace(/\/$/, "")) {
       const yearMonth = key.match(/(20\d{2})[-_/](0?[1-9]|1[0-2])(?:[-_/]|$)/);
+      const cardText = $(el).closest("article,li,[class*=card],[class*=tile],[class*=teaser],[class*=item]")
+        .first().text().replace(/\s+/g, " ").trim().slice(0, 1000);
+      const publishedAt = inferPublicationDate(key, text, cardText);
       out.set(key, {
         title: text,
         underSection,
-        date: inferPublicationDate(key, text)?.getTime()
+        publishedAt,
+        date: publishedAt?.getTime()
           ?? (yearMonth ? Date.UTC(Number(yearMonth[1]), Number(yearMonth[2]) - 1, 1) : 0),
         research: /\b(?:outlook|markets?|econom(?:y|ics?)|investment|credit|research|strategy|forecast)\b/i.test(`${path} ${text}`),
       });
@@ -66,24 +73,54 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
     .map(([url, value]) => ({ url, ...value }))
     .sort((a, b) => Number(b.underSection) - Number(a.underSection) || b.date - a.date || Number(b.research) - Number(a.research))
     .slice(0, 12)
-    .map(({ url, title }) => ({ url, title }));
+    .map(({ url, title, publishedAt }) => ({ url, title, publishedAt }));
 }
 
-/** Find same-origin native PDFs embedded by an otherwise body-less article page. */
-export function extractPdfLinks(html: string, baseUrl: string): string[] {
+/** Find same-origin native PDFs and retain the surrounding card's title/date hints. */
+export function extractPdfCandidates(html: string, baseUrl: string): CandidateLink[] {
   const $ = cheerio.load(html);
   const base = new URL(baseUrl);
-  const out = new Set<string>();
+  const out = new Map<string, CandidateLink>();
   $("a[href],iframe[src],embed[src],object[data]").each((_, element) => {
     if ($(element).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]").length) return;
     const raw = $(element).attr("href") || $(element).attr("src") || $(element).attr("data");
     if (!raw) return;
     try {
       const url = new URL(raw, base);
-      if (url.origin === base.origin && /\.pdf(?:$|\?)/i.test(url.href) && !DENY.test(url.pathname)) out.add(url.href.split("#")[0]);
+      if (url.origin !== base.origin || !/\.pdf(?:$|\?)/i.test(url.href) || DENY.test(url.pathname)) return;
+      const clean = url.href.split("#")[0];
+      const card = $(element).closest("article,li,[class*=card],[class*=tile],[class*=teaser],[class*=item]").first();
+      const cardText = card.text().replace(/\s+/g, " ").trim().slice(0, 1000);
+      const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim();
+      const linkText = $(element).text().replace(/\s+/g, " ").trim();
+      const filename = decodeURIComponent(url.pathname.split("/").pop() || "").replace(/\.pdf$/i, "").replace(/[-_]+/g, " ");
+      const title = (heading || (/^(?:download|pdf|read more)$/i.test(linkText) ? "" : linkText) || filename).slice(0, 240);
+      out.set(clean, { url: clean, title, publishedAt: inferPublicationDate(clean, title, cardText) });
     } catch { /* invalid link */ }
   });
-  return [...out];
+  return [...out.values()];
+}
+
+/** Backward-compatible URL-only PDF discovery. */
+export function extractPdfLinks(html: string, baseUrl: string): string[] {
+  return extractPdfCandidates(html, baseUrl).map((candidate) => candidate.url);
+}
+
+/** Discover publisher-declared RSS/Atom feeds without leaving the audited origin. */
+export function extractFeedLinks(html: string, baseUrl: string): string[] {
+  const $ = cheerio.load(html);
+  const base = new URL(baseUrl);
+  const out = new Set<string>();
+  $('link[rel~="alternate"][href],a[href]').each((_, element) => {
+    const href = $(element).attr("href");
+    const type = ($(element).attr("type") || "").toLowerCase();
+    if (!href || (!/rss|atom|feed|xml/i.test(`${href} ${type}`))) return;
+    try {
+      const url = new URL(href, base);
+      if (url.origin === base.origin) out.add(url.href);
+    } catch { /* invalid URL */ }
+  });
+  return [...out].slice(0, 5);
 }
 
 // Boilerplate containers to drop wholesale before reading body text.
@@ -108,6 +145,7 @@ export interface ExtractedArticle {
   segments: Segment[];
   author: string | null;
   publishedAt: Date | null;
+  publicationDateText: string | null;
 }
 
 export function newestByPublication<T extends { publishedAt: Date }>(articles: T[], limit: number): T[] {
@@ -117,6 +155,9 @@ export function newestByPublication<T extends { publishedAt: Date }>(articles: T
 /** Conservative date inference for URLs/titles that carry an explicit calendar date or quarter. */
 export function inferPublicationDate(...values: Array<string | null | undefined>): Date | null {
   const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+  const decoded = values.filter(Boolean).map((value) => {
+    try { return decodeURIComponent(value!); } catch { return value!; }
+  });
   for (const value of values) {
     if (!value) continue;
     let input = value;
@@ -134,10 +175,21 @@ export function inferPublicationDate(...values: Array<string | null | undefined>
     if (compact) return new Date(Date.UTC(Number(compact[3]), Number(compact[2]) - 1, Number(compact[1])));
     const shortCompact = input.match(/(?:^|[-_/\s])(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(\d{2})(?!\d)/);
     if (shortCompact) return new Date(Date.UTC(2000 + Number(shortCompact[3]), Number(shortCompact[2]) - 1, Number(shortCompact[1])));
-    const named = input.match(new RegExp(`(?:${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])[-_\\s]+(20\\d{2})`, "i"));
+    const named = input.match(new RegExp(`(?:${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[,]?[-_\\s]+(20\\d{2})`, "i"));
     if (named) return new Date(Date.UTC(Number(named[2]), months.indexOf(named[0].match(/[a-z]+/i)![0].toLowerCase()), Number(named[1])));
-    const dayNamed = input.match(new RegExp(`(0?[1-9]|[12]\\d|3[01])[-_\\s]+(${months.join("|")})[-_\\s]+(20\\d{2})`, "i"));
+    const dayNamed = input.match(new RegExp(`(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[-_\\s]+(${months.join("|")})[,]?[-_\\s]+(20\\d{2})`, "i"));
     if (dayNamed) return new Date(Date.UTC(Number(dayNamed[3]), months.indexOf(dayNamed[2].toLowerCase()), Number(dayNamed[1])));
+  }
+
+  // Some publishers put the year in the URL/card and only "22 June" in the body.
+  const years = [...new Set(decoded.flatMap((value) => value.match(/\b20\d{2}\b/g) || []))];
+  if (years.length === 1) {
+    for (const input of decoded) {
+      const named = input.match(new RegExp(`\\b(${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?\\b`, "i"));
+      if (named) return new Date(Date.UTC(Number(years[0]), months.indexOf(named[1].toLowerCase()), Number(named[2])));
+      const dayNamed = input.match(new RegExp(`\\b(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[-_\\s]+(${months.join("|")})\\b`, "i"));
+      if (dayNamed) return new Date(Date.UTC(Number(years[0]), months.indexOf(dayNamed[2].toLowerCase()), Number(dayNamed[1])));
+    }
   }
   return null;
 }
@@ -154,6 +206,11 @@ function parsePublicationDate(value: string): Date | null {
 /** Extract a clean title + body text (+ heading-delimited segments) from an article page. */
 export function extractArticle(html: string): ExtractedArticle {
   const $ = cheerio.load(html);
+  const partialDate = new RegExp(`(?:\\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\\s+\\d{1,2}|\\b\\d{1,2}\\s+(?:january|february|march|april|may|june|july|august|september|october|november|december))\\b`, "i");
+  const visibleDateBeforeStrip = $("time[datetime]").attr("datetime") ||
+    $("time,[class*=publish],[class*=date],[data-testid*=date],p").toArray()
+      .map((element) => $(element).text().replace(/\s+/g, " ").trim())
+      .find((value) => value.length <= 160 && (inferPublicationDate(value) || partialDate.test(value))) || "";
   $(STRIP).each((_, element) => {
     if ($(element).find("main,article,[itemprop=articleBody]").length === 0) $(element).remove();
   });
@@ -175,9 +232,19 @@ export function extractArticle(html: string): ExtractedArticle {
     $("time[datetime]").attr("datetime") ||
     $('meta[name="date"]').attr("content") ||
     $('meta[itemprop="datePublished"]').attr("content") ||
-    html.match(/"(?:datePublished|PublishedDate)"\s*:\s*"([^"\\]+)"/i)?.[1] ||
+    html.match(/"(?:datePublished|PublishedDate|publishDateStr|publishDate)"\s*:\s*"([^"\\]+)"/i)?.[1] ||
+    html.match(/&quot;(?:datePublished|PublishedDate|publishDateStr|publishDate)&quot;\s*:\s*&quot;([^&]+)&quot;/i)?.[1] ||
+    visibleDateBeforeStrip ||
     "";
-  const publishedAt = dateStr ? parsePublicationDate(dateStr) : null;
+  let publishedAt = dateStr
+    ? inferPublicationDate(dateStr) || (/\b20\d{2}\b|[T:]|(?:Z|[+-]\d\d:?\d\d)$/i.test(dateStr) ? parsePublicationDate(dateStr) : null)
+    : null;
+  if (!publishedAt) {
+    const visibleDate = $("time,[class*=publish],[class*=date],[data-testid*=date]").toArray()
+      .map((element) => $(element).text().replace(/\s+/g, " ").trim())
+      .find((value) => inferPublicationDate(value));
+    publishedAt = inferPublicationDate(visibleDate);
+  }
 
   // Pick the densest container by PARAGRAPH text (menus have lots of text but few <p>).
   let bestEl: any = null;
@@ -210,8 +277,19 @@ export function extractArticle(html: string): ExtractedArticle {
     const paras = $("p").toArray().map((p) => $(p).text().replace(/\s+/g, " ").trim()).filter((t) => t.length > 50);
     if (paras.length) segments.push({ heading: null, text: paras.join("\n\n") });
   }
+  if (segments.length === 0) {
+    // Modern client-rendered publishers sometimes emit prose as nested divs without <p> tags.
+    // Limit the fallback to semantic content roots; never use the entire body/document.
+    let fallbackText = "";
+    $("article,[itemprop=articleBody],main,[role=main],[class*=article-body],[class*=article-content],[class*=rich-text]").each((_, element) => {
+      const candidate = $(element).text().replace(/\s+/g, " ").trim();
+      if (candidate.length > fallbackText.length) fallbackText = candidate;
+    });
+    if (fallbackText.length >= 700) segments.push({ heading: null, text: fallbackText });
+  }
 
   const text = segments.map((s) => s.text).join("\n\n");
+  publishedAt ??= inferPublicationDate(title, text.slice(0, 1200));
 
   return {
     title,
@@ -219,6 +297,7 @@ export function extractArticle(html: string): ExtractedArticle {
     segments,
     author: author?.slice(0, 120) || null,
     publishedAt,
+    publicationDateText: visibleDateBeforeStrip || null,
   };
 }
 
@@ -229,12 +308,18 @@ export function extractArticle(html: string): ExtractedArticle {
  */
 /** Menu/nav dumps concatenate link labels into very long space-free tokens. */
 export function isJunk(text: string): boolean {
+  if (isAccessGateText(text)) return true;
   const tokens = text.split(/\s+/).filter((token) => token && !/^https?:\/\//i.test(token));
   if (tokens.length < 8) return false;
   const longest = tokens.reduce((m, t) => Math.max(m, t.length), 0);
   if (longest > 45) return true;
   const jammed = tokens.filter((t) => t.length > 22).length / tokens.length;
   return jammed > 0.06;
+}
+
+/** Recognize consent/login copy so it is never mistaken for publisher research. */
+export function isAccessGateText(text: string): boolean {
+  return /these cookies are necessary for the website to function|view as guest|sign in to continue|log in to continue|subscription required/i.test(text);
 }
 
 /** Reject pages whose extracted "body" is really only the publisher's legal footer. */
@@ -274,7 +359,7 @@ export function looksLikeResearchTopic(title: string, text: string): boolean {
 
 /** Strict article check for extracted HTML content. */
 export function looksLikeArticle(title: string, text: string): boolean {
-  if (!title || text.length < 1200) return false;
+  if (!title || text.length < 700) return false;
   const tokens = text.split(/\s+/).filter(Boolean);
   if (tokens.length < 60) return false;
   if (isJunk(text)) return false;

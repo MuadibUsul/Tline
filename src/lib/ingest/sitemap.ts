@@ -39,7 +39,7 @@ function allowedArticleUrl(raw: string, source: URL) {
 }
 
 const RESEARCH_PATH = /(?:^|\/)(?:insights?|research|outlooks?|markets?|econom(?:y|ics?)|strateg(?:y|ies|ic)|investment|views?|reports?|publications?|analysis|thought-leadership)(?:\/|[-_.]|$)/i;
-const NON_RESEARCH_PATH = /(?:^|\/)(?:about|careers?|contact|events?|help|legal|newsroom|privacy|products?|services?|solutions?|responsibility(?:-impact)?|sustainability|governance|investors?|shareholders?|policies?|annual-reports?)(?:\/|[-_.]|$)/i;
+const NON_RESEARCH_PATH = /(?:^|\/)(?:about|careers?|contact|events?|help|legal|newsroom|privacy|products?|services?|solutions?|governance|investors?|shareholders?|policies?|annual-reports?)(?:\/|[-_.]|$)/i;
 const COMMON_SOURCE_PARTS = new Set([
   "about", "global", "en", "us", "uk", "www", "index", "home", "html", "htm",
   "page",

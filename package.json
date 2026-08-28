@@ -14,6 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "ingest": "tsx src/lib/ingest/run.ts",
+    "ingest:probe": "tsx src/lib/ingest/probe.ts",
     "reparse": "tsx prisma/reparse.ts",
     "translate": "tsx prisma/translate.ts",
     "documents": "tsx prisma/documents.ts",

@@ -28,7 +28,7 @@ model Institution {
   crawlDelay       Int? // seconds; from robots Crawl-delay, honored by the crawler
   requiresRender   Boolean   @default(false) // explicit opt-in for public JS-rendered pages
   lastCrawlAt      DateTime?
-  lastCrawlStatus  String? // running | succeeded | paused | refused | failed
+  lastCrawlStatus  String? // running | succeeded | empty | paused | refused | failed
   lastCrawlMessage String?
   lastSuccessAt    DateTime?
   createdAt        DateTime  @default(now())

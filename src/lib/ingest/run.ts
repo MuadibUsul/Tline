@@ -2,7 +2,7 @@ import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchPdf, fetchText, lastFetchStatus, sleep } from "./fetch";
-import { extractLinks, extractArticle, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { extractLinks, extractArticle, extractFeedLinks, extractPdfCandidates, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
@@ -10,7 +10,7 @@ import { discoverFromSitemaps } from "./sitemap";
 import { extractPdf } from "../documents/extractPdf";
 import { generateArticleDocuments, saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
-import { renderHtml } from "./render";
+import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
 
 // Usage:
@@ -18,6 +18,7 @@ import { runTrackedJob } from "../jobs";
 //   npm run ingest -- --slug=ubs   -> one institution
 //   npm run ingest -- --all        -> every crawlable institution
 //   npm run ingest -- --limit=3    -> cap articles per institution
+//   npm run ingest -- --all --resume-minutes=60 -> skip sources completed in the last hour
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -37,7 +38,7 @@ async function ingestInstitution(
     where: { id: inst.id },
     data: { lastCrawlAt: new Date(), lastCrawlStatus: "running", lastCrawlMessage: null },
   });
-  const finish = async (status: "succeeded" | "paused" | "refused", message: string, created: number) => {
+  const finish = async (status: "succeeded" | "empty" | "paused" | "refused", message: string, created: number) => {
     await prisma.institution.update({
       where: { id: inst.id },
       data: {
@@ -65,17 +66,25 @@ async function ingestInstitution(
 
   const allowsUrl = (u: string) => {
     try {
-      return robotsAllows(robotsTxt, UA, new URL(u).pathname);
+      const url = new URL(u);
+      return url.origin === origin && robotsAllows(robotsTxt, UA, url.pathname);
     } catch {
       return false;
     }
+  };
+  let accessReason: string | undefined;
+  const renderPublic = async (url: string) => {
+    const html = await renderHtml(url);
+    accessReason ??= lastRenderReason(url);
+    return html;
   };
 
   let created = 0, dup = 0, empty = 0, blocked = 0, nativeRejected = 0;
   const raws: RawArticle[] = [];
   const nativePdfs = new Map<string, Buffer>();
   const seenCandidates = new Set<string>();
-  const candidateLimit = Math.min(40, Math.max(12, perLimit * 4));
+  let listingHtml: string | null = null;
+  const candidateLimit = Math.min(40, Math.max(3, perLimit * 3));
   const stage = (raw: RawArticle) => {
     if (isNaN(raw.publishedAt.getTime()) || raw.publishedAt.getTime() > Date.now() + 864e5) { empty++; return false; }
     if (raw.strict && (!looksLikeArticle(raw.title, raw.text) || !looksLikeResearchTopic(raw.title, raw.text))) { empty++; return false; }
@@ -95,14 +104,16 @@ async function ingestInstitution(
   };
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
     let staged = false;
-    for (const pdfUrl of extractPdfLinks(html, pageUrl)) {
+    for (const pdfCandidate of extractPdfCandidates(html, pageUrl).slice(0, candidateLimit)) {
+      if (raws.length >= perLimit) break;
+      const pdfUrl = pdfCandidate.url;
       if (!allowsUrl(pdfUrl) || await skipCandidate(pdfUrl)) continue;
       await sleep(delayMs);
       const pdf = await fetchPdf(pdfUrl);
       if (!pdf) continue;
       try {
         const extracted = await extractPdf(pdf);
-        const date = inferPublicationDate(pdfUrl, extracted.text.slice(0, 1000)) || publishedAt || inferPublicationDate(pageUrl, title);
+        const date = pdfCandidate.publishedAt || inferPublicationDate(pdfUrl, extracted.text.slice(0, 1000)) || publishedAt || inferPublicationDate(pageUrl, title);
         if (!date || !extracted.text.trim()) continue;
         const filename = decodeURIComponent(new URL(pdfUrl).pathname.split("/").pop() || "Research report")
           .replace(/\.pdf$/i, "")
@@ -112,7 +123,8 @@ async function ingestInstitution(
           .replace(/([a-z])([A-Z])/g, "$1 $2")
           .trim();
         const pageLabel = title.split(/[;|]/).at(-1)?.trim() || title;
-        const documentTitle = title && !/^(?:research|insights?|publications?|reports?)$/i.test(pageLabel) ? title : filename;
+        const candidateTitle = pdfCandidate.title && !/^(?:download|pdf|read more)$/i.test(pdfCandidate.title) ? pdfCandidate.title : "";
+        const documentTitle = candidateTitle || (title && !/^(?:research|insights?|publications?|reports?)$/i.test(pageLabel) ? title : filename);
         if (!looksLikeResearchTopic(documentTitle, extracted.text)) continue;
         const accepted = stage({
           title: documentTitle,
@@ -132,10 +144,19 @@ async function ingestInstitution(
     return staged;
   };
 
-  // 1) RSS first when configured (and allowed).
-  if (inst.rssUrl && allowsUrl(inst.rssUrl)) {
+  // 1) Publisher-declared RSS/Atom feeds. Fetch through the same compliant client.
+  const feedUrls: string[] = [];
+  if (inst.rssUrl && allowsUrl(inst.rssUrl)) feedUrls.push(inst.rssUrl);
+  if (feedUrls.length === 0) {
+    listingHtml = await fetchText(inst.researchUrl);
+    if (listingHtml) feedUrls.push(...extractFeedLinks(listingHtml, inst.researchUrl).filter(allowsUrl));
+  }
+  for (const feedUrl of feedUrls) {
     try {
-      const feed = await rss.parseURL(inst.rssUrl);
+      await sleep(delayMs);
+      const feedXml = await fetchText(feedUrl);
+      if (!feedXml) continue;
+      const feed = await rss.parseString(feedXml);
       for (const item of (feed.items || []).slice(0, candidateLimit)) {
         if (raws.length >= perLimit) break;
         if (!item.link || !allowsUrl(item.link)) continue;
@@ -161,11 +182,11 @@ async function ingestInstitution(
           continue;
         }
         let html = await fetchText(item.link);
-        if (!html && inst.requiresRender) html = await renderHtml(item.link);
+        if (!html) html = await renderPublic(item.link);
         if (!html) continue;
         let article = extractArticle(html);
-        if (article.text.length < 400 && inst.requiresRender) {
-          const rendered = await renderHtml(item.link);
+        if (article.text.length < 700) {
+          const rendered = await renderPublic(item.link);
           if (rendered) {
             html = rendered;
             article = extractArticle(rendered);
@@ -228,17 +249,17 @@ async function ingestInstitution(
         }
       } else {
         let artHtml = await fetchText(candidate.url);
-        if (!artHtml && inst.requiresRender) artHtml = await renderHtml(candidate.url);
+        if (!artHtml) artHtml = await renderPublic(candidate.url);
         if (!artHtml) continue;
         let article = extractArticle(artHtml);
-        if (article.text.length < 400 && inst.requiresRender) {
-          const rendered = await renderHtml(candidate.url);
+        if (article.text.length < 700) {
+          const rendered = await renderPublic(candidate.url);
           if (rendered) {
             artHtml = rendered;
             article = extractArticle(rendered);
           }
         }
-        const publishedAt = inferPublicationDate(candidate.url, article.title) || article.publishedAt || candidate.lastModified;
+        const publishedAt = inferPublicationDate(candidate.url, article.title, article.publicationDateText, article.text.slice(0, 1200)) || article.publishedAt || candidate.lastModified;
         if (!publishedAt || !looksLikeArticle(article.title, article.text)) {
           if (!await stageEmbeddedPdf(artHtml, candidate.url, article.title, publishedAt)) empty++;
           continue;
@@ -259,29 +280,30 @@ async function ingestInstitution(
   // 3) HTML listing → per-article extraction, each URL robots-checked.
   {
     const beforeListing = raws.length;
-    let listHtml = await fetchText(inst.researchUrl);
+    let listHtml = listingHtml ?? await fetchText(inst.researchUrl);
     let links = listHtml ? extractLinks(listHtml, inst.researchUrl) : [];
-    if (links.length === 0 && inst.requiresRender) {
-      listHtml = await renderHtml(inst.researchUrl);
+    if (links.length === 0) {
+      listHtml = await renderPublic(inst.researchUrl);
       links = listHtml ? extractLinks(listHtml, inst.researchUrl) : [];
     }
     if (listHtml) {
-      for (const link of links) {
+      for (const link of links.slice(0, candidateLimit)) {
+        if (raws.length >= perLimit) break;
         if (!allowsUrl(link.url)) { blocked++; continue; }
         if (await skipCandidate(link.url)) continue;
         await sleep(delayMs);
         let artHtml = await fetchText(link.url);
-        if (!artHtml && inst.requiresRender) artHtml = await renderHtml(link.url);
+        if (!artHtml) artHtml = await renderPublic(link.url);
         if (!artHtml) continue;
         let a = extractArticle(artHtml);
-        if (a.text.length < 400 && inst.requiresRender) {
-          const rendered = await renderHtml(link.url);
+        if (a.text.length < 700) {
+          const rendered = await renderPublic(link.url);
           if (rendered) {
             artHtml = rendered;
             a = extractArticle(rendered);
           }
         }
-        const publishedAt = inferPublicationDate(link.url, a.title || link.title) || a.publishedAt;
+        const publishedAt = inferPublicationDate(link.url, a.title || link.title, a.publicationDateText, a.text.slice(0, 1200)) || a.publishedAt || link.publishedAt;
         if (!publishedAt || !looksLikeArticle(a.title || link.title, a.text)) {
           if (!await stageEmbeddedPdf(artHtml, link.url, a.title || link.title, publishedAt)) empty++;
           continue;
@@ -347,6 +369,15 @@ async function ingestInstitution(
   if (raws.length === 0 && accessStatus && [401, 403, 429].includes(accessStatus)) {
     return finish("paused", `research endpoint HTTP ${accessStatus}; access wall not bypassed`, created);
   }
+  if (raws.length === 0 && accessReason) {
+    return finish("paused", `${accessReason}; access condition not bypassed`, created);
+  }
+  if (raws.length === 0 && dup > 0) {
+    return finish("succeeded", `source reachable · ${dup} known article${dup === 1 ? "" : "s"} · no new article selected`, created);
+  }
+  if (raws.length === 0) {
+    return finish("empty", `no candidate passed full-body/date/topic gates · ${dup} duplicate · ${empty} rejected · ${blocked} blocked`, created);
+  }
   return finish("succeeded", `${selectedRaws.length} selected from ${raws.length} accepted · ${created} created · ${dup} duplicate · ${empty} empty · ${blocked} blocked · ${nativeRejected} native PDF rejected`, created);
 }
 
@@ -354,14 +385,22 @@ async function executeIngest() {
   await ensureAssets();
   const perLimit = Number(arg("limit") || 6);
   const slug = arg("slug");
+  const resumeMinutes = Math.max(0, Number(arg("resume-minutes") || 0));
 
   // Compliance gate: never crawl blocked/manual institutions.
   const crawlable = { crawlPolicy: { in: ["allowed", "delayed"] } };
+  const resume = resumeMinutes > 0 ? {
+    OR: [
+      { lastCrawlAt: null },
+      { lastCrawlAt: { lt: new Date(Date.now() - resumeMinutes * 60_000) } },
+      { lastCrawlStatus: { in: ["running", "failed"] } },
+    ],
+  } : {};
   const where = slug
     ? { slug, ...crawlable }
     : flag("all")
-      ? crawlable
-      : { priority: 1, ...crawlable };
+      ? { ...crawlable, ...resume }
+      : { priority: 1, ...crawlable, ...resume };
 
   const institutions = await prisma.institution.findMany({
     where,
@@ -403,7 +442,7 @@ async function executeIngest() {
 }
 
 async function main() {
-  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), all: flag("all") };
+  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), all: flag("all"), resumeMinutes: Number(arg("resume-minutes") || 0) };
   await runTrackedJob("ingest", parameters, async () => {
     const metrics = await executeIngest();
     return { result: undefined, metrics };

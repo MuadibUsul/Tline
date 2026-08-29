@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getAssetView, getAssetTimeline } from "@/lib/queries";
 import { FeedCard, DirChip, Delta, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
-import { assetName, domainTerm, getLocale, institutionName, tr } from "@/lib/i18n";
+import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function AssetPage({ params }: { params: { ticker: string }
   return (
     <main className="wrap">
       <div className="page-head">
-        <div className="eyebrow">{tr(locale, "Institutional Consensus · last 24h", "机构共识 · 最近24小时")} · {domainTerm(asset.assetClass, locale)}</div>
+        <div className="eyebrow">{consensus?.isFallback ? tr(locale, `Institutional Consensus · latest available 24h · as of ${formatDate(consensus.windowEnd, locale)}`, `机构共识 · 最近可用24小时 · 截至 ${formatDate(consensus.windowEnd, locale)}`) : tr(locale, "Institutional Consensus · last 24h", "机构共识 · 最近24小时")} · {domainTerm(asset.assetClass, locale)}</div>
         <h1>{assetName(asset.name, locale, asset.ticker)}</h1>
         {consensus ? <>
           <div className="big-score">
@@ -32,7 +32,7 @@ export default async function AssetPage({ params }: { params: { ticker: string }
             <span>30D <Delta v={d30} /></span>
             <span style={{ color: "var(--faint)" }}>{tr(locale, `${consensus.institutionCount} institutions`, `${consensus.institutionCount} 家机构`)} · {consensus.bullishCount}↑ {consensus.neutralCount}→ {consensus.bearishCount}↓</span>
           </div>
-        </> : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No institutional view was published for this asset in the last 24 hours.", "最近24小时内没有机构发布该资产的观点。")}</p>}
+        </> : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No institutional view has been recorded for this asset yet.", "该资产尚未收录任何机构观点。")}</p>}
         <form action={addWatch} style={{ alignSelf: "flex-start" }}>
           <input type="hidden" name="kind" value="asset" />
           <input type="hidden" name="refId" value={asset.ticker} />
@@ -42,7 +42,7 @@ export default async function AssetPage({ params }: { params: { ticker: string }
       </div>
 
       {consensus && <section className="blk">
-        <div className="section-t">{tr(locale, "Institutional Views · last 24h", "机构观点 · 最近24小时")}</div>
+        <div className="section-t">{consensus.isFallback ? tr(locale, "Institutional Views · latest available 24h", "机构观点 · 最近可用24小时") : tr(locale, "Institutional Views · last 24h", "机构观点 · 最近24小时")}</div>
         <div className="tbl-wrap">
           <table>
             <thead><tr><th>{tr(locale, "Institution", "机构")}</th><th>{tr(locale, "Direction", "方向")}</th><th>{tr(locale, "Target", "目标价")}</th><th>{tr(locale, "Previous", "此前")}</th><th>{tr(locale, "Updated", "更新于")}</th></tr></thead>

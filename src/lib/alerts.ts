@@ -60,7 +60,7 @@ interface Hit {
 async function evalConsensusRule(type: string, threshold: number, ticker: string): Promise<Hit | null> {
   const asset = await prisma.asset.findUnique({ where: { ticker } });
   if (!asset) return null;
-  const consensus = await computeConsensus(asset.id);
+  const consensus = await computeConsensus(asset.id, { fallback: false });
   if (!consensus) return null;
   const change = await consensusChange(asset.id, 1);
   const met =

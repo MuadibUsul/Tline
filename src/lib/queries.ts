@@ -13,6 +13,8 @@ export interface ConsensusCard {
   d1: number | null;
   d7: number | null;
   d30: number | null;
+  isFallback: boolean;
+  windowEnd: Date;
 }
 
 export async function featuredConsensus(): Promise<ConsensusCard[]> {
@@ -31,6 +33,8 @@ export async function featuredConsensus(): Promise<ConsensusCard[]> {
       d1: await consensusChange(a.id, 1),
       d7: await consensusChange(a.id, 7),
       d30: await consensusChange(a.id, 30),
+      isFallback: c.isFallback,
+      windowEnd: c.windowEnd,
     });
   }
   cards.sort((x, y) => (order.get(x.ticker)! - order.get(y.ticker)!));

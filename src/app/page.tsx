@@ -2,7 +2,7 @@ import Link from "next/link";
 import { featuredConsensus, latestFeed, mostActive, viewChanges } from "@/lib/queries";
 import { FeedCard, Delta } from "./_components/ui";
 import SearchBox from "./_components/SearchBox";
-import { assetName, domainTerm, getLocale, institutionName, tr } from "@/lib/i18n";
+import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export default async function Home() {
       </section>
 
       <section className="blk">
-        <div className="section-t">{tr(locale, "Market Consensus · last 24h", "市场共识 · 最近24小时")}</div>
+        <div className="section-t">{tr(locale, "Market Consensus · current or latest available 24h", "市场共识 · 当前或最近可用24小时")}</div>
         <div className="ctiles">
           {cards.map((c) => (
             <Link key={c.ticker} href={`/asset/${c.ticker}`} className="ctile">
@@ -43,6 +43,7 @@ export default async function Home() {
                 <span>1D&nbsp;<Delta v={c.d1} /></span>
                 <span>7D&nbsp;<Delta v={c.d7} /></span>
                 <span>30D&nbsp;<Delta v={c.d30} /></span>
+                {c.isFallback && <span>{tr(locale, `as of ${formatDate(c.windowEnd, locale)}`, `截至 ${formatDate(c.windowEnd, locale)}`)}</span>}
               </div>
             </Link>
           ))}

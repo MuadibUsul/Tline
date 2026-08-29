@@ -6,7 +6,7 @@ import { addWatch, removeWatch, toggleRule, deleteRule } from "@/app/actions";
 import MonitoringRuleForm from "@/app/_components/MonitoringRuleForm";
 import { describeRule } from "@/lib/alerts";
 import { prisma } from "@/lib/db";
-import { assetName, getLocale, institutionName, localeSafeText, tr, type Locale } from "@/lib/i18n";
+import { assetName, formatDate, getLocale, institutionName, localeSafeText, tr, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
@@ -86,7 +86,7 @@ export default async function WatchlistPage() {
                 <div className="a">{assetName(asset.name, locale, asset.ticker)}</div>
                 {asset.score === null || asset.tone === null || asset.label === null ? <><div className="s tnum">—</div><div className="meta"><span>{tr(locale, "No consensus in the latest 24h", "最近24小时暂无共识")}</span></div></> : <>
                   <div className="s tnum">{asset.score}<span className={`dir ${asset.tone === "bull" ? "up" : asset.tone === "bear" ? "down" : "flat"}`}>{asset.tone === "bull" ? "↑" : asset.tone === "bear" ? "↓" : "→"} {tr(locale, asset.label, asset.tone === "bull" ? "看多" : asset.tone === "bear" ? "看空" : "中性")}</span></div>
-                  <div className="bar"><i style={{ width: `${asset.score}%`, background: TONE[asset.tone] }} /></div><div className="meta"><span>24h&nbsp;<Delta v={asset.d1} /></span></div>
+                  <div className="bar"><i style={{ width: `${asset.score}%`, background: TONE[asset.tone] }} /></div><div className="meta"><span>24h&nbsp;<Delta v={asset.d1} /></span>{asset.isFallback && asset.windowEnd && <span>{tr(locale, "as of", "截至")} {formatDate(asset.windowEnd, locale)}</span>}</div>
                 </>}
               </Link>
             </div>

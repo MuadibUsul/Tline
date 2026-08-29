@@ -18,6 +18,8 @@ export async function getWatchlistView(userId: string) {
       score: c?.score ?? null,
       label: c?.label ?? null,
       tone: c?.tone ?? null,
+      isFallback: c?.isFallback ?? false,
+      windowEnd: c?.windowEnd ?? null,
       d1: await consensusChange(asset.id, 1),
     });
   }

@@ -35,17 +35,41 @@ export interface ConsensusResult {
   neutralCount: number;
   bearishCount: number;
   contributors: Contributor[];
+  isFallback: boolean;
+  windowStart: Date;
+  windowEnd: Date;
 }
 
 /** Compute the current institutional consensus for one asset. */
-export async function computeConsensus(assetId: string): Promise<ConsensusResult | null> {
-  const now = new Date();
-  const since = consensusSince(now);
-  const rows = await prisma.articleAsset.findMany({
-    where: { assetId, article: { publishedAt: { gte: since, lte: now } } },
+export async function computeConsensus(
+  assetId: string,
+  { fallback = true, now = new Date() }: { fallback?: boolean; now?: Date } = {},
+): Promise<ConsensusResult | null> {
+  let windowEnd = now;
+  let windowStart = consensusSince(now);
+  let isFallback = false;
+  let rows = await prisma.articleAsset.findMany({
+    where: { assetId, article: { publishedAt: { gte: windowStart, lte: windowEnd } } },
     include: { article: { include: { institution: true } } },
     orderBy: { article: { publishedAt: "desc" } },
   });
+  if (rows.length === 0 && fallback) {
+    const latest = await prisma.articleAsset.findFirst({
+      where: { assetId, article: { publishedAt: { lte: now } } },
+      include: { article: { include: { institution: true } } },
+      orderBy: { article: { publishedAt: "desc" } },
+    });
+    if (latest) {
+      isFallback = true;
+      windowEnd = latest.article.publishedAt;
+      windowStart = consensusSince(windowEnd);
+      rows = await prisma.articleAsset.findMany({
+        where: { assetId, article: { publishedAt: { gte: windowStart, lte: windowEnd } } },
+        include: { article: { include: { institution: true } } },
+        orderBy: { article: { publishedAt: "desc" } },
+      });
+    }
+  }
   if (rows.length === 0) return null;
 
   // Keep only the most recent view per institution.
@@ -63,7 +87,7 @@ export async function computeConsensus(assetId: string): Promise<ConsensusResult
   const contributors: Contributor[] = [];
 
   for (const r of latest.values()) {
-    const ageDays = (now.getTime() - r.article.publishedAt.getTime()) / 864e5;
+    const ageDays = (windowEnd.getTime() - r.article.publishedAt.getTime()) / 864e5;
     const w = r.article.institution.authorityScore;
     const d = decayFor(ageDays);
     num += w * d * r.direction;
@@ -101,6 +125,9 @@ export async function computeConsensus(assetId: string): Promise<ConsensusResult
     neutralCount: neu,
     bearishCount: bear,
     contributors,
+    isFallback,
+    windowStart,
+    windowEnd,
   };
 }
 
@@ -110,7 +137,7 @@ export async function snapshotAll(): Promise<number> {
   let written = 0;
   for (const a of assets) {
     const c = await computeConsensus(a.id);
-    if (!c) continue;
+    if (!c || c.isFallback) continue;
     await prisma.consensusHistory.create({
       data: {
         assetId: a.id,

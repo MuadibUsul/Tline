@@ -43,14 +43,16 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Site-wide fuzzy search**: the home search instantly ranks institutions, assets and
   English/Chinese research content. It supports aliases, partial terms and common typos,
   with keyboard navigation and no separate search page or LLM dependency.
-- **Consensus engine** (`src/lib/consensus.ts`): only research published in the rolling
-  last 24 hours is eligible. `raw = Σ(wᵢ·dᵢ·dirᵢ)/Σ(wᵢ·dᵢ)` → `score = (raw+2)/4×100`;
+- **Consensus engine** (`src/lib/consensus.ts`): it uses research published in the rolling
+  last 24 hours; when an asset has none, display queries fall back to that asset's latest
+  available 24-hour window and label its as-of date. Alerts and history snapshots remain
+  strict-current and never treat fallback data as new. `raw = Σ(wᵢ·dᵢ·dirᵢ)/Σ(wᵢ·dᵢ)` → `score = (raw+2)/4×100`;
   authority weighting and within-window recency decay remain. Snapshots to
   `consensus_history` drive the 1D/7D/30D deltas.
 - **Ingestion pipeline** (`src/lib/ingest/`): RSS, Sitemap/Sitemap Index, native PDF and
   HTML-listing discovery; publisher-declared feeds; direct/embedded PDFs; static and normally
   rendered public pages; research-path/date/full-body gates; three-hash dedup and per-source
-  failure isolation. `ingest:probe` audits all 59 policy-crawlable sources without writing
+  failure isolation. `ingest:probe` audits all 58 policy-crawlable sources without writing
   articles. Real ingest records `succeeded`, `empty`, `paused`, `refused` or `failed` instead
   of treating a zero-result run as success.
   Stable site exceptions live in `sourceRules.ts`; scheduled crawling never uses an LLM to

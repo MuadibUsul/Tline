@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { computeConsensus } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
-import { assetName, domainTerm, getLocale, tr } from "@/lib/i18n";
+import { assetName, domainTerm, formatDate, getLocale, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
@@ -9,18 +9,18 @@ const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)",
 export default async function ConsensusPage() {
   const locale = getLocale();
   const assets = await prisma.asset.findMany({ orderBy: { assetClass: "asc" } });
-  const rows = [] as { ticker: string; name: string; cls: string; score: number; tone: string; label: string; n: number }[];
+  const rows = [] as { ticker: string; name: string; cls: string; score: number; tone: string; label: string; n: number; isFallback: boolean; windowEnd: Date }[];
   for (const a of assets) {
     const c = await computeConsensus(a.id);
     if (!c) continue;
-    rows.push({ ticker: a.ticker, name: a.name, cls: a.assetClass, score: c.score, tone: c.tone, label: c.label, n: c.institutionCount });
+    rows.push({ ticker: a.ticker, name: a.name, cls: a.assetClass, score: c.score, tone: c.tone, label: c.label, n: c.institutionCount, isFallback: c.isFallback, windowEnd: c.windowEnd });
   }
   rows.sort((x, y) => y.score - x.score);
 
   return (
     <main className="wrap">
       <div className="page-head"><div className="eyebrow">{tr(locale, "Institutional Consensus Engine", "机构共识引擎")}</div><h1>{tr(locale, "Consensus", "共识")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Authority-weighted direction from research published in the rolling last 24 hours (0–100).", "仅使用滚动最近24小时内发布的研报观点，按机构权威度加权计算方向评分（0–100）。")}</p></div>
+        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Authority-weighted direction from the rolling last 24 hours; assets without current research use their latest available 24-hour window (0–100).", "按机构权威度计算滚动最近24小时的方向评分；没有新研报的资产沿用其最近可用24小时窗口（0–100）。")}</p></div>
       <section style={{ paddingTop: 22 }}>
         <div className="tbl-wrap">
           <table>
@@ -32,7 +32,7 @@ export default async function ConsensusPage() {
                   <td className="mono-cell" style={{ color: "var(--muted)" }}>{domainTerm(r.cls, locale)}</td>
                   <td className="mono-cell" style={{ fontWeight: 700, color: TONE[r.tone] }}>{r.score}</td>
                   <td><span className={`chip ${r.tone}`}>{r.tone === "bull" ? tr(locale, r.label, "看多") : r.tone === "bear" ? tr(locale, r.label, "看空") : tr(locale, r.label, "中性")}</span></td>
-                  <td className="mono-cell">{r.n}</td>
+                  <td className="mono-cell">{r.n}{r.isFallback && <small style={{ display: "block", color: "var(--faint)" }}>{tr(locale, "as of", "截至")} {formatDate(r.windowEnd, locale)}</small>}</td>
                 </tr>
               ))}
             </tbody>

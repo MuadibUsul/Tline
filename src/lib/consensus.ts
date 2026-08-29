@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { directionLabel } from "./assets";
+import { publicationReadyWhere } from "./publication";
 
 export const CONSENSUS_WINDOW_HOURS = 24;
 const TAU = 31;
@@ -49,13 +50,13 @@ export async function computeConsensus(
   let windowStart = consensusSince(now);
   let isFallback = false;
   let rows = await prisma.articleAsset.findMany({
-    where: { assetId, article: { publishedAt: { gte: windowStart, lte: windowEnd } } },
+    where: { assetId, article: publicationReadyWhere({ publishedAt: { gte: windowStart, lte: windowEnd } }) },
     include: { article: { include: { institution: true } } },
     orderBy: { article: { publishedAt: "desc" } },
   });
   if (rows.length === 0 && fallback) {
     const latest = await prisma.articleAsset.findFirst({
-      where: { assetId, article: { publishedAt: { lte: now } } },
+      where: { assetId, article: publicationReadyWhere({ publishedAt: { lte: now } }) },
       include: { article: { include: { institution: true } } },
       orderBy: { article: { publishedAt: "desc" } },
     });
@@ -64,7 +65,7 @@ export async function computeConsensus(
       windowEnd = latest.article.publishedAt;
       windowStart = consensusSince(windowEnd);
       rows = await prisma.articleAsset.findMany({
-        where: { assetId, article: { publishedAt: { gte: windowStart, lte: windowEnd } } },
+        where: { assetId, article: publicationReadyWhere({ publishedAt: { gte: windowStart, lte: windowEnd } }) },
         include: { article: { include: { institution: true } } },
         orderBy: { article: { publishedAt: "desc" } },
       });

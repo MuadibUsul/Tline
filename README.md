@@ -43,6 +43,10 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 - **Site-wide fuzzy search**: the home search instantly ranks institutions, assets and
   English/Chinese research content. It supports aliases, partial terms and common typos,
   with keyboard navigation and no separate search page or LLM dependency.
+- **Publication gate** (`src/lib/publication.ts`): public lists, search, derived views and
+  direct article routes include only records with reviewed analysis, complete English text,
+  ready English PDF, reviewed Chinese translation and ready Chinese PDF. Incomplete work
+  stays in the processing database and never appears with a placeholder.
 - **Consensus engine** (`src/lib/consensus.ts`): it uses research published in the rolling
   last 24 hours; when an asset has none, display queries fall back to that asset's latest
   available 24-hour window and label its as-of date. Alerts and history snapshots remain

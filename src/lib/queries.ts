@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { computeConsensus, consensusChange, type ConsensusResult } from "./consensus";
 import { ASSETS, directionLabel } from "./assets";
+import { publicationReadyWhere } from "./publication";
 
 const FEATURED = ASSETS.filter((a) => a.featured).map((a) => a.ticker);
 
@@ -43,6 +44,7 @@ export async function featuredConsensus(): Promise<ConsensusCard[]> {
 
 export async function latestFeed(limit = 8) {
   return prisma.article.findMany({
+    where: publicationReadyWhere(),
     orderBy: { publishedAt: "desc" },
     take: limit,
     include: {
@@ -58,7 +60,7 @@ export async function mostActive(days = 7, limit = 6) {
   const since = new Date(Date.now() - days * 864e5);
   const rows = await prisma.article.groupBy({
     by: ["institutionId"],
-    where: { publishedAt: { gte: since } },
+    where: publicationReadyWhere({ publishedAt: { gte: since } }),
     _count: { _all: true },
     orderBy: { _count: { institutionId: "desc" } },
     take: limit,
@@ -99,7 +101,7 @@ export async function getAssetView(ticker: string) {
       }
     : null;
   const articles = await prisma.article.findMany({
-    where: { articleAssets: { some: { assetId: asset.id } } },
+    where: publicationReadyWhere({ articleAssets: { some: { assetId: asset.id } } }),
     orderBy: { publishedAt: "desc" },
     take: 8,
     include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } }, articleAssets: { include: { asset: true } } },
@@ -121,7 +123,7 @@ export interface InstTimeline {
 /** Per-institution target + direction evolution for one asset, changed sources first. */
 export async function getAssetTimeline(assetId: string): Promise<InstTimeline[]> {
   const rows = await prisma.articleAsset.findMany({
-    where: { assetId },
+    where: { assetId, article: publicationReadyWhere() },
     include: { article: { include: { institution: true } } },
     orderBy: { article: { publishedAt: "asc" } },
   });
@@ -165,7 +167,7 @@ export async function getInstitutionView(slug: string) {
   if (!inst) return null;
   const since = new Date(Date.now() - 90 * 864e5);
   const articles = await prisma.article.findMany({
-    where: { institutionId: inst.id, publishedAt: { gte: since } },
+    where: publicationReadyWhere({ institutionId: inst.id, publishedAt: { gte: since } }),
     orderBy: { publishedAt: "desc" },
     include: { analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } }, articleAssets: { include: { asset: true } } },
   });
@@ -195,8 +197,8 @@ export async function getInstitutionView(slug: string) {
 }
 
 export async function getResearchView(id: string) {
-  return prisma.article.findUnique({
-    where: { id },
+  return prisma.article.findFirst({
+    where: publicationReadyWhere({ id }),
     include: {
       institution: true,
       analysis: true,
@@ -205,7 +207,7 @@ export async function getResearchView(id: string) {
       segments: { orderBy: { position: "asc" } },
       documents: { where: { status: "ready" }, orderBy: { createdAt: "asc" } },
       translations: {
-        where: { locale: "zh-CN" },
+        where: { locale: "zh-CN", status: "reviewed" },
         take: 1,
         include: { segments: { orderBy: { position: "asc" } } },
       },

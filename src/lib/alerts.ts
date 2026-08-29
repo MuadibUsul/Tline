@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { computeConsensus, consensusChange, consensusSince } from "./consensus";
 import { ASSETS } from "./assets";
 import { assetName, domainTerm, institutionName } from "./i18n";
+import { publicationReadyWhere } from "./publication";
 
 const FEATURED = ASSETS.filter((asset) => asset.featured).map((asset) => asset.ticker);
 const DEDUPE_MS = 12 * 3600 * 1000;
@@ -84,7 +85,7 @@ async function evalResearchRule(scope: { kind: MonitorScopeKind; ref: string | n
 
   if (scope.kind === "asset") {
     const article = await prisma.article.findFirst({
-      where: { publishedAt, articleAssets: { some: { asset: { ticker: scope.ref } } } },
+      where: publicationReadyWhere({ publishedAt, articleAssets: { some: { asset: { ticker: scope.ref } } } }),
       orderBy: { publishedAt: "desc" },
       include: { institution: true },
     });
@@ -93,7 +94,7 @@ async function evalResearchRule(scope: { kind: MonitorScopeKind; ref: string | n
 
   if (scope.kind === "institution") {
     const article = await prisma.article.findFirst({
-      where: { publishedAt, institution: { slug: scope.ref } },
+      where: publicationReadyWhere({ publishedAt, institution: { slug: scope.ref } }),
       orderBy: { publishedAt: "desc" },
       include: { institution: true },
     });
@@ -102,7 +103,7 @@ async function evalResearchRule(scope: { kind: MonitorScopeKind; ref: string | n
 
   const term = scope.ref.normalize("NFKD").toLocaleLowerCase();
   const articles = await prisma.article.findMany({
-    where: { publishedAt },
+    where: publicationReadyWhere({ publishedAt }),
     orderBy: { publishedAt: "desc" },
     take: 100,
     include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1 } },

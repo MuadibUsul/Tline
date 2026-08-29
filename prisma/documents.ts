@@ -13,7 +13,16 @@ async function main() {
   const articles = await prisma.article.findMany({
     where: articleId
       ? { id: articleId, rawText: { not: null } }
-      : { rawText: { not: null }, documents: { none: { kind: "original_pdf", locale: "en", status: "ready" } } },
+      : {
+          rawText: { not: null },
+          OR: [
+            { documents: { none: { kind: "original_pdf", locale: "en", status: "ready" } } },
+            {
+              translations: { some: { locale: "zh-CN", status: "reviewed" } },
+              documents: { none: { kind: "translation_pdf", locale: "zh-CN", status: "ready" } },
+            },
+          ],
+        },
     select: { id: true, title: true },
     orderBy: { publishedAt: "desc" },
     take: limit,

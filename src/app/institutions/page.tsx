@@ -4,6 +4,7 @@ import { relTime } from "@/app/_components/ui";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, localizeChineseContent, localizedDataValue, tr, type Locale } from "@/lib/i18n";
 import { rankAtomicViews, type MarketEvent } from "@/lib/viewRanking";
 import marketEvents from "../../../data/market-events.json";
+import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function ViewsPage({ searchParams }: { searchParams: { page
   const page = Math.max(1, Number(searchParams.page) || 1);
   const take = 50;
   // ponytail: rank in memory while the corpus is small; persist scores when this reaches tens of thousands of views.
-  const allViews = await prisma.atomicView.findMany({ include: { article: { include: { institution: true } } } });
+  const allViews = await prisma.atomicView.findMany({ where: { article: publicationReadyWhere() }, include: { article: { include: { institution: true } } } });
   const ranked = rankAtomicViews(allViews, new Date(), marketEvents as MarketEvent[]);
   const total = ranked.length;
   const views = ranked.slice((page - 1) * take, page * take);

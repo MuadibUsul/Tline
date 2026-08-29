@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ResearchCard } from "@/app/_components/ui";
 import { prisma } from "@/lib/db";
 import { assetName, getLocale, institutionName, tr } from "@/lib/i18n";
+import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function ResearchIndex({
       : searchParams.direction === "neutral"
         ? { equals: 0 }
         : undefined;
-  const where = {
+  const where = publicationReadyWhere({
     ...(searchParams.institution ? { institution: { slug: searchParams.institution } } : {}),
     ...((searchParams.ticker || direction) ? {
       articleAssets: {
@@ -30,7 +31,7 @@ export default async function ResearchIndex({
         },
       },
     } : {}),
-  };
+  });
   const [feed, total, institutions, assets] = await Promise.all([
     prisma.article.findMany({
       where,
@@ -40,8 +41,8 @@ export default async function ResearchIndex({
       include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } }, articleAssets: { include: { asset: true } } },
     }),
     prisma.article.count({ where }),
-    prisma.institution.findMany({ where: { articles: { some: {} } }, orderBy: { name: "asc" }, select: { slug: true, name: true } }),
-    prisma.asset.findMany({ where: { articleAssets: { some: {} } }, orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
+    prisma.institution.findMany({ where: { articles: { some: publicationReadyWhere() } }, orderBy: { name: "asc" }, select: { slug: true, name: true } }),
+    prisma.asset.findMany({ where: { articleAssets: { some: { article: publicationReadyWhere() } } }, orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
   ]);
   const pages = Math.max(1, Math.ceil(total / take));
   const query = new URLSearchParams();

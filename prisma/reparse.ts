@@ -6,6 +6,8 @@ import { syncForecastsForArticle } from "../src/lib/forecast";
 const flag = (name: string) => process.argv.includes(`--${name}`);
 const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
 const limit = limitArg ? Math.max(1, Number(limitArg.split("=")[1]) || 1) : undefined;
+const concurrencyArg = process.argv.find((arg) => arg.startsWith("--concurrency="));
+const concurrency = Math.min(8, Math.max(1, Number(concurrencyArg?.split("=")[1] || process.env.REPARSE_CONCURRENCY || 3)));
 
 async function main() {
   if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.DEEPSEEK_API_KEY && !flag("heuristic")) {
@@ -37,8 +39,9 @@ async function main() {
   let unresolved = 0;
   let failed = 0;
 
-  for (const article of candidates) {
-    try {
+  for (let offset = 0; offset < candidates.length; offset += concurrency) {
+    await Promise.all(candidates.slice(offset, offset + concurrency).map(async (article) => {
+      try {
       const parsed = await parseArticle({
         institution: article.institution.name,
         title: article.title,
@@ -138,12 +141,13 @@ async function main() {
         })),
       ]);
       await syncForecastsForArticle(article.id);
-      updated++;
-      console.log(`  ${parsed.needsLLM ? "HOLD" : "OK  "} ${article.id} · ${article.title}`);
-    } catch (error) {
-      failed++;
-      console.error(`  FAIL ${article.id} · ${article.title}`, error);
-    }
+        updated++;
+        console.log(`  ${parsed.needsLLM ? "HOLD" : "OK  "} ${article.id} · ${article.title}`);
+      } catch (error) {
+        failed++;
+        console.error(`  FAIL ${article.id} · ${article.title}`, error);
+      }
+    }));
   }
 
   console.log(`Reparse complete: ${updated} updated · ${unresolved} unresolved · ${failed} failed.`);

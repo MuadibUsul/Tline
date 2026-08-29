@@ -63,19 +63,17 @@ export default async function ResearchPage({ params }: { params: { id: string } 
   const locale = getLocale();
   const a = await getResearchView(params.id);
   if (!a) notFound();
-  const an = a.analysis;
+  const an = a.analysis!;
   const keyNumbers = parseJson<{ label: string; value: string }[]>(locale === "zh-CN" ? an?.keyNumbersZh : an?.keyNumbers, []);
   const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
   const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
   const summary = locale === "zh-CN" ? an?.summaryZh : an?.summary;
   const interpretation = locale === "zh-CN" ? an?.interpretationZh : an?.interpretation;
   const date = formatDate(a.publishedAt, locale);
-  const translation = a.translations[0];
+  const translation = a.translations[0]!;
   const primaryViews = a.atomicViews.filter((view) => view.importance >= 4);
   const secondaryViews = a.atomicViews.filter((view) => view.importance < 4);
-  const translationStatus = translation?.status === "reviewed" ? tr(locale, "reviewed", "已复核")
-    : translation?.status === "needs_review" ? tr(locale, "needs review", "待复核")
-      : tr(locale, "translated", "已翻译");
+  const translationStatus = tr(locale, "reviewed", "已复核");
 
   return (
     <main className="wrap" style={{ maxWidth: 820 }}>
@@ -83,15 +81,14 @@ export default async function ResearchPage({ params }: { params: { id: string } 
         <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
           <Link href={`/institution/${a.institution.slug}`}>{institutionName(a.institution.name, locale)}</Link>
           {a.author ? ` · ${a.author}` : ""} · {date}
-          {an?.reviewStatus === "needs_review" && <span className="chip neu" style={{ marginLeft: 8 }}>{tr(locale, "needs review", "待复核")}</span>}
         </div>
-        <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{locale === "zh-CN" ? localizeChineseContent(translation?.title ?? "中文译文待处理") : a.title}</h1>
+        <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{locale === "zh-CN" ? localizeChineseContent(translation.title) : a.title}</h1>
       </div>
 
       <section className="blk">
         <div className="ai-box">
           <div className="lbl">◆ {tr(locale, "AI Summary — model-generated, not source text", "人工智能摘要 — 模型生成，非原文转载")}</div>
-          <p style={{ margin: 0, color: "var(--ink-2)" }}>{summary ? locale === "zh-CN" ? localizeChineseContent(summary) : summary : tr(locale, "Structured analysis is pending. The complete source text is already available below.", "结构化分析正在等待处理，完整原文已经保存并可在下方阅读。")}</p>
+          <p style={{ margin: 0, color: "var(--ink-2)" }}>{locale === "zh-CN" ? localizeChineseContent(summary!) : summary}</p>
         </div>
       </section>
 
@@ -151,7 +148,7 @@ export default async function ResearchPage({ params }: { params: { id: string } 
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />
           </div>
         )}
-        {translation && locale === "zh-CN" ? (
+        {locale === "zh-CN" && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
               中文译文 · {translationStatus} · 质量 {translation.qualityScore?.toFixed(2) ?? "—"} · {translation.provider}/{translation.model}
@@ -159,29 +156,25 @@ export default async function ResearchPage({ params }: { params: { id: string } 
             <h2 style={{ fontSize: 20, marginBottom: 8 }}>{localizeChineseContent(translation.title)}</h2>
             <ArticleBody segments={translation.segments} fallback={translation.text} locale={locale} translated />
           </div>
-        ) : !translation && locale === "zh-CN" ? (
-          <div className="empty-state" style={{ marginBottom: 18 }}>{tr(locale, "The Chinese translation is awaiting translation and quality review.", "中文译文正在等待翻译与质量复核。")}</div>
-        ) : null}
+        )}
         {locale === "zh-CN" && a.rawText && (
           <details className="article-original">
             <summary>完整英文原文</summary>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />
           </details>
         )}
-        {a.documents.length > 0 ? (
-          <div className="act">
-            {a.documents.map((document) => (
-              <a key={document.id} href={`/api/documents/${document.id}`} className={`minibtn ${document.kind === "translation_pdf" ? "p" : ""}`}>
-                {document.kind === "translation_pdf" ? tr(locale, "Download Chinese PDF", "下载中文 PDF") : document.kind === "source_native" ? tr(locale, "Download institution PDF", "下载机构原始 PDF") : tr(locale, "Download English PDF", "下载英文 PDF")}
-              </a>
-            ))}
-          </div>
-        ) : <div className="mono" style={{ color: "var(--muted)", fontSize: 11, marginTop: 14 }}>{tr(locale, "PDF generation pending", "PDF 正在等待生成")}</div>}
+        <div className="act">
+          {a.documents.map((document) => (
+            <a key={document.id} href={`/api/documents/${document.id}`} className={`minibtn ${document.kind === "translation_pdf" ? "p" : ""}`}>
+              {document.kind === "translation_pdf" ? tr(locale, "Download Chinese PDF", "下载中文 PDF") : document.kind === "source_native" ? tr(locale, "Download institution PDF", "下载机构原始 PDF") : tr(locale, "Download English PDF", "下载英文 PDF")}
+            </a>
+          ))}
+        </div>
       </section>
 
       <section style={{ paddingTop: 24 }}>
         <div className="mono" style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
-          {tr(locale, "Source", "来源")}: {institutionName(a.institution.name, locale)}{an ? ` · ${tr(locale, "confidence", "置信度")} ${an.confidence.toFixed(2)} · ${tr(locale, "model", "模型")} ${an.model}` : ` · ${tr(locale, "analysis pending", "分析待处理")}`}
+          {tr(locale, "Source", "来源")}: {institutionName(a.institution.name, locale)} · {tr(locale, "confidence", "置信度")} {an.confidence.toFixed(2)} · {tr(locale, "model", "模型")} {an.model}
         </div>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p">{tr(locale, "Read Original ↗", "阅读官网原文 ↗")}</a>
       </section>

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 
 const intervalMs = Math.max(60_000, Number(process.env.INGEST_INTERVAL_MS || 6 * 60 * 60 * 1000));
 const limit = Math.max(1, Number(process.env.INGEST_ARTICLE_LIMIT || 6));
-const processLimit = Math.max(1, Number(process.env.PROCESS_ARTICLE_LIMIT || 20));
+const processLimit = Math.max(1, Number(process.env.PROCESS_ARTICLE_LIMIT || 50));
 const retryLimit = Math.max(1, Number(process.env.JOB_RETRY_LIMIT || 3));
 const retryDelayMs = Math.max(10_000, Number(process.env.JOB_RETRY_DELAY_MS || 60_000));
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";

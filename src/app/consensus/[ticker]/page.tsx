@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { computeConsensus } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
 import { assetName, formatDate, getLocale, institutionName, tr, type Locale } from "@/lib/i18n";
+import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,7 @@ export default async function ConsensusTrendPage({
   const first = points[0]?.consensusScore;
   const change = first === undefined || !current ? null : current.score - first;
   const articles = await prisma.article.findMany({
-    where: { articleAssets: { some: { assetId: asset.id } } },
+    where: publicationReadyWhere({ articleAssets: { some: { assetId: asset.id } } }),
     orderBy: { publishedAt: "desc" },
     take: 6,
     include: { institution: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } } },
@@ -93,7 +94,7 @@ export default async function ConsensusTrendPage({
         <div className="rowlist">
           {articles.map((article) => (
             <Link key={article.id} href={`/research/${article.id}`}>
-              <span><b>{institutionName(article.institution.name, locale)}</b> · {locale === "zh-CN" ? article.translations[0]?.title ?? "中文译文待处理" : article.title}</span>
+              <span><b>{institutionName(article.institution.name, locale)}</b> · {locale === "zh-CN" ? article.translations[0]!.title : article.title}</span>
               <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{formatDate(article.publishedAt, locale)}</span>
             </Link>
           ))}

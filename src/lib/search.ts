@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { ASSETS } from "./assets";
+import { publicationReadyWhere } from "./publication";
 import { assetName, domainTerm, institutionName, localizeChineseContent, type Locale } from "./i18n";
 
 export type SearchResultKind = "institution" | "asset" | "article";
@@ -167,12 +168,13 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
 
   const [institutions, assets, articles] = await Promise.all([
     prisma.institution.findMany({
-      select: { id: true, slug: true, name: true, country: true, _count: { select: { articles: true } } },
+      select: { id: true, slug: true, name: true, country: true, _count: { select: { articles: { where: publicationReadyWhere() } } } },
     }),
     prisma.asset.findMany({
-      select: { id: true, ticker: true, name: true, assetClass: true, aliases: true, _count: { select: { articleAssets: true } } },
+      select: { id: true, ticker: true, name: true, assetClass: true, aliases: true, _count: { select: { articleAssets: { where: { article: publicationReadyWhere() } } } } },
     }),
     prisma.article.findMany({
+      where: publicationReadyWhere(),
       orderBy: { publishedAt: "desc" },
       select: {
         id: true,
@@ -214,9 +216,10 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         aliases: [...new Set([...parseAliases(asset.aliases), ...canonicalAliases])],
       };
     }),
-    ...articles.map((article) => {
+    ...articles.flatMap((article): SearchCandidate[] => {
       const translation = article.translations[0];
-      const title = useChinese ? localizeChineseContent(translation?.title ?? "中文译文待处理") : article.title;
+      if (useChinese && !translation) return [];
+      const title = useChinese ? localizeChineseContent(translation!.title) : article.title;
       const assetTerms = article.articleAssets.flatMap(({ asset }) => [
         asset.name,
         asset.ticker,
@@ -224,7 +227,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         ...(ASSETS.find((definition) => definition.ticker === asset.ticker)?.aliases ?? []),
       ]);
       const atomicText = article.atomicViews.flatMap((view) => [view.viewEn, view.viewZh, view.asset, view.assetTicker ?? "", view.topic, view.type, view.direction, view.timeHorizon, view.value ?? ""]);
-      return {
+      return [{
         result: {
           id: article.id,
           kind: "article" as const,
@@ -240,7 +243,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         aliases: [...assetTerms, ...article.atomicViews.flatMap((view) => [view.asset, view.assetTicker ?? "", view.topic])],
         secondary: [article.institution.name, article.institution.slug, article.author ?? ""],
         content: [article.analysis?.summary ?? "", article.analysis?.summaryZh ?? "", article.rawText ?? "", translation?.text ?? "", ...atomicText],
-      };
+      }];
     }),
   ];
 

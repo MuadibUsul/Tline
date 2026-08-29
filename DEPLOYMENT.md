@@ -41,6 +41,8 @@ The `scheduler` service runs one robots-compliant ingestion pass at startup and 
 
 - `INGEST_INTERVAL_MS` — minimum 60 seconds, default 21,600,000.
 - `INGEST_ARTICLE_LIMIT` — per-institution discovery cap, default 6.
+- `PROCESS_ARTICLE_LIMIT` — maximum queued articles processed per pass, default 50.
+- `REPARSE_CONCURRENCY` / `TRANSLATION_CONCURRENCY` — bounded model-worker concurrency, default 3 and maximum 8.
 - `JOB_RETRY_LIMIT` / `JOB_RETRY_DELAY_MS` — bounded attempts and linear backoff.
 - `JOB_FAILURE_WEBHOOK_URL` — optional internal alert endpoint after all attempts fail.
 

@@ -54,7 +54,7 @@ export default async function WatchlistPage() {
   const institutionOptions = allInstitutions.map((institution) => ({ value: institution.slug, label: institutionName(institution.name, locale) }));
   const alertMessage = (event: (typeof events)[number]) => {
     const article = event.targetId ? eventArticleById.get(event.targetId) : undefined;
-    if (article) return `${institutionName(article.institution.name, locale)}: ${locale === "zh-CN" ? article.translations[0]!.title : article.title}`;
+    if (article) return `${institutionName(article.institution.name, locale)}: ${locale === "zh-CN" && article.translations[0] ? article.translations[0].title : article.title}`;
     const asset = event.assetTicker ? allAssets.find((item) => item.ticker === event.assetTicker) : undefined;
     if (asset) return `${assetName(asset.name, locale, asset.ticker)} ${tr(locale, "consensus", "共识")} ${event.score ?? "—"}`;
     return describeRule(event.rule, locale);

@@ -35,14 +35,13 @@ type FeedArticle = {
 };
 
 export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale }) {
-  if (locale === "zh-CN" && !a.translations?.[0]) return null;
   const primary = a.articleAssets[0];
   return (
     <article className="fcard">
       <div className="top">
         <b>{institutionName(a.institution.name, locale)}</b> · <span>{relTime(a.publishedAt, locale)}</span>
       </div>
-      <h3 className="ttl"><Link href={`/research/${a.id}`}>{locale === "zh-CN" ? localizeChineseContent(a.translations![0].title) : a.title}</Link></h3>
+      <h3 className="ttl"><Link href={`/research/${a.id}`}>{locale === "zh-CN" && a.translations?.[0] ? localizeChineseContent(a.translations[0].title) : a.title}</Link></h3>
       <div className="tags">
         {a.articleAssets.slice(0, 4).map((aa) => {
           const direction = directionLabel(aa.direction);
@@ -77,10 +76,9 @@ function shortPreview(text: string | null | undefined) {
 
 export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale }) {
   const translation = a.translations?.[0];
-  if (locale === "zh-CN" && !translation) return null;
-  const title = locale === "zh-CN" ? localizeChineseContent(translation!.title) : a.title;
+  const title = locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title;
   const preview = shortPreview(locale === "zh-CN"
-    ? translation?.text ?? a.analysis?.summaryZh
+    ? translation?.text ?? a.analysis?.summaryZh ?? a.rawText
     : a.analysis?.summary ?? a.rawText);
   const localizedPreview = locale === "zh-CN" && preview ? localizeChineseContent(preview) : preview;
 

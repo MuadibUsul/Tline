@@ -94,7 +94,7 @@ export default async function ConsensusTrendPage({
         <div className="rowlist">
           {articles.map((article) => (
             <Link key={article.id} href={`/research/${article.id}`}>
-              <span><b>{institutionName(article.institution.name, locale)}</b> · {locale === "zh-CN" ? article.translations[0]!.title : article.title}</span>
+              <span><b>{institutionName(article.institution.name, locale)}</b> · {locale === "zh-CN" && article.translations[0] ? article.translations[0].title : article.title}</span>
               <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{formatDate(article.publishedAt, locale)}</span>
             </Link>
           ))}

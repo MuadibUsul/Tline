@@ -34,11 +34,11 @@ export default async function ResearchPage({ params }: { params: { id: string } 
   const locale = getLocale();
   const a = await getResearchView(params.id);
   if (!a) notFound();
-  const an = a.analysis!;
-  const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an.keyArgumentsZh : an.keyArguments, []);
-  const risks = parseJson<string[]>(locale === "zh-CN" ? an.risksZh : an.risks, []);
+  const an = a.analysis;
+  const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
+  const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
   const date = formatDate(a.publishedAt, locale);
-  const translation = a.translations[0]!;
+  const translation = a.translations[0];
 
   return (
     <main className="wrap" style={{ maxWidth: 820 }}>
@@ -47,7 +47,7 @@ export default async function ResearchPage({ params }: { params: { id: string } 
           <Link href={`/institution/${a.institution.slug}`}>{institutionName(a.institution.name, locale)}</Link>
           {a.author ? ` · ${a.author}` : ""} · {date}
         </div>
-        <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{locale === "zh-CN" ? localizeChineseContent(translation.title) : a.title}</h1>
+        <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title}</h1>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p" style={{ alignSelf: "flex-start" }}>{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
       </div>
 
@@ -59,7 +59,7 @@ export default async function ResearchPage({ params }: { params: { id: string } 
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />
           </div>
         )}
-        {locale === "zh-CN" && (
+        {locale === "zh-CN" && translation && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
               完整中文译文
@@ -68,7 +68,13 @@ export default async function ResearchPage({ params }: { params: { id: string } 
             <ArticleBody segments={translation.segments} fallback={translation.text} locale={locale} translated />
           </div>
         )}
-        {locale === "zh-CN" && a.rawText && (
+        {locale === "zh-CN" && !translation && a.rawText && (
+          <div style={{ marginBottom: 22 }}>
+            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
+            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />
+          </div>
+        )}
+        {locale === "zh-CN" && translation && a.rawText && (
           <details className="article-original">
             <summary>完整英文原文</summary>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />

@@ -218,8 +218,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
     }),
     ...articles.flatMap((article): SearchCandidate[] => {
       const translation = article.translations[0];
-      if (useChinese && !translation) return [];
-      const title = useChinese ? localizeChineseContent(translation!.title) : article.title;
+      const title = useChinese && translation ? localizeChineseContent(translation.title) : article.title;
       const assetTerms = article.articleAssets.flatMap(({ asset }) => [
         asset.name,
         asset.ticker,

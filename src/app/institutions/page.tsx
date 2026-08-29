@@ -34,7 +34,7 @@ export default async function ViewsPage({ searchParams }: { searchParams: { page
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Institutional Wire", "机构短讯")}</div>
         <h1>{tr(locale, "Views", "观点")}</h1>
-        <p className="sub">{tr(locale, `${total} evidence-backed views, ranked by market heat, institution authority and freshness.`, `共 ${total} 条可追溯观点，依次按市场热度、机构权重和新鲜度排序。`)}</p>
+        <p className="sub">{tr(locale, `${total} evidence-backed views published in the latest 7 days, ranked by market heat, institution authority and freshness.`, `共 ${total} 条最近7天发布的可追溯观点，依次按市场热度、机构权重和新鲜度排序。`)}</p>
       </div>
 
       <section className="view-flash-list" aria-label={tr(locale, "Latest institutional views", "最新机构观点")}>

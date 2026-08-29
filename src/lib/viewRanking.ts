@@ -34,6 +34,8 @@ export type RankedView<T extends RankableView> = T & {
   matchedEvent: MarketEvent | null;
 };
 
+export const VIEW_WINDOW_DAYS = 7;
+
 const normalized = (value: string) => value.normalize("NFKC").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 function keysFor(view: RankableView) {
@@ -55,10 +57,10 @@ function matchingEvent(view: RankableView, now: Date, events: MarketEvent[]) {
 
 /** Strict priority: heat first, institution authority second, freshness third. */
 export function rankAtomicViews<T extends RankableView>(views: T[], now = new Date(), events: MarketEvent[] = []): RankedView<T>[] {
-  const since = now.getTime() - 7 * 864e5;
+  const since = now.getTime() - VIEW_WINDOW_DAYS * 864e5;
+  const eligible = views.filter((view) => view.article.publishedAt.getTime() >= since && view.article.publishedAt <= now);
   const stats = new Map<string, { institutions: Set<string>; articles: Set<string> }>();
-  for (const view of views) {
-    if (view.article.publishedAt.getTime() < since || view.article.publishedAt > now) continue;
+  for (const view of eligible) {
     for (const key of keysFor(view)) {
       const stat = stats.get(key) ?? { institutions: new Set<string>(), articles: new Set<string>() };
       stat.institutions.add(view.article.institutionId);
@@ -67,7 +69,7 @@ export function rankAtomicViews<T extends RankableView>(views: T[], now = new Da
     }
   }
 
-  const ranked = views.map((view) => {
+  const ranked = eligible.map((view) => {
     const strongest = keysFor(view).map((key) => stats.get(key)).filter(Boolean)
       .sort((a, b) => (b!.institutions.size - a!.institutions.size) || (b!.articles.size - a!.articles.size))[0];
     const institutions = strongest?.institutions.size ?? 0;

@@ -33,3 +33,8 @@ test("an active market event receives the largest heat boost", () => {
   const eventView = { ...view("event", "Rates", "small", 3, 0.7, 5), viewEn: "Warsh speaks at Jackson Hole" };
   assert.equal(rankAtomicViews([eventView, view("other", "Gold", "large", 5, 1, 1)], now, [event])[0].id, "event");
 });
+
+test("only views published within the latest seven days are returned", () => {
+  const ranked = rankAtomicViews([view("boundary", "Gold", "a", 4, 0.85, 7 * 24), view("old", "Oil", "b", 4, 0.85, 7 * 24 + 1), view("future", "Rates", "c", 4, 0.85, -1)], now);
+  assert.deepEqual(ranked.map((item) => item.id), ["boundary"]);
+});

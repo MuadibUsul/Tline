@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { computeConsensus, consensusChange, consensusSince } from "./consensus";
 import { ASSETS } from "./assets";
+import { assetName, domainTerm, institutionName } from "./i18n";
 
 const FEATURED = ASSETS.filter((asset) => asset.featured).map((asset) => asset.ticker);
 const DEDUPE_MS = 12 * 3600 * 1000;
@@ -31,7 +32,11 @@ export function ruleScope(rule: RuleShape): { kind: MonitorScopeKind; ref: strin
 export function describeRule(rule: RuleShape, locale = "en"): string {
   const zh = locale === "zh-CN";
   const scope = ruleScope(rule);
-  const target = scope.ref ?? (zh ? "任一精选资产" : "any featured asset");
+  const target = scope.ref
+    ? scope.kind === "institution" ? institutionName(scope.ref, zh ? "zh-CN" : "en")
+      : scope.kind === "asset" ? assetName(scope.ref, zh ? "zh-CN" : "en", scope.ref)
+        : domainTerm(scope.ref, zh ? "zh-CN" : "en")
+    : (zh ? "任一精选资产" : "any featured asset");
   if (rule.type === "NEW_RESEARCH") {
     const kind = scope.kind === "institution" ? (zh ? "机构" : "institution") : scope.kind === "theme" ? (zh ? "交易主线" : "theme") : (zh ? "资产" : "asset");
     return zh ? `${kind}「${target}」发布相关新研报` : `new research for ${kind} “${target}”`;

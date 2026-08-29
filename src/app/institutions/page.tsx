@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { relTime } from "@/app/_components/ui";
-import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
+import { assetName, domainTerm, formatDate, getLocale, institutionName, localizeChineseContent, localizedDataValue, tr, type Locale } from "@/lib/i18n";
 import { rankAtomicViews, type MarketEvent } from "@/lib/viewRanking";
 import marketEvents from "../../../data/market-events.json";
 
@@ -39,27 +39,28 @@ export default async function ViewsPage({ searchParams }: { searchParams: { page
       <section className="view-flash-list" aria-label={tr(locale, "Latest institutional views", "最新机构观点")}>
         {views.map((view, viewIndex) => {
           const tone = view.direction === "bullish" ? "bull" : view.direction === "bearish" ? "bear" : "neu";
-          const copy = locale === "zh-CN" ? view.viewZh : view.viewEn;
+          const copy = locale === "zh-CN" ? localizeChineseContent(view.viewZh) : view.viewEn;
+          const displayValue = localizedDataValue(view.value, locale);
           return (
             <article className="view-flash" key={view.id}>
               <div className="view-rank"><b>#{(page - 1) * take + viewIndex + 1}</b><time dateTime={view.article.publishedAt.toISOString()} title={formatDate(view.article.publishedAt, locale)}>{relTime(view.article.publishedAt, locale)}</time></div>
               <div className="view-flash-main">
                 <div className="view-flash-meta">
-                  <Link href={`/institution/${view.article.institution.slug}`}>{view.article.institution.name}</Link>
+                  <Link href={`/institution/${view.article.institution.slug}`}>{institutionName(view.article.institution.name, locale)}</Link>
                   <span className={`chip ${tone}`}>{directionLabel(view.direction, locale)}</span>
-                  <span className="chip gray">{locale === "zh-CN" ? TYPE_ZH[view.type] ?? view.type : view.type.replace("_", " ")}</span>
-                  {view.assetTicker ? <Link href={`/asset/${view.assetTicker}`} className="chip acc">{view.asset} · {view.assetTicker}</Link> : <span className="chip acc">{view.asset}</span>}
+                  <span className="chip gray">{locale === "zh-CN" ? TYPE_ZH[view.type] ?? domainTerm(view.type, locale) : domainTerm(view.type, locale)}</span>
+                  {view.assetTicker ? <Link href={`/asset/${view.assetTicker}`} className="chip acc">{assetName(view.asset, locale, view.assetTicker, "相关资产")} · {view.assetTicker}</Link> : <span className="chip acc">{assetName(view.asset, locale, null, "相关资产")}</span>}
                   {view.matchedEvent && <a href={view.matchedEvent.sourceUrl} target="_blank" rel="noopener noreferrer" className="chip bear">{locale === "zh-CN" ? view.matchedEvent.titleZh : view.matchedEvent.titleEn}</a>}
-                  <span className="view-horizon">{view.timeHorizon}</span>
+                  <span className="view-horizon">{domainTerm(view.timeHorizon, locale, "时间范围见观点")}</span>
                 </div>
                 <h2><Link href={`/research/${view.articleId}`}>{copy}</Link></h2>
                 <div className="view-flash-foot">
-                  {view.value && <b>{view.value}</b>}
-                  <span>{view.topic}</span><span>{"★".repeat(view.importance)}</span>
+                  {displayValue && <b>{displayValue}</b>}
+                  <span>{domainTerm(view.topic, locale, "相关主题")}</span><span>{"★".repeat(view.importance)}</span>
                   <span title={tr(locale, "7-day cross-institution and event heat", "7天跨机构与事件热度")}>{tr(locale, "Heat", "热度")} {view.heatScore}{view.crossInstitutionCount > 1 ? ` · ${view.crossInstitutionCount}${tr(locale, " inst.", "家机构")}` : ""}</span>
                   <span title={tr(locale, "Institution authority and rating", "机构权威度与评级")}>{tr(locale, "Authority", "机构")} {view.authorityScore}</span>
                   <span title={tr(locale, "Exponential recency score", "指数衰减新鲜度")}>{tr(locale, "Fresh", "新鲜")} {view.freshnessScore}</span>
-                  <details><summary>{tr(locale, "Evidence", "原文依据")}</summary><blockquote>{view.sourceQuote}</blockquote></details>
+                  <details><summary>{tr(locale, "Evidence", "英文原文依据")}</summary><blockquote>{view.sourceQuote}</blockquote></details>
                 </div>
               </div>
             </article>

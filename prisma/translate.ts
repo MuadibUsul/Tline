@@ -29,7 +29,7 @@ async function main() {
     orderBy: { publishedAt: "desc" },
   });
   const candidates = rows
-    .filter((article) => flag("all") || article.translations.length === 0 || article.translations[0].status === "needs_review")
+    .filter((article) => flag("all") || article.translations.length === 0 || (flag("retry-review") && article.translations[0].status === "needs_review"))
     .slice(0, limit);
 
   let translated = 0;

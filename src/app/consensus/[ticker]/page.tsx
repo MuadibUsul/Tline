@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { computeConsensus } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
-import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
+import { assetName, formatDate, getLocale, institutionName, tr, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +71,7 @@ export default async function ConsensusTrendPage({
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Consensus Index · rolling 24h", "共识指数 · 滚动24小时")} · {asset.ticker}</div>
         <div className="big-score">
-          <h1>{asset.name}</h1>
+          <h1>{assetName(asset.name, locale, asset.ticker)}</h1>
           {current && <span className="num">{current.score}</span>}
         </div>
         <div className="deltas">
@@ -93,7 +93,7 @@ export default async function ConsensusTrendPage({
         <div className="rowlist">
           {articles.map((article) => (
             <Link key={article.id} href={`/research/${article.id}`}>
-              <span><b>{article.institution.name}</b> · {locale === "zh-CN" ? article.translations[0]?.title ?? article.title : article.title}</span>
+              <span><b>{institutionName(article.institution.name, locale)}</b> · {locale === "zh-CN" ? article.translations[0]?.title ?? "中文译文待处理" : article.title}</span>
               <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{formatDate(article.publishedAt, locale)}</span>
             </Link>
           ))}

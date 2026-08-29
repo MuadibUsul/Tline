@@ -15,8 +15,8 @@ export default function LanguageToggle({ locale }: { locale: Locale }) {
   }
   return (
     <div className="language-toggle" role="group" aria-label={trLabel(locale, "Language", "语言")}>
-      <button type="button" aria-pressed={locale === "zh-CN"} onClick={() => select("zh-CN")}>中</button>
-      <button type="button" aria-pressed={locale === "en"} onClick={() => select("en")}>EN</button>
+      <button type="button" aria-pressed={locale === "zh-CN"} onClick={() => select("zh-CN")}>{locale === "zh-CN" ? "中文" : "ZH"}</button>
+      <button type="button" aria-pressed={locale === "en"} onClick={() => select("en")}>{locale === "zh-CN" ? "英文" : "EN"}</button>
     </div>
   );
 }

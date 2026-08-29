@@ -14,6 +14,7 @@ async function main() {
   }
 
   const all = flag("all");
+  const retryReview = flag("retry-review");
   const rows = await prisma.article.findMany({
     where: { rawText: { not: null } },
     select: {
@@ -27,7 +28,8 @@ async function main() {
     },
     orderBy: { publishedAt: "desc" },
   });
-  const candidates = rows.filter((row) => all || row.analysis?.reviewStatus === "needs_review").slice(0, limit);
+  const pending = rows.filter((row) => all || !row.analysis || (retryReview && row.analysis.reviewStatus === "needs_review"));
+  const candidates = limit ? pending.slice(0, limit) : pending;
   const assets = await prisma.asset.findMany({ select: { id: true, ticker: true } });
   const assetIds = new Map(assets.map((asset) => [asset.ticker, asset.id]));
 

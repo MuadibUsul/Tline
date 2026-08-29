@@ -2,7 +2,7 @@ import Link from "next/link";
 import { featuredConsensus, latestFeed, mostActive, viewChanges } from "@/lib/queries";
 import { FeedCard, Delta } from "./_components/ui";
 import SearchBox from "./_components/SearchBox";
-import { getLocale, tr } from "@/lib/i18n";
+import { assetName, domainTerm, getLocale, institutionName, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ export default async function Home() {
         <div className="ctiles">
           {cards.map((c) => (
             <Link key={c.ticker} href={`/asset/${c.ticker}`} className="ctile">
-              <div className="a">{c.name}</div>
+              <div className="a">{assetName(c.name, locale, c.ticker)}</div>
               <div className="s tnum">
                 {c.score}
                 <span className={`dir ${c.tone === "bull" ? "up" : c.tone === "bear" ? "down" : "flat"}`}>
@@ -63,7 +63,7 @@ export default async function Home() {
             <div className="rowlist">
               {changes.map((c) => (
                 <Link key={c.ticker} href={`/asset/${c.ticker}`} className="r" style={{ textDecoration: "none" }}>
-                  <span className="inst">{c.name}</span>
+                  <span className="inst">{assetName(c.name, locale, c.ticker)}</span>
                   <span className={`n ${c.change > 0 ? "up" : "down"}`}>{c.change > 0 ? "+" : "−"}{Math.abs(c.change)}</span>
                 </Link>
               ))}
@@ -75,7 +75,7 @@ export default async function Home() {
             <div className="rowlist">
               {active.map((x) => (
                 <Link key={x.inst.id} href={`/institution/${x.inst.slug}`} className="r">
-                  <span className="inst">{x.inst.name}</span>
+                  <span className="inst">{institutionName(x.inst.name, locale)}</span>
                   <span className="n">{x.count}</span>
                 </Link>
               ))}
@@ -85,7 +85,7 @@ export default async function Home() {
             <div className="section-t">{tr(locale, "Trending Topics", "热门话题")}</div>
             <div className="tag-row">
               {["Fed", "AI Capex", "Nvidia", "Gold", "Oil", "USD", "Treasuries", "China"].map((t) => (
-                <span key={t} className="chip gray">{t}</span>
+                <span key={t} className="chip gray">{domainTerm(t, locale)}</span>
               ))}
             </div>
           </div>

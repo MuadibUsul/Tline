@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { directionLabel } from "@/lib/assets";
-import { relativeTime, tr, type Locale } from "@/lib/i18n";
+import { assetName, institutionName, localizeChineseContent, relativeTime, tr, type Locale } from "@/lib/i18n";
 
 export const relTime = (d: Date, locale: Locale = "en") => relativeTime(d, locale);
 
@@ -39,9 +39,9 @@ export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale
   return (
     <article className="fcard">
       <div className="top">
-        <b>{a.institution.name}</b> · <span>{relTime(a.publishedAt, locale)}</span>
+        <b>{institutionName(a.institution.name, locale)}</b> · <span>{relTime(a.publishedAt, locale)}</span>
       </div>
-      <h3 className="ttl"><Link href={`/research/${a.id}`}>{locale === "zh-CN" ? a.translations?.[0]?.title ?? a.title : a.title}</Link></h3>
+      <h3 className="ttl"><Link href={`/research/${a.id}`}>{locale === "zh-CN" ? localizeChineseContent(a.translations?.[0]?.title ?? "中文译文待处理") : a.title}</Link></h3>
       <div className="tags">
         {a.articleAssets.slice(0, 4).map((aa) => {
           const direction = directionLabel(aa.direction);
@@ -76,20 +76,21 @@ function shortPreview(text: string | null | undefined) {
 
 export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale }) {
   const translation = a.translations?.[0];
-  const title = locale === "zh-CN" ? translation?.title ?? a.title : a.title;
+  const title = locale === "zh-CN" ? localizeChineseContent(translation?.title ?? "中文译文待处理") : a.title;
   const preview = shortPreview(locale === "zh-CN"
-    ? translation?.text ?? a.analysis?.summaryZh ?? a.analysis?.summary ?? a.rawText
+    ? translation?.text ?? a.analysis?.summaryZh
     : a.analysis?.summary ?? a.rawText);
+  const localizedPreview = locale === "zh-CN" && preview ? localizeChineseContent(preview) : preview;
 
   return (
     <article className="research-card">
       <div className="research-card-meta">
-        <Link href={`/institution/${a.institution.slug}`}>{a.institution.name}</Link>
+        <Link href={`/institution/${a.institution.slug}`}>{institutionName(a.institution.name, locale)}</Link>
         <span>·</span>
         <span>{relTime(a.publishedAt, locale)}</span>
       </div>
       <h2><Link href={`/research/${a.id}`}>{title}</Link></h2>
-      {preview && <p>{preview}</p>}
+      {localizedPreview && <p>{localizedPreview}</p>}
       <div className="research-card-assets">
         {a.articleAssets.slice(0, 4).map((articleAsset) => {
           const direction = directionLabel(articleAsset.direction);
@@ -100,8 +101,8 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
               key={articleAsset.asset.ticker}
               href={`/asset/${articleAsset.asset.ticker}`}
               className={`chip ${direction.tone}`}
-              title={`${articleAsset.asset.name} · ${label}`}
-              aria-label={`${articleAsset.asset.name} · ${label}`}
+              title={`${assetName(articleAsset.asset.name, locale, articleAsset.asset.ticker)} · ${label}`}
+              aria-label={`${assetName(articleAsset.asset.name, locale, articleAsset.asset.ticker)} · ${label}`}
             >
               {articleAsset.asset.ticker} <span aria-hidden="true">{arrow}</span>
             </Link>

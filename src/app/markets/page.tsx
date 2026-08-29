@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { computeConsensus } from "@/lib/consensus";
-import { getLocale, tr } from "@/lib/i18n";
+import { assetName, getLocale, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function MarketsPage() {
             <div className="rowlist">
               {group.map(({ a, c }) => (
                 <Link key={a.ticker} href={`/asset/${a.ticker}`} className="r">
-                  <span className="inst">{a.name} <span className="mono" style={{ color: "var(--faint)", fontSize: 11 }}>{a.ticker}</span></span>
+                  <span className="inst">{assetName(a.name, locale, a.ticker)} <span className="mono" style={{ color: "var(--faint)", fontSize: 11 }}>{a.ticker}</span></span>
                   {c ? <span className={`n ${c.tone === "bull" ? "up" : c.tone === "bear" ? "down" : "flat"}`}>{c.score} · {c.tone === "bull" ? tr(locale, c.label, "看多") : c.tone === "bear" ? tr(locale, c.label, "看空") : tr(locale, c.label, "中性")}</span>
                      : <span className="mono" style={{ color: "var(--faint)" }}>{tr(locale, "no data", "暂无数据")}</span>}
                 </Link>

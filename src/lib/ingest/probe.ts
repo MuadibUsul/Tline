@@ -5,10 +5,11 @@ import Parser from "rss-parser";
 import { prisma } from "../db";
 import { extractPdf } from "../documents/extractPdf";
 import { extractArticle, extractFeedLinks, extractLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic } from "./extract";
-import { fetchPdf, fetchText, lastFetchStatus } from "./fetch";
+import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus } from "./fetch";
 import { lastRenderReason, renderHtml } from "./render";
 import { fetchRobots, robotsAllows, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
+import { candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
 
 const UA = "InstitutionalIntelligenceBot";
 const rss = new Parser({ timeout: 15000 });
@@ -80,13 +81,18 @@ async function probeInstitution(inst: {
       return renderedHtml;
     };
     let html = await fetchText(inst.researchUrl);
-    let listingCandidates = html ? extractLinks(html, inst.researchUrl) : [];
+    const sourceListings = listingUrls(inst.slug, inst.researchUrl).filter(allows);
+    let listingCandidates = html ? extractLinks(html, inst.researchUrl).filter((link) => candidateAllowed(inst.slug, link.url)) : [];
+    for (const listingUrl of sourceListings.slice(1)) {
+      const listingHtml = await fetchText(listingUrl);
+      if (listingHtml) listingCandidates.push(...extractLinks(listingHtml, listingUrl).filter((link) => candidateAllowed(inst.slug, link.url)));
+    }
     let rendered = false;
     if (flag("render") && listingCandidates.length === 0) {
       const renderedHtml = await renderPublic(inst.researchUrl);
       if (renderedHtml) {
         html = renderedHtml;
-        listingCandidates = extractLinks(renderedHtml, inst.researchUrl);
+        listingCandidates = extractLinks(renderedHtml, inst.researchUrl).filter((link) => candidateAllowed(inst.slug, link.url));
         rendered = true;
       }
     }
@@ -94,11 +100,13 @@ async function probeInstitution(inst: {
       ...robotsSitemaps(robots),
       ...(inst.sitemapUrl ? [inst.sitemapUrl] : []),
     ];
-    const sitemapCandidates = await discoverFromSitemaps(
-      declaredSitemaps.length || listingCandidates.length ? declaredSitemaps : [`${source.origin}/sitemap.xml`],
-      inst.researchUrl,
-      { limit: 20, maxSitemaps: 6, allows },
-    );
+    const sitemapCandidates = sitemapEnabled(inst.slug)
+      ? await discoverFromSitemaps(
+        declaredSitemaps.length || listingCandidates.length ? declaredSitemaps : [`${source.origin}/sitemap.xml`],
+        inst.researchUrl,
+        { limit: 20, maxSitemaps: 6, allows },
+      )
+      : [];
 
     const feedCandidates: Array<{ url: string; title: string; publishedAt: Date | null }> = [];
     const feeds = [...new Set([
@@ -109,7 +117,15 @@ async function probeInstitution(inst: {
       try {
         const xml = await fetchText(feedUrl);
         if (!xml) continue;
-        const feed = await rss.parseString(xml);
+        let feed;
+        try {
+          feed = await rss.parseString(xml);
+        } catch {
+          for (const nested of extractFeedLinks(xml, feedUrl)) {
+            if (allows(nested) && !feeds.includes(nested) && feeds.length < 12) feeds.push(nested);
+          }
+          continue;
+        }
         for (const item of (feed.items || []).slice(0, 20)) {
           if (!item.link || !allows(item.link)) continue;
           const parsed = item.isoDate ? new Date(item.isoDate) : null;
@@ -123,7 +139,7 @@ async function probeInstitution(inst: {
     }
 
     const candidates = new Map<string, { url: string; title: string; lastModified: Date | null }>();
-    for (const candidate of feedCandidates) {
+    for (const candidate of feedCandidates.filter((item) => candidateAllowed(inst.slug, item.url))) {
       if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, lastModified: candidate.publishedAt });
     }
     // Listing pages usually represent the publisher's current editorial order; sitemaps fill gaps.
@@ -134,21 +150,27 @@ async function probeInstitution(inst: {
     for (const candidate of directPdfCandidates) {
       if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, lastModified: candidate.publishedAt });
     }
-    for (const candidate of sitemapCandidates) {
+    for (const candidate of sitemapCandidates.filter((item) => candidateAllowed(inst.slug, item.url))) {
       if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, title: "" });
     }
 
     const sampleLimit = Math.max(1, Number(arg("sample") || 3));
+    const scanLimit = Math.max(sampleLimit, Number(arg("scan") || sampleLimit * 4));
     const examples: ProbeResult["examples"] = [];
     const failures: Record<string, number> = {};
     const fail = (reason: string) => { failures[reason] = (failures[reason] ?? 0) + 1; };
     let sampled = 0;
-    for (const candidate of [...candidates.values()].slice(0, sampleLimit)) {
+    const orderedCandidates = [...candidates.values()].sort((left, right) => {
+      const dated = Number(Boolean(right.lastModified || inferPublicationDate(right.url, right.title))) - Number(Boolean(left.lastModified || inferPublicationDate(left.url, left.title)));
+      return dated || Number(/\/(?:content\/articles|insights?\/[^/]+\/|research\/[^/]+\/)/i.test(right.url)) - Number(/\/(?:content\/articles|insights?\/[^/]+\/|research\/[^/]+\/)/i.test(left.url));
+    });
+    for (const candidate of orderedCandidates.slice(0, scanLimit)) {
+      if (examples.length >= sampleLimit) break;
       if (!allows(candidate.url)) continue;
       sampled++;
       if (/\.pdf(?:$|\?)/i.test(candidate.url)) {
         const pdf = await fetchPdf(candidate.url);
-        if (!pdf) { fail("pdf_fetch"); continue; }
+        if (!pdf) { accessReason ??= lastFetchReason(candidate.url); fail("pdf_fetch"); continue; }
         try {
           const extracted = await extractPdf(pdf);
           const publishedAt = inferPublicationDate(candidate.url, candidate.title) || candidate.lastModified;
@@ -184,7 +206,7 @@ async function probeInstitution(inst: {
       let embeddedReady = false;
       for (const pdfUrl of extractPdfLinks(articleHtml || "", candidate.url).slice(0, 2)) {
         const pdf = await fetchPdf(pdfUrl);
-        if (!pdf) continue;
+        if (!pdf) { accessReason ??= lastFetchReason(pdfUrl); continue; }
         try {
           const extracted = await extractPdf(pdf);
           const pdfDate = inferPublicationDate(pdfUrl, candidate.title, extracted.text.slice(0, 1000)) || publishedAt;

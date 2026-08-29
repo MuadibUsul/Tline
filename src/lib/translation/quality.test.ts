@@ -21,6 +21,14 @@ test("treats translated month names as the same numeric month", () => {
   assert.equal(result.passed, true);
 });
 
+test("does not interpret the modal verb may as the month May", () => {
+  const result = validateTranslation(
+    "Markets may rally and yields may fall.",
+    "市场可能上涨，收益率可能下降。",
+  );
+  assert.equal(result.passed, true);
+});
+
 test("rejects missing or invented numbers", () => {
   const result = validateTranslation(
     "The target rises from $4,700 to $4,900.",

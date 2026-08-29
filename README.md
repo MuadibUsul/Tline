@@ -53,6 +53,9 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
   failure isolation. `ingest:probe` audits all 59 policy-crawlable sources without writing
   articles. Real ingest records `succeeded`, `empty`, `paused`, `refused` or `failed` instead
   of treating a zero-result run as success.
+  Stable site exceptions live in `sourceRules.ts`; scheduled crawling never uses an LLM to
+  explore sites. Probing is an acceptance/maintenance tool only. Ingest is clamped to the
+  current month and stores raw English content before any AI processing.
 - **Robots compliance (strict)**: `scripts/robots_audit.py` audits all 64 sources' robots.txt
   → `64机构爬虫合规评估.xlsx` + `data/crawl_policy.json` (allowed/delayed/blocked/manual +
   Crawl-delay). The crawler (`run.ts`) only touches `allowed`/`delayed` institutions, and
@@ -91,12 +94,12 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 | `npm run ingest` | Live-crawl compliant sources (`-- --slug=ubs`, `-- --all`, `-- --limit=3`, `-- --resume-minutes=60`); blocked/manual are refused |
 | `npm run ingest:probe -- --sample=3 --render --output=data/crawl-probe.json` | Read-only live coverage audit with discovery, quality-gate and access-failure evidence |
 | `npm run consensus` | Recompute + snapshot all asset consensus, then evaluate alerts |
-| `npm run translate` | Translate/review pending articles and build ready bilingual PDFs |
+| `npm run translate` | Translate articles missing Chinese output and build ready bilingual PDFs (`--retry-review` is explicit) |
 | `npm run documents` | Rebuild article PDF assets |
 | `npm run forecasts` | Sync supported forecast horizons and settle due observations |
 | `npm run prices:import -- --file=prices.csv --source=vendor` | Import `ticker,timestamp,value` observations |
 | `npm run alerts` | Seed/refresh the demo user's watchlist + rules and fire alerts |
-| `npm run reparse -- --all --limit=1` | Re-run structured parsing and atomic-view extraction (omit `--limit` for all) |
+| `npm run reparse -- --limit=20` | Parse articles missing analysis; use `--retry-review` or `--all` only when explicitly intended |
 
 > **Live ingest note:** the application does not seed synthetic research. A source appears
 > only after its public article passes URL, publication-date, full-body and document checks.
@@ -119,6 +122,7 @@ prisma/schema.prisma      application data model; generated PostgreSQL schema + 
 data/institutions.json    64 sources derived from the source-list xlsx
 src/lib/                  auth, storage, documents, translation, forecast, consensus, queries
 src/lib/ingest/           fetch, robots, sitemap, extract, parse, store, jobs
+src/lib/ingest/sourceRules.ts  committed, tested exceptions for accepted existing sources
 src/app/                  Next.js App Router pages + components
 ```
 

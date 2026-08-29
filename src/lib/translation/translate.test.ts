@@ -43,3 +43,34 @@ test("produces a reviewed structured translation through the provider boundary",
   assert.equal(result.quality.passed, true);
   assert.equal(result.segments[0].position, 0);
 });
+
+test("chunks a very long source segment and restores its database structure", async () => {
+  let draftCalls = 0;
+  const provider: LLMProvider = {
+    name: "chunk-test",
+    model: "chunk-test-v1",
+    async complete(input) {
+      if (input.system.includes("independent bilingual quality reviewer")) {
+        return { provider: this.name, model: this.model, text: JSON.stringify({ pass: true, score: 1, issues: [] }) };
+      }
+      draftCalls++;
+      const payload = JSON.parse(input.user) as { title: string; segments: Array<{ position: number; heading: string | null; text: string }> };
+      return {
+        provider: this.name,
+        model: this.model,
+        text: JSON.stringify({ title: payload.title, segments: payload.segments }),
+      };
+    },
+  };
+  const paragraph = "Market growth was 2.5% while the policy rate remained 4.35%.";
+  const result = await translateArticle("Test Bank", "Long report 2026", [{
+    id: "long",
+    position: 0,
+    heading: "Outlook",
+    text: Array.from({ length: 700 }, () => paragraph).join("\n\n"),
+  }], provider);
+  assert.ok(draftCalls > 1);
+  assert.equal(result.segments.length, 1);
+  assert.match(result.segments[0].text, /4\.35%/);
+  assert.equal(result.quality.passed, true);
+});

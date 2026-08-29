@@ -6,7 +6,7 @@ import { addWatch, removeWatch, toggleRule, deleteRule } from "@/app/actions";
 import MonitoringRuleForm from "@/app/_components/MonitoringRuleForm";
 import { describeRule } from "@/lib/alerts";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, type Locale } from "@/lib/i18n";
+import { assetName, getLocale, institutionName, localeSafeText, tr, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
@@ -44,8 +44,20 @@ export default async function WatchlistPage() {
     prisma.asset.findMany({ orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
     prisma.institution.findMany({ orderBy: { name: "asc" }, select: { slug: true, name: true } }),
   ]);
-  const assetOptions = allAssets.map((asset) => ({ value: asset.ticker, label: `${asset.name} · ${asset.ticker}` }));
-  const institutionOptions = allInstitutions.map((institution) => ({ value: institution.slug, label: institution.name }));
+  const eventArticles = events.some((event) => event.targetId) ? await prisma.article.findMany({
+    where: { id: { in: events.flatMap((event) => event.targetId ? [event.targetId] : []) } },
+    select: { id: true, title: true, institution: { select: { name: true } }, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } } },
+  }) : [];
+  const eventArticleById = new Map(eventArticles.map((article) => [article.id, article]));
+  const assetOptions = allAssets.map((asset) => ({ value: asset.ticker, label: `${assetName(asset.name, locale, asset.ticker)} · ${asset.ticker}` }));
+  const institutionOptions = allInstitutions.map((institution) => ({ value: institution.slug, label: institutionName(institution.name, locale) }));
+  const alertMessage = (event: (typeof events)[number]) => {
+    const article = event.targetId ? eventArticleById.get(event.targetId) : undefined;
+    if (article) return `${institutionName(article.institution.name, locale)}: ${locale === "zh-CN" ? article.translations[0]?.title ?? "中文译文待处理" : article.title}`;
+    const asset = event.assetTicker ? allAssets.find((item) => item.ticker === event.assetTicker) : undefined;
+    if (asset) return `${assetName(asset.name, locale, asset.ticker)} ${tr(locale, "consensus", "共识")} ${event.score ?? "—"}`;
+    return describeRule(event.rule, locale);
+  };
 
   return (
     <main className="wrap">
@@ -71,7 +83,7 @@ export default async function WatchlistPage() {
             <div key={asset.ticker} className="ctile monitor-asset">
               <div className="monitor-remove"><RemoveButton kind="asset" refId={asset.ticker} locale={locale} /></div>
               <Link href={`/asset/${asset.ticker}`} style={{ display: "block" }}>
-                <div className="a">{asset.name}</div>
+                <div className="a">{assetName(asset.name, locale, asset.ticker)}</div>
                 {asset.score === null || asset.tone === null || asset.label === null ? <><div className="s tnum">—</div><div className="meta"><span>{tr(locale, "No consensus in the latest 24h", "最近24小时暂无共识")}</span></div></> : <>
                   <div className="s tnum">{asset.score}<span className={`dir ${asset.tone === "bull" ? "up" : asset.tone === "bear" ? "down" : "flat"}`}>{asset.tone === "bull" ? "↑" : asset.tone === "bear" ? "↓" : "→"} {tr(locale, asset.label, asset.tone === "bull" ? "看多" : asset.tone === "bear" ? "看空" : "中性")}</span></div>
                   <div className="bar"><i style={{ width: `${asset.score}%`, background: TONE[asset.tone] }} /></div><div className="meta"><span>24h&nbsp;<Delta v={asset.d1} /></span></div>
@@ -82,8 +94,8 @@ export default async function WatchlistPage() {
           {assets.length === 0 && <p className="mono monitor-empty">{tr(locale, "No followed assets yet.", "尚未关注资产。")}</p>}
         </div>
         <div className="monitor-object-grid">
-          <div><div className="section-t">{tr(locale, "Institutions", "机构")} · {institutions.length}</div><div className="rowlist">{institutions.map((institution) => <div key={institution.id} className="r"><Link href={`/institution/${institution.slug}`} className="inst">{institution.name}</Link><RemoveButton kind="institution" refId={institution.slug} locale={locale} /></div>)}{institutions.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed institutions.", "尚未关注机构。")}</div>}</div></div>
-          <div><div className="section-t">{tr(locale, "Trading themes", "交易主线")} · {themes.length}</div><div className="rowlist">{themes.map((theme) => <div key={theme} className="r"><span>{theme}</span><RemoveButton kind="theme" refId={theme} locale={locale} /></div>)}{themes.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed themes.", "尚未关注交易主线。")}</div>}</div></div>
+          <div><div className="section-t">{tr(locale, "Institutions", "机构")} · {institutions.length}</div><div className="rowlist">{institutions.map((institution) => <div key={institution.id} className="r"><Link href={`/institution/${institution.slug}`} className="inst">{institutionName(institution.name, locale)}</Link><RemoveButton kind="institution" refId={institution.slug} locale={locale} /></div>)}{institutions.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed institutions.", "尚未关注机构。")}</div>}</div></div>
+          <div><div className="section-t">{tr(locale, "Trading themes", "交易主线")} · {themes.length}</div><div className="rowlist">{themes.map((theme) => <div key={theme} className="r"><span>{localeSafeText(theme, locale, tr(locale, "Custom theme", "自定义主题"))}</span><RemoveButton kind="theme" refId={theme} locale={locale} /></div>)}{themes.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed themes.", "尚未关注交易主线。")}</div>}</div></div>
         </div>
       </section>
 
@@ -91,11 +103,11 @@ export default async function WatchlistPage() {
 
       <section className="blk monitor-object-grid">
         <div><div className="section-t">{tr(locale, "Active rules", "监控规则")} · {rules.length}</div><div className="rowlist">
-          {rules.map((rule) => <div key={rule.id} className="r monitor-rule-row"><span><b>{rule.name}</b><small>{describeRule(rule, locale)}</small></span><span className="monitor-actions"><form action={toggleRule}><input type="hidden" name="id" value={rule.id} /><button className={`chip ${rule.active ? "acc" : "gray"}`}>{rule.active ? tr(locale, "active", "启用") : tr(locale, "paused", "暂停")}</button></form><form action={deleteRule}><input type="hidden" name="id" value={rule.id} /><button className="iconbtn" title={tr(locale, "Delete", "删除")}>✕</button></form></span></div>)}
+          {rules.map((rule) => <div key={rule.id} className="r monitor-rule-row"><span><b>{localeSafeText(rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><small>{describeRule(rule, locale)}</small></span><span className="monitor-actions"><form action={toggleRule}><input type="hidden" name="id" value={rule.id} /><button className={`chip ${rule.active ? "acc" : "gray"}`}>{rule.active ? tr(locale, "active", "启用") : tr(locale, "paused", "暂停")}</button></form><form action={deleteRule}><input type="hidden" name="id" value={rule.id} /><button className="iconbtn" title={tr(locale, "Delete", "删除")}>✕</button></form></span></div>)}
           {rules.length === 0 && <div className="r monitor-empty">{tr(locale, "No monitoring rules yet.", "尚未创建监控规则。")}</div>}
         </div></div>
         <div><div className="section-t">{tr(locale, "Recent triggers", "近期触发")} · {events.length}</div><div className="feed">
-          {events.map((event) => <div key={event.id} className="fcard"><div className="top"><b>{event.rule.name}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{event.message}</div>{(event.targetId || event.assetTicker) && <Link href={event.targetId ? `/research/${event.targetId}` : `/asset/${event.assetTicker}`} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>)}
+          {events.map((event) => <div key={event.id} className="fcard"><div className="top"><b>{localeSafeText(event.rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{alertMessage(event)}</div>{(event.targetId || event.assetTicker) && <Link href={event.targetId ? `/research/${event.targetId}` : `/asset/${event.assetTicker}`} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>)}
           {events.length === 0 && <p className="mono monitor-empty">{tr(locale, "No triggers yet.", "尚未触发提醒。")}</p>}
         </div></div>
       </section>

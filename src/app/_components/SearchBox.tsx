@@ -40,7 +40,7 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&locale=${encodeURIComponent(locale)}`, { signal: controller.signal });
         const data = response.ok ? await response.json() as { results?: Result[] } : {};
         setResults(data.results ?? []);
         setActive(0);
@@ -55,7 +55,7 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [q]);
+  }, [q, locale]);
 
   const choose = (result?: Result) => {
     if (result) router.push(result.href);

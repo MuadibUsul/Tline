@@ -11,7 +11,9 @@ async function main() {
   const articleId = arg("id");
   const limit = Math.max(1, Number(arg("limit") || 20));
   const articles = await prisma.article.findMany({
-    where: articleId ? { id: articleId, rawText: { not: null } } : { rawText: { not: null } },
+    where: articleId
+      ? { id: articleId, rawText: { not: null } }
+      : { rawText: { not: null }, documents: { none: { kind: "original_pdf", locale: "en", status: "ready" } } },
     select: { id: true, title: true },
     orderBy: { publishedAt: "desc" },
     take: limit,

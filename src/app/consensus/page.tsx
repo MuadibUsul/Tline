@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { computeConsensus } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
+import { assetName, domainTerm, getLocale, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
@@ -28,8 +28,8 @@ export default async function ConsensusPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.ticker}>
-                  <td className="inst"><Link href={`/consensus/${r.ticker}`}>{r.name}</Link></td>
-                  <td className="mono-cell" style={{ color: "var(--muted)" }}>{r.cls}</td>
+                  <td className="inst"><Link href={`/consensus/${r.ticker}`}>{assetName(r.name, locale, r.ticker)}</Link></td>
+                  <td className="mono-cell" style={{ color: "var(--muted)" }}>{domainTerm(r.cls, locale)}</td>
                   <td className="mono-cell" style={{ fontWeight: 700, color: TONE[r.tone] }}>{r.score}</td>
                   <td><span className={`chip ${r.tone}`}>{r.tone === "bull" ? tr(locale, r.label, "看多") : r.tone === "bear" ? tr(locale, r.label, "看空") : tr(locale, r.label, "中性")}</span></td>
                   <td className="mono-cell">{r.n}</td>

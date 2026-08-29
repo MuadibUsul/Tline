@@ -13,8 +13,8 @@ function browserExecutable() {
   return candidates.find((candidate) => candidate && existsSync(candidate));
 }
 
-const BLOCKED_PAGE = /captcha|verify you are human|access denied|unusual traffic|enable cookies to continue|sign in to continue|log in to continue|subscription required/i;
-const CONSENT_GATE = /view as guest|these cookies are necessary for the website to function|confirm.{0,80}professional investor/i;
+const BLOCKED_PAGE = /captcha|verify you are human|access denied|unusual traffic|enable cookies to continue|sign in to continue|log in to continue|subscription required|we are sorry an error has occurred|unable to authorize your request/i;
+const CONSENT_GATE = /view as guest|these cookies are necessary for the website to function|confirm.{0,120}professional investor|i am a professional investor/i;
 const renderReasons = new Map<string, string>();
 
 export function lastRenderReason(url: string): string | undefined {
@@ -30,6 +30,27 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
   try {
     const context = await browser.newContext({ userAgent: UA });
     const page = await context.newPage();
+    const origin = new URL(url).origin;
+    const publicJson: string[] = [];
+    const captures: Promise<void>[] = [];
+    let capturedBytes = 0;
+    page.on("response", (response) => {
+      const capture = (async () => {
+        try {
+          const target = new URL(response.url());
+          const type = response.request().resourceType();
+          const contentType = response.headers()["content-type"] || "";
+          const length = Number(response.headers()["content-length"] || 0);
+          if (target.origin !== origin || !["xhr", "fetch"].includes(type) || !/json/i.test(contentType) || length > 1_000_000 || publicJson.length >= 12 || capturedBytes >= 4_000_000) return;
+          const body = await response.text();
+          if (!body.trim() || body.length > 1_000_000 || capturedBytes + body.length > 4_000_000) return;
+          JSON.parse(body);
+          capturedBytes += body.length;
+          publicJson.push(body.replace(/</g, "\\u003c"));
+        } catch { /* not a usable public JSON response */ }
+      })();
+      captures.push(capture);
+    });
     await page.route("**/*", async (route) => {
       const type = route.request().resourceType();
       if (["image", "media", "font"].includes(type)) await route.abort();
@@ -40,6 +61,7 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
     // that keep analytics connections open indefinitely.
     await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
     await page.waitForTimeout(800);
+    await Promise.allSettled(captures);
     const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 4000);
     if (BLOCKED_PAGE.test(visible) || BLOCKED_PAGE.test(await page.title())) {
       renderReasons.set(url, "access wall or human verification");
@@ -49,7 +71,10 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
       renderReasons.set(url, "interactive consent or guest-access gate");
       return null;
     }
-    return await page.content();
+    const html = await page.content();
+    if (publicJson.length === 0) return html;
+    const state = publicJson.map((body) => `<script type="application/json" data-public-response>${body}</script>`).join("");
+    return html.includes("</body>") ? html.replace("</body>", `${state}</body>`) : `${html}${state}`;
   } catch {
     renderReasons.set(url, "public page rendering failed");
     return null;

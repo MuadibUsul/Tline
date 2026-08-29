@@ -54,6 +54,8 @@ npm run ingest:probe -- --sample=3 --render --output=data/crawl-probe.json
 
 `ready` means at least one sampled candidate passed date, full-body and research-topic gates; `empty` is a discovery/content mismatch; `paused` is a current robots/access/render gate; `refused` is a runtime Disallow. The report does not write articles or mutate source status.
 
+Probe output is never consumed by the scheduler. After acceptance, persist every stable entry point and filter in `data/institutions.json` or `src/lib/ingest/sourceRules.ts`, add a regression test, seed the registry, and rerun the probe once. Runtime ingestion must remain deterministic without an LLM/API token; model keys are used only by the separate parse/translation stages.
+
 ## Documents and backups
 
 `document-storage` is private and must never be published by the web server. Downloads pass through the permission manager and application route. Native PDFs are rejected when they exceed the configured byte limit, are encrypted, or contain active/embedded content tokens.

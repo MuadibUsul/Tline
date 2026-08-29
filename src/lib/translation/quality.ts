@@ -19,10 +19,7 @@ function multiset(values: string[]) {
 
 function numberTokens(text: string): string[] {
   const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-  const normalized = months.reduce(
-    (value, month, index) => value.replace(new RegExp(`\\b${month}\\b`, "gi"), String(index + 1)),
-    text,
-  );
+  const normalized = text.replace(/(?<!\d)(1[0-2]|0?[1-9])\s*月/g, (_, month: string) => months[Number(month) - 1]);
   return (normalized.match(/(?:[$€£¥]\s*)?[+-]?\d[\d,]*(?:\.\d+)?(?:\s?%|\s?(?:bp|bps|basis points?|个?基点))?/gi) ?? [])
     .map((token) => token.toLowerCase().replace(/\s+/g, "").replace(/,/g, "").replace(/basispoints?|个?基点/g, "bps").replace(/bp$/, "bps"));
 }

@@ -6,9 +6,14 @@ const UA =
   "InstitutionalIntelligenceBot/0.1 (+respectful research aggregator; contact: ops@globalintel.io)";
 const textCacheDir = path.resolve(process.env.HTTP_CACHE_ROOT || path.join(process.cwd(), "data", "cache", "http"));
 const lastStatuses = new Map<string, number>();
+const lastReasons = new Map<string, string>();
 
 export function lastFetchStatus(url: string): number | undefined {
   return lastStatuses.get(url);
+}
+
+export function lastFetchReason(url: string): string | undefined {
+  return lastReasons.get(url);
 }
 
 export interface FetchResult {
@@ -89,9 +94,13 @@ export async function fetchText(url: string, timeoutMs = 15000): Promise<string 
 }
 
 export async function fetchPdf(url: string, timeoutMs = 30000): Promise<Buffer | null> {
+  lastReasons.delete(url);
   const result = await fetchResource(url, timeoutMs);
   if (!result.ok || !result.body || result.body.byteLength > 50 * 1024 * 1024) return null;
-  if (!/pdf/i.test(result.contentType) && !result.body.subarray(0, 1024).includes(Buffer.from("%PDF-"))) return null;
+  if (!/pdf/i.test(result.contentType) && !result.body.subarray(0, 1024).includes(Buffer.from("%PDF-"))) {
+    if (/html/i.test(result.contentType)) lastReasons.set(url, "PDF request returned an HTML access or disclaimer page");
+    return null;
+  }
   return result.body;
 }
 

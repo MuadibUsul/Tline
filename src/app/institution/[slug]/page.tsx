@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getInstitutionView } from "@/lib/queries";
 import { FeedCard, DirChip, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
-import { getLocale, tr } from "@/lib/i18n";
+import { assetName, domainTerm, getLocale, institutionName, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +17,12 @@ export default async function InstitutionPage({ params }: { params: { slug: stri
     <main className="wrap">
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Institution", "机构")}</div>
-        <h1>{inst.name}</h1>
+        <h1>{institutionName(inst.name, locale)}</h1>
         <div className="deltas">
           <span className="stars">{"★".repeat(inst.rating)}{"☆".repeat(5 - inst.rating)}</span>
           <span>{tr(locale, "Authority weight", "权威权重")} <b className="mono">{inst.authorityScore.toFixed(2)}</b></span>
           <span>{tr(locale, "Public views · 30d", "公开观点 · 30天")} <b className="mono">{count30}</b></span>
-          {coverage.length > 0 && <span style={{ color: "var(--faint)" }}>{coverage.join(" · ")}</span>}
+          {coverage.length > 0 && <span style={{ color: "var(--faint)" }}>{coverage.map((item) => domainTerm(item, locale)).join(" · ")}</span>}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <a href={inst.researchUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Research homepage ↗", "研报主页 ↗")}</a>
@@ -45,7 +45,7 @@ export default async function InstitutionPage({ params }: { params: { slug: stri
               <tbody>
                 {views.map((v) => (
                   <tr key={v.ticker}>
-                    <td className="inst"><Link href={`/asset/${v.ticker}`}>{v.name}</Link></td>
+                    <td className="inst"><Link href={`/asset/${v.ticker}`}>{assetName(v.name, locale, v.ticker)}</Link></td>
                     <td><DirChip direction={v.direction} locale={locale} /></td>
                     <td className="mono-cell">{v.target ? `$${v.target.toLocaleString()}` : "—"}</td>
                     <td className="mono-cell">{relTime(v.when, locale)}</td>

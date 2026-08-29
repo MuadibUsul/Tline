@@ -35,7 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="topbar">
           <div className="wrap inner">
             <Link href="/" className="brand">
-              <span className="glyph">II</span> <span className="brand-name">Institutional&nbsp;Intelligence</span>
+              <span className="glyph">II</span> <span className="brand-name">{tr(locale, "Institutional Intelligence", "全球机构情报")}</span>
             </Link>
             <nav className="nav">
               <Link href="/">{tr(locale, "Home", "首页")}</Link>

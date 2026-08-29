@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { ASSETS } from "./assets";
+import { assetName, domainTerm, institutionName, localizeChineseContent, type Locale } from "./i18n";
 
 export type SearchResultKind = "institution" | "asset" | "article";
 
@@ -159,10 +160,10 @@ function snippet(values: Array<string | null | undefined>, query: string) {
   return `${start ? "…" : ""}${excerpt}${start + 190 < text.length ? "…" : ""}`;
 }
 
-export async function searchSite(query: string, limit = 12): Promise<SearchResult[]> {
+export async function searchSite(query: string, limit = 12, locale: Locale = "en"): Promise<SearchResult[]> {
   const q = query.trim().slice(0, 120);
   if (normalizeSearchText(q).length < 2) return [];
-  const useChinese = /\p{Script=Han}/u.test(q);
+  const useChinese = locale === "zh-CN";
 
   const [institutions, assets, articles] = await Promise.all([
     prisma.institution.findMany({
@@ -193,7 +194,7 @@ export async function searchSite(query: string, limit = 12): Promise<SearchResul
       result: {
         id: institution.id,
         kind: "institution" as const,
-        title: institution.name,
+        title: institutionName(institution.name, locale),
         subtitle: [institution.country, `${institution._count.articles} ${useChinese ? "篇研报" : "reports"}`].filter(Boolean).join(" · "),
         href: `/institution/${institution.slug}`,
       },
@@ -205,8 +206,8 @@ export async function searchSite(query: string, limit = 12): Promise<SearchResul
         result: {
           id: asset.id,
           kind: "asset" as const,
-          title: `${asset.name} · ${asset.ticker}`,
-          subtitle: `${asset.assetClass} · ${asset._count.articleAssets} ${useChinese ? "篇相关研报" : "related reports"}`,
+          title: `${assetName(asset.name, locale, asset.ticker)} · ${asset.ticker}`,
+          subtitle: `${domainTerm(asset.assetClass, locale)} · ${asset._count.articleAssets} ${useChinese ? "篇相关研报" : "related reports"}`,
           href: `/asset/${asset.ticker}`,
         },
         primary: [asset.name, asset.ticker],
@@ -215,7 +216,7 @@ export async function searchSite(query: string, limit = 12): Promise<SearchResul
     }),
     ...articles.map((article) => {
       const translation = article.translations[0];
-      const title = useChinese && translation?.title ? translation.title : article.title;
+      const title = useChinese ? localizeChineseContent(translation?.title ?? "中文译文待处理") : article.title;
       const assetTerms = article.articleAssets.flatMap(({ asset }) => [
         asset.name,
         asset.ticker,
@@ -228,7 +229,7 @@ export async function searchSite(query: string, limit = 12): Promise<SearchResul
           id: article.id,
           kind: "article" as const,
           title,
-          subtitle: article.institution.name,
+          subtitle: institutionName(article.institution.name, locale),
           snippet: snippet(useChinese
             ? [...article.atomicViews.map((view) => view.viewZh), article.analysis?.summaryZh, translation?.text, translation?.title, article.analysis?.summary, article.rawText]
             : [...article.atomicViews.map((view) => view.viewEn), article.analysis?.summary, article.rawText, translation?.text], q),

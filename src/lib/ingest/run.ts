@@ -1,23 +1,26 @@
 import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
-import { fetchPdf, fetchText, lastFetchStatus, sleep } from "./fetch";
-import { extractLinks, extractArticle, extractFeedLinks, extractPdfCandidates, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
+import { extractLinks, extractArticle, extractFeedLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
 import { extractPdf } from "../documents/extractPdf";
-import { generateArticleDocuments, saveNativePdf } from "../documents/pdf";
+import { saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
+import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
 
 // Usage:
 //   npm run ingest                 -> priority-1 institutions (allowed/delayed only)
 //   npm run ingest -- --slug=ubs   -> one institution
 //   npm run ingest -- --all        -> every crawlable institution
 //   npm run ingest -- --limit=3    -> cap articles per institution
+//   npm run ingest -- --scan-limit=60 --pages=3 -> inspect deeper current-month listings
+//   npm run ingest -- --source-seconds=180 --render-limit=4 -> bound slow public rendering
 //   npm run ingest -- --all --resume-minutes=60 -> skip sources completed in the last hour
 
 function arg(name: string): string | undefined {
@@ -31,8 +34,13 @@ const UA = "InstitutionalIntelligenceBot";
 const MIN_DELAY_MS = 1000; // politeness floor even when robots is silent
 
 async function ingestInstitution(
-  inst: { id: string; name: string; researchUrl: string; rssUrl: string | null; sitemapUrl: string | null; language: string; crawlDelay: number | null; requiresRender: boolean },
+  inst: { id: string; slug: string; name: string; researchUrl: string; rssUrl: string | null; sitemapUrl: string | null; language: string; crawlDelay: number | null; requiresRender: boolean },
   perLimit: number,
+  scanLimit: number,
+  since: Date,
+  maxPages: number,
+  sourceSeconds: number,
+  renderLimit: number,
 ) {
   await prisma.institution.update({
     where: { id: inst.id },
@@ -50,6 +58,9 @@ async function ingestInstitution(
     return created;
   };
   const origin = new URL(inst.researchUrl).origin;
+  const sourceListings = listingUrls(inst.slug, inst.researchUrl).filter((url) => new URL(url).origin === origin);
+  const deadline = Date.now() + sourceSeconds * 1000;
+  const withinBudget = () => Date.now() < deadline;
 
   // --- Runtime robots.txt compliance check (authoritative) ---
   const robotsTxt = await fetchRobots(origin);
@@ -73,20 +84,31 @@ async function ingestInstitution(
     }
   };
   let accessReason: string | undefined;
+  let renderedCandidates = 0;
   const renderPublic = async (url: string) => {
+    if (url !== inst.researchUrl && renderedCandidates >= renderLimit) return null;
+    if (!withinBudget()) return null;
+    if (url !== inst.researchUrl) renderedCandidates++;
     const html = await renderHtml(url);
     accessReason ??= lastRenderReason(url);
     return html;
   };
+  const readArticle = (html: string) => {
+    const article = extractArticle(html);
+    if (isAccessGateText(article.text)) accessReason ??= "interactive consent or guest-access gate";
+    return article;
+  };
 
-  let created = 0, dup = 0, empty = 0, blocked = 0, nativeRejected = 0;
+  let created = 0, dup = 0, empty = 0, outOfWindow = 0, blocked = 0, nativeRejected = 0;
   const raws: RawArticle[] = [];
   const nativePdfs = new Map<string, Buffer>();
   const seenCandidates = new Set<string>();
   let listingHtml: string | null = null;
-  const candidateLimit = Math.min(40, Math.max(3, perLimit * 3));
+  const candidateLimit = Math.min(500, Math.max(perLimit * 3, scanLimit));
   const stage = (raw: RawArticle) => {
     if (isNaN(raw.publishedAt.getTime()) || raw.publishedAt.getTime() > Date.now() + 864e5) { empty++; return false; }
+    if (raw.publishedAt < since) { outOfWindow++; return false; }
+    if (!articleAllowed(inst.slug, raw.title, raw.text)) { empty++; return false; }
     if (raw.strict && (!looksLikeArticle(raw.title, raw.text) || !looksLikeResearchTopic(raw.title, raw.text))) { empty++; return false; }
     raws.push(raw);
     return true;
@@ -105,12 +127,12 @@ async function ingestInstitution(
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
     let staged = false;
     for (const pdfCandidate of extractPdfCandidates(html, pageUrl).slice(0, candidateLimit)) {
-      if (raws.length >= perLimit) break;
+      if (raws.length >= perLimit || !withinBudget()) break;
       const pdfUrl = pdfCandidate.url;
       if (!allowsUrl(pdfUrl) || await skipCandidate(pdfUrl)) continue;
       await sleep(delayMs);
       const pdf = await fetchPdf(pdfUrl);
-      if (!pdf) continue;
+      if (!pdf) { accessReason ??= lastFetchReason(pdfUrl); continue; }
       try {
         const extracted = await extractPdf(pdf);
         const date = pdfCandidate.publishedAt || inferPublicationDate(pdfUrl, extracted.text.slice(0, 1000)) || publishedAt || inferPublicationDate(pageUrl, title);
@@ -148,23 +170,37 @@ async function ingestInstitution(
   const feedUrls: string[] = [];
   if (inst.rssUrl && allowsUrl(inst.rssUrl)) feedUrls.push(inst.rssUrl);
   if (feedUrls.length === 0) {
-    listingHtml = await fetchText(inst.researchUrl);
-    if (listingHtml) feedUrls.push(...extractFeedLinks(listingHtml, inst.researchUrl).filter(allowsUrl));
+    for (const listingUrl of sourceListings) {
+      const html = await fetchText(listingUrl);
+      if (listingUrl === inst.researchUrl) listingHtml = html;
+      if (html) feedUrls.push(...extractFeedLinks(html, listingUrl).filter(allowsUrl));
+      if (feedUrls.length) break;
+    }
   }
   for (const feedUrl of feedUrls) {
     try {
       await sleep(delayMs);
       const feedXml = await fetchText(feedUrl);
       if (!feedXml) continue;
-      const feed = await rss.parseString(feedXml);
+      let feed;
+      try {
+        feed = await rss.parseString(feedXml);
+      } catch {
+        for (const nested of extractFeedLinks(feedXml, feedUrl)) {
+          if (allowsUrl(nested) && !feedUrls.includes(nested) && feedUrls.length < 12) feedUrls.push(nested);
+        }
+        continue;
+      }
       for (const item of (feed.items || []).slice(0, candidateLimit)) {
-        if (raws.length >= perLimit) break;
-        if (!item.link || !allowsUrl(item.link)) continue;
+        if (raws.length >= perLimit || !withinBudget()) break;
+        if (!item.link || !allowsUrl(item.link) || !candidateAllowed(inst.slug, item.link)) continue;
         if (await skipCandidate(item.link)) continue;
+        const feedDate = (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
+        if (feedDate && !isNaN(feedDate.getTime()) && feedDate < since) { outOfWindow++; continue; }
         await sleep(delayMs);
         if (/\.pdf(?:$|\?)/i.test(item.link)) {
           const pdf = await fetchPdf(item.link);
-          if (!pdf) continue;
+          if (!pdf) { accessReason ??= lastFetchReason(item.link); continue; }
           const extracted = await extractPdf(pdf);
           const publishedAt = (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
           if (!publishedAt || isNaN(publishedAt.getTime())) { empty++; continue; }
@@ -184,12 +220,12 @@ async function ingestInstitution(
         let html = await fetchText(item.link);
         if (!html) html = await renderPublic(item.link);
         if (!html) continue;
-        let article = extractArticle(html);
+        let article = readArticle(html);
         if (article.text.length < 700) {
           const rendered = await renderPublic(item.link);
           if (rendered) {
             html = rendered;
-            article = extractArticle(rendered);
+            article = readArticle(rendered);
           }
         }
         const publishedAt = article.publishedAt || (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
@@ -208,7 +244,7 @@ async function ingestInstitution(
   }
 
   // 2) Sitemap/Sitemap Index discovery, including native research PDFs.
-  if (raws.length < perLimit) {
+  if (raws.length < perLimit && sitemapEnabled(inst.slug)) {
     const sitemapSeeds = [
       ...robotsSitemaps(robotsTxt),
       ...(inst.sitemapUrl ? [inst.sitemapUrl] : []),
@@ -216,16 +252,17 @@ async function ingestInstitution(
     ];
     const candidates = await discoverFromSitemaps(sitemapSeeds, inst.researchUrl, {
       limit: candidateLimit,
+      since,
       allows: allowsUrl,
     });
-    for (const candidate of candidates) {
-      if (raws.length >= perLimit) break;
+    for (const candidate of candidates.filter((item) => candidateAllowed(inst.slug, item.url))) {
+      if (raws.length >= perLimit || !withinBudget()) break;
       if (!allowsUrl(candidate.url)) { blocked++; continue; }
       if (await skipCandidate(candidate.url)) continue;
       await sleep(delayMs);
       if (/\.pdf(?:$|\?)/i.test(candidate.url)) {
         const pdf = await fetchPdf(candidate.url);
-        if (!pdf) continue;
+        if (!pdf) { accessReason ??= lastFetchReason(candidate.url); continue; }
         try {
           const extracted = await extractPdf(pdf);
           const filename = decodeURIComponent(new URL(candidate.url).pathname.split("/").pop() || "Research report")
@@ -251,12 +288,12 @@ async function ingestInstitution(
         let artHtml = await fetchText(candidate.url);
         if (!artHtml) artHtml = await renderPublic(candidate.url);
         if (!artHtml) continue;
-        let article = extractArticle(artHtml);
+        let article = readArticle(artHtml);
         if (article.text.length < 700) {
           const rendered = await renderPublic(candidate.url);
           if (rendered) {
             artHtml = rendered;
-            article = extractArticle(rendered);
+            article = readArticle(rendered);
           }
         }
         const publishedAt = inferPublicationDate(candidate.url, article.title, article.publicationDateText, article.text.slice(0, 1200)) || article.publishedAt || candidate.lastModified;
@@ -277,30 +314,40 @@ async function ingestInstitution(
     }
   }
 
-  // 3) HTML listing → per-article extraction, each URL robots-checked.
+  // 3) HTML listings and explicit pagination → per-article extraction.
   {
     const beforeListing = raws.length;
-    let listHtml = listingHtml ?? await fetchText(inst.researchUrl);
-    let links = listHtml ? extractLinks(listHtml, inst.researchUrl) : [];
-    if (links.length === 0) {
-      listHtml = await renderPublic(inst.researchUrl);
-      links = listHtml ? extractLinks(listHtml, inst.researchUrl) : [];
-    }
-    if (listHtml) {
+    const pages = [...sourceListings];
+    const visitedPages = new Set<string>();
+    while (pages.length && visitedPages.size < maxPages && raws.length < perLimit && withinBudget()) {
+      const pageUrl = pages.shift()!;
+      if (visitedPages.has(pageUrl) || !allowsUrl(pageUrl)) continue;
+      visitedPages.add(pageUrl);
+      let listHtml = pageUrl === inst.researchUrl ? listingHtml ?? await fetchText(pageUrl) : await fetchText(pageUrl);
+      let links = listHtml ? extractLinks(listHtml, pageUrl, candidateLimit).filter((link) => candidateAllowed(inst.slug, link.url)) : [];
+      if (links.length === 0) {
+        const rendered = await renderPublic(pageUrl);
+        if (rendered) {
+          listHtml = rendered;
+          links = extractLinks(rendered, pageUrl, candidateLimit).filter((link) => candidateAllowed(inst.slug, link.url));
+        }
+      }
+      if (!listHtml) continue;
       for (const link of links.slice(0, candidateLimit)) {
-        if (raws.length >= perLimit) break;
+        if (raws.length >= perLimit || !withinBudget()) break;
         if (!allowsUrl(link.url)) { blocked++; continue; }
         if (await skipCandidate(link.url)) continue;
+        if (link.publishedAt && link.publishedAt < since) { outOfWindow++; continue; }
         await sleep(delayMs);
         let artHtml = await fetchText(link.url);
         if (!artHtml) artHtml = await renderPublic(link.url);
         if (!artHtml) continue;
-        let a = extractArticle(artHtml);
+        let a = readArticle(artHtml);
         if (a.text.length < 700) {
           const rendered = await renderPublic(link.url);
           if (rendered) {
             artHtml = rendered;
-            a = extractArticle(rendered);
+            a = readArticle(rendered);
           }
         }
         const publishedAt = inferPublicationDate(link.url, a.title || link.title, a.publicationDateText, a.text.slice(0, 1200)) || a.publishedAt || link.publishedAt;
@@ -318,16 +365,20 @@ async function ingestInstitution(
           strict: true, // HTML-extracted → enforce the full article check
         });
       }
-      if (links.length === 0 && raws.length === beforeListing) {
-        const listing = extractArticle(listHtml);
-        await stageEmbeddedPdf(listHtml, inst.researchUrl, listing.title, listing.publishedAt);
+      if (raws.length < perLimit) {
+        const listing = readArticle(listHtml);
+        await stageEmbeddedPdf(listHtml, pageUrl, listing.title, listing.publishedAt);
+      }
+      for (const next of extractPaginationLinks(listHtml, pageUrl, pageUrl)) {
+        if (!visitedPages.has(next) && allowsUrl(next)) pages.push(next);
       }
     }
+    if (raws.length === beforeListing && visitedPages.size === 0) empty++;
   }
 
   const selectedRaws = newestByPublication(raws, perLimit);
   for (const r of selectedRaws) {
-    const res = await persistArticle(inst.id, inst.name, r);
+    const res = await persistArticle(inst.id, r);
     if (res === "created") {
       created++;
       const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
@@ -340,18 +391,11 @@ async function ingestInstitution(
           console.warn(`  native PDF rejected for ${r.sourceUrl}: ${String(error)}`);
         }
       }
-      if (article) {
-        try {
-          await generateArticleDocuments(article.id);
-        } catch (error) {
-          console.error(`  document generation failed for ${r.sourceUrl}`, error);
-        }
-      }
     }
     else if (res === "duplicate") dup++;
     else empty++;
   }
-  const note = `delay ${delayMs}ms${robotsDelaySec ? " (robots)" : ""}${blocked ? ` · ${blocked} url blocked` : ""}${nativeRejected ? ` · ${nativeRejected} native PDF rejected` : ""}`;
+  const note = `since ${since.toISOString().slice(0, 10)} · delay ${delayMs}ms${robotsDelaySec ? " (robots)" : ""} · ${renderedCandidates}/${renderLimit} rendered${!withinBudget() ? " · time budget reached" : ""}${outOfWindow ? ` · ${outOfWindow} older` : ""}${blocked ? ` · ${blocked} url blocked` : ""}${nativeRejected ? ` · ${nativeRejected} native PDF rejected` : ""}`;
   console.log(`  ${inst.name.padEnd(26)} +${created} created · ${dup} dup · ${empty} empty · ${note}`);
   console.log(JSON.stringify({
     event: "ingest.source.complete",
@@ -361,6 +405,7 @@ async function ingestInstitution(
     created,
     duplicate: dup,
     empty,
+    outOfWindow,
     robotsBlocked: blocked,
     nativePdfRejected: nativeRejected,
     delayMs,
@@ -375,6 +420,9 @@ async function ingestInstitution(
   if (raws.length === 0 && dup > 0) {
     return finish("succeeded", `source reachable · ${dup} known article${dup === 1 ? "" : "s"} · no new article selected`, created);
   }
+  if (raws.length === 0 && outOfWindow > 0) {
+    return finish("succeeded", `source reachable · ${outOfWindow} article${outOfWindow === 1 ? "" : "s"} older than current-month window · no new article selected`, created);
+  }
   if (raws.length === 0) {
     return finish("empty", `no candidate passed full-body/date/topic gates · ${dup} duplicate · ${empty} rejected · ${blocked} blocked`, created);
   }
@@ -384,6 +432,13 @@ async function ingestInstitution(
 async function executeIngest() {
   await ensureAssets();
   const perLimit = Number(arg("limit") || 6);
+  const scanLimit = Math.max(perLimit * 3, Number(arg("scan-limit") || 60));
+  const maxPages = Math.min(10, Math.max(1, Number(arg("pages") || 3)));
+  const sourceSeconds = Math.min(600, Math.max(30, Number(arg("source-seconds") || 180)));
+  const renderLimit = Math.min(20, Math.max(0, Number(arg("render-limit") || 4)));
+  const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+  const requestedSince = arg("since") ? new Date(arg("since")!) : monthStart;
+  const since = !isNaN(requestedSince.getTime()) && requestedSince > monthStart ? requestedSince : monthStart;
   const slug = arg("slug");
   const resumeMinutes = Math.max(0, Number(arg("resume-minutes") || 0));
 
@@ -405,7 +460,7 @@ async function executeIngest() {
   const institutions = await prisma.institution.findMany({
     where,
     orderBy: { priority: "asc" },
-    select: { id: true, name: true, researchUrl: true, rssUrl: true, sitemapUrl: true, language: true, crawlDelay: true, requiresRender: true },
+    select: { id: true, slug: true, name: true, researchUrl: true, rssUrl: true, sitemapUrl: true, language: true, crawlDelay: true, requiresRender: true },
   });
 
   if (slug) {
@@ -420,12 +475,12 @@ async function executeIngest() {
     }
   }
 
-  console.log(`Ingesting ${institutions.length} compliant institution(s), up to ${perLimit} articles each…`);
+  console.log(`Ingesting ${institutions.length} compliant institution(s), up to ${perLimit} current-month articles each (scan ${scanLimit}, pages ${maxPages})…`);
   let total = 0;
   let failedSources = 0;
   for (const inst of institutions) {
     try {
-      total += await ingestInstitution(inst, perLimit);
+      total += await ingestInstitution(inst, perLimit, scanLimit, since, maxPages, sourceSeconds, renderLimit);
     } catch (error) {
       failedSources++;
       await prisma.institution.update({
@@ -442,7 +497,7 @@ async function executeIngest() {
 }
 
 async function main() {
-  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), all: flag("all"), resumeMinutes: Number(arg("resume-minutes") || 0) };
+  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), scanLimit: Number(arg("scan-limit") || 60), pages: Number(arg("pages") || 3), sourceSeconds: Number(arg("source-seconds") || 180), renderLimit: Number(arg("render-limit") || 4), since: arg("since") ?? "current-month", all: flag("all"), resumeMinutes: Number(arg("resume-minutes") || 0) };
   await runTrackedJob("ingest", parameters, async () => {
     const metrics = await executeIngest();
     return { result: undefined, metrics };

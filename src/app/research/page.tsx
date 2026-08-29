@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ResearchCard } from "@/app/_components/ui";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
+import { assetName, getLocale, institutionName, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -58,11 +58,11 @@ export default async function ResearchIndex({
         <form className="research-filters">
           <select name="institution" defaultValue={searchParams.institution ?? ""} aria-label={tr(locale, "Institution", "机构")}>
             <option value="">{tr(locale, "All institutions", "全部机构")}</option>
-            {institutions.map((institution) => <option key={institution.slug} value={institution.slug}>{institution.name}</option>)}
+            {institutions.map((institution) => <option key={institution.slug} value={institution.slug}>{institutionName(institution.name, locale)}</option>)}
           </select>
           <select name="ticker" defaultValue={searchParams.ticker ?? ""} aria-label={tr(locale, "Asset", "资产")}>
             <option value="">{tr(locale, "All assets", "全部资产")}</option>
-            {assets.map((asset) => <option key={asset.ticker} value={asset.ticker}>{asset.name} · {asset.ticker}</option>)}
+            {assets.map((asset) => <option key={asset.ticker} value={asset.ticker}>{assetName(asset.name, locale, asset.ticker)} · {asset.ticker}</option>)}
           </select>
           <select name="direction" defaultValue={searchParams.direction ?? ""} aria-label={tr(locale, "Direction", "方向")}>
             <option value="">{tr(locale, "All asset-view directions", "全部资产观点方向")}</option>

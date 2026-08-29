@@ -84,14 +84,14 @@ flowchart LR
 
 ### 5.1 来源注册表
 
-`data/institutions.json` 是机构基础信息的源，后续按需增加：
+`data/institutions.json` 是机构基础信息与稳定入口（如 RSS）的源。通用提取不能表达的少量已验收差异固化在 `src/lib/ingest/sourceRules.ts`：额外列表入口、候选路径、正文拒绝条件和是否使用 sitemap。
 
 - `rssUrl`、`sitemapUrl`
 - `includePaths`、`excludePaths`
 - `requiresRender`
 - 可选的 `listingSelector`、`articleSelector`
 
-这些字段通过 `prisma/seed.ts` 写入 `Institution`。只有通用配置不能解决的来源才在 `src/lib/ingest/adapters/` 增加代码适配器。
+这些字段通过 `prisma/seed.ts` 写入 `Institution`。站点验收只负责发现规则，生产调度只读取已提交的配置、通用解析器和 `sourceRules.ts`，不在每次运行时调用 LLM 或人工探站。每个新增例外必须同时提交回归测试；需要执行、点击或重写响应的站点才增加独立适配器。
 
 ### 5.2 URL 发现能力阶梯
 
@@ -145,6 +145,8 @@ Playwright 仅用于正常呈现公开 JS 页面：
 - `Institution.lastCrawl*`：记录 `running/succeeded/empty/paused/refused/failed`，零候选不再伪装成成功。
 - `JobRun`：记录一次全局任务的参数、尝试、耗时、结果指标和错误。
 - `GET /api/health`：返回数据库、存储、来源状态分布、24 小时内成功数和最近一次 ingest 结果。
+
+`ingest:probe` 只用于首次接入、规则变更和故障验收，不能成为 scheduler 的发现依赖。正式采集默认把时间窗口硬限制在当月月初之后；历史内容不主动回溯，已入库正文永久积累。抓取只写英文事实源与 segments，结构化、翻译和 PDF 由 scheduler 后续独立命令处理，任何模型故障都不会阻塞采集。
 
 只有在单轮采集超过调度周期、需要多机并发与分布式锁、采集与产品团队独立发布，或外部消费者需要稳定的数据事件接口时再拆 Worker/队列。届时上述模块边界可直接迁出，无需改前端事实模型。
 
@@ -419,10 +421,11 @@ function can(user: User | null, permission: Permission): boolean;
 
 ### 8.3 重解析与重译
 
-`npm run reparse` 扫描 `rawText IS NOT NULL` 且满足任一条件的文章：
+`npm run reparse` 默认只扫描 `rawText IS NOT NULL` 且缺少 Analysis 的文章；`npm run translate` 默认只扫描缺少中文译文的文章。`needs_review` 不会在每轮 scheduler 中无限消耗模型额度，需要人工确认后用 `--retry-review` 重试；`--all` 用于明确的全量版本升级。
 
-- `reviewStatus = needs_review`
-- `model/promptVersion` 旧于当前解析器版本
+- 缺少解析/翻译结果：进入默认队列。
+- `needs_review`：保留并等待显式重试或人工复核。
+- `model/promptVersion` 旧于当前版本：版本升级时用 `--all` 重建。
 
 重解析只更新 Analysis 和 ArticleAsset，不修改来源正文。译文的 Provider、模型、提示词或术语库版本落后时，独立进入重译任务。开发数据库可丢弃，因此首次接通新链路后直接重建，不为旧数据编写一次性迁移逻辑。
 

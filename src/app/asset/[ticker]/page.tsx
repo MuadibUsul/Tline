@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getAssetView, getAssetTimeline } from "@/lib/queries";
 import { FeedCard, DirChip, Delta, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
-import { getLocale, tr } from "@/lib/i18n";
+import { assetName, domainTerm, getLocale, institutionName, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +18,8 @@ export default async function AssetPage({ params }: { params: { ticker: string }
   return (
     <main className="wrap">
       <div className="page-head">
-        <div className="eyebrow">{tr(locale, "Institutional Consensus · last 24h", "机构共识 · 最近24小时")} · {asset.assetClass}</div>
-        <h1>{asset.name}</h1>
+        <div className="eyebrow">{tr(locale, "Institutional Consensus · last 24h", "机构共识 · 最近24小时")} · {domainTerm(asset.assetClass, locale)}</div>
+        <h1>{assetName(asset.name, locale, asset.ticker)}</h1>
         {consensus ? <>
           <div className="big-score">
             <span className="num" style={{ color: toneColor }}>{consensus.score}</span>
@@ -49,7 +49,7 @@ export default async function AssetPage({ params }: { params: { ticker: string }
             <tbody>
               {consensus.contributors.map((c, i) => (
                 <tr key={i}>
-                  <td className="inst"><Link href={`/institution/${c.slug}`}>{c.institutionName}</Link></td>
+                  <td className="inst"><Link href={`/institution/${c.slug}`}>{institutionName(c.institutionName, locale)}</Link></td>
                   <td><DirChip direction={c.direction} locale={locale} showLabel={false} /></td>
                   <td className="mono-cell">{c.target ? `$${c.target.toLocaleString()}` : "—"}</td>
                   <td className="mono-cell" style={{ color: "var(--faint)" }}>{c.previousTarget ? `$${c.previousTarget.toLocaleString()}` : "—"}</td>
@@ -67,7 +67,7 @@ export default async function AssetPage({ params }: { params: { ticker: string }
           <div className="changes">
             {timeline.map((t) => (
               <div key={t.slug} className="chg">
-                <Link href={`/institution/${t.slug}`} className="chg-inst">{t.institution}</Link>
+                <Link href={`/institution/${t.slug}`} className="chg-inst">{institutionName(t.institution, locale)}</Link>
                 <div className="chg-body">
                   {t.hasTargetMove && (
                     <div className="chain">

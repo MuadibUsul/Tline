@@ -78,6 +78,7 @@ class DeepSeekProvider implements LLMProvider {
         ],
         max_tokens: input.maxTokens ?? 1800,
         thinking: { type: "disabled" },
+        response_format: { type: "json_object" },
       }),
       signal: AbortSignal.timeout(120_000),
     });
@@ -108,10 +109,15 @@ export async function completeJSON<T>(
   provider: LLMProvider,
   input: CompletionInput,
 ): Promise<{ value: T; meta: CompletionResult }> {
-  const meta = await provider.complete(input);
-  const match = meta.text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error(`${meta.provider} did not return a JSON object.`);
-  return { value: JSON.parse(match[0]) as T, meta };
+  let meta = await provider.complete(input);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const match = meta.text.match(/\{[\s\S]*\}/);
+    try {
+      if (match) return { value: JSON.parse(match[0]) as T, meta };
+    } catch { /* retry once with an explicit format correction */ }
+    if (attempt === 0) meta = await provider.complete({ ...input, system: `${input.system}\nYour previous response was invalid JSON. Return one syntactically valid JSON object only.` });
+  }
+  throw new Error(`${meta.provider} did not return a valid JSON object.`);
 }
 
 export type { CompletionInput, CompletionResult, LLMProvider } from "./types";

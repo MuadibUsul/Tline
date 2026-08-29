@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractArticle, extractFeedLinks, extractLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
 
 test("extracts an embedded publisher date and conservative URL date hints", () => {
   const article = extractArticle(`<html><head><title>CIO Insights 4Q24 | Bank</title></head><body>
@@ -69,6 +70,45 @@ test("keeps semantic content when body and main class names mention cookie or na
   assert.equal(looksLikeArticle(article.title, article.text), true);
 });
 
+test("keeps research inside layout containers whose class contains promotion", () => {
+  const prose = "High yield credit quality improved as sector concentration fell and issuer demand broadened. ".repeat(30);
+  const article = extractArticle(`<main><article><h1>High Yield's Second Act</h1><div class="grid-container cmp-grid-container--2col-promotion"><div class="cmp-text"><p>${prose}</p></div></div></article></main>`);
+  assert.match(article.text, /credit quality improved/);
+  assert.equal(looksLikeArticle(article.title, article.text), true);
+});
+
+test("keeps research pages wrapped in a publisher ASP.NET form", () => {
+  const prose = "Eurozone growth remained resilient while inflation and monetary policy shaped the market outlook. ".repeat(30);
+  const article = extractArticle(`<main><form id="form1"><div class="main-content"><h1>Eurozone pulls level with the US</h1><p>${prose}</p></div></form></main>`);
+  assert.match(article.text, /Eurozone growth remained resilient/);
+  assert.equal(looksLikeArticle(article.title, article.text), true);
+});
+
+test("recognizes publisher consent copy and excludes author profile links", () => {
+  assert.equal(isAccessGateText("Natixis S.A. and its CIB entities worldwide as the Data Controllers use cookies. You can give or not your consent."), true);
+  const links = extractLinks(`<a href="/author/171022">Read the complete author profile and publications</a><a href="/Site/en/publication/market-outlook-for-global-investors">Market outlook for global institutional investors</a>`, "https://research.example/Site/");
+  assert.deepEqual(links.map((link) => link.url), ["https://research.example/Site/en/publication/market-outlook-for-global-investors"]);
+});
+
+test("applies durable source discovery exceptions", () => {
+  assert.deepEqual(listingUrls("commonwealth", "https://www.commbank.com.au/institutional/economic-insight.html"), [
+    "https://www.commbank.com.au/institutional/economic-insight.html",
+    "https://www.commbank.com.au/articles/newsroom.html",
+  ]);
+  assert.equal(candidateAllowed("commonwealth", "https://www.commbank.com.au/articles/newsroom/2026/08/rates.html"), true);
+  assert.equal(candidateAllowed("commonwealth", "https://www.commbank.com.au/products/rates.html"), false);
+  assert.equal(candidateAllowed("natixis", "https://www.research.natixis.com/author/171022"), false);
+  assert.equal(sitemapEnabled("intesa"), false);
+  assert.equal(sitemapEnabled("kkr"), true);
+  assert.equal(articleAllowed("commonwealth", "Market wrap", "Some of the content presented in this section has been provided by Australian Associated Press (AAP)."), false);
+  assert.equal(articleAllowed("commonwealth", "Rates outlook", "New Commonwealth Bank Economic research forecasts a November rate rise."), true);
+  assert.equal(candidateAllowed("saxo", "https://www.home.saxo/insights/saxostrats-experts"), false);
+  assert.equal(candidateAllowed("saxo", "https://www.home.saxo/content/articles/macro/market-update"), true);
+  assert.equal(candidateAllowed("nab-markets", "https://business.nab.com.au/tag/small-business/founder-story"), false);
+  assert.equal(candidateAllowed("nab-markets", "https://business.nab.com.au/tag/economic-commentary/nab-outlook"), true);
+  assert.equal(articleAllowed("seb", "Investment Outlook Reports", "A report listing"), false);
+});
+
 test("discovers nested article pages and embedded same-origin PDFs", () => {
   const base = "https://bank.example/about/economics/publications.html";
   const html = `<a href="/about/economics/publications/2025/market-review-from-last-year">A sufficiently descriptive older research publication</a>
@@ -86,10 +126,12 @@ test("discovers nested article pages and embedded same-origin PDFs", () => {
 test("discovers same-origin publisher RSS and Atom feeds", () => {
   const html = `<link rel="alternate" type="application/rss+xml" href="/insights/feed.xml">
     <a href="https://bank.example/research/atom.xml">Research feed</a>
+    <div id="RSS"><a title="RSS: Eco Week" href="/RSS/en-US/Eco-Week">Eco Week</a></div>
     <a href="https://feeds.vendor.example/bank.xml">External feed</a>`;
   assert.deepEqual(extractFeedLinks(html, "https://bank.example/research"), [
     "https://bank.example/insights/feed.xml",
     "https://bank.example/research/atom.xml",
+    "https://bank.example/RSS/en-US/Eco-Week",
   ]);
 });
 
@@ -155,4 +197,24 @@ test("selects newest accepted articles after all discovery channels run", () => 
     { title: "recent", publishedAt: new Date("2026-07-10") },
   ], 2);
   assert.deepEqual(selected.map((article) => article.title), ["current", "recent"]);
+});
+
+test("discovers articles and full bodies in public structured JSON", () => {
+  const body = "Growth is slowing while inflation is easing. Bond yields remain volatile and policy normalization will be gradual. ".repeat(12);
+  const html = `<script type="application/ld+json">${JSON.stringify({
+    "@type": "NewsArticle",
+    headline: "Monthly global market outlook for institutional investors",
+    url: "/insights/2026/08/monthly-global-market-outlook",
+    datePublished: "2026-08-27",
+    articleBody: body,
+  })}</script>`;
+  assert.equal(extractLinks(html, "https://bank.example/insights")[0]?.publishedAt?.toISOString().slice(0, 10), "2026-08-27");
+  const article = extractArticle(html);
+  assert.equal(article.title, "Monthly global market outlook for institutional investors");
+  assert.match(article.text, /policy normalization/);
+});
+
+test("follows only explicit same-origin listing pagination", () => {
+  const html = `<a rel="next" href="/insights?page=2">Next</a><a href="https://vendor.example/insights?page=2">Next</a><a href="/careers?page=2">Next</a>`;
+  assert.deepEqual(extractPaginationLinks(html, "https://bank.example/insights?page=1", "https://bank.example/insights"), ["https://bank.example/insights?page=2"]);
 });

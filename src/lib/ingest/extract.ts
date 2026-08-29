@@ -6,8 +6,42 @@ export interface CandidateLink {
   publishedAt: Date | null;
 }
 
+function jsonScripts($: cheerio.CheerioAPI): unknown[] {
+  const values: unknown[] = [];
+  $('script[type="application/ld+json"],script[type="application/json"],script#__NEXT_DATA__').each((_, element) => {
+    const raw = $(element).text().trim();
+    if (!raw || raw.length > 4_000_000) return;
+    try { values.push(JSON.parse(raw)); } catch { /* malformed publisher state */ }
+  });
+  return values;
+}
+
+function walkJson(value: unknown, visit: (record: Record<string, unknown>) => void, budget = { left: 30_000 }) {
+  if (budget.left-- <= 0 || value === null || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const item of value) walkJson(item, visit, budget);
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  visit(record);
+  for (const child of Object.values(record)) walkJson(child, visit, budget);
+}
+
+function firstString(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (value && typeof value === "object") {
+      const nested = value as Record<string, unknown>;
+      const id = nested["@id"] ?? nested.url;
+      if (typeof id === "string" && id.trim()) return id.trim();
+    }
+  }
+  return "";
+}
+
 // URL path segments that are almost never a research article.
-const DENY = /(\/about|\/contact|\/careers?|\/privacy|\/terms|\/cookie|\/sitemap|\/login|\/register|\/subscribe|\/faq|frequently-asked|\/values|\/purpose|\/leadership|foreign-direct|industries-we-serve|global-corporate|\/investors?(?:\/|$)|investors?-shareholders?|shareholder|\/media\/|\/events?|presentations?|modern-slavery|code-of-conduct|\/framework|advisory|\/solutions|\/banking|\/legal|\/disclaimer|\/help|\/support|\/team|\/people|\/awards|\/glossary)/i;
+const DENY = /(\/about|\/contact|\/careers?|\/privacy|\/terms|\/cookie|\/sitemap|\/login|\/register|\/subscribe|\/faq|frequently-asked|\/values|\/purpose|\/leadership|foreign-direct|industries-we-serve|global-corporate|\/investors?(?:\/|$)|investors?-shareholders?|shareholder|\/media\/|\/events?|presentations?|modern-slavery|code-of-conduct|\/framework|advisory|\/solutions|\/banking|\/legal|\/disclaimer|\/disclosures?(?:\/|$)|\/help|\/support|\/team|\/people|\/authors?(?:\/|$)|\/experts?(?:\/|$)|\/newsletters?(?:\/|$)|\/success-stor(?:y|ies)(?:\/|$)|\/(?:research|insights?|reports?|publications?)\/?$|\/awards|\/glossary)/i;
 
 // A link that looks like an actual article: a date in the path, or a long slug.
 function looksLikeArticleUrl(path: string): boolean {
@@ -18,7 +52,7 @@ function looksLikeArticleUrl(path: string): boolean {
 }
 
 /** Collect plausible article links from a listing/index page. */
-export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
+export function extractLinks(html: string, baseUrl: string, limit = 60): CandidateLink[] {
   const $ = cheerio.load(html);
   const base = new URL(baseUrl);
   const pathname = base.pathname.replace(/\/$/, "");
@@ -32,12 +66,12 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
     if (chrome.length && !$(el).closest("article").length) return;
     const href = $(el).attr("href") || "";
     let text = $(el).text().replace(/\s+/g, " ").trim();
-    if (text.length < 28) {
+    if (text.length < 12) {
       const card = $(el).closest("article,[class*=card],[class*=tile],[class*=teaser]");
       const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim();
       if (heading) text = heading;
     }
-    if (text.length < 28 || text.length > 500) return;
+    if (text.length < 12 || text.length > 500) return;
     text = text.slice(0, 240); // Some publishers append the standfirst and date inside the same anchor.
     let abs: URL;
     try {
@@ -69,11 +103,63 @@ export function extractLinks(html: string, baseUrl: string): CandidateLink[] {
     }
   });
 
+  // Public JSON-LD, Next.js state and captured same-origin JSON often contain
+  // cards that are not rendered as anchors in the initial HTML.
+  for (const root of jsonScripts($)) {
+    walkJson(root, (record) => {
+      const href = firstString(record, ["url", "href", "link", "canonicalUrl", "contentUrl", "@id"]);
+      const title = firstString(record, ["headline", "title", "name"]);
+      if (!href || title.length < 12 || title.length > 500) return;
+      let abs: URL;
+      try { abs = new URL(href, base); } catch { return; }
+      if (abs.host !== base.host || DENY.test(abs.pathname) || /\.(?:pdf|jpe?g|png|gif|zip|xlsx?|docx?|pptx?)$/i.test(abs.pathname)) return;
+      const underSection = basePath.length > 1 && (abs.pathname === basePath || abs.pathname.startsWith(`${basePath}/`));
+      if (!underSection && !looksLikeArticleUrl(abs.pathname)) return;
+      const key = abs.href.split("#")[0].split("?")[0];
+      if (out.has(key) || key === baseUrl.replace(/\/$/, "")) return;
+      const publishedAt = inferPublicationDate(
+        firstString(record, ["datePublished", "publishedAt", "publishDate", "publicationDate", "date", "dateModified"]),
+        key,
+        title,
+      );
+      out.set(key, {
+        title: title.replace(/\s+/g, " ").slice(0, 240),
+        underSection,
+        publishedAt,
+        date: publishedAt?.getTime() ?? 0,
+        research: /\b(?:outlook|markets?|econom(?:y|ics?)|investment|credit|research|strategy|forecast)\b/i.test(`${abs.pathname} ${title}`),
+      });
+    });
+  }
+
   return [...out.entries()]
     .map(([url, value]) => ({ url, ...value }))
     .sort((a, b) => Number(b.underSection) - Number(a.underSection) || b.date - a.date || Number(b.research) - Number(a.research))
-    .slice(0, 12)
+    .slice(0, Math.max(1, limit))
     .map(({ url, title, publishedAt }) => ({ url, title, publishedAt }));
+}
+
+/** Follow only explicit public listing pagination, never arbitrary navigation. */
+export function extractPaginationLinks(html: string, pageUrl: string, sourceUrl: string): string[] {
+  const $ = cheerio.load(html);
+  const page = new URL(pageUrl);
+  const source = new URL(sourceUrl);
+  const sourcePath = source.pathname.replace(/\/$/, "");
+  const out = new Set<string>();
+  $('link[rel~="next"][href],a[href]').each((_, element) => {
+    const href = $(element).attr("href") || "";
+    const rel = ($(element).attr("rel") || "").toLowerCase();
+    const text = $(element).text().replace(/\s+/g, " ").trim();
+    if (!rel.includes("next") && !/^(?:next|older|more|load more|view more|下一页|更多)\b/i.test(text) && !/[?&](?:page|p|offset|start)=\d+/i.test(href) && !/\/page\/\d+(?:\/|$)/i.test(href)) return;
+    try {
+      const url = new URL(href, page);
+      const relativePath = url.pathname.startsWith(sourcePath) ? url.pathname.slice(sourcePath.length) : url.pathname;
+      if (url.origin !== source.origin || DENY.test(relativePath)) return;
+      const sameSection = sourcePath.length <= 1 || url.pathname.startsWith(sourcePath) || sourcePath.startsWith(url.pathname.replace(/\/page\/\d+\/?$/i, ""));
+      if (sameSection) out.add(url.href.split("#")[0]);
+    } catch { /* invalid pagination URL */ }
+  });
+  return [...out].slice(0, 5);
 }
 
 /** Find same-origin native PDFs and retain the surrounding card's title/date hints. */
@@ -114,7 +200,8 @@ export function extractFeedLinks(html: string, baseUrl: string): string[] {
   $('link[rel~="alternate"][href],a[href]').each((_, element) => {
     const href = $(element).attr("href");
     const type = ($(element).attr("type") || "").toLowerCase();
-    if (!href || (!/rss|atom|feed|xml/i.test(`${href} ${type}`))) return;
+    const label = `${$(element).attr("title") || ""} ${$(element).closest("[id*=rss],[class*=rss]").attr("id") || ""}`;
+    if (!href || (!/rss|atom|feed|xml/i.test(`${href} ${type} ${label}`))) return;
     try {
       const url = new URL(href, base);
       if (url.origin === base.origin) out.add(url.href);
@@ -124,7 +211,7 @@ export function extractFeedLinks(html: string, baseUrl: string): string[] {
 }
 
 // Boilerplate containers to drop wholesale before reading body text.
-const STRIP = "script,style,noscript,nav,header,footer,aside,form,svg,button,iframe," +
+const STRIP = "script,style,noscript,nav,header,footer,aside,svg,button,iframe," +
   "[role=navigation],[role=banner],[role=contentinfo],[role=search],[aria-hidden=true]," +
   "div[class*=nav],section[class*=nav],div[class*=menu],section[class*=menu]," +
   "div[class*=header],section[class*=header],div[class*=footer],section[class*=footer]," +
@@ -132,7 +219,7 @@ const STRIP = "script,style,noscript,nav,header,footer,aside,form,svg,button,ifr
   "div[class*=subscribe],section[class*=subscribe],div[class*=breadcrumb],section[class*=breadcrumb]," +
   "div[class*=social],section[class*=social],div[class*=share],section[class*=share]," +
   "div[class*=related],section[class*=related],div[class*=sidebar],section[class*=sidebar]," +
-  "div[class*=promo],section[class*=promo],div[class*=banner],section[class*=banner]," +
+  "div.promo,section.promo,div[class~=promo],section[class~=promo],div[class*=banner],section[class*=banner]," +
   "div[class*=menu-content],div[class*=apollo-l1-info],div[class*=apollo-featured-info],div[class*=featured-content-info]," +
   "div[class*=skip],section[class*=skip],div[id*=nav],section[id*=nav],div[id*=menu],section[id*=menu]," +
   "div[id*=footer],section[id*=footer],div[id*=header],section[id*=header],div[id*=cookie],section[id*=cookie]";
@@ -206,6 +293,22 @@ function parsePublicationDate(value: string): Date | null {
 /** Extract a clean title + body text (+ heading-delimited segments) from an article page. */
 export function extractArticle(html: string): ExtractedArticle {
   const $ = cheerio.load(html);
+  let structuredTitle = "";
+  let structuredBody = "";
+  let structuredAuthor = "";
+  let structuredDate = "";
+  for (const root of jsonScripts($)) {
+    walkJson(root, (record) => {
+      const body = firstString(record, ["articleBody", "text", "body"]);
+      const headline = firstString(record, ["headline", "title"]);
+      if (body.length > structuredBody.length && (headline || /Article|Report|Analysis|BlogPosting/i.test(String(record["@type"] || "")))) {
+        structuredBody = body;
+        structuredTitle = headline;
+        structuredAuthor = firstString(record, ["author", "creator"]);
+        structuredDate = firstString(record, ["datePublished", "publishedAt", "publishDate", "publicationDate"]);
+      }
+    });
+  }
   const partialDate = new RegExp(`(?:\\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\\s+\\d{1,2}|\\b\\d{1,2}\\s+(?:january|february|march|april|may|june|july|august|september|october|november|december))\\b`, "i");
   const visibleDateBeforeStrip = $("time[datetime]").attr("datetime") ||
     $("time,[class*=publish],[class*=date],[data-testid*=date],p").toArray()
@@ -218,6 +321,7 @@ export function extractArticle(html: string): ExtractedArticle {
   const title = (
     $('meta[property="og:title"]').attr("content") ||
     $("h1").first().text() ||
+    structuredTitle ||
     $("title").text() ||
     ""
   ).replace(/\s+/g, " ").replace(/\s+[|–—-]\s+[^|–—-]{0,40}$/, "").trim();
@@ -225,6 +329,7 @@ export function extractArticle(html: string): ExtractedArticle {
   const author =
     $('meta[name="author"]').attr("content") ||
     $('[rel="author"]').first().text().trim() ||
+    structuredAuthor ||
     null;
 
   const dateStr =
@@ -234,6 +339,7 @@ export function extractArticle(html: string): ExtractedArticle {
     $('meta[itemprop="datePublished"]').attr("content") ||
     html.match(/"(?:datePublished|PublishedDate|publishDateStr|publishDate)"\s*:\s*"([^"\\]+)"/i)?.[1] ||
     html.match(/&quot;(?:datePublished|PublishedDate|publishDateStr|publishDate)&quot;\s*:\s*&quot;([^&]+)&quot;/i)?.[1] ||
+    structuredDate ||
     visibleDateBeforeStrip ||
     "";
   let publishedAt = dateStr
@@ -271,6 +377,10 @@ export function extractArticle(html: string): ExtractedArticle {
       else if (t.length > 40) cur.buf.push(t);
     });
     flush();
+  }
+  if (segments.length === 0) {
+    const structuredParagraphs = structuredBody.split(/\n\s*\n|\\n\s*\\n/).map((value) => value.replace(/\s+/g, " ").trim()).filter((value) => value.length > 40);
+    if (structuredParagraphs.join("\n\n").length >= 300) segments.push({ heading: null, text: structuredParagraphs.join("\n\n") });
   }
   if (segments.length === 0) {
     // Fallback: no usable container/headings — one segment of every substantive paragraph.
@@ -319,7 +429,7 @@ export function isJunk(text: string): boolean {
 
 /** Recognize consent/login copy so it is never mistaken for publisher research. */
 export function isAccessGateText(text: string): boolean {
-  return /these cookies are necessary for the website to function|view as guest|sign in to continue|log in to continue|subscription required/i.test(text);
+  return /these cookies are necessary for the website to function|view as guest|sign in to continue|log in to continue|subscription required|confirm.{0,120}professional investor|i am a professional investor|data controllers.{0,250}use cookies|give or not your consent|we are sorry an error has occurred/i.test(text);
 }
 
 /** Reject pages whose extracted "body" is really only the publisher's legal footer. */

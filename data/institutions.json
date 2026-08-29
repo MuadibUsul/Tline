@@ -183,7 +183,7 @@
   {
     "slug": "schroders",
     "name": "Schroders",
-    "researchUrl": "https://www.schroders.com/en/insights/",
+    "researchUrl": "https://www.schroders.com/en/global/individual/insights/",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -374,6 +374,7 @@
     "slug": "bnp",
     "name": "BNP Paribas",
     "researchUrl": "https://economic-research.bnpparibas.com/",
+    "rssUrl": "https://economic-research.bnpparibas.com/RSS/en-US",
     "rating": 5,
     "authorityScore": 1.0,
     "priority": 3,
@@ -503,7 +504,7 @@
   {
     "slug": "soci-t-g-n-rale",
     "name": "Société Générale",
-    "researchUrl": "https://wholesale.banking.societegenerale.com/en/insights/",
+    "researchUrl": "https://wholesale.banking.societegenerale.com/en/news-insights/all-news-insights/",
     "rating": 5,
     "authorityScore": 1.0,
     "priority": 3,
@@ -573,7 +574,7 @@
   {
     "slug": "lloyds",
     "name": "Lloyds Bank",
-    "researchUrl": "https://www.lloydsbankinggroup.com/insights.html",
+    "researchUrl": "https://www.lloydsbankinggroup.com/insights.f0-5.html",
     "rating": 3,
     "authorityScore": 0.7,
     "priority": 3,
@@ -613,7 +614,7 @@
   {
     "slug": "natixis",
     "name": "Natixis",
-    "researchUrl": "https://research.natixis.com/",
+    "researchUrl": "https://www.research.natixis.com/Site/",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,

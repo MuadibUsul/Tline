@@ -243,6 +243,9 @@ input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px;bord
 .stars{color:var(--neu);letter-spacing:2px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
+.markets-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.markets-grid section.blk{min-width:0}
+@media(max-width:860px){.markets-grid{grid-template-columns:1fr}}
 .trend-chart{margin-top:14px;border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px;overflow:hidden}
 .trend-chart svg{display:block;width:100%;height:auto;min-height:220px}
 .range-tabs{display:flex;gap:6px}

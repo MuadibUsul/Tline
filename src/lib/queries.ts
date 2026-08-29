@@ -202,8 +202,6 @@ export async function getResearchView(id: string) {
     include: {
       institution: true,
       analysis: true,
-      articleAssets: { include: { asset: true } },
-      atomicViews: { orderBy: { position: "asc" } },
       segments: { orderBy: { position: "asc" } },
       documents: { where: { status: "ready" }, orderBy: { createdAt: "asc" } },
       translations: {

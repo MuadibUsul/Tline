@@ -221,16 +221,6 @@
     "language": "en"
   },
   {
-    "slug": "janus",
-    "name": "Janus Henderson",
-    "researchUrl": "https://www.janushenderson.com/en-us/advisor/insights/",
-    "rating": 4,
-    "authorityScore": 0.85,
-    "priority": 3,
-    "updateFreq": "85–160",
-    "language": "en"
-  },
-  {
     "slug": "fidelity",
     "name": "Fidelity International",
     "researchUrl": "https://www.fidelityinternational.com/editorial/",
@@ -557,16 +547,6 @@
     "researchUrl": "https://www.smbcgroup.com/americas/analyst-reports",
     "rating": 4,
     "authorityScore": 0.85,
-    "priority": 3,
-    "updateFreq": "30–65",
-    "language": "en"
-  },
-  {
-    "slug": "swedbank",
-    "name": "Swedbank",
-    "researchUrl": "https://www.swedbank-research.com/",
-    "rating": 3,
-    "authorityScore": 0.7,
     "priority": 3,
     "updateFreq": "30–65",
     "language": "en"

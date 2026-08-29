@@ -61,7 +61,7 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
   Crawl-delay). The crawler (`run.ts`) only touches `allowed`/`delayed` institutions, and
   **re-checks robots.txt live at crawl time** (`robots.ts`: User-agent groups, longest-match
   Allow/Disallow, `*`/`$` wildcards) — skipping any disallowed URL and honoring Crawl-delay.
-  Result of the audit: 59 crawlable, 1 robots-blocked (Janus Henderson), 4 manual
+  Result of the maintained source set: 58 crawlable and 4 manual
   (BlackRock/Neuberger/Mizuho/BofA — sites that block automated access; never bypassed).
 - **Cleaning**: aggressive boilerplate stripping + paragraph-density body selection
   (`extract.ts`), gates that reject nav/menu dumps, thin JS shells, disclaimer-only pages,

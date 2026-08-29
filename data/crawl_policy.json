@@ -131,12 +131,6 @@
     "crawlDelay": null,
     "verdict": "可采集"
   },
-  "janus": {
-    "name": "Janus Henderson",
-    "policy": "blocked",
-    "crawlDelay": null,
-    "verdict": "禁止采集该路径（robots）"
-  },
   "fidelity": {
     "name": "Fidelity International",
     "policy": "allowed",
@@ -334,12 +328,6 @@
     "policy": "allowed",
     "crawlDelay": null,
     "verdict": "可采集（无 robots 限制）"
-  },
-  "swedbank": {
-    "name": "Swedbank",
-    "policy": "delayed",
-    "crawlDelay": 10,
-    "verdict": "可采集 · 遵守 Crawl-delay 10s"
   },
   "lloyds": {
     "name": "Lloyds Bank",

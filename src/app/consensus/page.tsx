@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
 
 export default async function ConsensusPage() {
-  const locale = getLocale();
+  const locale = await getLocale();
   const assets = await prisma.asset.findMany({ orderBy: { assetClass: "asc" } });
   const rows = [] as { ticker: string; name: string; cls: string; score: number; tone: string; label: string; n: number; isFallback: boolean; windowEnd: Date }[];
   for (const a of assets) {

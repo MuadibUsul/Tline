@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { getLocale, tr } from "@/lib/i18n";
 
-export default function NotFound() {
-  const locale = getLocale();
+export default async function NotFound() {
+  const locale = await getLocale();
   return (
     <main className="wrap system-state">
       <div className="eyebrow">404</div>

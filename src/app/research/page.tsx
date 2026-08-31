@@ -6,12 +6,13 @@ import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 
-export default async function ResearchIndex({
-  searchParams,
-}: {
-  searchParams: { institution?: string; ticker?: string; direction?: string; page?: string };
-}) {
-  const locale = getLocale();
+export default async function ResearchIndex(
+  props: {
+    searchParams: Promise<{ institution?: string; ticker?: string; direction?: string; page?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
   const take = 20;
   const direction = searchParams.direction === "bull"

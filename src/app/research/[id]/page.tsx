@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
 import { formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale } from "@/lib/i18n";
+import { stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,9 @@ function ArticleBody({ segments, fallback, locale, translated = false }: {
   locale: Locale;
   translated?: boolean;
 }) {
-  const sections = segments.length ? segments : [{ id: "fallback", heading: null, text: fallback }];
+  const cleanSegments = stripTrailingDisclaimerSegments(segments);
+  const cleanFallback = stripTrailingDisclaimer(fallback);
+  const sections = cleanSegments.length ? cleanSegments : [{ id: "fallback", heading: null, text: cleanFallback }];
   const display = (value: string) => translated && locale === "zh-CN" ? localizeChineseContent(value) : value;
   return (
     <div className="prose article-sections">
@@ -30,8 +33,9 @@ function ArticleBody({ segments, fallback, locale, translated = false }: {
   );
 }
 
-export default async function ResearchPage({ params }: { params: { id: string } }) {
-  const locale = getLocale();
+export default async function ResearchPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const locale = await getLocale();
   const a = await getResearchView(params.id);
   if (!a) notFound();
   const an = a.analysis;
@@ -78,6 +82,12 @@ export default async function ResearchPage({ params }: { params: { id: string } 
           <details className="article-original">
             <summary>完整英文原文</summary>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />
+          </details>
+        )}
+        {a.disclaimerText && (
+          <details className="article-original">
+            <summary>{tr(locale, "Publisher disclaimer", "机构免责声明")}</summary>
+            <div className="prose article-body" style={{ marginTop: 12 }}>{a.disclaimerText}</div>
           </details>
         )}
         <div className="act">

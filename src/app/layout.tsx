@@ -8,9 +8,10 @@ import { isFormalAuthConfigured } from "@/lib/auth-config";
 import OAuthSignOutButton from "./_components/OAuthSignOutButton";
 import LanguageToggle from "./_components/LanguageToggle";
 import { getLocale, tr } from "@/lib/i18n";
+import { can } from "@/lib/permissions";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = getLocale();
+  const locale = await getLocale();
   return {
     title: tr(locale, "Institutional Intelligence", "全球机构情报"),
     description: tr(locale, "Turn institutional research into actionable signal.", "将全球机构研究转化为可执行信号。"),
@@ -20,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   const formalAuth = isFormalAuthConfigured();
-  const locale = getLocale();
+  const locale = await getLocale();
   return (
     <html lang={locale}>
       <head>
@@ -40,10 +41,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <nav className="nav">
               <Link href="/">{tr(locale, "Home", "首页")}</Link>
               <Link href="/markets">{tr(locale, "Markets", "市场")}</Link>
+              <Link href="/macro">{tr(locale, "Economic Data", "经济数据")}</Link>
               <Link href="/institutions">{tr(locale, "Views", "观点")}</Link>
               <Link href="/research">{tr(locale, "Research", "研报")}</Link>
               <Link href="/consensus">{tr(locale, "Consensus", "共识")}</Link>
               <Link href="/watchlist">{tr(locale, "Monitoring", "监控")}</Link>
+              {can(user, "admin.review") && <Link href="/admin">{tr(locale, "Operations", "运营")}</Link>}
             </nav>
             <div className="sp" />
             {user && formalAuth ? (

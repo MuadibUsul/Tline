@@ -111,13 +111,35 @@ export async function completeJSON<T>(
 ): Promise<{ value: T; meta: CompletionResult }> {
   let meta = await provider.complete(input);
   for (let attempt = 0; attempt < 2; attempt++) {
-    const match = meta.text.match(/\{[\s\S]*\}/);
-    try {
-      if (match) return { value: JSON.parse(match[0]) as T, meta };
-    } catch { /* retry once with an explicit format correction */ }
+    const value = firstJsonObject<T>(meta.text);
+    if (value !== null) return { value, meta };
     if (attempt === 0) meta = await provider.complete({ ...input, system: `${input.system}\nYour previous response was invalid JSON. Return one syntactically valid JSON object only.` });
   }
   throw new Error(`${meta.provider} did not return a valid JSON object.`);
+}
+
+function firstJsonObject<T>(text: string): T | null {
+  for (let start = 0; start < text.length; start++) {
+    if (text[start] !== "{") continue;
+    let depth = 0;
+    let quoted = false;
+    let escaped = false;
+    for (let index = start; index < text.length; index++) {
+      const char = text[index];
+      if (quoted) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') quoted = false;
+        continue;
+      }
+      if (char === '"') quoted = true;
+      else if (char === "{") depth++;
+      else if (char === "}" && --depth === 0) {
+        try { return JSON.parse(text.slice(start, index + 1)) as T; } catch { break; }
+      }
+    }
+  }
+  return null;
 }
 
 export type { CompletionInput, CompletionResult, LLMProvider } from "./types";

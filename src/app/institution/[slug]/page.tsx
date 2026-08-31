@@ -7,8 +7,9 @@ import { assetName, domainTerm, getLocale, institutionName, tr } from "@/lib/i18
 
 export const dynamic = "force-dynamic";
 
-export default async function InstitutionPage({ params }: { params: { slug: string } }) {
-  const locale = getLocale();
+export default async function InstitutionPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
+  const locale = await getLocale();
   const data = await getInstitutionView(params.slug);
   if (!data) notFound();
   const { inst, articles, count30, views, coverage } = data;

@@ -36,20 +36,25 @@ function RemoveButton({ kind, refId, locale }: { kind: string; refId: string; lo
 }
 
 export default async function WatchlistPage() {
-  const locale = getLocale();
+  const locale = await getLocale();
   const user = await getSessionUser();
   if (!user) return <SignInGate locale={locale} />;
 
-  const [{ assets, institutions, themes }, { rules, events }, allAssets, allInstitutions] = await Promise.all([
+  const [{ assets, institutions, themes }, { rules, events }, allAssets, allInstitutions, macroIndicators, policyBanks] = await Promise.all([
     getWatchlistView(user.id), getAlertsView(user.id),
     prisma.asset.findMany({ orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
     prisma.institution.findMany({ orderBy: { name: "asc" }, select: { slug: true, name: true } }),
+    prisma.macroIndicator.findMany({ where: { enabled: true }, orderBy: { nameEn: "asc" }, select: { canonicalKey: true, nameEn: true, nameZh: true } }),
+    prisma.macroPolicyDocument.findMany({ distinct: ["centralBank"], orderBy: { centralBank: "asc" }, select: { centralBank: true } }),
   ]);
   const eventArticles = events.some((event) => event.targetId) ? await prisma.article.findMany({
     where: publicationReadyWhere({ id: { in: events.flatMap((event) => event.targetId ? [event.targetId] : []) } }),
     select: { id: true, title: true, institution: { select: { name: true } }, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } } },
   }) : [];
   const eventArticleById = new Map(eventArticles.map((article) => [article.id, article]));
+  const releaseIds = events.flatMap((event) => event.targetId ? [event.targetId] : []);
+  const eventReleases = releaseIds.length ? await prisma.macroRelease.findMany({ where: { id: { in: releaseIds } }, select: { id: true } }) : [];
+  const eventReleaseIds = new Set(eventReleases.map((release) => release.id));
   const assetOptions = allAssets.map((asset) => ({ value: asset.ticker, label: `${assetName(asset.name, locale, asset.ticker)} · ${asset.ticker}` }));
   const institutionOptions = allInstitutions.map((institution) => ({ value: institution.slug, label: institutionName(institution.name, locale) }));
   const alertMessage = (event: (typeof events)[number]) => {
@@ -57,7 +62,7 @@ export default async function WatchlistPage() {
     if (article) return `${institutionName(article.institution.name, locale)}: ${locale === "zh-CN" && article.translations[0] ? article.translations[0].title : article.title}`;
     const asset = event.assetTicker ? allAssets.find((item) => item.ticker === event.assetTicker) : undefined;
     if (asset) return `${assetName(asset.name, locale, asset.ticker)} ${tr(locale, "consensus", "共识")} ${event.score ?? "—"}`;
-    return describeRule(event.rule, locale);
+    return event.message || describeRule(event.rule, locale);
   };
 
   return (
@@ -100,7 +105,7 @@ export default async function WatchlistPage() {
         </div>
       </section>
 
-      <section className="blk"><div className="section-t">{tr(locale, "Create monitoring rule", "创建监控规则")}</div><MonitoringRuleForm assets={assetOptions} institutions={institutionOptions} themes={themes} locale={locale} /></section>
+      <section className="blk"><div className="section-t">{tr(locale, "Create monitoring rule", "创建监控规则")}</div><MonitoringRuleForm assets={assetOptions} institutions={institutionOptions} themes={themes} macroIndicators={macroIndicators.map((item) => ({ value: item.canonicalKey, label: locale === "zh-CN" ? item.nameZh ?? item.nameEn : item.nameEn }))} centralBanks={policyBanks.map((item) => ({ value: item.centralBank, label: item.centralBank }))} locale={locale} /></section>
 
       <section className="blk monitor-object-grid">
         <div><div className="section-t">{tr(locale, "Active rules", "监控规则")} · {rules.length}</div><div className="rowlist">
@@ -108,7 +113,7 @@ export default async function WatchlistPage() {
           {rules.length === 0 && <div className="r monitor-empty">{tr(locale, "No monitoring rules yet.", "尚未创建监控规则。")}</div>}
         </div></div>
         <div><div className="section-t">{tr(locale, "Recent triggers", "近期触发")} · {events.length}</div><div className="feed">
-          {events.map((event) => { const readyTarget = event.targetId ? eventArticleById.has(event.targetId) : false; return <div key={event.id} className="fcard"><div className="top"><b>{localeSafeText(event.rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{alertMessage(event)}</div>{(readyTarget || event.assetTicker) && <Link href={readyTarget ? `/research/${event.targetId}` : `/asset/${event.assetTicker}`} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>; })}
+          {events.map((event) => { const readyTarget = event.targetId ? eventArticleById.has(event.targetId) : false; const macroTarget = event.targetId ? eventReleaseIds.has(event.targetId) : false; return <div key={event.id} className="fcard"><div className="top"><b>{localeSafeText(event.rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{alertMessage(event)}</div>{(readyTarget || macroTarget || event.assetTicker) && <Link href={readyTarget ? `/research/${event.targetId}` : macroTarget ? `/macro/release/${event.targetId}` : `/asset/${event.assetTicker}`} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>; })}
           {events.length === 0 && <p className="mono monitor-empty">{tr(locale, "No triggers yet.", "尚未触发提醒。")}</p>}
         </div></div>
       </section>

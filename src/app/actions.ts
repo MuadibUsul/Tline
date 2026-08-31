@@ -30,14 +30,14 @@ export async function doSignIn(fd: FormData) {
     update: {},
   });
   await writeAudit({ actorId: user.id, action: "auth.sign_in" });
-  cookies().set(COOKIE, makeToken(user), SESSION_COOKIE_OPTS);
+  (await cookies()).set(COOKIE, makeToken(user), SESSION_COOKIE_OPTS);
   redirect(localPath(str(fd, "next"), "/watchlist"));
 }
 
 export async function doSignOut() {
   const user = await getSessionUser();
   if (user) await writeAudit({ actorId: user.id, action: "auth.sign_out" });
-  cookies().delete(COOKIE);
+  (await cookies()).delete(COOKIE);
   redirect("/");
 }
 
@@ -50,9 +50,9 @@ export async function addWatch(fd: FormData) {
   if (!(["asset", "institution", "theme"] as string[]).includes(kind) || !refId || refId.length > 80) return;
   if (kind === "asset") {
     refId = refId.toUpperCase();
-    if (!await prisma.asset.findUnique({ where: { ticker: refId }, select: { id: true } })) return;
+    if (!(await prisma.asset.findUnique({ where: { ticker: refId }, select: { id: true } }))) return;
   }
-  if (kind === "institution" && !await prisma.institution.findUnique({ where: { slug: refId }, select: { id: true } })) return;
+  if (kind === "institution" && !(await prisma.institution.findUnique({ where: { slug: refId }, select: { id: true } }))) return;
   const item = await prisma.watchlistItem.upsert({
     where: { userId_kind_refId: { userId: user!.id, kind, refId } },
     create: { userId: user!.id, kind, refId },
@@ -84,16 +84,23 @@ export async function createRule(fd: FormData) {
   let scopeRef = str(fd, "scopeRef") || legacyTicker;
   const threshold = Number(str(fd, "threshold") || 0);
   const consensusTypes = ["CONSENSUS_ABOVE", "CONSENSUS_BELOW", "CONSENSUS_DROP_24H", "CONSENSUS_RISE_24H"];
-  if (![...consensusTypes, "NEW_RESEARCH"].includes(type) || !["asset", "institution", "theme", "market"].includes(scopeKind)) return;
+  const macroTypes = ["MACRO_RELEASE", "MACRO_SURPRISE_ABOVE", "MACRO_SURPRISE_BELOW", "MACRO_REVISION", "CENTRAL_BANK_DECISION", "POLICY_STANCE_CHANGE"];
+  if (![...consensusTypes, "NEW_RESEARCH", ...macroTypes].includes(type) || !["asset", "institution", "theme", "market", "macro_indicator", "macro_release_family", "central_bank"].includes(scopeKind)) return;
   if (consensusTypes.includes(type) && !["asset", "market"].includes(scopeKind)) return;
   if (type === "NEW_RESEARCH" && !["asset", "institution", "theme"].includes(scopeKind)) return;
-  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) return;
+  if (["MACRO_RELEASE", "MACRO_REVISION"].includes(type) && !["macro_indicator", "macro_release_family"].includes(scopeKind)) return;
+  if (["MACRO_SURPRISE_ABOVE", "MACRO_SURPRISE_BELOW"].includes(type) && scopeKind !== "macro_indicator") return;
+  if (["CENTRAL_BANK_DECISION", "POLICY_STANCE_CHANGE"].includes(type) && scopeKind !== "central_bank") return;
+  if (!Number.isFinite(threshold) || (consensusTypes.includes(type) && (threshold < 0 || threshold > 100)) || (macroTypes.includes(type) && Math.abs(threshold) > 10000)) return;
   if (scopeKind !== "market" && (!scopeRef || scopeRef.length > 80)) return;
   if (scopeKind === "asset") {
     scopeRef = scopeRef.toUpperCase();
-    if (!await prisma.asset.findUnique({ where: { ticker: scopeRef }, select: { id: true } })) return;
+    if (!(await prisma.asset.findUnique({ where: { ticker: scopeRef }, select: { id: true } }))) return;
   }
-  if (scopeKind === "institution" && !await prisma.institution.findUnique({ where: { slug: scopeRef }, select: { id: true } })) return;
+  if (scopeKind === "institution" && !(await prisma.institution.findUnique({ where: { slug: scopeRef }, select: { id: true } }))) return;
+  if (scopeKind === "macro_indicator" && !(await prisma.macroIndicator.findUnique({ where: { canonicalKey: scopeRef }, select: { id: true } }))) return;
+  if (scopeKind === "macro_release_family" && !(await prisma.macroRelease.findFirst({ where: { releaseFamily: scopeRef }, select: { id: true } }))) return;
+  if (scopeKind === "central_bank" && !(await prisma.macroPolicyDocument.findFirst({ where: { centralBank: scopeRef }, select: { id: true } }))) return;
   const ruleShape = { type, threshold, scopeKind, scopeRef: scopeRef || null, assetTicker: scopeKind === "asset" ? scopeRef : null };
   const rule = await prisma.alertRule.create({
     data: {

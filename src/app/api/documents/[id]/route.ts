@@ -12,7 +12,8 @@ function safeFilename(title: string, locale: string) {
   return (clean || "research") + "-" + locale + ".pdf";
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const document = await prisma.articleDocument.findUnique({
     where: { id: params.id },
     include: { article: { select: { title: true } } },

@@ -40,14 +40,15 @@ function TrendChart({ points, ticker, locale }: { points: { timestamp: Date; con
   );
 }
 
-export default async function ConsensusTrendPage({
-  params,
-  searchParams,
-}: {
-  params: { ticker: string };
-  searchParams: { range?: string };
-}) {
-  const locale = getLocale();
+export default async function ConsensusTrendPage(
+  props: {
+    params: Promise<{ ticker: string }>;
+    searchParams: Promise<{ range?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
+  const locale = await getLocale();
   const asset = await prisma.asset.findUnique({ where: { ticker: params.ticker.toUpperCase() } });
   if (!asset) notFound();
   const ranges: Record<string, number> = { "1m": 31, "3m": 93, "1y": 366 };

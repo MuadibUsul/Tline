@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
 
 export default async function Home() {
-  const locale = getLocale();
+  const locale = await getLocale();
   const [cards, feed, active, changes] = await Promise.all([
     featuredConsensus(),
     latestFeed(8),

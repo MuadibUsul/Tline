@@ -18,13 +18,27 @@ function directionLabel(direction: string, locale: Locale) {
   return ({ bullish: "看多", bearish: "看空", neutral: "中性", conditional: "条件性" } as Record<string, string>)[direction] ?? direction;
 }
 
-export default async function ViewsPage({ searchParams }: { searchParams: { page?: string } }) {
-  const locale = getLocale();
+export default async function ViewsPage(props: { searchParams: Promise<{ page?: string }> }) {
+  const searchParams = await props.searchParams;
+  const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
   const take = 50;
   // ponytail: rank in memory while the corpus is small; persist scores when this reaches tens of thousands of views.
-  const allViews = await prisma.atomicView.findMany({ where: { article: publicationReadyWhere() }, include: { article: { include: { institution: true } } } });
+  const allViews = await prisma.atomicView.findMany({
+    where: { article: publicationReadyWhere() },
+    include: { article: { include: {
+      institution: true,
+      translations: { where: { locale: "zh-CN" }, select: { title: true }, take: 1 },
+    } } },
+  });
   const ranked = rankAtomicViews(allViews, new Date(), marketEvents as MarketEvent[]);
+  const seenLatestArticles = new Set<string>();
+  const latest = [...ranked]
+    .sort((a, b) => b.article.publishedAt.getTime() - a.article.publishedAt.getTime()
+      || b.article.createdAt.getTime() - a.article.createdAt.getTime()
+      || b.importance - a.importance)
+    .filter((view) => !seenLatestArticles.has(view.articleId) && Boolean(seenLatestArticles.add(view.articleId)))
+    .slice(0, 8);
   const total = ranked.length;
   const views = ranked.slice((page - 1) * take, page * take);
   const pages = Math.max(1, Math.ceil(total / take));
@@ -36,6 +50,19 @@ export default async function ViewsPage({ searchParams }: { searchParams: { page
         <h1>{tr(locale, "Views", "观点")}</h1>
         <p className="sub">{tr(locale, `${total} evidence-backed views published in the latest 7 days, ranked by market heat, institution authority and freshness.`, `共 ${total} 条最近7天发布的可追溯观点，依次按市场热度、机构权重和新鲜度排序。`)}</p>
       </div>
+
+      {page === 1 && latest.length > 0 && <section className="latest-views" aria-label={tr(locale, "Newest publications", "最新发布")}>
+        <div className="section-t">{tr(locale, "Newest publications", "最新发布")}</div>
+        <div className="latest-view-grid">{latest.map((view) => {
+          return <article className="latest-view" key={view.articleId}>
+            <div className="latest-view-meta">
+              <Link href={`/institution/${view.article.institution.slug}`}>{institutionName(view.article.institution.name, locale)}</Link>
+              <time dateTime={view.article.publishedAt.toISOString()} title={formatDate(view.article.publishedAt, locale)}>{relTime(view.article.publishedAt, locale)}</time>
+            </div>
+            <h2><Link href={`/research/${view.articleId}`}>{locale === "zh-CN" ? view.article.translations[0]?.title || view.article.title : view.article.title}</Link></h2>
+          </article>;
+        })}</div>
+      </section>}
 
       <section className="view-flash-list" aria-label={tr(locale, "Latest institutional views", "最新机构观点")}>
         {views.map((view, viewIndex) => {

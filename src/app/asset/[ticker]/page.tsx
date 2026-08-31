@@ -7,8 +7,9 @@ import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } fro
 
 export const dynamic = "force-dynamic";
 
-export default async function AssetPage({ params }: { params: { ticker: string } }) {
-  const locale = getLocale();
+export default async function AssetPage(props: { params: Promise<{ ticker: string }> }) {
+  const params = await props.params;
+  const locale = await getLocale();
   const data = await getAssetView(params.ticker);
   if (!data) notFound();
   const { asset, consensus, d1, d7, d30, dist, articles } = data;

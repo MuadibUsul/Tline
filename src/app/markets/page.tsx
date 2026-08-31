@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 const CLASSES = ["equity", "rate", "fx", "commodity", "crypto", "macro"] as const;
 export default async function MarketsPage() {
-  const locale = getLocale();
+  const locale = await getLocale();
   const labels: Record<string, string> = { equity: tr(locale, "Equities", "股票"), rate: tr(locale, "Rates", "利率"), fx: tr(locale, "FX", "外汇"), commodity: tr(locale, "Commodities", "大宗商品"), crypto: tr(locale, "Crypto", "加密资产"), macro: tr(locale, "Macro", "宏观") };
   const assets = await prisma.asset.findMany({ orderBy: { name: "asc" } });
   const scored = await Promise.all(assets.map(async (a) => ({ a, c: await computeConsensus(a.id) })));

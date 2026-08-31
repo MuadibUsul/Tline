@@ -7,8 +7,9 @@ import { getLocale, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
-export default async function SignInPage({ searchParams }: { searchParams: { next?: string; error?: string } }) {
-  const locale = getLocale();
+export default async function SignInPage(props: { searchParams: Promise<{ next?: string; error?: string }> }) {
+  const searchParams = await props.searchParams;
+  const locale = await getLocale();
   const next = searchParams.next?.startsWith("/") && !searchParams.next.startsWith("//") ? searchParams.next : "/watchlist";
   const user = await getSessionUser();
   if (user) redirect(next);

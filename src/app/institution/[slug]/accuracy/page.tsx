@@ -9,8 +9,9 @@ function value(value: number | null) {
   return value === null ? "—" : value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-export default async function AccuracyPage({ params }: { params: { slug: string } }) {
-  const locale = getLocale();
+export default async function AccuracyPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
+  const locale = await getLocale();
   const data = await getInstitutionAccuracy(params.slug);
   if (!data) notFound();
   return (

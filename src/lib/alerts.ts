@@ -3,6 +3,7 @@ import { computeConsensus, consensusChange, consensusSince } from "./consensus";
 import { ASSETS } from "./assets";
 import { assetName, domainTerm, institutionName } from "./i18n";
 import { publicationReadyWhere } from "./publication";
+import { Prisma } from "@prisma/client";
 
 const FEATURED = ASSETS.filter((asset) => asset.featured).map((asset) => asset.ticker);
 const DEDUPE_MS = 12 * 3600 * 1000;
@@ -12,9 +13,15 @@ export type AlertType =
   | "CONSENSUS_BELOW"
   | "CONSENSUS_DROP_24H"
   | "CONSENSUS_RISE_24H"
-  | "NEW_RESEARCH";
+  | "NEW_RESEARCH"
+  | "MACRO_RELEASE"
+  | "MACRO_SURPRISE_ABOVE"
+  | "MACRO_SURPRISE_BELOW"
+  | "MACRO_REVISION"
+  | "CENTRAL_BANK_DECISION"
+  | "POLICY_STANCE_CHANGE";
 
-export type MonitorScopeKind = "asset" | "institution" | "theme" | "market";
+export type MonitorScopeKind = "asset" | "institution" | "theme" | "market" | "macro_indicator" | "macro_release_family" | "central_bank";
 
 type RuleShape = {
   type: string;
@@ -38,6 +45,12 @@ export function describeRule(rule: RuleShape, locale = "en"): string {
       : scope.kind === "asset" ? assetName(scope.ref, zh ? "zh-CN" : "en", scope.ref)
         : domainTerm(scope.ref, zh ? "zh-CN" : "en")
     : (zh ? "任一精选资产" : "any featured asset");
+  if (rule.type === "MACRO_RELEASE") return zh ? `${target} 数据发布` : `${target} data release`;
+  if (rule.type === "MACRO_SURPRISE_ABOVE") return zh ? `${target} 惊喜百分比 ≥ ${rule.threshold}%` : `${target} surprise ≥ ${rule.threshold}%`;
+  if (rule.type === "MACRO_SURPRISE_BELOW") return zh ? `${target} 惊喜百分比 ≤ ${rule.threshold}%` : `${target} surprise ≤ ${rule.threshold}%`;
+  if (rule.type === "MACRO_REVISION") return zh ? `${target} 数据发生修订` : `${target} data revision`;
+  if (rule.type === "CENTRAL_BANK_DECISION") return zh ? `${target} 央行公布利率决议` : `${target} central-bank decision`;
+  if (rule.type === "POLICY_STANCE_CHANGE") return zh ? `${target} 政策立场发生变化` : `${target} policy stance changes`;
   if (rule.type === "NEW_RESEARCH") {
     const kind = scope.kind === "institution" ? (zh ? "机构" : "institution") : scope.kind === "theme" ? (zh ? "交易主线" : "theme") : (zh ? "资产" : "asset");
     return zh ? `${kind}「${target}」发布相关新研报` : `new research for ${kind} “${target}”`;
@@ -56,6 +69,69 @@ interface Hit {
   score: number | null;
   message: string;
   targetId?: string;
+}
+
+const MACRO_TYPES = new Set(["MACRO_RELEASE", "MACRO_SURPRISE_ABOVE", "MACRO_SURPRISE_BELOW", "MACRO_REVISION", "CENTRAL_BANK_DECISION", "POLICY_STANCE_CHANGE"]);
+
+export function surpriseThresholdMet(type: string, surprisePct: Prisma.Decimal.Value | null, thresholdPercent: number): boolean {
+  if (surprisePct === null || !Number.isFinite(thresholdPercent)) return false;
+  const percent = new Prisma.Decimal(surprisePct).times(100);
+  return type === "MACRO_SURPRISE_ABOVE" ? percent.greaterThanOrEqualTo(thresholdPercent)
+    : type === "MACRO_SURPRISE_BELOW" ? percent.lessThanOrEqualTo(thresholdPercent)
+      : false;
+}
+
+type ParsedPolicy = { decision?: unknown; stance?: unknown; changeBps?: unknown };
+function parsedPolicy(value: string | null): ParsedPolicy | null {
+  if (!value) return null;
+  try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed : null; } catch { return null; }
+}
+
+export function stanceChanged(current: string | null, previous: string | null): boolean {
+  return Boolean(current && previous && current !== "UNKNOWN" && previous !== "UNKNOWN" && current !== previous);
+}
+
+async function evalMacroRule(rule: RuleShape, scope: { kind: MonitorScopeKind; ref: string | null }): Promise<Hit | null> {
+  if (!scope.ref) return null;
+  const indicatorWhere = scope.kind === "macro_indicator" ? { canonicalKey: scope.ref } : undefined;
+  if (rule.type === "MACRO_RELEASE" || rule.type.startsWith("MACRO_SURPRISE_")) {
+    const release = await prisma.macroRelease.findFirst({
+      where: {
+        releasedAt: { not: null },
+        ...(scope.kind === "macro_release_family" ? { releaseFamily: scope.ref } : {}),
+        ...(indicatorWhere ? { values: { some: { indicator: indicatorWhere } } } : {}),
+      },
+      orderBy: { releasedAt: "desc" },
+      include: { values: { where: indicatorWhere ? { indicator: indicatorWhere } : {}, include: { indicator: true } } },
+    });
+    if (!release) return null;
+    if (rule.type === "MACRO_RELEASE") return { assetTicker: null, score: null, targetId: release.id, message: `${release.titleEn} released` };
+    const value = release.values.find((item) => item.consensusAtRelease !== null && surpriseThresholdMet(rule.type, item.surprisePct, rule.threshold));
+    if (!value) return null;
+    const percent = new Prisma.Decimal(value.surprisePct!).times(100).toDecimalPlaces(2).toString();
+    return { assetTicker: null, score: null, targetId: release.id, message: `${value.indicator.nameEn} surprise ${percent}%` };
+  }
+  if (rule.type === "MACRO_REVISION" && indicatorWhere) {
+    const observation = await prisma.macroObservation.findFirst({
+      where: { revisionNo: { gt: 0 }, seriesSource: { indicator: indicatorWhere } },
+      orderBy: [{ vintageAt: "desc" }, { revisionNo: "desc" }],
+      include: { seriesSource: { include: { indicator: true } } },
+    });
+    return observation ? { assetTicker: null, score: null, targetId: observation.id, message: `${observation.seriesSource.indicator.nameEn} revised to ${observation.value.toString()}` } : null;
+  }
+  if ((rule.type === "CENTRAL_BANK_DECISION" || rule.type === "POLICY_STANCE_CHANGE") && scope.kind === "central_bank") {
+    const documents = await prisma.macroPolicyDocument.findMany({ where: { centralBank: scope.ref, parsedJson: { not: null } }, orderBy: { publishedAt: "desc" }, take: 20 });
+    const parsed = documents.map((document) => ({ document, policy: parsedPolicy(document.parsedJson) })).filter((item) => item.policy);
+    if (!parsed.length) return null;
+    if (rule.type === "CENTRAL_BANK_DECISION") {
+      const current = parsed.find((item) => typeof item.policy!.decision === "string" && item.policy!.decision !== "OTHER");
+      return current ? { assetTicker: null, score: null, targetId: current.document.releaseId ?? current.document.id, message: `${scope.ref} decision: ${String(current.policy!.decision)}${typeof current.policy!.changeBps === "number" ? ` (${current.policy!.changeBps} bps)` : ""}` } : null;
+    }
+    const stances = parsed.filter((item) => typeof item.policy!.stance === "string" && item.policy!.stance !== "UNKNOWN");
+    if (stances.length < 2 || !stanceChanged(String(stances[0].policy!.stance), String(stances[1].policy!.stance))) return null;
+    return { assetTicker: null, score: null, targetId: stances[0].document.releaseId ?? stances[0].document.id, message: `${scope.ref} stance: ${String(stances[1].policy!.stance)} → ${String(stances[0].policy!.stance)}` };
+  }
+  return null;
 }
 
 async function evalConsensusRule(type: string, threshold: number, ticker: string): Promise<Hit | null> {
@@ -125,7 +201,9 @@ export async function evaluateRules(): Promise<number> {
 
   for (const rule of rules) {
     const scope = ruleScope(rule);
-    const hits = rule.type === "NEW_RESEARCH"
+    const hits = MACRO_TYPES.has(rule.type)
+      ? [await evalMacroRule(rule, scope)]
+      : rule.type === "NEW_RESEARCH"
       ? [await evalResearchRule(scope)]
       : await Promise.all((scope.kind === "asset" && scope.ref ? [scope.ref] : FEATURED)
         .map((ticker) => evalConsensusRule(rule.type, rule.threshold, ticker)));

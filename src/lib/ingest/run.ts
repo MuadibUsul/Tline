@@ -13,7 +13,7 @@ import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
 import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
-import { crawlIntervalSeconds, runSourcesByOrigin } from "./scheduling";
+import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
 // Usage:
 //   npm run ingest                 -> priority-1 institutions (allowed/delayed only)
@@ -33,6 +33,18 @@ const flag = (name: string) => process.argv.includes(`--${name}`);
 const rss = new Parser({ timeout: 15000 });
 const UA = "InstitutionalIntelligenceBot";
 const MIN_DELAY_MS = 1000; // politeness floor even when robots is silent
+
+async function notifySourceProtection(event: "source.blocked" | "source.circuit_open", source: { slug: string; name: string; researchUrl: string }, status: number, failures: number, retrySeconds: number) {
+  const payload = { event, source: source.slug, institution: source.name, url: source.researchUrl, status, consecutiveFailures: failures, retrySeconds, timestamp: new Date().toISOString() };
+  console.warn(JSON.stringify(payload));
+  const webhook = process.env.JOB_FAILURE_WEBHOOK_URL;
+  if (!webhook) return;
+  try {
+    await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(10_000) });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "source.notification.failed", source: source.slug, error: String(error) }));
+  }
+}
 
 async function ingestInstitution(
   inst: { id: string; slug: string; name: string; researchUrl: string; rssUrl: string | null; sitemapUrl: string | null; language: string; crawlDelay: number | null; requiresRender: boolean; crawlIntervalSec: number | null; consecutiveFailures: number },
@@ -60,17 +72,18 @@ async function ingestInstitution(
     console.log(JSON.stringify({ event: "ingest.source.busy", institution: inst.name }));
     return 0;
   }
-  const finish = async (status: "succeeded" | "empty" | "paused" | "refused", message: string, created: number) => {
+  const finish = async (status: "succeeded" | "empty" | "paused" | "refused", message: string, created: number, protection?: { failures: number; retrySeconds: number; disable?: boolean }) => {
     const now = new Date();
     const healthy = status === "succeeded" || status === "empty";
-    const nextDelay = healthy ? intervalSeconds : Math.max(intervalSeconds, 3600);
+    const nextDelay = protection?.retrySeconds ?? (healthy ? healthyScheduleSeconds(intervalSeconds, inst.consecutiveFailures) : jitterSeconds(Math.max(intervalSeconds, 3600)));
     await prisma.institution.update({
       where: { id: inst.id },
       data: {
         lastCrawlStatus: status,
         lastCrawlMessage: message.slice(0, 1000),
         nextCrawlAt: new Date(now.getTime() + nextDelay * 1000),
-        consecutiveFailures: healthy ? 0 : inst.consecutiveFailures,
+        consecutiveFailures: protection?.failures ?? (healthy ? 0 : inst.consecutiveFailures),
+        ...(protection?.disable ? { monitoringEnabled: false } : {}),
         ...(healthy ? { lastSuccessAt: now } : {}),
         ...(created > 0 ? { lastDiscoveredAt: now } : {}),
       },
@@ -82,13 +95,13 @@ async function ingestInstitution(
   const deadline = Date.now() + sourceSeconds * 1000;
   const withinBudget = () => Date.now() < deadline;
 
-  // --- Runtime robots.txt compliance check (authoritative) ---
+  // --- Runtime robots.txt compliance check ---
+  // When robots.txt cannot be fetched we proceed (treat as allowed) rather than pausing;
+  // an explicit Disallow in a robots.txt we DID retrieve is still respected.
   const robotsTxt = await fetchRobots(origin);
   if (robotsTxt === null) {
-    console.log(`  ${inst.name.padEnd(26)} PAUSE · robots unavailable and no valid 24h cache`);
-    return finish("paused", "robots unavailable and no valid 24h cache", 0);
-  }
-  if (robotsTxt && !robotsAllows(robotsTxt, UA, new URL(inst.researchUrl).pathname)) {
+    console.log(`  ${inst.name.padEnd(26)} robots unavailable — proceeding (treated as allowed)`);
+  } else if (!robotsAllows(robotsTxt, UA, new URL(inst.researchUrl).pathname)) {
     console.log(`  ${inst.name.padEnd(26)} SKIP · robots disallows research path`);
     return finish("refused", "robots disallows research path", 0);
   }
@@ -98,7 +111,7 @@ async function ingestInstitution(
   const allowsUrl = (u: string) => {
     try {
       const url = new URL(u);
-      return url.origin === origin && robotsAllows(robotsTxt, UA, url.pathname);
+      return url.origin === origin && (robotsTxt === null || robotsAllows(robotsTxt, UA, url.pathname));
     } catch {
       return false;
     }
@@ -271,7 +284,7 @@ async function ingestInstitution(
 
   // 2) Sitemap/Sitemap Index discovery, including native research PDFs.
   if (raws.length < perLimit && sitemapEnabled(inst.slug)) {
-    const declaredSitemaps = robotsSitemaps(robotsTxt).filter(allowsUrl);
+    const declaredSitemaps = (robotsTxt ? robotsSitemaps(robotsTxt) : []).filter(allowsUrl);
     if (!inst.sitemapUrl && declaredSitemaps[0]) {
       await prisma.institution.update({ where: { id: inst.id }, data: { sitemapUrl: declaredSitemaps[0] } });
       inst.sitemapUrl = declaredSitemaps[0];
@@ -358,7 +371,7 @@ async function ingestInstitution(
       visitedPages.add(pageUrl);
       let listHtml = pageUrl === inst.researchUrl ? listingHtml ?? await fetchText(pageUrl) : await fetchText(pageUrl);
       let links = listHtml ? extractLinks(listHtml, pageUrl, candidateLimit).filter((link) => candidateAllowed(inst.slug, link.url)) : [];
-      if (links.length === 0) {
+      if (inst.requiresRender || links.length === 0) {
         const rendered = await renderPublic(pageUrl);
         if (rendered) {
           listHtml = rendered;
@@ -461,8 +474,13 @@ async function ingestInstitution(
     delayMs,
   }));
   const accessStatus = lastFetchStatus(inst.researchUrl);
-  if (raws.length === 0 && accessStatus && [401, 403, 429].includes(accessStatus)) {
-    return finish("paused", `research endpoint HTTP ${accessStatus}; access wall not bypassed`, created);
+  const accessBlocked = Boolean(accessStatus && [401, 403, 429].includes(accessStatus)) || /access wall|human verification/i.test(accessReason ?? "");
+  if (raws.length === 0 && accessBlocked) {
+    const failures = inst.consecutiveFailures + 1;
+    const retrySeconds = jitterSeconds(sourceBackoffSeconds(intervalSeconds, failures, true));
+    const circuitOpen = failures >= ACCESS_CIRCUIT_FAILURES;
+    await notifySourceProtection(circuitOpen ? "source.circuit_open" : "source.blocked", inst, accessStatus ?? 0, failures, retrySeconds);
+    return finish("paused", `${accessStatus ? `research endpoint HTTP ${accessStatus}` : accessReason}; access wall not bypassed${circuitOpen ? "; circuit opened after repeated blocks" : ""}`, created, { failures, retrySeconds, disable: circuitOpen });
   }
   if (raws.length === 0 && accessReason) {
     return finish("paused", `${accessReason}; access condition not bypassed`, created);
@@ -536,7 +554,7 @@ async function executeIngest() {
     } catch (error) {
       failedSources++;
       const failures = inst.consecutiveFailures + 1;
-      const retrySeconds = Math.min(3600, crawlIntervalSeconds(inst) * 2 ** Math.min(failures, 6));
+      const retrySeconds = jitterSeconds(sourceBackoffSeconds(crawlIntervalSeconds(inst), failures));
       await prisma.institution.update({
         where: { id: inst.id },
         data: { lastCrawlStatus: "failed", lastCrawlMessage: String(error).slice(0, 1000), consecutiveFailures: failures, nextCrawlAt: new Date(Date.now() + retrySeconds * 1000) },

@@ -5,8 +5,26 @@ type ScheduledSource = {
   crawlIntervalSec: number | null;
 };
 
+// Low-frequency baseline: one pass an hour per source. Enough to catch the publish
+// window without hammering publishers; override per source with crawlIntervalSec.
 export function crawlIntervalSeconds(source: Omit<ScheduledSource, "researchUrl">) {
-  return Math.max(30, source.crawlIntervalSec ?? (source.rssUrl ? 60 : source.requiresRender ? 600 : 180));
+  return Math.max(30, source.crawlIntervalSec ?? 3600);
+}
+
+export const ACCESS_CIRCUIT_FAILURES = 6;
+
+/** Positive-only jitter avoids synchronized crawls without checking earlier than configured. */
+export function jitterSeconds(seconds: number, random = Math.random) {
+  return Math.ceil(seconds * (1 + random() * 0.2));
+}
+
+export function sourceBackoffSeconds(intervalSeconds: number, failures: number, accessBlocked = false) {
+  if (accessBlocked) return failures >= 3 ? 86_400 : failures === 2 ? 14_400 : 3_600;
+  return Math.min(86_400, intervalSeconds * 2 ** Math.min(Math.max(1, failures), 8));
+}
+
+export function healthyScheduleSeconds(intervalSeconds: number, previousFailures: number, random = Math.random) {
+  return jitterSeconds(intervalSeconds * (previousFailures > 0 ? 4 : 1), random);
 }
 
 /** Bounded async I/O across domains; sources sharing a publisher domain stay serial. */

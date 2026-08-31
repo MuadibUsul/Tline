@@ -214,4 +214,28 @@ export async function getResearchView(id: string) {
   });
 }
 
+// China observes a fixed UTC+8 (no DST), so the Beijing week boundary is exact.
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000;
+function endOfBeijingWeek(now: Date): Date {
+  const beijing = new Date(now.getTime() + BEIJING_OFFSET_MS);
+  const daysUntilSunday = (7 - beijing.getUTCDay()) % 7; // week ends Sunday
+  const wall = Date.UTC(beijing.getUTCFullYear(), beijing.getUTCMonth(), beijing.getUTCDate() + daysUntilSunday, 23, 59, 59, 999);
+  return new Date(wall - BEIJING_OFFSET_MS);
+}
+
+/** A short list of high-impact macro releases scheduled for the rest of the current Beijing week. */
+export async function importantReleasesThisWeek(limit = 5) {
+  const now = new Date();
+  return prisma.macroRelease.findMany({
+    where: {
+      scheduledAt: { gte: now, lte: endOfBeijingWeek(now) },
+      importance: { gte: 4 },
+      status: { in: ["SCHEDULED", "WAITING", "DELAYED"] },
+    },
+    orderBy: { scheduledAt: "asc" },
+    take: limit,
+    select: { id: true, titleEn: true, titleZh: true, countryCode: true, importance: true, scheduledAt: true },
+  });
+}
+
 export type { ConsensusResult };

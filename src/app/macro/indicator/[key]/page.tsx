@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
-import { beijingDateTime, macroDateTime, macroNumber } from "@/lib/macro/presentation";
+import { beijingDateTime, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +85,7 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
         <h1>{nm(indicator.nameEn, indicator.nameZh)}</h1>
         <div className="big-score">
           <span className="num">{macroNumber(latest?.value, locale)}</span>
-          <span className="mono">{indicator.unit}</span>
+          <span className="mono">{unitLabel(indicator.unit, locale)}</span>
           {change !== null && <span className={`macro-change ${up ? "up" : "down"}`}>{change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}</span>}
         </div>
         <div className="deltas">
@@ -106,7 +106,7 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
             <Stat label={tr(locale, "Previous", "前值")} value={previous ? `${previous.value}` : "—"} />
             <Stat label={tr(locale, "12-period high", "近12期高")} value={high !== null ? `${high}` : "—"} />
             <Stat label={tr(locale, "12-period low", "近12期低")} value={low !== null ? `${low}` : "—"} />
-            <Stat label={tr(locale, "Unit", "单位")} value={indicator.unit} />
+            <Stat label={tr(locale, "Unit", "单位")} value={unitLabel(indicator.unit, locale)} />
             <Stat label={tr(locale, "Frequency", "频率")} value={indicator.frequency} />
           </div>
         </section>

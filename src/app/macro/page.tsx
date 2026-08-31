@@ -1,27 +1,106 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
-import { actualText, macroDateTime, macroNumber } from "@/lib/macro/presentation";
+import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
+import { beijingDateTime, unitLabel } from "@/lib/macro/presentation";
 
 export const dynamic = "force-dynamic";
 
+const CATEGORY_ORDER = ["POLICY", "INFLATION", "GROWTH", "LABOR", "LIQUIDITY"];
+const CATEGORY_ZH: Record<string, string> = { POLICY: "货币政策", INFLATION: "通胀", GROWTH: "增长", LABOR: "就业", LIQUIDITY: "流动性" };
+const dec = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? "—" : value.toString());
+
 export default async function MacroPage() {
   const locale = await getLocale();
+  const nm = (en: string, zh?: string | null) => (locale === "zh-CN" ? zh ?? en : en);
   const now = new Date();
-  const [upcoming, latest, indicators, revisions] = await Promise.all([
-    prisma.macroRelease.findMany({ where: { scheduledAt: { gte: now }, importance: { gte: 4 }, status: { in: ["SCHEDULED", "WAITING", "DELAYED"] } }, orderBy: { scheduledAt: "asc" }, take: 8 }),
-    prisma.macroRelease.findMany({ where: { status: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 8, include: { values: { include: { indicator: true } } } }),
-    prisma.macroIndicator.findMany({ where: { enabled: true }, orderBy: [{ category: "asc" }, { importance: "desc" }], include: { seriesSources: { where: { enabled: true }, orderBy: { priority: "asc" }, include: { observations: { orderBy: [{ period: "desc" }, { vintageAt: "desc" }], take: 1 } } } } }),
-    prisma.macroObservation.findMany({ where: { revisionNo: { gt: 0 } }, orderBy: { vintageAt: "desc" }, take: 8, include: { seriesSource: { include: { indicator: true } } } }),
+
+  const [calendar, indicators] = await Promise.all([
+    prisma.macroRelease.findMany({
+      where: { scheduledAt: { gte: new Date(now.getTime() - 3 * 864e5), lte: new Date(now.getTime() + 14 * 864e5) }, importance: { gte: 3 } },
+      orderBy: { scheduledAt: "asc" },
+      take: 30,
+      include: { values: { take: 1, include: { indicator: true } } },
+    }),
+    prisma.macroIndicator.findMany({
+      where: { enabled: true },
+      orderBy: [{ importance: "desc" }, { nameEn: "asc" }],
+      include: { seriesSources: { where: { enabled: true }, orderBy: { priority: "asc" }, include: { observations: { orderBy: [{ period: "desc" }, { vintageAt: "desc" }], take: 2 } } } },
+    }),
   ]);
-  const categories = ["INFLATION", "GROWTH", "LABOR", "POLICY"];
-  return <main className="wrap">
-    <div className="page-head"><div className="eyebrow">Macro Intelligence</div><h1>{tr(locale, "Economic Data", "经济数据")}</h1><p className="sub">{tr(locale, "Official releases, point-in-time vintages and source-backed central-bank policy.", "官方发布、时点版本与有原文依据的央行政策数据。")}</p><div className="tag-row"><Link className="minibtn p" href="/macro/calendar">{tr(locale, "Economic calendar", "经济日历")}</Link></div></div>
-    <div className="grid-main">
-      <section className="blk"><div className="section-t">{tr(locale, "Upcoming high-impact events", "即将公布的重要事件")}</div><div className="rowlist">{upcoming.length ? upcoming.map((release) => <Link key={release.id} href={`/macro/release/${release.id}`}><span><b>{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}</b><small className="mono" style={{ display: "block", color: "var(--muted)" }}>{release.countryCode} · {"●".repeat(release.importance)}</small></span><span className="mono">{macroDateTime(release.scheduledAt, locale, release.sourceTimezone)}</span></Link>) : <div className="r">{tr(locale, "No scheduled events", "暂无计划事件")}</div>}</div></section>
-      <section className="blk"><div className="section-t">{tr(locale, "Recent revisions", "近期修订")}</div><div className="rowlist">{revisions.length ? revisions.map((row) => <Link key={row.id} href={`/macro/indicator/${row.seriesSource.indicator.canonicalKey}`}><span>{locale === "zh-CN" ? row.seriesSource.indicator.nameZh ?? row.seriesSource.indicator.nameEn : row.seriesSource.indicator.nameEn}</span><span className="mono">#{row.revisionNo} · {row.value.toString()}</span></Link>) : <div className="r">{tr(locale, "No revisions recorded", "暂无修订记录")}</div>}</div></section>
-    </div>
-    <section className="blk"><div className="section-t">{tr(locale, "Latest releases", "最新发布")}</div><div className="tbl-wrap"><table><thead><tr><th>{tr(locale, "Release", "发布")}</th><th>{tr(locale, "Indicator", "指标")}</th><th>{tr(locale, "Actual", "实际值")}</th><th>{tr(locale, "Released", "发布时间")}</th></tr></thead><tbody>{latest.flatMap((release) => release.values.length ? release.values.map((value) => <tr key={value.id}><td className="inst"><Link href={`/macro/release/${release.id}`}>{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}</Link></td><td><Link href={`/macro/indicator/${value.indicator.canonicalKey}`}>{locale === "zh-CN" ? value.indicator.nameZh ?? value.indicator.nameEn : value.indicator.nameEn}</Link></td><td className="mono-cell">{actualText(value.actualInitial, true, locale)}</td><td className="mono-cell">{release.releasedAt ? macroDateTime(release.releasedAt, locale, release.sourceTimezone) : macroNumber(null, locale)}</td></tr>) : [])}</tbody></table></div></section>
-    <div className="markets-grid">{categories.map((category) => <section className="blk" key={category}><div className="section-t">{category}</div><div className="rowlist">{indicators.filter((item) => item.category === category).map((indicator) => { const observation = indicator.seriesSources.find((source) => source.observations.length)?.observations[0]; return <Link key={indicator.id} href={`/macro/indicator/${indicator.canonicalKey}`}><span>{locale === "zh-CN" ? indicator.nameZh ?? indicator.nameEn : indicator.nameEn}<small className="mono" style={{ display: "block", color: "var(--faint)" }}>{indicator.unit} · {indicator.seasonalAdjustment ?? "N/A"}</small></span><span className="n">{macroNumber(observation?.value, locale)}</span></Link>; })}</div></section>)}</div>
-  </main>;
+
+  const rows = indicators.map((indicator) => {
+    const source = indicator.seriesSources.find((series) => series.observations.length);
+    return { indicator, last: source?.observations[0] ?? null, previous: source?.observations[1] ?? null };
+  });
+  const categories = [...new Set([...CATEGORY_ORDER, ...rows.map((row) => row.indicator.category)])].filter((category) => rows.some((row) => row.indicator.category === category));
+
+  return (
+    <main className="wrap">
+      <div className="page-head">
+        <div className="eyebrow">Macro Intelligence</div>
+        <h1>{tr(locale, "Economic Data", "经济数据")}</h1>
+        <p className="sub">{tr(locale, "Official releases, point-in-time vintages and source-backed central-bank policy — release times in Beijing time.", "官方发布、时点版本与有原文依据的央行政策数据——发布时间以北京时间为准。")}</p>
+        <div className="tag-row"><Link className="minibtn p" href="/macro/calendar">{tr(locale, "Full economic calendar", "完整经济日历")}</Link></div>
+      </div>
+
+      <section className="blk">
+        <div className="section-t">{tr(locale, "Economic calendar · Beijing time", "经济日历 · 北京时间")}</div>
+        <div className="tbl-wrap"><table>
+          <thead><tr>
+            <th>{tr(locale, "Time", "时间")}</th>
+            <th>{tr(locale, "Country", "国家")}</th>
+            <th>{tr(locale, "Event", "事件")}</th>
+            <th className="ctr">{tr(locale, "Impact", "重要性")}</th>
+            <th className="num-h">{tr(locale, "Actual", "实际")}</th>
+            <th className="num-h">{tr(locale, "Previous", "前值")}</th>
+            <th className="num-h">{tr(locale, "Consensus", "预期")}</th>
+          </tr></thead>
+          <tbody>
+            {calendar.map((release) => {
+              const value = release.values[0];
+              const released = release.status === "RELEASED";
+              return (
+                <tr key={release.id} className={released ? "" : "macro-upcoming"}>
+                  <td className="mono-cell">{beijingDateTime(release.scheduledAt, locale)}</td>
+                  <td className="mono-cell">{release.countryCode}</td>
+                  <td className="inst"><Link href={`/macro/release/${release.id}`}>{nm(release.titleEn, release.titleZh)}</Link></td>
+                  <td className="ctr" title={`${release.importance}/5`}>{"●".repeat(release.importance)}</td>
+                  <td className="mono-cell num"><b>{released ? dec(value?.actualInitial) : tr(locale, "—", "—")}</b></td>
+                  <td className="mono-cell num">{dec(value?.revisedPreviousAtRelease ?? value?.previousAtRelease)}</td>
+                  <td className="mono-cell num">{dec(value?.consensusAtRelease)}</td>
+                </tr>
+              );
+            })}
+            {calendar.length === 0 && <tr><td colSpan={7} className="mono-cell" style={{ color: "var(--muted)" }}>{tr(locale, "No scheduled releases in this window.", "该时间窗内暂无计划发布。")}</td></tr>}
+          </tbody>
+        </table></div>
+      </section>
+
+      <div className="markets-grid">
+        {categories.map((category) => (
+          <section className="blk" key={category}>
+            <div className="section-t">{CATEGORY_ZH[category] && locale === "zh-CN" ? CATEGORY_ZH[category] : category}</div>
+            <div className="tbl-wrap"><table>
+              <thead><tr>
+                <th>{tr(locale, "Indicator", "指标")}</th>
+                <th className="num-h">{tr(locale, "Last", "最新")}</th>
+                <th className="num-h">{tr(locale, "Prev.", "前值")}</th>
+                <th>{tr(locale, "Reference", "参考期")}</th>
+              </tr></thead>
+              <tbody>
+                {rows.filter((row) => row.indicator.category === category).map(({ indicator, last, previous }) => (
+                  <tr key={indicator.id}>
+                    <td className="inst"><Link href={`/macro/indicator/${indicator.canonicalKey}`}>{nm(indicator.nameEn, indicator.nameZh)}</Link><small className="mono" style={{ display: "block", color: "var(--faint)" }}>{unitLabel(indicator.unit, locale)}</small></td>
+                    <td className="mono-cell num"><b>{dec(last?.value)}</b></td>
+                    <td className="mono-cell num" style={{ color: "var(--faint)" }}>{dec(previous?.value)}</td>
+                    <td className="mono-cell">{last ? formatDate(last.period, locale) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+          </section>
+        ))}
+      </div>
+    </main>
+  );
 }

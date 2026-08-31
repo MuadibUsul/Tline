@@ -181,6 +181,9 @@ td.inst{color:var(--ink);font-weight:600}
 .macro-stat .v{font:600 16px var(--mono);color:var(--ink)}
 .macro-next{color:var(--muted)}
 td.up{color:var(--bull)}td.down{color:var(--bear)}
+.num-h{text-align:right}th.ctr{text-align:center}
+td.num{text-align:right}td.ctr{text-align:center;color:var(--accent-ink);letter-spacing:1px;font-size:10px}
+.macro-upcoming td{color:var(--muted)}.macro-upcoming .inst a{color:var(--ink)}
 
 /* distribution */
 .dist{display:flex;gap:26px;flex-wrap:wrap}

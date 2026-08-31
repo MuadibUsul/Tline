@@ -21,23 +21,13 @@ export interface ConsensusCard {
 export async function featuredConsensus(): Promise<ConsensusCard[]> {
   const assets = await prisma.asset.findMany({ where: { ticker: { in: FEATURED } } });
   const order = new Map(FEATURED.map((t, i) => [t, i]));
-  const cards: ConsensusCard[] = [];
-  for (const a of assets) {
+  // Compute each asset (and its 1/7/30-day deltas) concurrently instead of one await at a time.
+  const cards = (await Promise.all(assets.map(async (a): Promise<ConsensusCard | null> => {
     const c = await computeConsensus(a.id);
-    if (!c) continue;
-    cards.push({
-      ticker: a.ticker,
-      name: a.name,
-      score: c.score,
-      label: c.label,
-      tone: c.tone,
-      d1: await consensusChange(a.id, 1),
-      d7: await consensusChange(a.id, 7),
-      d30: await consensusChange(a.id, 30),
-      isFallback: c.isFallback,
-      windowEnd: c.windowEnd,
-    });
-  }
+    if (!c) return null;
+    const [d1, d7, d30] = await Promise.all([consensusChange(a.id, 1), consensusChange(a.id, 7), consensusChange(a.id, 30)]);
+    return { ticker: a.ticker, name: a.name, score: c.score, label: c.label, tone: c.tone, d1, d7, d30, isFallback: c.isFallback, windowEnd: c.windowEnd };
+  }))).filter((card): card is ConsensusCard => card !== null);
   cards.sort((x, y) => (order.get(x.ticker)! - order.get(y.ticker)!));
   return cards;
 }
@@ -74,11 +64,10 @@ export async function mostActive(days = 7, limit = 6) {
 
 export async function viewChanges(limit = 6) {
   const assets = await prisma.asset.findMany();
-  const out: { ticker: string; name: string; change: number }[] = [];
-  for (const a of assets) {
+  const out = (await Promise.all(assets.map(async (a) => {
     const ch = await consensusChange(a.id, 1);
-    if (ch !== null && ch !== 0) out.push({ ticker: a.ticker, name: a.name, change: ch });
-  }
+    return ch !== null && ch !== 0 ? { ticker: a.ticker, name: a.name, change: ch } : null;
+  }))).filter((row): row is { ticker: string; name: string; change: number } => row !== null);
   out.sort((x, y) => Math.abs(y.change) - Math.abs(x.change));
   return out.slice(0, limit);
 }
@@ -206,7 +195,7 @@ export async function getResearchView(id: string) {
       figures: { orderBy: [{ afterSegmentPosition: "asc" }, { ordinal: "asc" }] },
       documents: { where: { status: "ready" }, orderBy: { createdAt: "asc" } },
       translations: {
-        where: { locale: "zh-CN", status: "reviewed" },
+        where: { locale: "zh-CN" },
         take: 1,
         include: { segments: { orderBy: { position: "asc" } } },
       },

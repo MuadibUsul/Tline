@@ -9,12 +9,11 @@ const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)",
 export default async function ConsensusPage() {
   const locale = await getLocale();
   const assets = await prisma.asset.findMany({ orderBy: { assetClass: "asc" } });
-  const rows = [] as { ticker: string; name: string; cls: string; score: number; tone: string; label: string; n: number; isFallback: boolean; windowEnd: Date }[];
-  for (const a of assets) {
-    const c = await computeConsensus(a.id);
-    if (!c) continue;
-    rows.push({ ticker: a.ticker, name: a.name, cls: a.assetClass, score: c.score, tone: c.tone, label: c.label, n: c.institutionCount, isFallback: c.isFallback, windowEnd: c.windowEnd });
-  }
+  // Score every asset concurrently rather than sequentially awaiting each consensus.
+  const scored = await Promise.all(assets.map(async (a) => ({ a, c: await computeConsensus(a.id) })));
+  const rows = scored.flatMap(({ a, c }) => c
+    ? [{ ticker: a.ticker, name: a.name, cls: a.assetClass, score: c.score, tone: c.tone, label: c.label, n: c.institutionCount, isFallback: c.isFallback, windowEnd: c.windowEnd }]
+    : []);
   rows.sort((x, y) => y.score - x.score);
 
   return (

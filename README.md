@@ -99,6 +99,14 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 | `python scripts/robots_audit.py` | Re-audit robots.txt for all 64 → Excel + `data/crawl_policy.json` |
 | `npm run ingest` | Live-crawl compliant sources (`-- --slug=ubs`, `-- --all`, `-- --limit=3`, `-- --resume-minutes=60`); blocked/manual are refused |
 | `npm run ingest:probe -- --sample=3 --render --output=data/crawl-probe.json` | Read-only live coverage audit with discovery, quality-gate and access-failure evidence |
+| `npm run macro:sync -- --provider=bls` | Sync one official macro provider (`bls`, `bea`, `fred`, `eia`, `eurostat`, `ecb`); use `--all` for all |
+| `npm run macro:calendar` | Idempotently sync future U.S. economic releases from official agency calendars with FRED fallback |
+| `npm run macro:watch` | Poll imminent releases using the configured hot/warm/late cadence |
+| `npm run macro:revision` | Refresh the recent two-year window and append genuine revisions |
+| `npm run macro:policy` | Sync and parse official central-bank policy documents |
+| `npm run macro:scheduler` | Run the separate Macro calendar/provider/watch/revision/policy/alert scheduler |
+| `npm run macro:backfill -- --all --from=2020-01-01 --dry-run` | Preview a bounded, restartable historical backfill; omit `--dry-run` to persist |
+| `npm run macro:audit` | Write `data/macro/audit-YYYYMMDD.json` and fail on severe integrity issues |
 | `npm run consensus` | Recompute + snapshot all asset consensus, then evaluate alerts |
 | `npm run translate` | Translate articles missing Chinese output and build ready bilingual PDFs (`--retry-review` is explicit) |
 | `npm run documents` | Rebuild article PDF assets |
@@ -106,6 +114,8 @@ Or, in one shot after `npm install`: `npm run setup && npm run dev`.
 | `npm run prices:import -- --file=prices.csv --source=vendor` | Import `ticker,timestamp,value` observations |
 | `npm run alerts` | Seed/refresh the demo user's watchlist + rules and fire alerts |
 | `npm run reparse -- --limit=20` | Parse articles missing analysis; use `--retry-review` or `--all` only when explicitly intended |
+
+Only emails listed in `ADMIN_EMAILS` can discover or open `/admin`. The owner can inspect source health, recent jobs and review queues, pause/resume compliant sources, and queue failed sources for the next scheduler pass; every change is written to `AuditLog`.
 
 > **Live ingest note:** the application does not seed synthetic research. A source appears
 > only after its public article passes URL, publication-date, full-body and document checks.

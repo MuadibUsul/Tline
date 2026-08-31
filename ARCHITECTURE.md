@@ -144,6 +144,7 @@ Playwright 仅用于正常呈现公开 JS 页面：
 - `npm run ingest:probe`：对 59 个合规候选源做无副作用实时探测，输出 feed/sitemap/listing/PDF 数量、抽样通过数和失败分类。
 - `Institution.lastCrawl*`：记录 `running/succeeded/empty/paused/refused/failed`，零候选不再伪装成成功。
 - `JobRun`：记录一次全局任务的参数、尝试、耗时、结果指标和错误。
+- `/admin`：复用单体认证、权限和 Prisma 事实库的运营界面；来源暂停与重试不会覆盖 robots 合规策略，并写入 `AuditLog`。
 - `GET /api/health`：返回数据库、存储、来源状态分布、24 小时内成功数和最近一次 ingest 结果。
 
 `ingest:probe` 只用于首次接入、规则变更和故障验收，不能成为 scheduler 的发现依赖。正式采集默认把时间窗口硬限制在当月月初之后；历史内容不主动回溯，已入库正文永久积累。抓取只写英文事实源与 segments，结构化、翻译和 PDF 由 scheduler 后续独立命令处理，任何模型故障都不会阻塞采集。
@@ -428,6 +429,27 @@ function can(user: User | null, permission: Permission): boolean;
 - `model/promptVersion` 旧于当前版本：版本升级时用 `--all` 重建。
 
 重解析只更新 Analysis 和 ArticleAsset，不修改来源正文。译文的 Provider、模型、提示词或术语库版本落后时，独立进入重译任务。开发数据库可丢弃，因此首次接通新链路后直接重建，不为旧数据编写一次性迁移逻辑。
+
+### 8.4 Macro Intelligence 数据域
+
+Macro Intelligence 与 Article ingest、ArticleAsset 和 Institutional Consensus 保持独立。当前数据层已建立：
+
+- `MacroIndicator`：网站使用的 canonical indicator identity。
+- `MacroSeriesSource`：provider series 到 canonical indicator 的映射与优先级。
+- `MacroObservation`：Decimal-safe、append-only 的 period/vintage/revision observation。
+- `MacroRelease` / `MacroReleaseValue`：scheduled/released time 与发布当时 actual/previous/consensus snapshot。
+- `MacroPolicyDocument`：官方央行原文、content hash 和可选的结构化解析。
+- `MacroSyncState`：provider/scope 级 cursor、conditional request 与同步状态。
+
+SQLite 不支持 Prisma `Json`，因此 Macro metadata 和 parsed JSON 按项目现有惯例保存为 JSON string，并在领域边界校验。所有数值事实使用 Prisma `Decimal`；`period`、`scheduledAt`、`releasedAt`、`sourcePublishedAt`、`vintageAt` 和 `fetchedAt` 分开保存。旧 observation 不原地覆盖，同 source/period 的新值只追加为新 revision。
+
+`data/macro/` 保存 canonical indicators、provider series mappings 和 release families。`src/lib/macro/` 已实现 registry validation、Decimal-safe normalization、UTC/timezone helper、SHA-256 raw hash、registry upsert 和 transaction 内的 append-only revision decision；相同值的后续抓取不制造虚假 revision，不同 provider 的 vintage 相互独立。
+
+`src/lib/macro/providers/` 已接入 BLS、BEA、FRED、EIA、Eurostat 与 ECB。adapter 共用 timeout、有限重试、provider 级限速、统一 User-Agent 和 secret-safe structured error；SDMX provider 使用同等的 CSV 边界。`fetch` 可注入，测试只读取裁剪后的官方响应 fixture。BLS key 可选，BEA/FRED/EIA key 来自环境变量，Eurostat/ECB 使用公开官方接口。映射参数保存在 registry，不散落在 adapter。`npm run macro:sync -- --provider=<name>` 或 `--all` 会同步 registry、规范化 observation，并通过 append-only 存储幂等落库和记录 `JobRun`。
+
+`src/lib/macro/calendar.ts` 建立 release-centric Economic Calendar。优先读取 BLS iCal、BEA release schedule、Federal Reserve FOMC calendar 和 EIA WPSR holiday schedule；官方来源缺失时可用 FRED release dates，手工候选只作为最后 fallback。release identity 与 `scheduledAt` 分离，因此官方改期更新原记录而不制造重复；同步缺失不会自动取消既有事件。所有时间按来源 `America/New_York` 解释并以 UTC 落库，family registry 同时保存 importance 与 watcher polling strategy。
+
+完整领域决策见 `docs/adr/ADR-macro-intelligence.md`。Release watcher、独立 Macro scheduler、历史回填、审计、告警与 `/macro` Web 查询均已接入；它们仍不写入 Article 或 Institutional Consensus 数据域。
 
 ## 9. Consensus 与信号
 

@@ -1,10 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    // Prisma client is a server-only dependency
-    serverComponentsExternalPackages: ["@prisma/client", "prisma"],
-  },
+  // Prisma client is a server-only dependency. This option is stable in Next 15.
+  serverExternalPackages: ["@prisma/client", "prisma"],
 };
 
 export default nextConfig;

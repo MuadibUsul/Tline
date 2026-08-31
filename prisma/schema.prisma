@@ -11,45 +11,53 @@ datasource db {
 }
 
 model Institution {
-  id               String    @id @default(cuid())
-  slug             String    @unique
-  name             String
-  country          String?
-  homepage         String?
-  researchUrl      String
-  rssUrl           String?
-  sitemapUrl       String?
-  rating           Int       @default(4) // stars 3..5 from the source list
-  authorityScore   Float     @default(0.85) // 0..1 weight used by the consensus engine
-  priority         Int       @default(3) // 1 = phase-1 high-value source
-  updateFreq       String? // annual estimate from the source list
-  language         String    @default("en")
-  crawlPolicy      String    @default("allowed") // allowed | delayed | blocked | manual (from robots audit)
-  crawlDelay       Int? // seconds; from robots Crawl-delay, honored by the crawler
-  requiresRender   Boolean   @default(false) // explicit opt-in for public JS-rendered pages
-  lastCrawlAt      DateTime?
-  lastCrawlStatus  String? // running | succeeded | empty | paused | refused | failed
-  lastCrawlMessage String?
-  lastSuccessAt    DateTime?
-  createdAt        DateTime  @default(now())
+  id                  String    @id @default(cuid())
+  slug                String    @unique
+  name                String
+  country             String?
+  homepage            String?
+  researchUrl         String
+  rssUrl              String?
+  sitemapUrl          String?
+  rating              Int       @default(4) // stars 3..5 from the source list
+  authorityScore      Float     @default(0.85) // 0..1 weight used by the consensus engine
+  priority            Int       @default(3) // 1 = phase-1 high-value source
+  updateFreq          String? // annual estimate from the source list
+  language            String    @default("en")
+  crawlPolicy         String    @default("allowed") // allowed | delayed | blocked | manual (from robots audit)
+  monitoringEnabled   Boolean   @default(true) // operational pause; never overrides crawlPolicy
+  crawlDelay          Int? // seconds; from robots Crawl-delay, honored by the crawler
+  requiresRender      Boolean   @default(false) // explicit opt-in for public JS-rendered pages
+  crawlIntervalSec    Int? // null selects RSS/static/render defaults (60/180/600 seconds)
+  nextCrawlAt         DateTime?
+  consecutiveFailures Int       @default(0)
+  lastCrawlAt         DateTime?
+  lastCrawlStatus     String? // running | succeeded | empty | paused | refused | failed
+  lastCrawlMessage    String?
+  lastSuccessAt       DateTime?
+  lastDiscoveredAt    DateTime?
+  createdAt           DateTime  @default(now())
 
   articles  Article[]
   forecasts Forecast[]
+
+  @@index([monitoringEnabled, nextCrawlAt])
 }
 
 model Article {
-  id            String   @id @default(cuid())
-  institutionId String
-  title         String
-  author        String?
-  publishedAt   DateTime
-  sourceUrl     String
-  language      String   @default("en")
-  urlHash       String   @unique
-  titleHash     String
-  contentHash   String
-  rawText       String? // canonical cleaned English body; access is permission-controlled
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  institutionId  String
+  title          String
+  author         String?
+  publishedAt    DateTime
+  sourceUrl      String
+  language       String   @default("en")
+  urlHash        String   @unique
+  titleHash      String
+  contentHash    String
+  rawText        String? // canonical cleaned English body; access is permission-controlled
+  disclaimerText String? // publisher legal disclosure, excluded from analysis/translation
+  createdAt      DateTime @default(now())
 
   institution   Institution          @relation(fields: [institutionId], references: [id])
   analysis      Analysis?
@@ -99,25 +107,25 @@ model AtomicView {
 }
 
 model Analysis {
-  id              String   @id @default(cuid())
-  articleId       String   @unique
-  summary         String
-  summaryZh       String?
-  keyArguments    String   @default("[]") // JSON string
-  keyArgumentsZh  String   @default("[]")
-  keyNumbers      String   @default("[]") // JSON string [{label,value}]
-  keyNumbersZh    String   @default("[]")
-  risks           String   @default("[]") // JSON string
-  risksZh         String   @default("[]")
-  interpretation  String? // AI trading interpretation
+  id               String   @id @default(cuid())
+  articleId        String   @unique
+  summary          String
+  summaryZh        String?
+  keyArguments     String   @default("[]") // JSON string
+  keyArgumentsZh   String   @default("[]")
+  keyNumbers       String   @default("[]") // JSON string [{label,value}]
+  keyNumbersZh     String   @default("[]")
+  risks            String   @default("[]") // JSON string
+  risksZh          String   @default("[]")
+  interpretation   String? // AI trading interpretation
   interpretationZh String?
-  importanceScore Float    @default(0.5)
-  confidence      Float    @default(0.6)
-  provider        String   @default("local")
-  model           String   @default("mock-rules-v1")
-  promptVersion   String   @default("v1")
-  reviewStatus    String   @default("ok") // ok | needs_review
-  createdAt       DateTime @default(now())
+  importanceScore  Float    @default(0.5)
+  confidence       Float    @default(0.6)
+  provider         String   @default("local")
+  model            String   @default("mock-rules-v1")
+  promptVersion    String   @default("v1")
+  reviewStatus     String   @default("ok") // ok | needs_review
+  createdAt        DateTime @default(now())
 
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 }
@@ -286,6 +294,227 @@ model ConsensusHistory {
   asset Asset @relation(fields: [assetId], references: [id])
 
   @@index([assetId, timestamp])
+}
+
+// ---- Macro Intelligence. Independent from Article ingest and Institutional Consensus. ----
+
+model MacroIndicator {
+  id                 String   @id @default(cuid())
+  canonicalKey       String   @unique
+  nameEn             String
+  nameZh             String?
+  countryCode        String
+  currency           String?
+  category           String
+  frequency          String
+  unit               String
+  seasonalAdjustment String?
+  importance         Int      @default(3)
+  enabled            Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  seriesSources MacroSeriesSource[]
+  releaseValues MacroReleaseValue[]
+
+  @@index([countryCode, category, enabled])
+}
+
+model MacroSeriesSource {
+  id               String   @id @default(cuid())
+  indicatorId      String
+  provider         String
+  externalSeriesId String
+  dataset          String?
+  tableCode        String?
+  lineCode         String?
+  priority         Int      @default(100)
+  sourceUrl        String?
+  metadata         String? // JSON string; SQLite has no Prisma Json support
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  indicator    MacroIndicator     @relation(fields: [indicatorId], references: [id], onDelete: Restrict)
+  observations MacroObservation[]
+
+  @@unique([provider, externalSeriesId])
+  @@index([indicatorId, enabled, priority])
+}
+
+model MacroObservation {
+  id                String    @id @default(cuid())
+  seriesSourceId    String
+  period            DateTime
+  value             Decimal
+  vintageAt         DateTime
+  fetchedAt         DateTime
+  isInitial         Boolean   @default(false)
+  revisionNo        Int       @default(0)
+  status            String    @default("PUBLISHED")
+  sourcePublishedAt DateTime?
+  rawHash           String?
+  metadata          String? // JSON string
+  createdAt         DateTime  @default(now())
+
+  seriesSource MacroSeriesSource @relation(fields: [seriesSourceId], references: [id], onDelete: Restrict)
+
+  @@unique([seriesSourceId, period, vintageAt])
+  @@unique([seriesSourceId, period, revisionNo])
+  @@index([seriesSourceId, vintageAt])
+  @@index([period, status])
+}
+
+model MacroRelease {
+  id                String    @id @default(cuid())
+  releaseKey        String    @unique
+  releaseFamily     String
+  countryCode       String
+  currency          String?
+  agency            String
+  titleEn           String
+  titleZh           String?
+  scheduledAt       DateTime
+  sourceTimezone    String
+  releasedAt        DateTime?
+  importance        Int       @default(3)
+  status            String    @default("SCHEDULED")
+  sourceUrl         String?
+  externalReleaseId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  values          MacroReleaseValue[]
+  policyDocuments MacroPolicyDocument[]
+
+  @@index([status, scheduledAt])
+  @@index([releaseFamily, scheduledAt])
+  @@index([agency, externalReleaseId])
+}
+
+model MacroReleaseValue {
+  id                       String    @id @default(cuid())
+  releaseId                String
+  indicatorId              String
+  observationPeriod        DateTime
+  actualInitial            Decimal?
+  previousAtRelease        Decimal?
+  revisedPreviousAtRelease Decimal?
+  consensusAtRelease       Decimal?
+  consensusProvider        String?
+  consensusAsOf            DateTime?
+  surpriseRaw              Decimal?
+  surprisePct              Decimal?
+  fetchedAt                DateTime
+  createdAt                DateTime  @default(now())
+
+  release   MacroRelease   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  indicator MacroIndicator @relation(fields: [indicatorId], references: [id], onDelete: Restrict)
+
+  @@unique([releaseId, indicatorId])
+  @@index([indicatorId, observationPeriod])
+}
+
+model MacroPolicyDocument {
+  id            String    @id @default(cuid())
+  releaseId     String?
+  centralBank   String
+  docType       String
+  meetingDate   DateTime?
+  publishedAt   DateTime
+  sourceUrl     String
+  rawText       String
+  contentHash   String
+  parsedJson    String? // JSON string
+  provider      String?
+  model         String?
+  promptVersion String?
+  reviewStatus  String    @default("unparsed")
+  fetchedAt     DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  release MacroRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+
+  @@unique([sourceUrl, contentHash])
+  @@index([releaseId])
+  @@index([centralBank, docType, publishedAt])
+  @@index([contentHash])
+}
+
+model MacroSyncState {
+  id            String    @id @default(cuid())
+  provider      String
+  scopeKey      String
+  cursor        String?
+  etag          String?
+  lastModified  String?
+  lastAttemptAt DateTime?
+  lastSuccessAt DateTime?
+  lastStatus    String    @default("never")
+  lastError     String?
+  metadata      String? // JSON string
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([provider, scopeKey])
+  @@index([lastStatus, lastSuccessAt])
+}
+
+model MarketInstrument {
+  id            String   @id @default(cuid())
+  symbol        String   @unique
+  baseAsset     String
+  quoteCurrency String
+  assetClass    String
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  observations MarketObservation[]
+
+  @@index([assetClass, enabled])
+}
+
+model MarketObservation {
+  id             String   @id @default(cuid())
+  instrumentId   String
+  provider       String
+  externalSymbol String
+  observedAt     DateTime
+  fetchedAt      DateTime
+  interval       String
+  quoteCurrency  String
+  quality        String
+  status         String
+  open           Decimal?
+  high           Decimal?
+  low            Decimal?
+  close          Decimal
+  sourceUrl      String?
+  rawHash        String?
+  metadata       String?
+  createdAt      DateTime @default(now())
+
+  instrument MarketInstrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalSymbol, observedAt, interval])
+  @@index([instrumentId, observedAt])
+  @@index([quality, fetchedAt])
+}
+
+model MacroSignalSnapshot {
+  id                  String   @id @default(cuid())
+  scopeKey            String   @default("GLOBAL")
+  methodologyVersion  String
+  generatedAt         DateTime
+  contextJson         String
+  inputReleaseIds     String
+  inputObservationIds String
+  createdAt           DateTime @default(now())
+
+  @@index([scopeKey, generatedAt])
+  @@index([methodologyVersion, generatedAt])
 }
 
 // ---- User side (Phase 2). Refs to assets/institutions are scalar (ticker/slug). ----

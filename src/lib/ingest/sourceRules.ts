@@ -27,6 +27,9 @@ const RULES: Record<string, SourceRule> = {
     candidatePath: /\/insights\//i,
   },
   rbc: {
+    // The registered source is Canadian analysis; the US Week Ahead section carries the
+    // US data previews (payrolls, CPI) whose forecasts feed the expectations pipeline.
+    listingUrls: ["https://www.rbc.com/en/economics/us-week-ahead/"],
     articleRejected: /^Featured Analysis\s*$/i,
   },
   commerzbank: {

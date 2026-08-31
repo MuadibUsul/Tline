@@ -15,6 +15,7 @@ export type SpotlightRelease = {
   actual: number | null;
   previous: number | null;
   consensus: number | null;
+  consensusCount: number;
   unit: string;
   analysis: string | null;
 };
@@ -92,12 +93,12 @@ export default function ReleaseSpotlight({ releases, locale }: { releases: Spotl
             <span className="spot-actual">{focal.actual}</span>
             <span className="spot-unit">{focal.unit}</span>
             {change !== null && <span className={`spot-chg ${change >= 0 ? "up" : "down"}`}>{change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}</span>}
-            <span className="spot-prev">{zh ? "前值" : "prev"} {focal.previous ?? "—"}{focal.consensus !== null ? ` · ${zh ? "预期" : "cons."} ${focal.consensus}` : ""}</span>
+            <span className="spot-prev">{zh ? "前值" : "prev"} {focal.previous ?? "—"}{focal.consensus !== null ? ` · ${zh ? "机构预期" : "cons."} ${focal.consensus}${focal.consensusCount ? ` (${focal.consensusCount}${zh ? "家" : ""})` : ""}` : ""}</span>
           </div>
         ) : (
           <div className="spot-figure">
             <span className="spot-countdown">{countdown(focal.sched, now, zh)}</span>
-            <span className="spot-prev">{beijing(focal.scheduledAt, zh)} · {zh ? "前值" : "prev"} {focal.previous ?? "—"}{focal.consensus !== null ? ` · ${zh ? "预期" : "cons."} ${focal.consensus}` : ""}</span>
+            <span className="spot-prev">{beijing(focal.scheduledAt, zh)} · {zh ? "前值" : "prev"} {focal.previous ?? "—"}{focal.consensus !== null ? ` · ${zh ? "机构预期" : "cons."} ${focal.consensus}${focal.consensusCount ? ` (${focal.consensusCount}${zh ? "家" : ""})` : ""}` : ""}</span>
           </div>
         )}
         <p className="spot-analysis">{focal.analysis

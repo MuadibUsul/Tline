@@ -44,12 +44,20 @@ export function parseReferencePeriod(text: string, fallbackYear = new Date().get
   return null;
 }
 
-const SYSTEM = `You extract explicit numeric forecasts an institution makes for UPCOMING official economic data releases (nonfarm payrolls, unemployment rate, CPI, core CPI, PPI, PCE, JOLTS, GDP, etc.).
-For every forecast the author is predicting for a scheduled release, output the indicator name, the reference period (e.g. "August 2026" or "Q2 2026"), the numeric value, its unit, and a short verbatim quote.
-Only include forecasts the author themselves states, with an explicit number, for a data release. Ignore past actual values, market pricing, and vague qualitative statements.
-Return ONLY JSON: {"forecasts":[{"indicator":string,"referencePeriod":string,"value":string,"unit":string,"quote":string}]}.`;
+const SYSTEM = `You extract FORWARD-LOOKING numeric forecasts an institution makes for UPCOMING United States official data releases ONLY (US nonfarm payrolls, US unemployment rate, US CPI / core CPI, US PPI, US PCE, US JOLTS job openings, US GDP).
+Include a forecast only if ALL of these hold:
+- it is the author's own prediction for a scheduled release that has NOT yet been published;
+- it states an explicit number and a reference period;
+- it concerns a UNITED STATES release. Ignore every other country entirely.
+NEVER include a value that is described as already released, reported, printed, or written in the past tense ("came in", "rose", "grew", "surprised", "printed at"): those are actuals, not forecasts.
+For each kept forecast output the country, indicator name, reference period (e.g. "August 2026" or "Q2 2026"), numeric value, unit, and a short verbatim quote.
+Return ONLY JSON: {"forecasts":[{"country":string,"indicator":string,"referencePeriod":string,"value":string,"unit":string,"quote":string}]}.`;
 
-interface RawForecast { indicator?: string; referencePeriod?: string; value?: string; unit?: string; quote?: string }
+interface RawForecast { country?: string; indicator?: string; referencePeriod?: string; value?: string; unit?: string; quote?: string }
+
+const IS_US = /\b(u\.?s\.?a?|united states|america)\b/i;
+// Past-tense actuals masquerading as forecasts — belt-and-braces alongside the prompt.
+const PAST_ACTUAL = /\b(came in|printed at|rose to|fell to|grew|surprised|jumped|climbed|declined to|beat expectations|missed expectations|was reported|were reported)\b/i;
 
 /** Extract normalized forecasts from one research article. Institution-agnostic. */
 export async function extractForecasts(
@@ -66,6 +74,9 @@ export async function extractForecasts(
   const rows = Array.isArray(value.forecasts) ? value.forecasts : [];
   const out: ExtractedForecast[] = [];
   for (const row of rows) {
+    // Structural gate: US releases only (we only track US indicators), forward-looking only.
+    if (!IS_US.test(`${row.country ?? ""} ${row.indicator ?? ""} ${row.quote ?? ""}`)) continue;
+    if (PAST_ACTUAL.test(row.quote ?? "")) continue;
     const indicatorKey = normalizeIndicator(`${row.indicator ?? ""} ${row.quote ?? ""}`);
     const referencePeriod = row.referencePeriod ? parseReferencePeriod(row.referencePeriod) : null;
     const numeric = row.value != null ? Number(String(row.value).replace(/[^0-9.\-]/g, "")) : NaN;

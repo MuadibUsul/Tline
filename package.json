@@ -23,6 +23,7 @@
     "macro:alerts": "tsx scripts/macro-alerts.ts",
     "macro:scheduler": "node scripts/macro-scheduler.mjs",
     "macro:backfill": "tsx scripts/macro-backfill.ts",
+    "macro:forecasts": "tsx prisma/macro-forecasts.ts",
     "macro:audit": "tsx scripts/macro-audit.ts",
     "reparse": "tsx prisma/reparse.ts",
     "translate": "tsx prisma/translate.ts",

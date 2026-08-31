@@ -38,8 +38,9 @@ model Institution {
   lastDiscoveredAt    DateTime?
   createdAt           DateTime  @default(now())
 
-  articles  Article[]
-  forecasts Forecast[]
+  articles       Article[]
+  forecasts      Forecast[]
+  macroForecasts MacroForecast[]
 
   @@index([monitoringEnabled, nextCrawlAt])
 }
@@ -65,8 +66,9 @@ model Article {
   segments      ArticleSegment[]
   translations  ArticleTranslation[]
   documents     ArticleDocument[]
-  atomicViews   AtomicView[]
-  figures       ArticleFigure[]
+  atomicViews    AtomicView[]
+  figures        ArticleFigure[]
+  macroForecasts MacroForecast[]
 
   @@index([institutionId, publishedAt])
   @@index([titleHash])
@@ -403,6 +405,9 @@ model MacroRelease {
   status            String    @default("SCHEDULED")
   sourceUrl         String?
   externalReleaseId String?
+  analysisEn        String? // AI read-out generated on release (actual vs consensus/previous)
+  analysisZh        String?
+  analysisAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -412,6 +417,26 @@ model MacroRelease {
   @@index([status, scheduledAt])
   @@index([releaseFamily, scheduledAt])
   @@index([agency, externalReleaseId])
+}
+
+model MacroForecast {
+  id              String   @id @default(cuid())
+  institutionId   String
+  indicatorKey    String // canonical indicator key, e.g. US_NFP
+  referencePeriod DateTime // first day of the forecast month/quarter
+  value           Float
+  unit            String?
+  quote           String?
+  articleId       String? // source research article
+  asOf            DateTime // article publication time (recency for de-duplication)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  article     Article?    @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@unique([institutionId, indicatorKey, referencePeriod])
+  @@index([indicatorKey, referencePeriod])
 }
 
 model MacroReleaseValue {
@@ -675,4 +700,14 @@ model JobRun {
 
   @@index([name, startedAt])
   @@index([status, startedAt])
+}
+
+model WorkerHeartbeat {
+  name       String   @id
+  status     String   @default("running")
+  details    String   @default("{}")
+  startedAt  DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+
+  @@index([lastSeenAt])
 }

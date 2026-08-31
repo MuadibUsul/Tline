@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
 import { beijingDateTime, unitLabel } from "@/lib/macro/presentation";
 import ReleaseSpotlight, { type SpotlightRelease } from "./ReleaseSpotlight";
+import { getReleaseConsensusMap } from "@/lib/macro/releaseConsensus";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +38,10 @@ export default async function MacroPage() {
   });
   const categories = [...new Set([...CATEGORY_ORDER, ...rows.map((row) => row.indicator.category)])].filter((category) => rows.some((row) => row.indicator.category === category));
 
+  const consensusMap = await getReleaseConsensusMap(calendar);
   const spotlight: SpotlightRelease[] = calendar.map((release) => {
     const value = release.values[0];
+    const consensus = consensusMap.get(release.id);
     return {
       id: release.id,
       titleEn: release.titleEn,
@@ -50,9 +53,11 @@ export default async function MacroPage() {
       status: release.status,
       actual: toNum(value?.actualInitial),
       previous: toNum(value?.revisedPreviousAtRelease ?? value?.previousAtRelease),
-      consensus: toNum(value?.consensusAtRelease),
-      unit: value?.indicator ? unitLabel(value.indicator.unit, locale) : "",
-      analysis: null,
+      // Our own institutional consensus (mined from research) takes precedence; fall back to any captured value.
+      consensus: consensus?.median ?? toNum(value?.consensusAtRelease),
+      consensusCount: consensus?.count ?? 0,
+      unit: value?.indicator ? unitLabel(value.indicator.unit, locale) : consensus?.unit ?? "",
+      analysis: (locale === "zh-CN" ? release.analysisZh : release.analysisEn) ?? null,
     };
   });
 

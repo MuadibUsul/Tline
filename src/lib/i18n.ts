@@ -177,7 +177,10 @@ export function articleTimestamp(publishedAt: Date | string, createdAt: Date | s
   const dateOnly = published.getUTCHours() === 0 && published.getUTCMinutes() === 0 && published.getUTCSeconds() === 0 && published.getUTCMilliseconds() === 0;
   if (!dateOnly) return published;
   const discovered = new Date(createdAt);
-  return new Date(Date.UTC(published.getUTCFullYear(), published.getUTCMonth(), published.getUTCDate(), discovered.getUTCHours(), discovered.getUTCMinutes(), discovered.getUTCSeconds()));
+  const composed = Date.UTC(published.getUTCFullYear(), published.getUTCMonth(), published.getUTCDate(), discovered.getUTCHours(), discovered.getUTCMinutes(), discovered.getUTCSeconds());
+  // Never later than discovery: a date-only item can't read as newer than when we found it
+  // (guards a post-dated publication discovered before its date from showing a future time).
+  return new Date(Math.min(composed, discovered.getTime()));
 }
 
 export function relativeTime(value: Date | string, locale: Locale) {

@@ -10,6 +10,11 @@ test("articleTimestamp keeps a publisher time but falls back to discovery time f
   const dateOnly = new Date("2026-08-28T00:00:00Z");
   const discovered = new Date("2026-08-31T10:40:19Z");
   assert.equal(articleTimestamp(dateOnly, discovered).toISOString(), "2026-08-28T10:40:19.000Z");
+  // A publication dated today but discovered late yesterday must not read as a future time.
+  assert.equal(
+    articleTimestamp(new Date("2026-09-01T00:00:00Z"), new Date("2026-08-31T23:50:00Z")).toISOString(),
+    "2026-08-31T23:50:00.000Z",
+  );
 });
 
 test("relativeTime is minute-precise between one hour and one day", () => {

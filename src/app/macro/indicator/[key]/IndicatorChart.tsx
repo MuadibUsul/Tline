@@ -52,13 +52,16 @@ export default function IndicatorChart({ series, unit, locale }: { series: Serie
         </div>
       </div>
       <svg className="macro-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={zh ? "历史走势图" : "history chart"}>
-        {ticks.map((t, i) => (
+        {data.length < 2 && (
+          <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="13" fill="var(--muted)" fontFamily="var(--sans)">{zh ? "本区间数据不足" : "Not enough data in range"}</text>
+        )}
+        {data.length >= 2 && ticks.map((t, i) => (
           <g key={i}>
             <line x1={PL} x2={W - PR} y1={y(t)} y2={y(t)} stroke="var(--border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
             <text x={PL - 6} y={y(t) + 3} textAnchor="end" fontSize="10" fill="var(--faint)" fontFamily="var(--mono)">{fmt(t)}</text>
           </g>
         ))}
-        {metric === "value" ? (
+        {data.length >= 2 && (metric === "value" ? (
           <>
             <path d={area} fill="var(--accent)" fillOpacity="0.1" />
             <path d={line} fill="none" stroke="var(--accent-ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
@@ -67,7 +70,7 @@ export default function IndicatorChart({ series, unit, locale }: { series: Serie
           data.map((d, i) => (
             <rect key={i} x={x(i) - barW / 2} width={barW} y={Math.min(y(d.v), y(0))} height={Math.abs(y(d.v) - y(0))} fill={d.v >= 0 ? "var(--bull)" : "var(--bear)"} opacity="0.9" />
           ))
-        )}
+        ))}
         {data.length > 1 && [0, Math.floor(data.length / 2), data.length - 1].map((i, k) => (
           <text key={k} x={x(i)} y={H - 6} textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"} fontSize="10" fill="var(--faint)" fontFamily="var(--mono)">{yearLabel(data[i].t)}</text>
         ))}

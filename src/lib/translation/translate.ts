@@ -202,6 +202,7 @@ export async function translateArticle(
   title: string,
   segments: SourceSegment[],
   provider = getLLMProvider(process.env.TRANSLATION_PROVIDER),
+  reviewer = provider,
 ): Promise<TranslationResult> {
   if (!provider) throw new Error("No LLM provider is configured for translation.");
   const source = articleText(title, segments);
@@ -261,8 +262,7 @@ export async function translateArticle(
   const quality = validateTranslation(source, translated, segments.length, draftSegments.length);
 
   let review: ReviewResult | null = null;
-  if (quality.passed) {
-    const reviewer = getLLMProvider(process.env.TRANSLATION_REVIEW_PROVIDER) ?? provider;
+  if (quality.passed && reviewer) {
     try {
       review = await reviewDraft(reviewer, source, translated);
     } catch {
@@ -312,7 +312,11 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
     });
   }
 
-  const result = await translateArticle(article.institution.name, article.title, article.segments, provider);
+  // Production may review with a distinct provider; resolve it here (not inside the
+  // pure translateArticle) so unit tests that inject a provider stay deterministic.
+  const translationProvider = provider ?? getLLMProvider(process.env.TRANSLATION_PROVIDER);
+  const reviewer = getLLMProvider(process.env.TRANSLATION_REVIEW_PROVIDER) ?? translationProvider ?? undefined;
+  const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider ?? undefined, reviewer);
   return prisma.$transaction(async (tx) => {
     const translation = await tx.articleTranslation.upsert({
       where: { articleId_locale: { articleId, locale: "zh-CN" } },

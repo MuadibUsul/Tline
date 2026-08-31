@@ -26,6 +26,7 @@
     "macro:audit": "tsx scripts/macro-audit.ts",
     "reparse": "tsx prisma/reparse.ts",
     "translate": "tsx prisma/translate.ts",
+    "translate:eval": "tsx prisma/translate-eval.ts",
     "documents": "tsx prisma/documents.ts",
     "consensus": "tsx src/lib/ingest/recompute.ts",
     "forecasts": "tsx prisma/forecasts.ts",

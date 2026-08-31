@@ -92,15 +92,46 @@ class DeepSeekProvider implements LLMProvider {
   }
 }
 
+class GeminiProvider implements LLMProvider {
+  readonly name = "gemini";
+  readonly model = process.env.GEMINI_MODEL || process.env.LLM_MODEL || "gemini-2.0-flash";
+
+  async complete(input: CompletionInput): Promise<CompletionResult> {
+    const baseUrl = (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
+    const response = await fetch(`${baseUrl}/v1beta/models/${this.model}:generateContent`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": process.env.GEMINI_API_KEY ?? "",
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: input.system }] },
+        contents: [{ role: "user", parts: [{ text: input.user }] }],
+        generationConfig: { maxOutputTokens: input.maxTokens ?? 1800, temperature: 0, responseMimeType: "application/json" },
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!response.ok) {
+      throw new Error(`Gemini request failed (${response.status}): ${(await response.text()).slice(0, 500)}`);
+    }
+    const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const text = (data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") || "").trim();
+    if (!text) throw new Error("Gemini returned an empty completion.");
+    return { text, provider: this.name, model: this.model };
+  }
+}
+
 export function getLLMProvider(preferred = process.env.LLM_PROVIDER): LLMProvider | null {
+  const providers = ["anthropic", "openai", "deepseek", "gemini"];
   const requested = preferred?.toLowerCase();
-  const order = requested && ["anthropic", "openai", "deepseek"].includes(requested)
-    ? [requested, ...["anthropic", "openai", "deepseek"].filter((name) => name !== requested)]
-    : ["anthropic", "openai", "deepseek"];
+  const order = requested && providers.includes(requested)
+    ? [requested, ...providers.filter((name) => name !== requested)]
+    : providers;
   for (const name of order) {
     if (name === "anthropic" && process.env.ANTHROPIC_API_KEY) return new AnthropicProvider();
     if (name === "openai" && process.env.OPENAI_API_KEY) return new OpenAIProvider();
     if (name === "deepseek" && process.env.DEEPSEEK_API_KEY) return new DeepSeekProvider();
+    if (name === "gemini" && process.env.GEMINI_API_KEY) return new GeminiProvider();
   }
   return null;
 }

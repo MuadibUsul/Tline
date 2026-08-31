@@ -58,20 +58,25 @@ function sourcePayload(
     institution,
     title,
     locale: "zh-CN",
-    glossary,
     correction_issues: issues,
     segments: segments.map(({ position, heading, text }) => ({ position, heading, text })),
   });
 }
 
+// The glossary lives in the (constant) system prompt so the whole system prefix is
+// identical on every request — this is what lets DeepSeek's automatic context cache
+// hit, instead of re-billing the glossary as fresh input tokens each call.
 const TRANSLATION_SYSTEM = `You are a senior Chinese-language editor at a global financial institution.
 Translate the complete English research article into professional Simplified Chinese.
 Be faithful, complete, restrained, and consistent. Never summarize, omit, add analysis, or strengthen uncertainty.
 Preserve every number, currency symbol, percentage, basis-point value, date, ticker, proper noun, and segment position.
 Keep Arabic digit strings and scale units verbatim: never spell digits as Chinese numerals or convert 503bn into 5030亿.
 Preserve every __TL_NUM_n__ and __TLD_x__ placeholder exactly; they will be restored after translation.
-Apply the supplied glossary. Keep official tickers and product names unchanged.
-Return ONLY JSON: {"title":string,"segments":[{"position":number,"heading":string|null,"text":string}]}.`;
+Apply the glossary below consistently. Keep official tickers and product names unchanged.
+Return ONLY JSON: {"title":string,"segments":[{"position":number,"heading":string|null,"text":string}]}.
+
+Glossary (JSON, apply consistently):
+${JSON.stringify(glossary)}`;
 
 function normalizeDraft(value: unknown, source: SourceSegment[]): TranslationDraft | null {
   if (!value || typeof value !== "object") return null;
@@ -162,7 +167,23 @@ function translationParts(segments: SourceSegment[]): TranslationPart[] {
   })));
 }
 
-const batches = (parts: TranslationPart[]): TranslationPart[][] => parts.map((part) => [part]);
+// Merge consecutive parts into one request up to the same size splitText already deemed
+// reliable (3500), so many-small-segment articles collapse to far fewer calls while no
+// single request grows larger than before (larger batches make the model drop content,
+// fail the per-batch integrity check and retry — which costs more, not less).
+function batches(parts: TranslationPart[], maxChars = 3_500): TranslationPart[][] {
+  const grouped: TranslationPart[][] = [];
+  let current: TranslationPart[] = [];
+  let size = 0;
+  for (const part of parts) {
+    const length = part.text.length + (part.heading?.length ?? 0);
+    if (current.length && size + length > maxChars) { grouped.push(current); current = []; size = 0; }
+    current.push(part);
+    size += length;
+  }
+  if (current.length) grouped.push(current);
+  return grouped;
+}
 
 function protectNumbers(value: string, values: string[]): string {
   return value.replace(/(?:[$€£¥]\s*)?[+-]?\d[\d,]*(?:\.\d+)?(?:\s?%|\s?(?:bp|bps|basis points?))?/gi, (token) => {
@@ -203,6 +224,7 @@ export async function translateArticle(
   segments: SourceSegment[],
   provider = getLLMProvider(process.env.TRANSLATION_PROVIDER),
   reviewer = provider,
+  enableReview = true,
 ): Promise<TranslationResult> {
   if (!provider) throw new Error("No LLM provider is configured for translation.");
   const source = articleText(title, segments);
@@ -261,17 +283,20 @@ export async function translateArticle(
   const translated = articleText(translatedTitle, draftSegments);
   const quality = validateTranslation(source, translated, segments.length, draftSegments.length);
 
+  // The deterministic quality gate runs on every article; the extra LLM review is a
+  // second opinion we only spend on important articles. When it is skipped, a passing
+  // deterministic gate is enough to publish (avoids marking the long tail needs_review).
   let review: ReviewResult | null = null;
-  if (quality.passed && reviewer) {
+  if (enableReview && quality.passed && reviewer) {
     try {
       review = await reviewDraft(reviewer, source, translated);
     } catch {
       review = null;
     }
   }
-  const reviewed = quality.passed && review?.pass === true;
+  const reviewed = quality.passed && (enableReview ? review?.pass === true : true);
   const qualityScore = reviewed
-    ? Number(((quality.score + (review?.score ?? 0)) / 2).toFixed(2))
+    ? Number(((quality.score + (review?.score ?? quality.score)) / 2).toFixed(2))
     : Number((quality.score * 0.7).toFixed(2));
 
   return {
@@ -293,8 +318,10 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
   let article = await prisma.article.findUnique({
     where: { id: articleId },
     include: {
-      institution: { select: { name: true } },
+      institution: { select: { name: true, rating: true } },
       segments: { orderBy: { position: "asc" } },
+      analysis: { select: { importanceScore: true } },
+      atomicViews: { select: { importance: true }, orderBy: { importance: "desc" }, take: 1 },
     },
   });
   if (!article?.rawText) throw new Error("Article has no canonical English body.");
@@ -306,8 +333,10 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
     article = await prisma.article.findUniqueOrThrow({
       where: { id: articleId },
       include: {
-        institution: { select: { name: true } },
+        institution: { select: { name: true, rating: true } },
         segments: { orderBy: { position: "asc" } },
+        analysis: { select: { importanceScore: true } },
+        atomicViews: { select: { importance: true }, orderBy: { importance: "desc" }, take: 1 },
       },
     });
   }
@@ -316,7 +345,11 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
   // pure translateArticle) so unit tests that inject a provider stay deterministic.
   const translationProvider = provider ?? getLLMProvider(process.env.TRANSLATION_PROVIDER);
   const reviewer = getLLMProvider(process.env.TRANSLATION_REVIEW_PROVIDER) ?? translationProvider ?? undefined;
-  const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider ?? undefined, reviewer);
+  // Spend the extra LLM review only on important articles; the deterministic gate covers the rest.
+  const important = article.institution.rating >= 5
+    || (article.analysis?.importanceScore ?? 0) >= 0.6
+    || (article.atomicViews[0]?.importance ?? 0) >= 4;
+  const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider ?? undefined, reviewer, important);
   return prisma.$transaction(async (tx) => {
     const translation = await tx.articleTranslation.upsert({
       where: { articleId_locale: { articleId, locale: "zh-CN" } },

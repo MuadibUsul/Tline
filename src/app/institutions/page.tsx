@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { relTime } from "@/app/_components/ui";
 import { articleTimestamp, assetName, domainTerm, formatDate, getLocale, institutionName, localizeChineseContent, localizedDataValue, tr, type Locale } from "@/lib/i18n";
-import { clusterViewsNewestFirst, rankAtomicViews, type MarketEvent } from "@/lib/viewRanking";
+import { clusterViewsNewestFirst, rankAtomicViews, VIEW_WINDOW_DAYS, type MarketEvent } from "@/lib/viewRanking";
 import marketEvents from "../../../data/market-events.json";
 import { publicationReadyWhere } from "@/lib/publication";
 
@@ -23,9 +23,11 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
   const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
   const take = 50;
-  // ponytail: rank in memory while the corpus is small; persist scores when this reaches tens of thousands of views.
+  // Only the last VIEW_WINDOW_DAYS are rankable, so bound the fetch to that window instead
+  // of loading the whole corpus; ranking still happens in memory while the set is small.
+  const windowStart = new Date(Date.now() - VIEW_WINDOW_DAYS * 864e5);
   const allViews = await prisma.atomicView.findMany({
-    where: { article: publicationReadyWhere() },
+    where: { article: publicationReadyWhere({ publishedAt: { gte: windowStart } }) },
     include: { article: { include: { institution: true } } },
   });
   const ranked = clusterViewsNewestFirst(rankAtomicViews(allViews, new Date(), marketEvents as MarketEvent[]));
@@ -58,6 +60,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
                   {view.matchedEvent && <a href={view.matchedEvent.sourceUrl} target="_blank" rel="noopener noreferrer" className="chip bear">{locale === "zh-CN" ? view.matchedEvent.titleZh : view.matchedEvent.titleEn}</a>}
                   <span className="view-horizon">{domainTerm(view.timeHorizon, locale, "时间范围见观点")}</span>
                 </div>
+                <div className="ai-analysis-label">{tr(locale, "AI-generated analytical summary · not a direct translation", "AI 观点摘要 · 非原文直译")}</div>
                 <h2><Link href={`/research/${view.articleId}`}>{copy}</Link></h2>
                 <div className="view-flash-foot">
                   {displayValue && <b>{displayValue}</b>}
@@ -65,7 +68,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
                   <span title={tr(locale, "7-day cross-institution and event heat", "7天跨机构与事件热度")}>{tr(locale, "Heat", "热度")} {view.heatScore}{view.crossInstitutionCount > 1 ? ` · ${view.crossInstitutionCount}${tr(locale, " inst.", "家机构")}` : ""}</span>
                   <span title={tr(locale, "Institution authority and rating", "机构权威度与评级")}>{tr(locale, "Authority", "机构")} {view.authorityScore}</span>
                   <span title={tr(locale, "Exponential recency score", "指数衰减新鲜度")}>{tr(locale, "Fresh", "新鲜")} {view.freshnessScore}</span>
-                  <details><summary>{tr(locale, "Evidence", "英文原文依据")}</summary><blockquote>{view.sourceQuote}</blockquote></details>
+                  <details><summary>{tr(locale, "English source evidence", "英文原文证据（非上文直译）")}</summary><blockquote>{view.sourceQuote}</blockquote></details>
                 </div>
               </div>
             </article>

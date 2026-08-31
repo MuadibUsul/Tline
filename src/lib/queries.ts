@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { computeConsensus, consensusChange, type ConsensusResult } from "./consensus";
+import { computeConsensus, computeConsensusMany, consensusDeltas, type ConsensusResult } from "./consensus";
 import { ASSETS, directionLabel } from "./assets";
 import { publicationReadyWhere } from "./publication";
 
@@ -21,13 +21,15 @@ export interface ConsensusCard {
 export async function featuredConsensus(): Promise<ConsensusCard[]> {
   const assets = await prisma.asset.findMany({ where: { ticker: { in: FEATURED } } });
   const order = new Map(FEATURED.map((t, i) => [t, i]));
-  // Compute each asset (and its 1/7/30-day deltas) concurrently instead of one await at a time.
-  const cards = (await Promise.all(assets.map(async (a): Promise<ConsensusCard | null> => {
-    const c = await computeConsensus(a.id);
-    if (!c) return null;
-    const [d1, d7, d30] = await Promise.all([consensusChange(a.id, 1), consensusChange(a.id, 7), consensusChange(a.id, 30)]);
-    return { ticker: a.ticker, name: a.name, score: c.score, label: c.label, tone: c.tone, d1, d7, d30, isFallback: c.isFallback, windowEnd: c.windowEnd };
-  }))).filter((card): card is ConsensusCard => card !== null);
+  const ids = assets.map((a) => a.id);
+  // Whole featured block in three queries: batched consensus + batched 1/7/30-day deltas.
+  const [consensus, deltas] = await Promise.all([computeConsensusMany(ids), consensusDeltas(ids, [1, 7, 30])]);
+  const cards = assets.flatMap((a): ConsensusCard[] => {
+    const c = consensus.get(a.id);
+    if (!c) return [];
+    const d = deltas.get(a.id) ?? {};
+    return [{ ticker: a.ticker, name: a.name, score: c.score, label: c.label, tone: c.tone, d1: d[1] ?? null, d7: d[7] ?? null, d30: d[30] ?? null, isFallback: c.isFallback, windowEnd: c.windowEnd }];
+  });
   cards.sort((x, y) => (order.get(x.ticker)! - order.get(y.ticker)!));
   return cards;
 }
@@ -64,10 +66,11 @@ export async function mostActive(days = 7, limit = 6) {
 
 export async function viewChanges(limit = 6) {
   const assets = await prisma.asset.findMany();
-  const out = (await Promise.all(assets.map(async (a) => {
-    const ch = await consensusChange(a.id, 1);
-    return ch !== null && ch !== 0 ? { ticker: a.ticker, name: a.name, change: ch } : null;
-  }))).filter((row): row is { ticker: string; name: string; change: number } => row !== null);
+  const deltas = await consensusDeltas(assets.map((a) => a.id), [1]);
+  const out = assets.flatMap((a) => {
+    const ch = deltas.get(a.id)?.[1] ?? null;
+    return ch !== null && ch !== 0 ? [{ ticker: a.ticker, name: a.name, change: ch }] : [];
+  });
   out.sort((x, y) => Math.abs(y.change) - Math.abs(x.change));
   return out.slice(0, limit);
 }
@@ -75,10 +78,9 @@ export async function viewChanges(limit = 6) {
 export async function getAssetView(ticker: string) {
   const asset = await prisma.asset.findUnique({ where: { ticker: ticker.toUpperCase() } });
   if (!asset) return null;
-  const c = await computeConsensus(asset.id);
-  const d1 = await consensusChange(asset.id, 1);
-  const d7 = await consensusChange(asset.id, 7);
-  const d30 = await consensusChange(asset.id, 30);
+  const [c, deltas] = await Promise.all([computeConsensus(asset.id), consensusDeltas([asset.id], [1, 7, 30])]);
+  const d = deltas.get(asset.id) ?? {};
+  const d1 = d[1] ?? null, d7 = d[7] ?? null, d30 = d[30] ?? null;
   const targets = (c?.contributors ?? []).map((x) => x.target).filter((t): t is number => t != null);
   targets.sort((a, b) => a - b);
   const dist = targets.length

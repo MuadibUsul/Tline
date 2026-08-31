@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { computeConsensus } from "@/lib/consensus";
+import { computeConsensusMany } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
 import { assetName, domainTerm, formatDate, getLocale, tr } from "@/lib/i18n";
 
@@ -9,11 +9,14 @@ const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)",
 export default async function ConsensusPage() {
   const locale = await getLocale();
   const assets = await prisma.asset.findMany({ orderBy: { assetClass: "asc" } });
-  // Score every asset concurrently rather than sequentially awaiting each consensus.
-  const scored = await Promise.all(assets.map(async (a) => ({ a, c: await computeConsensus(a.id) })));
-  const rows = scored.flatMap(({ a, c }) => c
-    ? [{ ticker: a.ticker, name: a.name, cls: a.assetClass, score: c.score, tone: c.tone, label: c.label, n: c.institutionCount, isFallback: c.isFallback, windowEnd: c.windowEnd }]
-    : []);
+  // Score every asset in two batched queries instead of one-to-three per asset.
+  const consensus = await computeConsensusMany(assets.map((a) => a.id));
+  const rows = assets.flatMap((a) => {
+    const c = consensus.get(a.id);
+    return c
+      ? [{ ticker: a.ticker, name: a.name, cls: a.assetClass, score: c.score, tone: c.tone, label: c.label, n: c.institutionCount, isFallback: c.isFallback, windowEnd: c.windowEnd }]
+      : [];
+  });
   rows.sort((x, y) => y.score - x.score);
 
   return (

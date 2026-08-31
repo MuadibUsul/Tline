@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { computeConsensus } from "@/lib/consensus";
+import { computeConsensusMany } from "@/lib/consensus";
 import { assetName, formatDate, getLocale, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,8 @@ export default async function MarketsPage() {
   const locale = await getLocale();
   const labels: Record<string, string> = { equity: tr(locale, "Equities", "股票"), rate: tr(locale, "Rates", "利率"), fx: tr(locale, "FX", "外汇"), commodity: tr(locale, "Commodities", "大宗商品"), crypto: tr(locale, "Crypto", "加密资产"), macro: tr(locale, "Macro", "宏观") };
   const assets = await prisma.asset.findMany({ orderBy: { name: "asc" } });
-  const scored = await Promise.all(assets.map(async (a) => ({ a, c: await computeConsensus(a.id) })));
+  const consensus = await computeConsensusMany(assets.map((a) => a.id));
+  const scored = assets.map((a) => ({ a, c: consensus.get(a.id) ?? null }));
 
   return (
     <main className="wrap">

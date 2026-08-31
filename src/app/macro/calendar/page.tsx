@@ -9,7 +9,7 @@ export default async function MacroCalendarPage() {
   const locale = await getLocale();
   const from = new Date(Date.now() - 30 * 86_400_000);
   const to = new Date(Date.now() + 180 * 86_400_000);
-  const releases = await prisma.macroRelease.findMany({ where: { scheduledAt: { gte: from, lte: to } }, orderBy: { scheduledAt: "asc" }, include: { values: { include: { indicator: true } } } });
+  const releases = await prisma.macroRelease.findMany({ where: { scheduledAt: { gte: from, lte: to } }, orderBy: { scheduledAt: "asc" }, take: 300, include: { values: { include: { indicator: true } } } });
   type Release = (typeof releases)[number];
   type ReleaseValue = Release["values"][number];
   const rows: Array<{ release: Release; value: ReleaseValue | null }> = [];

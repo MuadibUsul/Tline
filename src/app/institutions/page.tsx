@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { relTime } from "@/app/_components/ui";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, localizeChineseContent, localizedDataValue, tr, type Locale } from "@/lib/i18n";
-import { rankAtomicViews, type MarketEvent } from "@/lib/viewRanking";
+import { clusterViewsNewestFirst, rankAtomicViews, type MarketEvent } from "@/lib/viewRanking";
 import marketEvents from "../../../data/market-events.json";
 import { publicationReadyWhere } from "@/lib/publication";
 
@@ -26,19 +26,9 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
   // ponytail: rank in memory while the corpus is small; persist scores when this reaches tens of thousands of views.
   const allViews = await prisma.atomicView.findMany({
     where: { article: publicationReadyWhere() },
-    include: { article: { include: {
-      institution: true,
-      translations: { where: { locale: "zh-CN" }, select: { title: true }, take: 1 },
-    } } },
+    include: { article: { include: { institution: true } } },
   });
-  const ranked = rankAtomicViews(allViews, new Date(), marketEvents as MarketEvent[]);
-  const seenLatestArticles = new Set<string>();
-  const latest = [...ranked]
-    .sort((a, b) => b.article.publishedAt.getTime() - a.article.publishedAt.getTime()
-      || b.article.createdAt.getTime() - a.article.createdAt.getTime()
-      || b.importance - a.importance)
-    .filter((view) => !seenLatestArticles.has(view.articleId) && Boolean(seenLatestArticles.add(view.articleId)))
-    .slice(0, 8);
+  const ranked = clusterViewsNewestFirst(rankAtomicViews(allViews, new Date(), marketEvents as MarketEvent[]));
   const total = ranked.length;
   const views = ranked.slice((page - 1) * take, page * take);
   const pages = Math.max(1, Math.ceil(total / take));
@@ -48,21 +38,8 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Institutional Wire", "机构短讯")}</div>
         <h1>{tr(locale, "Views", "观点")}</h1>
-        <p className="sub">{tr(locale, `${total} evidence-backed views published in the latest 7 days, ranked by market heat, institution authority and freshness.`, `共 ${total} 条最近7天发布的可追溯观点，依次按市场热度、机构权重和新鲜度排序。`)}</p>
+        <p className="sub">{tr(locale, `${total} evidence-backed views published in the latest 7 days, newest first with same-topic and same-event views grouped together.`, `共 ${total} 条最近7天发布的可追溯观点，最新优先，同主题、同事件的观点聚合在一起。`)}</p>
       </div>
-
-      {page === 1 && latest.length > 0 && <section className="latest-views" aria-label={tr(locale, "Newest publications", "最新发布")}>
-        <div className="section-t">{tr(locale, "Newest publications", "最新发布")}</div>
-        <div className="latest-view-grid">{latest.map((view) => {
-          return <article className="latest-view" key={view.articleId}>
-            <div className="latest-view-meta">
-              <Link href={`/institution/${view.article.institution.slug}`}>{institutionName(view.article.institution.name, locale)}</Link>
-              <time dateTime={view.article.publishedAt.toISOString()} title={formatDate(view.article.publishedAt, locale)}>{relTime(view.article.publishedAt, locale)}</time>
-            </div>
-            <h2><Link href={`/research/${view.articleId}`}>{locale === "zh-CN" ? view.article.translations[0]?.title || view.article.title : view.article.title}</Link></h2>
-          </article>;
-        })}</div>
-      </section>}
 
       <section className="view-flash-list" aria-label={tr(locale, "Latest institutional views", "最新机构观点")}>
         {views.map((view, viewIndex) => {

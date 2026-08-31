@@ -84,3 +84,40 @@ export function rankAtomicViews<T extends RankableView>(views: T[], now = new Da
 
   return ranked.sort((a, b) => b.rankScore - a.rankScore || b.importance - a.importance || a.id.localeCompare(b.id));
 }
+
+/** Canonical cluster key: same event, else same topic, else same asset; unique otherwise. */
+function clusterKey(view: RankedView<RankableView>) {
+  if (view.matchedEvent) return `event:${view.matchedEvent.id}`;
+  const topic = normalized(view.topic);
+  if (topic) return `topic:${topic}`;
+  if (view.assetTicker) return `ticker:${view.assetTicker.toUpperCase()}`;
+  const asset = normalized(view.asset);
+  if (asset) return `asset:${asset}`;
+  return `id:${view.id}`;
+}
+
+/**
+ * Arrange the view wire newest-first while keeping same-topic/event views together:
+ * clusters are ordered by their most recent member, and members within a cluster are
+ * ordered newest-first. Enrichment (heat/authority/freshness) from rankAtomicViews is kept.
+ */
+export function clusterViewsNewestFirst<T extends RankedView<RankableView>>(views: T[]): T[] {
+  const byRecency = (a: T, b: T) =>
+    b.article.publishedAt.getTime() - a.article.publishedAt.getTime() ||
+    b.importance - a.importance ||
+    a.id.localeCompare(b.id);
+  const clusters = new Map<string, T[]>();
+  for (const view of views) {
+    const key = clusterKey(view);
+    const members = clusters.get(key);
+    if (members) members.push(view);
+    else clusters.set(key, [view]);
+  }
+  return [...clusters.values()]
+    .map((members) => members.sort(byRecency))
+    .sort((a, b) =>
+      b[0].article.publishedAt.getTime() - a[0].article.publishedAt.getTime() ||
+      b.length - a.length ||
+      a[0].id.localeCompare(b[0].id))
+    .flat();
+}

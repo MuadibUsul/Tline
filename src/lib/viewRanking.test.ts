@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rankAtomicViews, type RankableView } from "./viewRanking";
+import { clusterViewsNewestFirst, rankAtomicViews, type MarketEvent, type RankableView } from "./viewRanking";
 
 const now = new Date("2026-08-28T12:00:00.000Z");
 function view(id: string, asset: string, institutionId: string, rating: number, authorityScore: number, hoursAgo: number): RankableView {
@@ -37,4 +37,24 @@ test("an active market event receives the largest heat boost", () => {
 test("only views published within the latest seven days are returned", () => {
   const ranked = rankAtomicViews([view("boundary", "Gold", "a", 4, 0.85, 7 * 24), view("old", "Oil", "b", 4, 0.85, 7 * 24 + 1), view("future", "Rates", "c", 4, 0.85, -1)], now);
   assert.deepEqual(ranked.map((item) => item.id), ["boundary"]);
+});
+
+test("wire is newest-first with same-topic views grouped together", () => {
+  const enriched = rankAtomicViews([
+    view("gold-new", "Gold", "a", 4, 0.85, 1),
+    view("oil", "Oil", "b", 4, 0.85, 2),
+    view("gold-old", "Gold", "c", 4, 0.85, 5),
+  ], now);
+  // Gold cluster (newest member 1h ago) leads, its members newest-first, then Oil.
+  assert.deepEqual(clusterViewsNewestFirst(enriched).map((item) => item.id), ["gold-new", "gold-old", "oil"]);
+});
+
+test("views matching the same active event cluster together", () => {
+  const event: MarketEvent = { id: "jh", titleEn: "Jackson Hole", titleZh: "杰克逊霍尔", activeFrom: "2026-08-27T00:00:00Z", activeUntil: "2026-08-29T00:00:00Z", keywords: ["Warsh"], tickers: [], sourceUrl: "https://example.com" };
+  const a = { ...view("warsh-a", "Rates", "a", 4, 0.85, 3), viewEn: "Warsh turns hawkish" };
+  const b = { ...view("warsh-b", "Equities", "b", 4, 0.85, 6), viewEn: "Warsh remarks move stocks" };
+  const other = view("gold", "Gold", "c", 4, 0.85, 1);
+  const arranged = clusterViewsNewestFirst(rankAtomicViews([a, b, other], now, [event]));
+  // Gold is newest (1h) so leads; the two event views stay adjacent, newest-first.
+  assert.deepEqual(arranged.map((item) => item.id), ["gold", "warsh-a", "warsh-b"]);
 });

@@ -66,6 +66,7 @@ model Article {
   translations  ArticleTranslation[]
   documents     ArticleDocument[]
   atomicViews   AtomicView[]
+  figures       ArticleFigure[]
 
   @@index([institutionId, publishedAt])
   @@index([titleHash])
@@ -141,6 +142,27 @@ model ArticleSegment {
   translatedSegments ArticleTranslationSegment[]
 
   @@unique([articleId, position])
+  @@index([articleId])
+}
+
+model ArticleFigure {
+  id                   String   @id @default(cuid())
+  articleId            String
+  afterSegmentPosition Int // render after the body segment at this position; identical in EN and ZH
+  ordinal              Int // order among figures sharing the same anchor
+  storageKey           String
+  mimeType             String   @default("image/jpeg")
+  sourceUrl            String
+  alt                  String?
+  caption              String?
+  width                Int?
+  height               Int?
+  byteSize             Int?
+  createdAt            DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, afterSegmentPosition, ordinal])
   @@index([articleId])
 }
 

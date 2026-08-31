@@ -114,6 +114,21 @@ export async function fetchPdf(url: string, timeoutMs = 30000): Promise<Buffer |
   return result.body;
 }
 
+const IMAGE_MIME = /^image\/(png|jpe?g|gif|webp|avif)$/i;
+const IMAGE_EXT_MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", avif: "image/avif" };
+
+/** Fetch a content image (bounded size, image content-type only). */
+export async function fetchImage(url: string, timeoutMs = 20000): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const result = await fetchResource(url, timeoutMs);
+  if (!result.ok || !result.body || result.body.byteLength < 512 || result.body.byteLength > 12 * 1024 * 1024) return null;
+  const declared = result.contentType.split(";")[0].trim().toLowerCase();
+  if (IMAGE_MIME.test(declared)) return { buffer: result.body, mimeType: declared };
+  // Content-type missing/wrong: fall back to the URL extension.
+  const ext = new URL(url).pathname.split(".").pop()?.toLowerCase() ?? "";
+  if (IMAGE_EXT_MIME[ext]) return { buffer: result.body, mimeType: IMAGE_EXT_MIME[ext] };
+  return null;
+}
+
 export function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }

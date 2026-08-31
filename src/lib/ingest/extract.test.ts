@@ -4,6 +4,30 @@ import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks,
 import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
 import { stripTrailingDisclaimerSegments } from "../articleText";
 
+test("captures inline figures in document order and anchors them to body segments", () => {
+  const lead = "Our tactical allocation framework blends quantitative signals with fundamental overlays. ".repeat(6);
+  const tail = "We reduced the long-duration Treasury overweight and rotated into credit exposure this quarter. ".repeat(6);
+  const article = extractArticle(
+    `<html><head><title>Quant-anchored TAA | Bank</title></head><body><main><article><h1>Quant-anchored TAA</h1>` +
+      `<p>${lead}</p>` +
+      `<figure><img src="/images/exhibit-9.png" alt="Relative value fixed income sleeve"><figcaption>Exhibit 9: Relative value fixed income sleeve</figcaption></figure>` +
+      `<h2>Active adjustments</h2><p>${tail}</p>` +
+      `<img src="tracking/pixel.gif" alt="">` +
+      `<img src="https://cdn.example.com/exhibit-11.jpg" alt="TAA model portfolio adjustment">` +
+      `</article></main></body></html>`,
+    "https://www.bank.com/insights/quant-anchored-taa",
+  );
+  assert.equal(article.figures.length, 2);
+  assert.deepEqual(article.figures[0], {
+    url: "https://www.bank.com/images/exhibit-9.png",
+    afterSegmentPosition: 0,
+    alt: "Relative value fixed income sleeve",
+    caption: "Exhibit 9: Relative value fixed income sleeve",
+  });
+  assert.equal(article.figures[1].url, "https://cdn.example.com/exhibit-11.jpg");
+  assert.equal(article.figures[1].afterSegmentPosition, 1);
+});
+
 test("extracts an embedded publisher date and conservative URL date hints", () => {
   const article = extractArticle(`<html><head><title>CIO Insights 4Q24 | Bank</title></head><body>
     <main><h1>CIO Insights 4Q24</h1><p>${"A substantive research sentence. ".repeat(20)}</p></main>

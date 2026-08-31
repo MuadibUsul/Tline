@@ -1,9 +1,9 @@
 import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
-import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
+import { fetchImage, fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
 import { extractLinks, extractArticle, extractFeedLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
-import { ensureAssets, persistArticle, type RawArticle } from "./store";
+import { ensureAssets, persistArticle, persistArticleFigures, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
@@ -113,8 +113,8 @@ async function ingestInstitution(
     accessReason ??= lastRenderReason(url);
     return html;
   };
-  const readArticle = (html: string) => {
-    const article = extractArticle(html);
+  const readArticle = (html: string, url?: string) => {
+    const article = extractArticle(html, url);
     if (isAccessGateText(article.text)) accessReason ??= "interactive consent or guest-access gate";
     return article;
   };
@@ -244,12 +244,12 @@ async function ingestInstitution(
         let html = await fetchText(item.link);
         if (!html) html = await renderPublic(item.link);
         if (!html) continue;
-        let article = readArticle(html);
+        let article = readArticle(html, item.link);
         if (article.text.length < 700) {
           const rendered = await renderPublic(item.link);
           if (rendered) {
             html = rendered;
-            article = readArticle(rendered);
+            article = readArticle(rendered, item.link);
           }
         }
         const publishedAt = article.publishedAt || (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
@@ -261,6 +261,7 @@ async function ingestInstitution(
           author: article.author || item.creator || null,
           publishedAt,
           segments: article.segments,
+          figures: article.figures,
           disclaimerText: article.disclaimerText,
           strict: true,
         });
@@ -318,12 +319,12 @@ async function ingestInstitution(
         let artHtml = await fetchText(candidate.url);
         if (!artHtml) artHtml = await renderPublic(candidate.url);
         if (!artHtml) continue;
-        let article = readArticle(artHtml);
+        let article = readArticle(artHtml, candidate.url);
         if (article.text.length < 700) {
           const rendered = await renderPublic(candidate.url);
           if (rendered) {
             artHtml = rendered;
-            article = readArticle(rendered);
+            article = readArticle(rendered, candidate.url);
           }
         }
         const publishedAt = inferPublicationDate(candidate.url, article.title, article.publicationDateText, article.text.slice(0, 1200)) || article.publishedAt || candidate.lastModified;
@@ -338,6 +339,7 @@ async function ingestInstitution(
           author: article.author,
           publishedAt,
           segments: article.segments,
+          figures: article.figures,
           disclaimerText: article.disclaimerText,
           strict: true,
         });
@@ -373,12 +375,12 @@ async function ingestInstitution(
         let artHtml = await fetchText(link.url);
         if (!artHtml) artHtml = await renderPublic(link.url);
         if (!artHtml) continue;
-        let a = readArticle(artHtml);
+        let a = readArticle(artHtml, link.url);
         if (a.text.length < 700) {
           const rendered = await renderPublic(link.url);
           if (rendered) {
             artHtml = rendered;
-            a = readArticle(rendered);
+            a = readArticle(rendered, link.url);
           }
         }
         const publishedAt = inferPublicationDate(link.url, a.title || link.title, a.publicationDateText, a.text.slice(0, 1200)) || a.publishedAt || link.publishedAt;
@@ -393,6 +395,7 @@ async function ingestInstitution(
           author: a.author,
           publishedAt,
           segments: a.segments,
+          figures: a.figures,
           disclaimerText: a.disclaimerText,
           strict: true, // HTML-extracted → enforce the full article check
         });
@@ -409,13 +412,18 @@ async function ingestInstitution(
   }
 
   const selectedRaws = newestByPublication(raws, perLimit);
+  let figuresStored = 0;
   for (const r of selectedRaws) {
     const res = await persistArticle(inst.id, r);
+    if (res === "created") created++;
+    else if (res === "updated") updated++;
+    else if (res === "duplicate") { dup++; continue; }
+    else { empty++; continue; }
+    const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
+    if (!article) continue;
     if (res === "created") {
-      created++;
-      const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
       const native = nativePdfs.get(r.sourceUrl);
-      if (native && article) {
+      if (native) {
         try {
           await saveNativePdf(article.id, r.sourceUrl, native);
         } catch (error) {
@@ -423,9 +431,18 @@ async function ingestInstitution(
           console.warn(`  native PDF rejected for ${r.sourceUrl}: ${String(error)}`);
         }
       }
-    } else if (res === "updated") updated++;
-    else if (res === "duplicate") dup++;
-    else empty++;
+    }
+    // Download inline figures (skip when the article already has some on a refresh).
+    if (r.figures?.length && withinBudget()) {
+      const existing = res === "updated" ? await prisma.articleFigure.count({ where: { articleId: article.id } }) : 0;
+      if (existing === 0) {
+        try {
+          figuresStored += await persistArticleFigures(article.id, r.figures, (url) => allowsUrl(url) || new URL(url).origin !== origin ? fetchImage(url) : Promise.resolve(null), async () => { await sleep(delayMs); });
+        } catch (error) {
+          console.warn(`  figures skipped for ${r.sourceUrl}: ${String(error)}`);
+        }
+      }
+    }
   }
   const note = `since ${since.toISOString().slice(0, 10)} · delay ${delayMs}ms${robotsDelaySec ? " (robots)" : ""} · ${renderedCandidates}/${renderLimit} rendered${!withinBudget() ? " · time budget reached" : ""}${outOfWindow ? ` · ${outOfWindow} older` : ""}${blocked ? ` · ${blocked} url blocked` : ""}${nativeRejected ? ` · ${nativeRejected} native PDF rejected` : ""}`;
   console.log(`  ${inst.name.padEnd(26)} +${created} created · ${updated} refreshed · ${dup} dup · ${empty} empty · ${note}`);

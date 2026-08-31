@@ -227,14 +227,47 @@ const STRIP = "script,style,noscript,nav,header,footer,aside,svg,button,iframe,"
 
 export interface Segment { heading: string | null; text: string }
 
+export interface ExtractedFigure {
+  url: string; // absolute
+  afterSegmentPosition: number; // render after the body segment at this index
+  alt: string | null;
+  caption: string | null;
+}
+
 export interface ExtractedArticle {
   title: string;
   text: string;
   segments: Segment[];
+  figures: ExtractedFigure[];
   author: string | null;
   publishedAt: Date | null;
   publicationDateText: string | null;
   disclaimerText: string | null;
+}
+
+// Non-content images we never want inline in the body.
+const FIGURE_URL_DENY = /(sprite|logo|icon|avatar|favicon|pixel|spacer|tracking|beacon|1x1|placeholder|loading|share|social|badge|button|arrow|chevron|bg-|background)/i;
+
+/** Resolve the best real image URL for an <img>/<figure> node, honoring lazy-loading attributes. */
+function pickImageUrl($: cheerio.CheerioAPI, img: any, baseUrl: string | undefined): string | null {
+  const raw =
+    $(img).attr("src") ||
+    $(img).attr("data-src") ||
+    $(img).attr("data-original") ||
+    $(img).attr("data-lazy-src") ||
+    $(img).attr("srcset")?.split(",").pop()?.trim().split(/\s+/)[0] ||
+    "";
+  const candidate = raw.trim();
+  if (!candidate || candidate.startsWith("data:")) return null;
+  let absolute: string;
+  try {
+    absolute = baseUrl ? new URL(candidate, baseUrl).href : new URL(candidate).href;
+  } catch {
+    return null;
+  }
+  if (!/^https?:/i.test(absolute)) return null;
+  if (/\.svg(?:$|\?)/i.test(absolute) || FIGURE_URL_DENY.test(absolute)) return null;
+  return absolute;
 }
 
 export function newestByPublication<T extends { publishedAt: Date }>(articles: T[], limit: number): T[] {
@@ -293,7 +326,7 @@ function parsePublicationDate(value: string): Date | null {
 }
 
 /** Extract a clean title + body text (+ heading-delimited segments) from an article page. */
-export function extractArticle(html: string): ExtractedArticle {
+export function extractArticle(html: string, baseUrl?: string): ExtractedArticle {
   const $ = cheerio.load(html);
   let structuredTitle = "";
   let structuredBody = "";
@@ -381,13 +414,29 @@ export function extractArticle(html: string): ExtractedArticle {
     });
   }
 
-  // Split the chosen container into heading-delimited segments (h2/h3/h4 → p).
+  // Split the chosen container into heading-delimited segments (h2/h3/h4 → p),
+  // capturing inline figures in document order so the body keeps its illustrations.
   const segments: Segment[] = [];
+  const figures: ExtractedFigure[] = [];
+  const seenFigureUrls = new Set<string>();
   if (bestEl && bestScore >= 300) {
     let cur: { heading: string | null; buf: string[] } = { heading: null, buf: [] };
     const flush = () => { if (cur.buf.length) segments.push({ heading: cur.heading, text: cur.buf.join("\n\n") }); };
-    $(bestEl).find("h2,h3,h4,p,li").each((_, node) => {
+    $(bestEl).find("h2,h3,h4,p,li,figure,img").each((_, node) => {
       const tag = (node as any).name as string;
+      if (tag === "figure" || tag === "img") {
+        if (tag === "img" && $(node).parents("figure").length) return; // the enclosing <figure> handles it
+        const imgNode = tag === "img" ? node : $(node).find("img").get(0);
+        if (!imgNode) return;
+        const url = pickImageUrl($, imgNode, baseUrl);
+        if (!url || seenFigureUrls.has(url)) return;
+        seenFigureUrls.add(url);
+        const alt = ($(imgNode).attr("alt") || "").replace(/\s+/g, " ").trim() || null;
+        const caption = tag === "figure" ? ($(node).find("figcaption").text().replace(/\s+/g, " ").trim() || null) : null;
+        // Anchor to the section currently being built; if it is empty, to the previous one.
+        figures.push({ url, afterSegmentPosition: cur.buf.length ? segments.length : Math.max(-1, segments.length - 1), alt, caption });
+        return;
+      }
       if (tag === "li" && $(node).find("p").length) return;
       const t = $(node).text().replace(/\s+/g, " ").trim();
       if (!t) return;
@@ -421,10 +470,17 @@ export function extractArticle(html: string): ExtractedArticle {
   const text = cleanSegments.map((s) => s.text).join("\n\n");
   publishedAt ??= inferPublicationDate(title, text.slice(0, 1200));
 
+  // Keep only figures that anchor inside the retained body; clamp into range.
+  const cleanFigures = cleanSegments.length === 0 ? [] : figures.map((figure) => ({
+    ...figure,
+    afterSegmentPosition: Math.min(cleanSegments.length - 1, Math.max(-1, figure.afterSegmentPosition)),
+  }));
+
   return {
     title,
     text,
     segments: cleanSegments,
+    figures: cleanFigures,
     author: author?.slice(0, 120) || null,
     publishedAt,
     publicationDateText: visibleDateBeforeStrip || null,

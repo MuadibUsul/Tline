@@ -203,6 +203,7 @@ export async function getResearchView(id: string) {
       institution: true,
       analysis: true,
       segments: { orderBy: { position: "asc" } },
+      figures: { orderBy: [{ afterSegmentPosition: "asc" }, { ordinal: "asc" }] },
       documents: { where: { status: "ready" }, orderBy: { createdAt: "asc" } },
       translations: {
         where: { locale: "zh-CN", status: "reviewed" },

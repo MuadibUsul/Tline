@@ -11,22 +11,46 @@ function parseJson<T>(s: string | undefined, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }
 }
 
-function ArticleBody({ segments, fallback, locale, translated = false }: {
+type Figure = { id: string; afterSegmentPosition: number; alt: string | null; caption: string | null };
+
+function Figures({ items }: { items: Figure[] }) {
+  if (!items.length) return null;
+  return (
+    <>
+      {items.map((figure) => (
+        <figure className="article-figure" key={figure.id}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/figures/${figure.id}`} alt={figure.alt ?? figure.caption ?? ""} loading="lazy" />
+          {figure.caption && <figcaption>{figure.caption}</figcaption>}
+        </figure>
+      ))}
+    </>
+  );
+}
+
+function ArticleBody({ segments, fallback, locale, translated = false, figures = [] }: {
   segments: { id: string; heading: string | null; text: string }[];
   fallback: string;
   locale: Locale;
   translated?: boolean;
+  figures?: Figure[];
 }) {
   const cleanSegments = stripTrailingDisclaimerSegments(segments);
   const cleanFallback = stripTrailingDisclaimer(fallback);
   const sections = cleanSegments.length ? cleanSegments : [{ id: "fallback", heading: null, text: cleanFallback }];
   const display = (value: string) => translated && locale === "zh-CN" ? localizeChineseContent(value) : value;
+  // Figures anchor by body-segment index — identical for the English and Chinese renders.
+  const lead = figures.filter((figure) => figure.afterSegmentPosition < 0);
+  const at = (index: number) => figures.filter((figure) => figure.afterSegmentPosition === index);
+  const tail = figures.filter((figure) => figure.afterSegmentPosition >= sections.length);
   return (
     <div className="prose article-sections">
-      {sections.map((segment) => (
+      <Figures items={lead} />
+      {sections.map((segment, index) => (
         <section className="article-section" key={segment.id}>
           {segment.heading && <h3>{display(segment.heading)}</h3>}
           <div className="article-body">{display(segment.text)}</div>
+          <Figures items={index === sections.length - 1 ? [...at(index), ...tail] : at(index)} />
         </section>
       ))}
     </div>
@@ -60,7 +84,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         {locale === "en" && a.rawText && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
-            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />
+            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
           </div>
         )}
         {locale === "zh-CN" && translation && (
@@ -69,19 +93,19 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
               完整中文译文
             </div>
             <h2 style={{ fontSize: 20, marginBottom: 8 }}>{localizeChineseContent(translation.title)}</h2>
-            <ArticleBody segments={translation.segments} fallback={translation.text} locale={locale} translated />
+            <ArticleBody segments={translation.segments} fallback={translation.text} locale={locale} translated figures={a.figures} />
           </div>
         )}
         {locale === "zh-CN" && !translation && a.rawText && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
-            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />
+            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
           </div>
         )}
         {locale === "zh-CN" && translation && a.rawText && (
           <details className="article-original">
             <summary>完整英文原文</summary>
-            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} />
+            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
           </details>
         )}
         {a.disclaimerText && (

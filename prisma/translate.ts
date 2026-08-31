@@ -17,11 +17,11 @@ async function main() {
     console.log("No translation provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY or DEEPSEEK_API_KEY.");
     return;
   }
-  const articleId = arg("id");
+  const articleIds = (arg("ids") || arg("id") || "").split(",").filter(Boolean);
   const limit = Math.max(1, Number(arg("limit") || 20));
   const concurrency = Math.min(8, Math.max(1, Number(arg("concurrency") || process.env.TRANSLATION_CONCURRENCY || 3)));
   const rows = await prisma.article.findMany({
-    where: articleId ? { id: articleId, rawText: { not: null } } : { rawText: { not: null } },
+    where: articleIds.length ? { id: { in: articleIds }, rawText: { not: null } } : { rawText: { not: null } },
     select: {
       id: true,
       title: true,

@@ -4,6 +4,7 @@ import { parseArticle } from "../src/lib/ingest/parseLLM";
 import { syncForecastsForArticle } from "../src/lib/forecast";
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
+const articleIds = (process.argv.find((arg) => arg.startsWith("--ids="))?.slice(6) || process.argv.find((arg) => arg.startsWith("--id="))?.slice(5) || "").split(",").filter(Boolean);
 const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
 const limit = limitArg ? Math.max(1, Number(limitArg.split("=")[1]) || 1) : undefined;
 const concurrencyArg = process.argv.find((arg) => arg.startsWith("--concurrency="));
@@ -18,7 +19,7 @@ async function main() {
   const all = flag("all");
   const retryReview = flag("retry-review");
   const rows = await prisma.article.findMany({
-    where: { rawText: { not: null } },
+    where: articleIds.length ? { id: { in: articleIds }, rawText: { not: null } } : { rawText: { not: null } },
     select: {
       id: true,
       title: true,

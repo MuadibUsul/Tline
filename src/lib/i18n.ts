@@ -8,8 +8,9 @@ export function resolveLocale(cookie?: string, acceptLanguage?: string | null): 
   return /^zh\b/i.test(acceptLanguage?.trim() ?? "") ? "zh-CN" : "en";
 }
 
-export function getLocale(): Locale {
-  return resolveLocale(cookies().get(LOCALE_COOKIE)?.value, headers().get("accept-language"));
+export async function getLocale(): Promise<Locale> {
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
+  return resolveLocale(cookieStore.get(LOCALE_COOKIE)?.value, headerStore.get("accept-language"));
 }
 
 export function tr(locale: Locale, en: string, zh: string) {

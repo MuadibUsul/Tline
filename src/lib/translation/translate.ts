@@ -2,8 +2,9 @@ import glossary from "../../../data/financial_glossary.zh-CN.json";
 import { prisma } from "../db";
 import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider";
 import { validateTranslation, type TranslationQuality } from "./quality";
+import { protectTitleDates, restoreTitleDates } from "./titleDates";
 
-const PROMPT_VERSION = "finance-translation-v1";
+const PROMPT_VERSION = "finance-translation-v2";
 
 interface SourceSegment {
   id: string;
@@ -68,7 +69,7 @@ Translate the complete English research article into professional Simplified Chi
 Be faithful, complete, restrained, and consistent. Never summarize, omit, add analysis, or strengthen uncertainty.
 Preserve every number, currency symbol, percentage, basis-point value, date, ticker, proper noun, and segment position.
 Keep Arabic digit strings and scale units verbatim: never spell digits as Chinese numerals or convert 503bn into 5030亿.
-Preserve every __TL_NUM_n__ placeholder exactly; it will be restored after translation.
+Preserve every __TL_NUM_n__ and __TLD_x__ placeholder exactly; they will be restored after translation.
 Apply the supplied glossary. Keep official tickers and product names unchanged.
 Return ONLY JSON: {"title":string,"segments":[{"position":number,"heading":string|null,"text":string}]}.`;
 
@@ -103,17 +104,33 @@ async function requestDraft(
   segments: SourceSegment[],
   issues?: string[],
 ) {
-  const result = await completeJSON<unknown>(provider, {
-    system: TRANSLATION_SYSTEM,
-    user: sourcePayload(institution, title, segments, issues),
-    maxTokens: 9000,
-  });
-  const draft = normalizeDraft(result.value, segments);
-  if (!draft) throw new Error("Translation response did not preserve the source segment structure.");
-  return { draft, provider: result.meta.provider, model: result.meta.model };
+  let lastMeta = { provider: provider.name, model: provider.model };
+  let retryIssues = issues;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let result;
+    try {
+      result = await completeJSON<unknown>(provider, {
+        system: TRANSLATION_SYSTEM,
+        user: sourcePayload(institution, title, segments, retryIssues),
+        maxTokens: 9000,
+      });
+    } catch (error) {
+      if (attempt === 1) throw error;
+      retryIssues = [...(issues ?? []), "Your previous response was not valid JSON. Return exactly one JSON object and no surrounding prose."];
+      continue;
+    }
+    lastMeta = result.meta;
+    const draft = normalizeDraft(result.value, segments);
+    if (draft) return { draft, provider: result.meta.provider, model: result.meta.model };
+    retryIssues = [
+      ...(issues ?? []),
+      "Your previous response changed, omitted, or duplicated segment positions. Return exactly one output segment for every input segment, preserving each position.",
+    ];
+  }
+  throw new Error(`Translation response did not preserve the source segment structure (${lastMeta.provider}/${lastMeta.model}).`);
 }
 
-function splitText(text: string, maxChars = 6_000): string[] {
+function splitText(text: string, maxChars = 3_500): string[] {
   if (text.length <= maxChars) return [text];
   const paragraphs = text.split(/\n\s*\n/).filter(Boolean);
   const parts: string[] = [];
@@ -195,14 +212,16 @@ export async function translateArticle(
   let model = provider.model;
   for (const batch of batches(parts)) {
     const numbers: string[] = [];
-    const protectedTitle = protectNumbers(title, numbers);
+    const dates: string[] = [];
+    // Protect whole date expressions in the title first (alpha placeholder), then numbers.
+    const protectedTitle = protectNumbers(protectTitleDates(title, dates), numbers);
     const protectedBatch = batch.map((part) => ({
       ...part,
       heading: part.heading ? protectNumbers(part.heading, numbers) : null,
       text: protectNumbers(part.text, numbers),
     }));
     let generated = await requestDraft(provider, institution, protectedTitle, protectedBatch);
-    generated.draft.title = restoreNumbers(generated.draft.title, numbers);
+    generated.draft.title = restoreTitleDates(restoreNumbers(generated.draft.title, numbers), dates);
     generated.draft.segments = generated.draft.segments.map((segment) => ({
       ...segment,
       heading: segment.heading ? restoreNumbers(segment.heading, numbers) : null,
@@ -216,7 +235,7 @@ export async function translateArticle(
     );
     if (!batchQuality.passed) {
       generated = await requestDraft(provider, institution, protectedTitle, protectedBatch, batchQuality.issues.map((issue) => issue.message));
-      generated.draft.title = restoreNumbers(generated.draft.title, numbers);
+      generated.draft.title = restoreTitleDates(restoreNumbers(generated.draft.title, numbers), dates);
       generated.draft.segments = generated.draft.segments.map((segment) => ({
         ...segment,
         heading: segment.heading ? restoreNumbers(segment.heading, numbers) : null,

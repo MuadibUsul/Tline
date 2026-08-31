@@ -74,3 +74,37 @@ test("chunks a very long source segment and restores its database structure", as
   assert.match(result.segments[0].text, /4\.35%/);
   assert.equal(result.quality.passed, true);
 });
+
+test("retries when a draft is valid JSON but does not preserve segment positions", async () => {
+  let draftCalls = 0;
+  const provider: LLMProvider = {
+    name: "structure-retry-test",
+    model: "structure-retry-v1",
+    async complete(input) {
+      if (input.system.includes("independent bilingual quality reviewer")) {
+        return { provider: this.name, model: this.model, text: JSON.stringify({ pass: true, score: 1, issues: [] }) };
+      }
+      draftCalls++;
+      const payload = JSON.parse(input.user) as { title: string; segments: Array<{ position: number; heading: string | null; text: string }> };
+      return {
+        provider: this.name,
+        model: this.model,
+        text: JSON.stringify({
+          title: payload.title,
+          segments: draftCalls === 1 ? [] : payload.segments,
+        }),
+      };
+    },
+  };
+
+  const result = await translateArticle("Test Bank", "Retry structure", [{
+    id: "retry",
+    position: 0,
+    heading: "Outlook",
+    text: "Growth remains resilient at 2.5%.",
+  }], provider);
+
+  assert.equal(draftCalls, 2);
+  assert.equal(result.status, "reviewed");
+  assert.equal(result.segments.length, 1);
+});

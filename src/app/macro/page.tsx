@@ -2,8 +2,11 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
 import { beijingDateTime, unitLabel } from "@/lib/macro/presentation";
+import ReleaseSpotlight, { type SpotlightRelease } from "./ReleaseSpotlight";
 
 export const dynamic = "force-dynamic";
+
+const toNum = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? null : Number(value.toString()));
 
 const CATEGORY_ORDER = ["POLICY", "INFLATION", "GROWTH", "LABOR", "LIQUIDITY"];
 const CATEGORY_ZH: Record<string, string> = { POLICY: "货币政策", INFLATION: "通胀", GROWTH: "增长", LABOR: "就业", LIQUIDITY: "流动性" };
@@ -34,8 +37,28 @@ export default async function MacroPage() {
   });
   const categories = [...new Set([...CATEGORY_ORDER, ...rows.map((row) => row.indicator.category)])].filter((category) => rows.some((row) => row.indicator.category === category));
 
+  const spotlight: SpotlightRelease[] = calendar.map((release) => {
+    const value = release.values[0];
+    return {
+      id: release.id,
+      titleEn: release.titleEn,
+      titleZh: release.titleZh,
+      countryCode: release.countryCode,
+      importance: release.importance,
+      scheduledAt: release.scheduledAt.toISOString(),
+      releasedAt: release.releasedAt?.toISOString() ?? null,
+      status: release.status,
+      actual: toNum(value?.actualInitial),
+      previous: toNum(value?.revisedPreviousAtRelease ?? value?.previousAtRelease),
+      consensus: toNum(value?.consensusAtRelease),
+      unit: value?.indicator ? unitLabel(value.indicator.unit, locale) : "",
+      analysis: null,
+    };
+  });
+
   return (
     <main className="wrap">
+      <ReleaseSpotlight releases={spotlight} locale={locale} />
       <div className="page-head">
         <div className="eyebrow">Macro Intelligence</div>
         <h1>{tr(locale, "Economic Data", "经济数据")}</h1>

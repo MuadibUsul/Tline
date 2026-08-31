@@ -1,0 +1,14 @@
+{
+  "status": "REQUEST_SUCCEEDED",
+  "message": [],
+  "Results": {
+    "series": [{
+      "seriesID": "CUSR0000SA0",
+      "data": [
+        { "year": "2026", "period": "M02", "periodName": "February", "value": "318.376", "footnotes": [{ "code": "P", "text": "Preliminary." }] },
+        { "year": "2026", "period": "M01", "periodName": "January", "value": "317.671", "footnotes": [{}] },
+        { "year": "2025", "period": "M13", "periodName": "Annual", "value": "315.2", "footnotes": [{}] }
+      ]
+    }]
+  }
+}

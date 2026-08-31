@@ -1,0 +1,112 @@
+{
+  "generatedAt": "2026-08-29T23:24:30.985Z",
+  "summary": {
+    "observations": 3914,
+    "releases": 85,
+    "sources": 31,
+    "issues": 8,
+    "severe": 0,
+    "warning": 8,
+    "info": 0
+  },
+  "issues": [
+    {
+      "code": "EMPTY_SOURCE",
+      "severity": "warning",
+      "message": "Enabled source has no observations.",
+      "entityType": "series_source",
+      "entityId": "cmtehinol000ho19nl740jc8p"
+    },
+    {
+      "code": "EMPTY_SOURCE",
+      "severity": "warning",
+      "message": "Enabled source has no observations.",
+      "entityType": "series_source",
+      "entityId": "cmtehinon000lo19n2bxosc6h"
+    },
+    {
+      "code": "EMPTY_SOURCE",
+      "severity": "warning",
+      "message": "Enabled source has no observations.",
+      "entityType": "series_source",
+      "entityId": "cmtehinop000ro19nes30wnac"
+    },
+    {
+      "code": "EMPTY_SOURCE",
+      "severity": "warning",
+      "message": "Enabled source has no observations.",
+      "entityType": "series_source",
+      "entityId": "cmtehinor000vo19n8yjwzrvw"
+    },
+    {
+      "code": "EMPTY_SOURCE",
+      "severity": "warning",
+      "message": "Enabled source has no observations.",
+      "entityType": "series_source",
+      "entityId": "cmtehinos000zo19nbg1n7cfg"
+    },
+    {
+      "code": "CROSS_PROVIDER_DISAGREEMENT",
+      "severity": "warning",
+      "message": "Primary agency and FRED disagree for the latest common period; no value was overwritten.",
+      "entityType": "indicator",
+      "entityId": "US_CORE_PCE_PRICE",
+      "details": {
+        "observations": [
+          {
+            "id": "cmtf07ey1005j9gb1ua2nvdyq",
+            "provider": "bea",
+            "value": "93.419"
+          },
+          {
+            "id": "cmtemig0q00923imjdo704dfb",
+            "provider": "fred",
+            "value": "130.658"
+          }
+        ]
+      }
+    },
+    {
+      "code": "CROSS_PROVIDER_DISAGREEMENT",
+      "severity": "warning",
+      "message": "Primary agency and FRED disagree for the latest common period; no value was overwritten.",
+      "entityType": "indicator",
+      "entityId": "US_PERSONAL_INCOME",
+      "details": {
+        "observations": [
+          {
+            "id": "cmtf07onu007o9gb10phyx57i",
+            "provider": "bea",
+            "value": "27114792"
+          },
+          {
+            "id": "cmtemii0800a23imjttqdch12",
+            "provider": "fred",
+            "value": "27114.8"
+          }
+        ]
+      }
+    },
+    {
+      "code": "CROSS_PROVIDER_DISAGREEMENT",
+      "severity": "warning",
+      "message": "Primary agency and FRED disagree for the latest common period; no value was overwritten.",
+      "entityType": "indicator",
+      "entityId": "US_PERSONAL_SPENDING",
+      "details": {
+        "observations": [
+          {
+            "id": "cmtf07v4c009a9gb134pyqe6v",
+            "provider": "bea",
+            "value": "22250420"
+          },
+          {
+            "id": "cmtemijgz00b03imj2ulc931a",
+            "provider": "fred",
+            "value": "22250.4"
+          }
+        ]
+      }
+    }
+  ]
+}

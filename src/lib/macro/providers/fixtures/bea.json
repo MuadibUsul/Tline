@@ -1,0 +1,11 @@
+{
+  "BEAAPI": {
+    "Results": {
+      "Data": [
+        { "TableName": "T20804", "LineNumber": "1", "LineDescription": "Personal consumption expenditures (PCE)", "TimePeriod": "2026M05", "DataValue": "126.742", "CL_UNIT": "Index numbers", "UNIT_MULT": "0" },
+        { "TableName": "T20804", "LineNumber": "1", "LineDescription": "Personal consumption expenditures (PCE)", "TimePeriod": "2026M06", "DataValue": "127.011", "CL_UNIT": "Index numbers", "UNIT_MULT": "0" },
+        { "TableName": "T20804", "LineNumber": "6", "LineDescription": "PCE excluding food and energy", "TimePeriod": "2026M06", "DataValue": "125.900", "CL_UNIT": "Index numbers", "UNIT_MULT": "0" }
+      ]
+    }
+  }
+}

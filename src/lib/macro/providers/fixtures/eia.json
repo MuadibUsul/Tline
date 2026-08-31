@@ -1,0 +1,11 @@
+{
+  "response": {
+    "total": "2",
+    "dateFormat": "YYYY-MM-DD",
+    "frequency": "weekly",
+    "data": [
+      { "period": "2026-08-14", "series": "WCESTUS1", "series-description": "U.S. Ending Stocks of Crude Oil", "value": "421156", "units": "Thousand Barrels" },
+      { "period": "2026-08-21", "series": "WCESTUS1", "series-description": "U.S. Ending Stocks of Crude Oil", "value": "419802", "units": "Thousand Barrels" }
+    ]
+  }
+}

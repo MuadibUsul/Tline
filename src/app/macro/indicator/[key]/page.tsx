@@ -3,31 +3,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
 import { beijingDateTime, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
+import IndicatorChart from "./IndicatorChart";
 
 export const dynamic = "force-dynamic";
 
-const num = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? null : Number(value.toString()));
 const dec = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? "—" : value.toString());
-
-// Inline SVG area chart — no external libraries, theme-aware, CSP-safe.
-function SeriesChart({ points, up }: { points: { v: number }[]; up: boolean }) {
-  if (points.length < 2) return null;
-  const W = 640, H = 200, P = 10;
-  const values = points.map((point) => point.v);
-  const min = Math.min(...values), max = Math.max(...values);
-  const span = max - min || 1;
-  const x = (i: number) => P + (i / (points.length - 1)) * (W - 2 * P);
-  const y = (v: number) => H - P - ((v - min) / span) * (H - 2 * P);
-  const line = points.map((point, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(point.v).toFixed(1)}`).join(" ");
-  const area = `${line} L${x(points.length - 1).toFixed(1)},${(H - P).toFixed(1)} L${x(0).toFixed(1)},${(H - P).toFixed(1)} Z`;
-  const stroke = up ? "var(--bull)" : "var(--bear)";
-  return (
-    <svg className="macro-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="series chart">
-      <path d={area} fill={stroke} fillOpacity="0.1" />
-      <path d={line} fill="none" stroke={stroke} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
-}
+const fmtChange = (value: number) => `${value >= 0 ? "+" : "−"}${Math.abs(value) >= 100 ? Math.abs(value).toFixed(0) : Math.abs(value).toFixed(2)}`;
 
 function Stat({ label, value }: { label: string; value: string }) {
   return <div className="macro-stat"><span className="k">{label}</span><span className="v tnum">{value}</span></div>;
@@ -52,7 +33,6 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
     }
   }
   const series = [...byPeriod.values()].sort((a, b) => a.period.getTime() - b.period.getTime());
-  const chartPoints = series.slice(-60).map((point) => ({ v: point.value }));
   const latest = series.at(-1);
   const previous = series.at(-2);
   const change = latest && previous ? latest.value - previous.value : null;
@@ -78,6 +58,17 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
       })
     : null;
 
+  // Release history straight from the observation series (which has data); enrich the
+  // consensus column from any captured release values (blank until a forecast feed exists).
+  const consensusByPeriod = new Map(calendar.map((value) => [value.observationPeriod.getTime(), value.consensusAtRelease] as const));
+  const descending = [...series].reverse();
+  const history = descending.slice(0, 14).map((point, index) => ({
+    period: point.period,
+    value: point.value,
+    previous: descending[index + 1]?.value ?? null,
+    consensus: consensusByPeriod.get(point.period.getTime()) ?? null,
+  }));
+
   return (
     <main className="wrap">
       <div className="page-head">
@@ -97,10 +88,10 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
         <Link href="/macro" className="minibtn" style={{ alignSelf: "flex-start" }}>← {tr(locale, "Economic data", "经济数据")}</Link>
       </div>
 
-      {chartPoints.length >= 2 && (
+      {series.length >= 2 && (
         <section className="blk">
-          <div className="section-t">{tr(locale, `History · last ${chartPoints.length} periods`, `历史走势 · 最近 ${chartPoints.length} 期`)}</div>
-          <SeriesChart points={chartPoints} up={up} />
+          <div className="section-t">{tr(locale, "History", "历史走势")}</div>
+          <IndicatorChart series={series.map((point) => ({ period: point.period.toISOString(), value: point.value }))} unit={unitLabel(indicator.unit, locale)} locale={locale} />
           <div className="macro-stats">
             <Stat label={tr(locale, "Latest", "最新")} value={latest ? `${latest.value}` : "—"} />
             <Stat label={tr(locale, "Previous", "前值")} value={previous ? `${previous.value}` : "—"} />
@@ -112,37 +103,36 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
         </section>
       )}
 
-      {calendar.length > 0 && (
+      {history.length > 0 && (
         <section className="blk">
-          <div className="section-t">{tr(locale, "Release calendar", "发布日历")}</div>
+          <div className="section-t">{tr(locale, "Release history", "发布历史")}</div>
           <div className="tbl-wrap"><table>
             <thead><tr>
-              <th>{tr(locale, "Reference", "数据期")}</th>
-              <th>{tr(locale, "Actual", "实际值")}</th>
-              <th>{tr(locale, "Previous", "前值")}</th>
-              <th>{tr(locale, "Consensus", "预期")}</th>
-              <th>{tr(locale, "Surprise", "超预期")}</th>
-              <th>{tr(locale, "Released (Beijing)", "发布(北京时间)")}</th>
+              <th>{tr(locale, "Reference", "参考日期")}</th>
+              <th className="num-h">{tr(locale, "Actual", "现值")}</th>
+              <th className="num-h">{tr(locale, "Previous", "前次数据")}</th>
+              <th className="num-h">{tr(locale, "Change", "变化")}</th>
+              <th className="num-h">{tr(locale, "Consensus", "市场预期值")}</th>
             </tr></thead>
             <tbody>
               {nextRelease && (
                 <tr className="macro-next">
-                  <td className="mono-cell">{tr(locale, "Next", "下次")}</td>
-                  <td className="mono-cell">{tr(locale, "Not released", "尚未发布")}</td>
-                  <td className="mono-cell">—</td><td className="mono-cell">—</td><td className="mono-cell">—</td>
-                  <td className="mono-cell">{beijingDateTime(nextRelease.scheduledAt, locale)}</td>
+                  <td className="mono-cell">{tr(locale, "Next release", "下次发布")} · {beijingDateTime(nextRelease.scheduledAt, locale)}</td>
+                  <td className="mono-cell num">{tr(locale, "Not released", "尚未发布")}</td>
+                  <td className="mono-cell num">{dec(latest?.value)}</td>
+                  <td className="mono-cell num">—</td>
+                  <td className="mono-cell num">—</td>
                 </tr>
               )}
-              {calendar.map((value) => {
-                const surprise = num(value.surpriseRaw);
+              {history.map((row) => {
+                const change = row.previous !== null ? row.value - row.previous : null;
                 return (
-                  <tr key={value.id}>
-                    <td className="mono-cell"><Link href={`/macro/release/${value.release.id}`}>{formatDate(value.observationPeriod, locale)}</Link></td>
-                    <td className="mono-cell"><b>{dec(value.actualInitial)}</b></td>
-                    <td className="mono-cell">{dec(value.revisedPreviousAtRelease ?? value.previousAtRelease)}</td>
-                    <td className="mono-cell">{dec(value.consensusAtRelease)}</td>
-                    <td className={`mono-cell ${surprise === null ? "" : surprise >= 0 ? "up" : "down"}`}>{surprise === null ? "—" : `${surprise >= 0 ? "+" : ""}${surprise}`}</td>
-                    <td className="mono-cell">{value.release.releasedAt ? beijingDateTime(value.release.releasedAt, locale) : macroDateTime(value.release.scheduledAt, locale)}</td>
+                  <tr key={row.period.getTime()}>
+                    <td className="mono-cell">{formatDate(row.period, locale)}</td>
+                    <td className="mono-cell num"><b>{row.value}</b></td>
+                    <td className="mono-cell num" style={{ color: "var(--faint)" }}>{row.previous ?? "—"}</td>
+                    <td className={`mono-cell num ${change === null ? "" : change >= 0 ? "up" : "down"}`}>{change === null ? "—" : fmtChange(change)}</td>
+                    <td className="mono-cell num">{dec(row.consensus)}</td>
                   </tr>
                 );
               })}

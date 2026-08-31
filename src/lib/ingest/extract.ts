@@ -246,7 +246,23 @@ export interface ExtractedArticle {
 }
 
 // Non-content images we never want inline in the body.
-const FIGURE_URL_DENY = /(sprite|logo|icon|avatar|favicon|pixel|spacer|tracking|beacon|1x1|placeholder|loading|share|social|badge|button|arrow|chevron|bg-|background)/i;
+const FIGURE_URL_DENY = /(sprite|logo|icon|avatar|favicon|pixel|spacer|tracking|beacon|1x1|placeholder|loading|share|social|badge|button|arrow|chevron|bg-|background|headshot|portrait|profile|byline|author)/i;
+
+// Decorative / non-explanatory blocks: author bios, share bars, related/promo, etc.
+// We only want figures that illustrate the article (charts, exhibits, diagrams).
+const DECORATIVE_CONTEXT = /(author|byline|bio|profile|headshot|avatar|contributor|team|staff|portrait|people|social|share|related|recommend|promo|advert|newsletter|subscribe|cta|footer|sidebar|disclaimer)/i;
+const DECORATIVE_HEADING = /^(authors?|about the authors?|meet the (?:author|team)|contributors?|our (?:people|team|experts|authors)|biograph|related|recommended|share this|subscribe|follow us|contact us|disclaimer|important information)/i;
+
+/** True when an image sits inside an author bio, share bar, related/promo or similar non-content block. */
+function isDecorativeFigure($: cheerio.CheerioAPI, img: any): boolean {
+  let node = $(img);
+  for (let depth = 0; depth < 6 && node.length; depth++) {
+    const marker = `${node.attr("class") ?? ""} ${node.attr("id") ?? ""} ${node.attr("data-testid") ?? ""}`;
+    if (DECORATIVE_CONTEXT.test(marker)) return true;
+    node = node.parent();
+  }
+  return false;
+}
 
 /** Resolve the best real image URL for an <img>/<figure> node, honoring lazy-loading attributes. */
 function pickImageUrl($: cheerio.CheerioAPI, img: any, baseUrl: string | undefined): string | null {
@@ -428,6 +444,9 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
         if (tag === "img" && $(node).parents("figure").length) return; // the enclosing <figure> handles it
         const imgNode = tag === "img" ? node : $(node).find("img").get(0);
         if (!imgNode) return;
+        // Only keep figures that illustrate the article — drop author headshots, share
+        // bars, related/promo and anything under a bio/related/disclaimer heading.
+        if (DECORATIVE_HEADING.test(cur.heading ?? "") || isDecorativeFigure($, tag === "figure" ? node : imgNode)) return;
         const url = pickImageUrl($, imgNode, baseUrl);
         if (!url || seenFigureUrls.has(url)) return;
         seenFigureUrls.add(url);

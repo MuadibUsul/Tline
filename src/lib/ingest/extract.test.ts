@@ -28,6 +28,21 @@ test("captures inline figures in document order and anchors them to body segment
   assert.equal(article.figures[1].afterSegmentPosition, 1);
 });
 
+test("excludes author headshots and other non-explanatory images", () => {
+  const body = "The framework blends quantitative signals with fundamental overlays across asset classes. ".repeat(8);
+  const article = extractArticle(
+    `<html><head><title>Report | Bank</title></head><body><main><article><h1>Report</h1>` +
+      `<p>${body}</p>` +
+      `<figure><img src="https://cdn.example.com/charts/exhibit-1.png" alt="Chart"><figcaption>Exhibit 1</figcaption></figure>` +
+      `<div class="author-bio"><img src="https://cdn.example.com/people/jane-doe.jpg" alt="Jane Doe"></div>` +
+      `<h2>Authors</h2><div class="team"><img src="https://cdn.example.com/john-smith.jpg" alt="John Smith"></div>` +
+      `<img src="https://cdn.example.com/headshot-bob.jpg" alt="Bob">` +
+      `</article></main></body></html>`,
+    "https://www.bank.com/insights/report",
+  );
+  assert.deepEqual(article.figures.map((figure) => figure.url), ["https://cdn.example.com/charts/exhibit-1.png"]);
+});
+
 test("extracts an embedded publisher date and conservative URL date hints", () => {
   const article = extractArticle(`<html><head><title>CIO Insights 4Q24 | Bank</title></head><body>
     <main><h1>CIO Insights 4Q24</h1><p>${"A substantive research sentence. ".repeat(20)}</p></main>

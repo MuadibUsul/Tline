@@ -6,9 +6,11 @@ import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 
+const ASSET_CLASSES: Array<[string, string]> = [["equity", "股票"], ["rate", "利率"], ["fx", "外汇"], ["commodity", "大宗商品"], ["crypto", "加密资产"], ["macro", "宏观"]];
+
 export default async function ResearchIndex(
   props: {
-    searchParams: Promise<{ institution?: string; ticker?: string; direction?: string; page?: string }>;
+    searchParams: Promise<{ institution?: string; country?: string; category?: string; ticker?: string; direction?: string; page?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
@@ -22,18 +24,28 @@ export default async function ResearchIndex(
       : searchParams.direction === "neutral"
         ? { equals: 0 }
         : undefined;
+  const asset = {
+    ...(searchParams.ticker ? { ticker: searchParams.ticker } : {}),
+    ...(searchParams.category ? { assetClass: searchParams.category } : {}),
+  };
+  const hasAssetFilter = searchParams.ticker || searchParams.category || direction;
   const where = publicationReadyWhere({
-    ...(searchParams.institution ? { institution: { slug: searchParams.institution } } : {}),
-    ...((searchParams.ticker || direction) ? {
+    ...((searchParams.institution || searchParams.country) ? {
+      institution: {
+        ...(searchParams.institution ? { slug: searchParams.institution } : {}),
+        ...(searchParams.country ? { country: searchParams.country } : {}),
+      },
+    } : {}),
+    ...(hasAssetFilter ? {
       articleAssets: {
         some: {
-          ...(searchParams.ticker ? { asset: { ticker: searchParams.ticker } } : {}),
+          ...(Object.keys(asset).length ? { asset } : {}),
           ...(direction ? { direction } : {}),
         },
       },
     } : {}),
   });
-  const [feed, total, institutions, assets] = await Promise.all([
+  const [feed, total, institutions, assets, countries] = await Promise.all([
     prisma.article.findMany({
       where,
       orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
@@ -44,10 +56,13 @@ export default async function ResearchIndex(
     prisma.article.count({ where }),
     prisma.institution.findMany({ where: { articles: { some: publicationReadyWhere() } }, orderBy: { name: "asc" }, select: { slug: true, name: true } }),
     prisma.asset.findMany({ where: { articleAssets: { some: { article: publicationReadyWhere() } } }, orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
+    prisma.institution.findMany({ where: { country: { not: null }, articles: { some: publicationReadyWhere() } }, orderBy: { country: "asc" }, distinct: ["country"], select: { country: true } }),
   ]);
   const pages = Math.max(1, Math.ceil(total / take));
   const query = new URLSearchParams();
   if (searchParams.institution) query.set("institution", searchParams.institution);
+  if (searchParams.country) query.set("country", searchParams.country);
+  if (searchParams.category) query.set("category", searchParams.category);
   if (searchParams.ticker) query.set("ticker", searchParams.ticker);
   if (searchParams.direction) query.set("direction", searchParams.direction);
 
@@ -58,9 +73,19 @@ export default async function ResearchIndex(
       </div>
       <section style={{ paddingTop: 22 }}>
         <form className="research-filters">
-          <select name="institution" defaultValue={searchParams.institution ?? ""} aria-label={tr(locale, "Institution", "机构")}>
-            <option value="">{tr(locale, "All institutions", "全部机构")}</option>
+          {countries.length > 0 && (
+            <select name="country" defaultValue={searchParams.country ?? ""} aria-label={tr(locale, "Country", "国家")}>
+              <option value="">{tr(locale, "All countries", "全部国家")}</option>
+              {countries.map(({ country }) => <option key={country!} value={country!}>{country}</option>)}
+            </select>
+          )}
+          <select name="institution" defaultValue={searchParams.institution ?? ""} aria-label={tr(locale, "Institution", "投行")}>
+            <option value="">{tr(locale, "All institutions", "全部投行")}</option>
             {institutions.map((institution) => <option key={institution.slug} value={institution.slug}>{institutionName(institution.name, locale)}</option>)}
+          </select>
+          <select name="category" defaultValue={searchParams.category ?? ""} aria-label={tr(locale, "Category", "类别")}>
+            <option value="">{tr(locale, "All categories", "全部类别")}</option>
+            {ASSET_CLASSES.map(([value, zh]) => <option key={value} value={value}>{locale === "zh-CN" ? zh : value}</option>)}
           </select>
           <select name="ticker" defaultValue={searchParams.ticker ?? ""} aria-label={tr(locale, "Asset", "资产")}>
             <option value="">{tr(locale, "All assets", "全部资产")}</option>

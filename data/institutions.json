@@ -23,7 +23,7 @@
   {
     "slug": "scotiabank",
     "name": "Scotiabank Economics",
-    "researchUrl": "https://www.scotiabank.com/ca/en/about/economics/economics-publications.html",
+    "researchUrl": "https://www.scotiabank.com/ca/en/about/economics.html",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 1,
@@ -35,7 +35,7 @@
     "name": "UBS CIO",
     "researchUrl": "https://www.ubs.com/global/en/wealthmanagement/insights/chief-investment-office/house-view.html",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 1,
     "updateFreq": "350–550",
     "language": "en"
@@ -63,7 +63,7 @@
   {
     "slug": "dbs",
     "name": "DBS Insights / CIO",
-    "researchUrl": "https://www.dbs.com/insightsdirect/",
+    "researchUrl": "https://www.dbs.com/insightsdirect/landingpage",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 1,
@@ -95,7 +95,7 @@
     "name": "BlackRock",
     "researchUrl": "https://www.blackrock.com/us/individual/insights",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 1,
     "updateFreq": "150–280",
     "language": "en"
@@ -105,7 +105,7 @@
     "name": "J.P. Morgan",
     "researchUrl": "https://www.jpmorgan.com/insights/global-research",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 1,
     "updateFreq": "140–240",
     "language": "en"
@@ -115,7 +115,7 @@
     "name": "Goldman Sachs",
     "researchUrl": "https://www.goldmansachs.com/insights",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 1,
     "updateFreq": "120–220",
     "language": "en"
@@ -125,7 +125,7 @@
     "name": "Morgan Stanley",
     "researchUrl": "https://www.morganstanley.com/insights",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 1,
     "updateFreq": "120–220",
     "language": "en"
@@ -203,7 +203,7 @@
   {
     "slug": "franklin",
     "name": "Franklin Templeton",
-    "researchUrl": "https://www.franklintempleton.com/insights",
+    "researchUrl": "https://www.franklintempleton.com/articles",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -244,11 +244,13 @@
     "slug": "pimco",
     "name": "PIMCO",
     "researchUrl": "https://www.pimco.com/us/en/insights",
+    "sitemapUrl": "https://www.pimco.com/us/en/sitemap.xml",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 3,
     "updateFreq": "70–140",
-    "language": "en"
+    "language": "en",
+    "requiresRender": true
   },
   {
     "slug": "man",
@@ -313,7 +315,7 @@
   {
     "slug": "westpac",
     "name": "Westpac / Westpac IQ",
-    "researchUrl": "https://www.westpaciq.com.au/",
+    "researchUrl": "https://www.westpaciq.com.au/economics",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -355,7 +357,7 @@
     "name": "HSBC",
     "researchUrl": "https://www.business.hsbc.com/en-gb/insights",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 3,
     "updateFreq": "55–110",
     "language": "en"
@@ -366,7 +368,7 @@
     "researchUrl": "https://economic-research.bnpparibas.com/",
     "rssUrl": "https://economic-research.bnpparibas.com/RSS/en-US",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 3,
     "updateFreq": "55–110",
     "language": "en"
@@ -434,7 +436,7 @@
   {
     "slug": "nomura",
     "name": "Nomura Connects",
-    "researchUrl": "https://www.nomuraconnects.com/articles",
+    "researchUrl": "https://www.nomuraconnects.com/about-asia",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 1,
@@ -444,7 +446,7 @@
   {
     "slug": "neuberger-berman",
     "name": "Neuberger Berman",
-    "researchUrl": "https://www.nb.com/en/global/insights",
+    "researchUrl": "https://www.nb.com/insights",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -464,7 +466,7 @@
   {
     "slug": "mizuho",
     "name": "Mizuho",
-    "researchUrl": "https://www.mizuho-fg.com/company/activity/onethinktank/research/index.html",
+    "researchUrl": "https://www.mizuhogroup.com/bank/insights",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -474,9 +476,9 @@
   {
     "slug": "barclays",
     "name": "Barclays",
-    "researchUrl": "https://www.ib.barclays/our-insights/",
+    "researchUrl": "https://www.ib.barclays/our-insights.html",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 3,
     "updateFreq": "30–75",
     "language": "en"
@@ -486,7 +488,7 @@
     "name": "Deutsche Bank",
     "researchUrl": "https://wealth.db.com/en/articles/cio-publications.html",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 3,
     "updateFreq": "30–70",
     "language": "en"
@@ -496,7 +498,7 @@
     "name": "Société Générale",
     "researchUrl": "https://wholesale.banking.societegenerale.com/en/news-insights/all-news-insights/",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 3,
     "updateFreq": "30–70",
     "language": "en"
@@ -509,16 +511,6 @@
     "authorityScore": 0.85,
     "priority": 3,
     "updateFreq": "30–70",
-    "language": "en"
-  },
-  {
-    "slug": "unicredit",
-    "name": "UniCredit",
-    "researchUrl": "https://www.unicreditgroup.eu/en/economics-research.html",
-    "rating": 4,
-    "authorityScore": 0.85,
-    "priority": 3,
-    "updateFreq": "30–65",
     "language": "en"
   },
   {
@@ -562,16 +554,6 @@
     "language": "en"
   },
   {
-    "slug": "santander",
-    "name": "Santander",
-    "researchUrl": "https://www.santander.com/en/press-room/insights",
-    "rating": 4,
-    "authorityScore": 0.85,
-    "priority": 3,
-    "updateFreq": "25–60",
-    "language": "en"
-  },
-  {
     "slug": "apollo",
     "name": "Apollo",
     "researchUrl": "https://www.apollo.com/insights-news/insights",
@@ -606,7 +588,7 @@
     "name": "Citi",
     "researchUrl": "https://www.citigroup.com/global/insights",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 3,
     "updateFreq": "20–55",
     "language": "en"
@@ -616,7 +598,7 @@
     "name": "Bank of America",
     "researchUrl": "https://www.bofainstitute.com/insights",
     "rating": 5,
-    "authorityScore": 1.0,
+    "authorityScore": 1,
     "priority": 3,
     "updateFreq": "20–55",
     "language": "en"

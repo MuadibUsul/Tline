@@ -11,10 +11,38 @@ const RULES: Record<string, SourceRule> = {
   commonwealth: {
     listingUrls: ["https://www.commbank.com.au/articles/newsroom.html"],
     candidatePath: /^\/articles\/newsroom\/20\d{2}\//i,
-    articleRejected: /content presented in this section has been provided by Australian Associated Press/i,
+    articleRejected: /(?:content presented in this section has been provided by Australian Associated Press|merchant fees?|card surcharg(?:e|ing)|scam prevention|customer support)/i,
   },
   saxo: {
     candidatePath: /^\/content\/articles\//i,
+  },
+  nordea: {
+    candidatePath: /^\/en\/news\/[^/]+\/?$/i,
+    articleRejected: /^(?:All news stories\s*|Stock exchange release:.*|(?:Half-year report.*Nordea Hypotek|Nordea Hypotek.*half-year report).*)$/i,
+  },
+  westpac: {
+    articleRejected: /^Westpac IQ\s*$/i,
+  },
+  schroders: {
+    candidatePath: /\/insights\//i,
+  },
+  rbc: {
+    articleRejected: /^Featured Analysis\s*$/i,
+  },
+  commerzbank: {
+    articleRejected: /^Newsletters?(?:\s*\|\s*Corporate Clients)?\s*$/i,
+  },
+  santander: {
+    articleRejected: /^The Magnifying Glass(?:\s*\|\s*Sala de Comunicación)?\s*$/i,
+  },
+  franklin: {
+    articleRejected: /^Investment Themes\s*$/i,
+  },
+  invesco: {
+    articleRejected: /^Market and economic insights\s*$/i,
+  },
+  uob: {
+    articleRejected: /^Quarterly Global Outlook\s*$/i,
   },
   "nab-markets": {
     listingUrls: ["https://business.nab.com.au/tag/economic-commentary"],
@@ -30,6 +58,11 @@ const RULES: Record<string, SourceRule> = {
   },
   natixis: {
     candidatePath: /^\/Site\/en\/publication\//i,
+  },
+  "cr-dit-cib": {
+    // The global sitemap also contains corporate transaction announcements.
+    // The configured source is the Global Markets Research area, not /news/.
+    candidatePath: /(?:research|insights?)/i,
   },
   intesa: {
     // The official listing exposes native PDFs directly; its sitemap points to

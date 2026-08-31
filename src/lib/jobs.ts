@@ -4,8 +4,9 @@ export async function runTrackedJob<T>(
   name: string,
   parameters: Record<string, unknown>,
   work: () => Promise<{ result: T; metrics?: Record<string, unknown> }>,
-  attempt = 1,
+  attempt = Math.max(1, Number(process.env.JOB_ATTEMPT || 1)),
 ): Promise<T> {
+  attempt = Number.isFinite(attempt) ? Math.max(1, Math.trunc(attempt)) : 1;
   const job = await prisma.jobRun.create({
     data: { name, attempt, parameters: JSON.stringify(parameters) },
   });
@@ -17,9 +18,10 @@ export async function runTrackedJob<T>(
     });
     return result;
   } catch (error) {
+    const failureMetrics = error && typeof error === "object" && "metrics" in error ? (error as { metrics?: Record<string, unknown> }).metrics : undefined;
     await prisma.jobRun.update({
       where: { id: job.id },
-      data: { status: "failed", error: String(error).slice(0, 4000), finishedAt: new Date() },
+      data: { status: "failed", ...(failureMetrics ? { metrics: JSON.stringify(failureMetrics) } : {}), error: String(error).slice(0, 4000), finishedAt: new Date() },
     });
     throw error;
   }

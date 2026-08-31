@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { partitionArticleSegments } from "../articleText";
 
 export interface CandidateLink {
   url: string;
@@ -233,6 +234,7 @@ export interface ExtractedArticle {
   author: string | null;
   publishedAt: Date | null;
   publicationDateText: string | null;
+  disclaimerText: string | null;
 }
 
 export function newestByPublication<T extends { publishedAt: Date }>(articles: T[], limit: number): T[] {
@@ -318,9 +320,12 @@ export function extractArticle(html: string): ExtractedArticle {
     if ($(element).find("main,article,[itemprop=articleBody]").length === 0) $(element).remove();
   });
 
+  const ogTitle = $('meta[property="og:title"]').attr("content")?.trim() || "";
+  const headingTitle = $("h1").first().text().replace(/\s+/g, " ").trim();
+  const slugLikeTitle = /^[a-z0-9]+(?:-[a-z0-9]+){2,}$/i.test(ogTitle) && !/\s/.test(ogTitle);
   const title = (
-    $('meta[property="og:title"]').attr("content") ||
-    $("h1").first().text() ||
+    (slugLikeTitle ? headingTitle : ogTitle) ||
+    headingTitle ||
     structuredTitle ||
     $("title").text() ||
     ""
@@ -357,20 +362,33 @@ export function extractArticle(html: string): ExtractedArticle {
   let bestScore = 0;
   const candidates = "article,[itemprop=articleBody],main,[class*=article],[class*=post],[class*=content],[class*=rich-text],[class*=body-copy]";
   $(candidates).each((_, el) => {
-    const score = $(el).find("p").toArray()
+    const score = $(el).find("p,li").toArray()
+      .filter((node) => (node as any).name !== "li" || $(node).find("p").length === 0)
       .map((p) => $(p).text().replace(/\s+/g, " ").trim())
       .filter((t) => t.length > 40)
       .reduce((s, t) => s + t.length, 0);
     if (score > bestScore) { bestScore = score; bestEl = el; }
   });
+  if (bestEl) {
+    let nestedScore = 0;
+    $(bestEl).find("article,[itemprop=articleBody],[class~=article]").each((_, el) => {
+      const score = $(el).find("p,li").toArray()
+        .filter((node) => (node as any).name !== "li" || $(node).find("p").length === 0)
+        .map((node) => $(node).text().replace(/\s+/g, " ").trim())
+        .filter((text) => text.length > 40)
+        .reduce((sum, text) => sum + text.length, 0);
+      if (score >= bestScore * 0.65 && score > nestedScore) { bestEl = el; nestedScore = score; }
+    });
+  }
 
   // Split the chosen container into heading-delimited segments (h2/h3/h4 → p).
   const segments: Segment[] = [];
   if (bestEl && bestScore >= 300) {
     let cur: { heading: string | null; buf: string[] } = { heading: null, buf: [] };
     const flush = () => { if (cur.buf.length) segments.push({ heading: cur.heading, text: cur.buf.join("\n\n") }); };
-    $(bestEl).find("h2,h3,h4,p").each((_, node) => {
+    $(bestEl).find("h2,h3,h4,p,li").each((_, node) => {
       const tag = (node as any).name as string;
+      if (tag === "li" && $(node).find("p").length) return;
       const t = $(node).text().replace(/\s+/g, " ").trim();
       if (!t) return;
       if (/^h[234]$/.test(tag)) { flush(); cur = { heading: t.slice(0, 160), buf: [] }; }
@@ -398,16 +416,19 @@ export function extractArticle(html: string): ExtractedArticle {
     if (fallbackText.length >= 700) segments.push({ heading: null, text: fallbackText });
   }
 
-  const text = segments.map((s) => s.text).join("\n\n");
+  const partitioned = partitionArticleSegments(segments);
+  const cleanSegments = partitioned.body;
+  const text = cleanSegments.map((s) => s.text).join("\n\n");
   publishedAt ??= inferPublicationDate(title, text.slice(0, 1200));
 
   return {
     title,
     text,
-    segments,
+    segments: cleanSegments,
     author: author?.slice(0, 120) || null,
     publishedAt,
     publicationDateText: visibleDateBeforeStrip || null,
+    disclaimerText: partitioned.disclaimer,
   };
 }
 
@@ -470,6 +491,7 @@ export function looksLikeResearchTopic(title: string, text: string): boolean {
 /** Strict article check for extracted HTML content. */
 export function looksLikeArticle(title: string, text: string): boolean {
   if (!title || text.length < 700) return false;
+  if (/^(?:all news stories|latest (?:news|insights|research)|research|insights|publications|reports)$/i.test(title.trim())) return false;
   const tokens = text.split(/\s+/).filter(Boolean);
   if (tokens.length < 60) return false;
   if (isJunk(text)) return false;

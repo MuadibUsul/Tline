@@ -13,6 +13,7 @@ import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
 import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
+import { crawlIntervalSeconds, runSourcesByOrigin } from "./scheduling";
 
 // Usage:
 //   npm run ingest                 -> priority-1 institutions (allowed/delayed only)
@@ -34,7 +35,7 @@ const UA = "InstitutionalIntelligenceBot";
 const MIN_DELAY_MS = 1000; // politeness floor even when robots is silent
 
 async function ingestInstitution(
-  inst: { id: string; slug: string; name: string; researchUrl: string; rssUrl: string | null; sitemapUrl: string | null; language: string; crawlDelay: number | null; requiresRender: boolean },
+  inst: { id: string; slug: string; name: string; researchUrl: string; rssUrl: string | null; sitemapUrl: string | null; language: string; crawlDelay: number | null; requiresRender: boolean; crawlIntervalSec: number | null; consecutiveFailures: number },
   perLimit: number,
   scanLimit: number,
   since: Date,
@@ -42,17 +43,36 @@ async function ingestInstitution(
   sourceSeconds: number,
   renderLimit: number,
 ) {
-  await prisma.institution.update({
-    where: { id: inst.id },
+  const intervalSeconds = crawlIntervalSeconds(inst);
+  const startedAt = new Date();
+  const claim = await prisma.institution.updateMany({
+    where: {
+      id: inst.id,
+      OR: [
+        { lastCrawlStatus: { not: "running" } },
+        { lastCrawlAt: null },
+        { lastCrawlAt: { lt: new Date(startedAt.getTime() - (sourceSeconds + 300) * 1000) } },
+      ],
+    },
     data: { lastCrawlAt: new Date(), lastCrawlStatus: "running", lastCrawlMessage: null },
   });
+  if (claim.count === 0) {
+    console.log(JSON.stringify({ event: "ingest.source.busy", institution: inst.name }));
+    return 0;
+  }
   const finish = async (status: "succeeded" | "empty" | "paused" | "refused", message: string, created: number) => {
+    const now = new Date();
+    const healthy = status === "succeeded" || status === "empty";
+    const nextDelay = healthy ? intervalSeconds : Math.max(intervalSeconds, 3600);
     await prisma.institution.update({
       where: { id: inst.id },
       data: {
         lastCrawlStatus: status,
         lastCrawlMessage: message.slice(0, 1000),
-        ...(status === "succeeded" ? { lastSuccessAt: new Date() } : {}),
+        nextCrawlAt: new Date(now.getTime() + nextDelay * 1000),
+        consecutiveFailures: healthy ? 0 : inst.consecutiveFailures,
+        ...(healthy ? { lastSuccessAt: now } : {}),
+        ...(created > 0 ? { lastDiscoveredAt: now } : {}),
       },
     });
     return created;
@@ -99,10 +119,14 @@ async function ingestInstitution(
     return article;
   };
 
-  let created = 0, dup = 0, empty = 0, outOfWindow = 0, blocked = 0, nativeRejected = 0;
+  let created = 0, updated = 0, dup = 0, empty = 0, outOfWindow = 0, blocked = 0, nativeRejected = 0;
   const raws: RawArticle[] = [];
   const nativePdfs = new Map<string, Buffer>();
   const seenCandidates = new Set<string>();
+  const knownCandidates = new Set((await prisma.article.findMany({
+    where: { institutionId: inst.id },
+    select: { urlHash: true },
+  })).map((article) => article.urlHash));
   let listingHtml: string | null = null;
   const candidateLimit = Math.min(500, Math.max(perLimit * 3, scanLimit));
   const stage = (raw: RawArticle) => {
@@ -113,15 +137,11 @@ async function ingestInstitution(
     raws.push(raw);
     return true;
   };
-  const knownUrl = async (url: string) => Boolean(await prisma.article.findUnique({
-    where: { urlHash: urlHash(url) },
-    select: { id: true },
-  }));
   const skipCandidate = async (url: string) => {
     const clean = url.split("#")[0];
     if (seenCandidates.has(clean)) return true;
     seenCandidates.add(clean);
-    if (await knownUrl(clean)) { dup++; return true; }
+    if (knownCandidates.has(urlHash(clean))) { dup++; return true; }
     return false;
   };
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
@@ -176,6 +196,10 @@ async function ingestInstitution(
       if (html) feedUrls.push(...extractFeedLinks(html, listingUrl).filter(allowsUrl));
       if (feedUrls.length) break;
     }
+  }
+  if (!inst.rssUrl && feedUrls[0]) {
+    await prisma.institution.update({ where: { id: inst.id }, data: { rssUrl: feedUrls[0] } });
+    inst.rssUrl = feedUrls[0];
   }
   for (const feedUrl of feedUrls) {
     try {
@@ -237,6 +261,7 @@ async function ingestInstitution(
           author: article.author || item.creator || null,
           publishedAt,
           segments: article.segments,
+          disclaimerText: article.disclaimerText,
           strict: true,
         });
       }
@@ -245,8 +270,13 @@ async function ingestInstitution(
 
   // 2) Sitemap/Sitemap Index discovery, including native research PDFs.
   if (raws.length < perLimit && sitemapEnabled(inst.slug)) {
+    const declaredSitemaps = robotsSitemaps(robotsTxt).filter(allowsUrl);
+    if (!inst.sitemapUrl && declaredSitemaps[0]) {
+      await prisma.institution.update({ where: { id: inst.id }, data: { sitemapUrl: declaredSitemaps[0] } });
+      inst.sitemapUrl = declaredSitemaps[0];
+    }
     const sitemapSeeds = [
-      ...robotsSitemaps(robotsTxt),
+      ...declaredSitemaps,
       ...(inst.sitemapUrl ? [inst.sitemapUrl] : []),
       `${origin}/sitemap.xml`,
     ];
@@ -308,6 +338,7 @@ async function ingestInstitution(
           author: article.author,
           publishedAt,
           segments: article.segments,
+          disclaimerText: article.disclaimerText,
           strict: true,
         });
       }
@@ -362,6 +393,7 @@ async function ingestInstitution(
           author: a.author,
           publishedAt,
           segments: a.segments,
+          disclaimerText: a.disclaimerText,
           strict: true, // HTML-extracted → enforce the full article check
         });
       }
@@ -391,18 +423,19 @@ async function ingestInstitution(
           console.warn(`  native PDF rejected for ${r.sourceUrl}: ${String(error)}`);
         }
       }
-    }
+    } else if (res === "updated") updated++;
     else if (res === "duplicate") dup++;
     else empty++;
   }
   const note = `since ${since.toISOString().slice(0, 10)} · delay ${delayMs}ms${robotsDelaySec ? " (robots)" : ""} · ${renderedCandidates}/${renderLimit} rendered${!withinBudget() ? " · time budget reached" : ""}${outOfWindow ? ` · ${outOfWindow} older` : ""}${blocked ? ` · ${blocked} url blocked` : ""}${nativeRejected ? ` · ${nativeRejected} native PDF rejected` : ""}`;
-  console.log(`  ${inst.name.padEnd(26)} +${created} created · ${dup} dup · ${empty} empty · ${note}`);
+  console.log(`  ${inst.name.padEnd(26)} +${created} created · ${updated} refreshed · ${dup} dup · ${empty} empty · ${note}`);
   console.log(JSON.stringify({
     event: "ingest.source.complete",
     institution: inst.name,
     discovered: selectedRaws.length,
     acceptedCandidates: raws.length,
     created,
+    updated,
     duplicate: dup,
     empty,
     outOfWindow,
@@ -436,14 +469,16 @@ async function executeIngest() {
   const maxPages = Math.min(10, Math.max(1, Number(arg("pages") || 3)));
   const sourceSeconds = Math.min(600, Math.max(30, Number(arg("source-seconds") || 180)));
   const renderLimit = Math.min(20, Math.max(0, Number(arg("render-limit") || 4)));
+  const concurrency = Math.min(16, Math.max(1, Number(arg("concurrency") || process.env.INGEST_CONCURRENCY || 8)));
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
   const requestedSince = arg("since") ? new Date(arg("since")!) : monthStart;
   const since = !isNaN(requestedSince.getTime()) && requestedSince > monthStart ? requestedSince : monthStart;
   const slug = arg("slug");
   const resumeMinutes = Math.max(0, Number(arg("resume-minutes") || 0));
+  const due = flag("due") ? { OR: [{ nextCrawlAt: null }, { nextCrawlAt: { lte: new Date() } }] } : {};
 
   // Compliance gate: never crawl blocked/manual institutions.
-  const crawlable = { crawlPolicy: { in: ["allowed", "delayed"] } };
+  const crawlable = { crawlPolicy: { in: ["allowed", "delayed"] }, monitoringEnabled: true };
   const resume = resumeMinutes > 0 ? {
     OR: [
       { lastCrawlAt: null },
@@ -454,13 +489,13 @@ async function executeIngest() {
   const where = slug
     ? { slug, ...crawlable }
     : flag("all")
-      ? { ...crawlable, ...resume }
-      : { priority: 1, ...crawlable, ...resume };
+      ? { ...crawlable, ...resume, ...due }
+      : { priority: 1, ...crawlable, ...resume, ...due };
 
   const institutions = await prisma.institution.findMany({
     where,
     orderBy: { priority: "asc" },
-    select: { id: true, slug: true, name: true, researchUrl: true, rssUrl: true, sitemapUrl: true, language: true, crawlDelay: true, requiresRender: true },
+    select: { id: true, slug: true, name: true, researchUrl: true, rssUrl: true, sitemapUrl: true, language: true, crawlDelay: true, requiresRender: true, crawlIntervalSec: true, consecutiveFailures: true },
   });
 
   if (slug) {
@@ -478,18 +513,20 @@ async function executeIngest() {
   console.log(`Ingesting ${institutions.length} compliant institution(s), up to ${perLimit} current-month articles each (scan ${scanLimit}, pages ${maxPages})…`);
   let total = 0;
   let failedSources = 0;
-  for (const inst of institutions) {
+  await runSourcesByOrigin(institutions, concurrency, async (inst) => {
     try {
       total += await ingestInstitution(inst, perLimit, scanLimit, since, maxPages, sourceSeconds, renderLimit);
     } catch (error) {
       failedSources++;
+      const failures = inst.consecutiveFailures + 1;
+      const retrySeconds = Math.min(3600, crawlIntervalSeconds(inst) * 2 ** Math.min(failures, 6));
       await prisma.institution.update({
         where: { id: inst.id },
-        data: { lastCrawlStatus: "failed", lastCrawlMessage: String(error).slice(0, 1000) },
+        data: { lastCrawlStatus: "failed", lastCrawlMessage: String(error).slice(0, 1000), consecutiveFailures: failures, nextCrawlAt: new Date(Date.now() + retrySeconds * 1000) },
       });
       console.error(JSON.stringify({ event: "ingest.source.failed", institution: inst.name, error: String(error) }));
     }
-  }
+  });
 
   const snaps = await snapshotAll();
   console.log(`\nDone. ${total} new articles · ${snaps} consensus snapshots.`);
@@ -497,7 +534,7 @@ async function executeIngest() {
 }
 
 async function main() {
-  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), scanLimit: Number(arg("scan-limit") || 60), pages: Number(arg("pages") || 3), sourceSeconds: Number(arg("source-seconds") || 180), renderLimit: Number(arg("render-limit") || 4), since: arg("since") ?? "current-month", all: flag("all"), resumeMinutes: Number(arg("resume-minutes") || 0) };
+  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), scanLimit: Number(arg("scan-limit") || 60), pages: Number(arg("pages") || 3), sourceSeconds: Number(arg("source-seconds") || 180), renderLimit: Number(arg("render-limit") || 4), concurrency: Number(arg("concurrency") || process.env.INGEST_CONCURRENCY || 8), since: arg("since") ?? "current-month", all: flag("all"), due: flag("due"), resumeMinutes: Number(arg("resume-minutes") || 0) };
   await runTrackedJob("ingest", parameters, async () => {
     const metrics = await executeIngest();
     return { result: undefined, metrics };

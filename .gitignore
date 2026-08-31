@@ -9,6 +9,7 @@ next-env.d.ts
 *.tsbuildinfo
 .DS_Store
 storage/
+.runtime/
 data/cache/
 data/crawl-probe*.json
 prisma/postgresql/schema.prisma

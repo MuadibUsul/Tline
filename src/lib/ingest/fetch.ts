@@ -24,6 +24,7 @@ export interface FetchResult {
   etag: string | null;
   lastModified: string | null;
   retryAfter: string | null;
+  finalUrl: string;
 }
 
 export async function fetchResource(
@@ -54,10 +55,11 @@ export async function fetchResource(
       etag: res.headers.get("etag"),
       lastModified: res.headers.get("last-modified"),
       retryAfter: res.headers.get("retry-after"),
+      finalUrl: res.url,
     };
   } catch {
     lastStatuses.set(url, 0);
-    return { ok: false, status: 0, body: null, contentType: "", etag: null, lastModified: null, retryAfter: null };
+    return { ok: false, status: 0, body: null, contentType: "", etag: null, lastModified: null, retryAfter: null, finalUrl: url };
   } finally {
     clearTimeout(t);
   }
@@ -81,6 +83,14 @@ export async function fetchText(url: string, timeoutMs = 15000): Promise<string 
     result = await fetchResource(url, timeoutMs, cached ?? undefined);
   }
   if (result.status === 304 && cached) return cached.body;
+  try {
+    const requested = new URL(url);
+    const final = new URL(result.finalUrl);
+    if (requested.pathname.replace(/\/$/, "") && !final.pathname.replace(/^\/(?:index\.[a-z0-9]+)?\/?$/i, "")) {
+      lastReasons.set(url, `redirected to site root: ${result.finalUrl}`);
+      return null;
+    }
+  } catch { /* URL validation already happens at fetch */ }
   if (!result.ok || !result.body || !/text|html|xml|rss|json/i.test(result.contentType)) return null;
   const body = result.body.toString("utf8");
   await mkdir(textCacheDir, { recursive: true });

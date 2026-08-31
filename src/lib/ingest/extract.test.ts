@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
+import { stripTrailingDisclaimerSegments } from "../articleText";
 
 test("extracts an embedded publisher date and conservative URL date hints", () => {
   const article = extractArticle(`<html><head><title>CIO Insights 4Q24 | Bank</title></head><body>
@@ -21,6 +22,12 @@ test("extracts an embedded publisher date and conservative URL date hints", () =
   assert.equal(inferPublicationDate("economic_monthly_ASEANIndiaau20260820e.pdf")?.toISOString().slice(0, 10), "2026-08-20");
   assert.equal(inferPublicationDate("market-view-latest"), null);
   assert.equal(extractArticle(`<title>Daily: Navigating higher long-end yields | UBS</title><main><p>${"Bond markets remain volatile. ".repeat(20)}</p></main>`).title, "Daily: Navigating higher long-end yields");
+});
+
+test("prefers a real h1 when publisher open graph metadata is only a URL slug", () => {
+  const prose = "Cross-border investment and trade flows are expanding as supply chains diversify. ".repeat(12);
+  const article = extractArticle(`<html><head><meta property="og:title" content="corridors-in-focus-us-india"></head><body><main><h1>US-India: Enabling the next wave of corporate growth</h1><p>${prose}</p></main></body></html>`);
+  assert.equal(article.title, "US-India: Enabling the next wave of corporate growth");
 });
 
 test("does not truncate a long article body", () => {
@@ -46,6 +53,34 @@ test("rejects legal disclosures presented as the article body", () => {
 
   const research = `${"Growth is moderating while inflation is easing. Bond valuations now compensate investors for duration risk. Policy normalization should remain gradual. Portfolio diversification remains important. ".repeat(35)}\n\n${disclosure}`;
   assert.equal(looksLikeArticle("Market outlook", research), true);
+});
+
+test("removes trailing publisher disclaimers from article segments", () => {
+  const prose = "Growth is moderating while inflation is easing and bond valuations are improving. ".repeat(12);
+  const article = extractArticle(`<article><h1>Market outlook</h1><ul><li>${prose}</li></ul><h2>Questions or comments?</h2><p>This content is marketing material. None of this information constitutes investment advice.</p></article>`);
+  assert.match(article.text, /bond valuations are improving/);
+  assert.doesNotMatch(article.text, /marketing material/);
+  assert.equal(article.segments.length, 1);
+  assert.match(article.disclaimerText || "", /marketing material/);
+
+  const translated = stripTrailingDisclaimerSegments([
+    { heading: "观点", text: prose },
+    { heading: "如有疑问或评论", text: "本内容为营销材料。本网站提供的任何信息均不构成投资建议。" },
+  ]);
+  assert.equal(translated.length, 1);
+
+  const generic = stripTrailingDisclaimerSegments([
+    { heading: null, text: prose },
+    { heading: "Important information", text: "This report is for informational purposes only and does not constitute investment advice. Its accuracy and completeness are not guaranteed." },
+  ]);
+  assert.equal(generic.length, 1);
+});
+
+test("stops before related-content modules", () => {
+  const prose = "Economic growth remains resilient while inflation is easing gradually. ".repeat(14);
+  const article = extractArticle(`<article><h1>Economic outlook</h1><p>${prose}</p><h2>Explore the latest from our research</h2><p>Another article title that must not enter this body.</p><h2>Disclaimer</h2><p>This report is for informational purposes only and does not constitute investment advice.</p></article>`);
+  assert.match(article.text, /inflation is easing/);
+  assert.doesNotMatch(article.text, /Another article title/);
 });
 
 test("distinguishes investment research PDFs from operational vendor notices", () => {
@@ -102,11 +137,22 @@ test("applies durable source discovery exceptions", () => {
   assert.equal(sitemapEnabled("kkr"), true);
   assert.equal(articleAllowed("commonwealth", "Market wrap", "Some of the content presented in this section has been provided by Australian Associated Press (AAP)."), false);
   assert.equal(articleAllowed("commonwealth", "Rates outlook", "New Commonwealth Bank Economic research forecasts a November rate rise."), true);
+  assert.equal(articleAllowed("commonwealth", "CommBank reduces merchant fees", "Support for business merchants"), false);
+  assert.equal(articleAllowed("invesco", "Market and economic insights", "A topic collection"), false);
+  assert.equal(articleAllowed("nordea", "Stock exchange release: Half-year report 2026 for Nordea Hypotek AB published", "Issuer report"), false);
+  assert.equal(candidateAllowed("schroders", "https://www.schroders.com/en-au/au/individual/insights/market-view/"), true);
+  assert.equal(candidateAllowed("schroders", "https://www.schroders.com/en-au/au/individual/funds/global-shares/example/"), false);
+  assert.equal(candidateAllowed("cr-dit-cib", "https://www.ca-cib.com/en/news/project-finance-transaction"), false);
+  assert.equal(candidateAllowed("cr-dit-cib", "https://www.ca-cib.com/en/insights/global-markets-research"), true);
   assert.equal(candidateAllowed("saxo", "https://www.home.saxo/insights/saxostrats-experts"), false);
   assert.equal(candidateAllowed("saxo", "https://www.home.saxo/content/articles/macro/market-update"), true);
   assert.equal(candidateAllowed("nab-markets", "https://business.nab.com.au/tag/small-business/founder-story"), false);
   assert.equal(candidateAllowed("nab-markets", "https://business.nab.com.au/tag/economic-commentary/nab-outlook"), true);
   assert.equal(articleAllowed("seb", "Investment Outlook Reports", "A report listing"), false);
+  assert.equal(articleAllowed("rbc", "Featured Analysis", "A collection of featured reports"), false);
+  assert.equal(articleAllowed("commerzbank", "Newsletters | Corporate Clients", "Newsletter archive"), false);
+  assert.equal(articleAllowed("santander", "The Magnifying Glass | Sala de Comunicación", "Press-room collection"), false);
+  assert.equal(articleAllowed("citi", "View Transcript", "A complete podcast transcript with substantive research."), true);
 });
 
 test("discovers nested article pages and embedded same-origin PDFs", () => {

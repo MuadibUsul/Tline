@@ -21,7 +21,51 @@ const RULES: Record<string, SourceRule> = {
     articleRejected: /^(?:All news stories\s*|Stock exchange release:.*|(?:Half-year report.*Nordea Hypotek|Nordea Hypotek.*half-year report).*)$/i,
   },
   westpac: {
+    // Sub-topic listing pages under Westpac IQ economics.
+    listingUrls: [
+      "https://www.westpaciq.com.au/markets",
+      "https://www.westpaciq.com.au/topic.rba",
+      "https://www.westpaciq.com.au/topic.consumer",
+      "https://www.westpaciq.com.au/topic.businessconditions",
+      "https://www.westpaciq.com.au/topic.housing",
+      "https://www.westpaciq.com.au/topic.commodities",
+      "https://www.westpaciq.com.au/topic.australia",
+      "https://www.westpaciq.com.au/topic.newzealand",
+    ],
     articleRejected: /^Westpac IQ\s*$/i,
+  },
+  scotiabank: {
+    // Each economics-publications sub-series is its own listing page.
+    listingUrls: [
+      "https://www.scotiabank.com/ca/en/about/economics/economics-publications.html",
+      "https://www.scotiabank.com/ca/en/about/economics/economics-publications.daily-points.html",
+      "https://www.scotiabank.com/ca/en/about/economics/economics-publications.global-week-ahead.html",
+      "https://www.scotiabank.com/ca/en/about/economics/economics-publications.economic-indicators.html",
+      "https://www.scotiabank.com/ca/en/about/economics/economics-publications.global-outlook-and-forecast-tables.html",
+      "https://www.scotiabank.com/ca/en/about/economics/economics-publications.housing.html",
+      "https://www.scotiabank.com/ca/en/about/economics/economics-publications.fiscal-policy.html",
+    ],
+  },
+  barclays: {
+    listingUrls: [
+      "https://www.ib.barclays/our-insights/themes.html",
+      "https://www.ib.barclays/our-insights/series.html",
+      "https://www.ib.barclays/our-insights/themes/macro-shifts.html",
+      "https://www.ib.barclays/our-insights/themes/innovation-edge.html",
+    ],
+  },
+  nomura: {
+    listingUrls: [
+      "https://www.nomuraconnects.com/economics",
+      "https://www.nomuraconnects.com/emerging-markets",
+      "https://www.nomuraconnects.com/annual-outlook",
+    ],
+  },
+  ocbc: {
+    listingUrls: [
+      "https://www.ocbc.com/group/research/research-with-filter",
+      "https://www.ocbc.com/group/research/investment-reports",
+    ],
   },
   schroders: {
     candidatePath: /\/insights\//i,
@@ -35,13 +79,18 @@ const RULES: Record<string, SourceRule> = {
   commerzbank: {
     articleRejected: /^Newsletters?(?:\s*\|\s*Corporate Clients)?\s*$/i,
   },
-  santander: {
-    articleRejected: /^The Magnifying Glass(?:\s*\|\s*Sala de Comunicación)?\s*$/i,
-  },
   franklin: {
+    listingUrls: [
+      "https://www.franklintempleton.com/insights/franklin-templeton-institute/index",
+      "https://www.franklintempleton.com/insights/research-findings/index",
+    ],
     articleRejected: /^Investment Themes\s*$/i,
   },
   invesco: {
+    listingUrls: [
+      "https://www.invesco.com/us/en/insights/topic/market-and-economic-insights.html",
+      "https://www.invesco.com/us/en/insights/topic/investment-related-insights.html",
+    ],
     articleRejected: /^Market and economic insights\s*$/i,
   },
   uob: {

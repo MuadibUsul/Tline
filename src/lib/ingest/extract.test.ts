@@ -190,8 +190,14 @@ test("applies durable source discovery exceptions", () => {
   assert.equal(articleAllowed("seb", "Investment Outlook Reports", "A report listing"), false);
   assert.equal(articleAllowed("rbc", "Featured Analysis", "A collection of featured reports"), false);
   assert.equal(articleAllowed("commerzbank", "Newsletters | Corporate Clients", "Newsletter archive"), false);
-  assert.equal(articleAllowed("santander", "The Magnifying Glass | Sala de Comunicación", "Press-room collection"), false);
   assert.equal(articleAllowed("citi", "View Transcript", "A complete podcast transcript with substantive research."), true);
+  // Newly registered sub-topic listing pages are crawled alongside the main research URL.
+  assert.deepEqual(listingUrls("nomura", "https://www.nomuraconnects.com/about-asia"), [
+    "https://www.nomuraconnects.com/about-asia",
+    "https://www.nomuraconnects.com/economics",
+    "https://www.nomuraconnects.com/emerging-markets",
+    "https://www.nomuraconnects.com/annual-outlook",
+  ]);
 });
 
 test("discovers nested article pages and embedded same-origin PDFs", () => {

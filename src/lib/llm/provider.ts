@@ -94,7 +94,8 @@ class DeepSeekProvider implements LLMProvider {
 
 class GeminiProvider implements LLMProvider {
   readonly name = "gemini";
-  readonly model = process.env.GEMINI_MODEL || process.env.LLM_MODEL || "gemini-2.0-flash";
+  // Do not fall back to the cross-provider LLM_MODEL — that leaks another vendor's model name.
+  readonly model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
   async complete(input: CompletionInput): Promise<CompletionResult> {
     const baseUrl = (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com").replace(/\/$/, "");

@@ -40,7 +40,7 @@ export async function getSessionUser() {
     const session = await getServerSession(authOptions);
     return session?.user?.email ? prisma.user.findUnique({ where: { email: session.user.email } }) : null;
   }
-  const raw = cookies().get(COOKIE)?.value;
+  const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;
   const claim = readToken(raw);
   if (!claim) return null;

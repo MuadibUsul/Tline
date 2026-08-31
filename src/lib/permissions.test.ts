@@ -15,8 +15,11 @@ test("stateful user features still require a session", () => {
   assert.equal(can({ id: "u2", tier: "professional" }, "api.use"), true);
 });
 
-test("review roles are independent from commercial tiers", () => {
-  assert.equal(can({ id: "u1", tier: "professional", role: "member" }, "admin.review"), false);
-  assert.equal(can({ id: "u2", tier: "free", role: "reviewer" }, "admin.review"), true);
-  assert.equal(can({ id: "u3", tier: "free", role: "admin" }, "admin.review"), true);
+test("operations access is restricted to the owner email allowlist", () => {
+  const previous = process.env.ADMIN_EMAILS;
+  process.env.ADMIN_EMAILS = "owner@example.com";
+  assert.equal(can({ id: "u1", email: "other@example.com", tier: "professional", role: "admin" }, "admin.review"), false);
+  assert.equal(can({ id: "u2", email: "owner@example.com", tier: "free", role: "member" }, "admin.review"), true);
+  if (previous === undefined) delete process.env.ADMIN_EMAILS;
+  else process.env.ADMIN_EMAILS = previous;
 });

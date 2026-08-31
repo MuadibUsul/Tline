@@ -2,18 +2,12 @@ import Link from "next/link";
 import { featuredConsensus, importantReleasesThisWeek, latestFeed, mostActive, viewChanges } from "@/lib/queries";
 import { FeedCard, Delta } from "./_components/ui";
 import SearchBox from "./_components/SearchBox";
-import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, type Locale } from "@/lib/i18n";
+import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
+import { beijingDateTime } from "@/lib/macro/presentation";
 
 export const dynamic = "force-dynamic";
 
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
-
-// Beijing wall-clock (fixed UTC+8), e.g. "周三 09/03 20:30".
-function beijingTime(value: Date, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en-GB", {
-    timeZone: "Asia/Shanghai", weekday: "short", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
-  }).format(value);
-}
 
 export default async function Home() {
   const locale = await getLocale();
@@ -73,7 +67,7 @@ export default async function Home() {
               {thisWeek.map((release) => (
                 <Link key={release.id} href={`/macro/release/${release.id}`} className="r" style={{ textDecoration: "none" }}>
                   <span className="inst">{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}<small className="mono" style={{ display: "block", color: "var(--faint)" }}>{release.countryCode} · {"●".repeat(release.importance)}</small></span>
-                  <span className="mono" style={{ whiteSpace: "nowrap", color: "var(--muted)" }}>{beijingTime(release.scheduledAt, locale)}</span>
+                  <span className="mono" style={{ whiteSpace: "nowrap", color: "var(--muted)" }}>{beijingDateTime(release.scheduledAt, locale)}</span>
                 </Link>
               ))}
               {thisWeek.length === 0 && <div className="r"><span style={{ color: "var(--muted)" }}>{tr(locale, "No high-impact releases left this week.", "本周暂无重要数据发布。")}</span></div>}

@@ -172,6 +172,15 @@ td.inst{color:var(--ink);font-weight:600}
 .deltas{display:flex;gap:18px;font-family:var(--mono);font-size:12px;color:var(--muted)}
 .big-score{display:flex;align-items:baseline;gap:12px}
 .big-score .num{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1}
+.macro-change{font-family:var(--mono);font-size:14px;font-weight:600}
+.macro-change.up{color:var(--bull)}.macro-change.down{color:var(--bear)}
+.macro-chart{width:100%;height:200px;display:block;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.macro-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;margin-top:14px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.macro-stat{display:flex;flex-direction:column;gap:4px;padding:12px 14px;background:var(--panel)}
+.macro-stat .k{font:11px var(--mono);color:var(--faint)}
+.macro-stat .v{font:600 16px var(--mono);color:var(--ink)}
+.macro-next{color:var(--muted)}
+td.up{color:var(--bull)}td.down{color:var(--bear)}
 
 /* distribution */
 .dist{display:flex;gap:26px;flex-wrap:wrap}

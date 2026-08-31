@@ -17,3 +17,10 @@ export function consensusText(value: { toString(): string } | null | undefined, 
 export function macroDateTime(value: Date, locale: Locale, timeZone = "UTC") {
   return new Intl.DateTimeFormat(locale, { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZoneName: "short" }).format(value);
 }
+
+/** Weekday + date + time in Beijing wall-clock (fixed UTC+8), e.g. "周三 09/03 20:30". */
+export function beijingDateTime(value: Date, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en-GB", {
+    timeZone: "Asia/Shanghai", weekday: "short", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(value);
+}

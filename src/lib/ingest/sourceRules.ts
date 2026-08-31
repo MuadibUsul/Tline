@@ -67,6 +67,21 @@ const RULES: Record<string, SourceRule> = {
       "https://www.ocbc.com/group/research/investment-reports",
     ],
   },
+  mizuho: {
+    // Insights are JS-loaded tabs; every tab is its own sub-category listing.
+    listingUrls: [
+      "https://www.mizuhogroup.com/bank/insights/information?tab=market-outlooks",
+      "https://www.mizuhogroup.com/bank/insights/information?tab=economic-information",
+      "https://www.mizuhogroup.com/bank/insights/information?tab=market-trends",
+      "https://www.mizuhogroup.com/bank/insights/information?tab=industry-reports",
+      "https://www.mizuhogroup.com/bank/insights/information?tab=country-reports",
+      "https://www.mizuhogroup.com/bank/insights/information?tab=research",
+      "https://www.mizuhogroup.com/bank/insights/information?tab=research-report",
+      "https://www.mizuhogroup.com/bank/insights/information?tab=information-and-reports-on-china",
+      "https://www.mizuhogroup.com/bank/insights/information?tab=mizuho-china-business-express",
+      "https://www.mizuhogroup.com/americas/insights",
+    ],
+  },
   schroders: {
     candidatePath: /\/insights\//i,
   },

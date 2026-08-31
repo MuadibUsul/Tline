@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assetName, domainTerm, institutionName, localizeChineseContent, localizedDataValue, localeSafeText, resolveLocale, tr } from "./i18n";
+import { articleTimestamp, assetName, domainTerm, institutionName, localizeChineseContent, localizedDataValue, localeSafeText, relativeTime, resolveLocale, tr } from "./i18n";
+
+test("articleTimestamp keeps a publisher time but falls back to discovery time for date-only publications", () => {
+  // Publisher gave a real time-of-day -> used verbatim.
+  const precise = new Date("2026-08-31T14:32:00Z");
+  assert.equal(articleTimestamp(precise, new Date("2026-08-31T09:00:00Z")).toISOString(), precise.toISOString());
+  // Date-only (midnight) publication -> discovery time-of-day carried onto the publication day.
+  const dateOnly = new Date("2026-08-28T00:00:00Z");
+  const discovered = new Date("2026-08-31T10:40:19Z");
+  assert.equal(articleTimestamp(dateOnly, discovered).toISOString(), "2026-08-28T10:40:19.000Z");
+});
+
+test("relativeTime is minute-precise between one hour and one day", () => {
+  const now = Date.now();
+  assert.equal(relativeTime(new Date(now - (2 * 3600 + 9 * 60) * 1000), "zh-CN"), "2小时9分钟前");
+  assert.equal(relativeTime(new Date(now - 2 * 3600 * 1000), "zh-CN"), "2小时前");
+  assert.equal(relativeTime(new Date(now - 15 * 60 * 1000), "zh-CN"), "15分钟前");
+});
 
 test("resolves an explicit locale before browser language", () => {
   assert.equal(resolveLocale("en", "zh-CN,zh;q=0.9"), "en");

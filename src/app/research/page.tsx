@@ -36,7 +36,7 @@ export default async function ResearchIndex(
   const [feed, total, institutions, assets] = await Promise.all([
     prisma.article.findMany({
       where,
-      orderBy: { publishedAt: "desc" },
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
       skip: (page - 1) * take,
       take,
       include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } }, articleAssets: { include: { asset: true } } },

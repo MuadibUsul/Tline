@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { relTime } from "@/app/_components/ui";
-import { assetName, domainTerm, formatDate, getLocale, institutionName, localizeChineseContent, localizedDataValue, tr, type Locale } from "@/lib/i18n";
+import { articleTimestamp, assetName, domainTerm, formatDate, getLocale, institutionName, localizeChineseContent, localizedDataValue, tr, type Locale } from "@/lib/i18n";
 import { clusterViewsNewestFirst, rankAtomicViews, type MarketEvent } from "@/lib/viewRanking";
 import marketEvents from "../../../data/market-events.json";
 import { publicationReadyWhere } from "@/lib/publication";
@@ -48,7 +48,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
           const displayValue = localizedDataValue(view.value, locale);
           return (
             <article className="view-flash" key={view.id}>
-              <div className="view-rank"><b>#{(page - 1) * take + viewIndex + 1}</b><time dateTime={view.article.publishedAt.toISOString()} title={formatDate(view.article.publishedAt, locale)}>{relTime(view.article.publishedAt, locale)}</time></div>
+              <div className="view-rank"><b>#{(page - 1) * take + viewIndex + 1}</b><time dateTime={view.article.publishedAt.toISOString()} title={formatDate(view.article.publishedAt, locale)}>{relTime(articleTimestamp(view.article.publishedAt, view.article.createdAt), locale)}</time></div>
               <div className="view-flash-main">
                 <div className="view-flash-meta">
                   <Link href={`/institution/${view.article.institution.slug}`}>{institutionName(view.article.institution.name, locale)}</Link>

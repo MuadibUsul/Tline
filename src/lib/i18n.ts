@@ -166,9 +166,27 @@ export function formatDate(value: Date | string, locale: Locale) {
   return new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
 }
 
+/**
+ * Effective, minute-precise timestamp for an article: the publisher's own time when it
+ * provided one (a non-midnight `publishedAt`); otherwise the crawler discovery time
+ * (`createdAt`) carried onto the publication day, so the day stays correct while
+ * same-day items differentiate down to the minute.
+ */
+export function articleTimestamp(publishedAt: Date | string, createdAt: Date | string): Date {
+  const published = new Date(publishedAt);
+  const dateOnly = published.getUTCHours() === 0 && published.getUTCMinutes() === 0 && published.getUTCSeconds() === 0 && published.getUTCMilliseconds() === 0;
+  if (!dateOnly) return published;
+  const discovered = new Date(createdAt);
+  return new Date(Date.UTC(published.getUTCFullYear(), published.getUTCMonth(), published.getUTCDate(), discovered.getUTCHours(), discovered.getUTCMinutes(), discovered.getUTCSeconds()));
+}
+
 export function relativeTime(value: Date | string, locale: Locale) {
   const seconds = (Date.now() - new Date(value).getTime()) / 1000;
   if (seconds < 3600) return tr(locale, `${Math.max(1, Math.round(seconds / 60))}m`, `${Math.max(1, Math.round(seconds / 60))}分钟前`);
-  if (seconds < 86400) return tr(locale, `${Math.round(seconds / 3600)}h`, `${Math.round(seconds / 3600)}小时前`);
+  if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds - hours * 3600) / 60);
+    return minutes ? tr(locale, `${hours}h ${minutes}m`, `${hours}小时${minutes}分钟前`) : tr(locale, `${hours}h`, `${hours}小时前`);
+  }
   return tr(locale, `${Math.round(seconds / 86400)}d`, `${Math.round(seconds / 86400)}天前`);
 }

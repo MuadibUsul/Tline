@@ -45,7 +45,7 @@ export async function featuredConsensus(): Promise<ConsensusCard[]> {
 export async function latestFeed(limit = 8) {
   return prisma.article.findMany({
     where: publicationReadyWhere(),
-    orderBy: { publishedAt: "desc" },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
     take: limit,
     include: {
       institution: true,

@@ -549,6 +549,21 @@ export function isDisclaimerOnly(text: string): boolean {
   return legalChars / Math.max(text.length, 1) >= 0.65;
 }
 
+// Webinar / podcast / video / live-event pages read like prose but are an invitation to a
+// broadcast, not written research. Source policy excludes video/audio/blog-style content.
+const BROADCAST_TITLE = /\b(?:webinars?|web-?casts?|live ?streams?|livestreams?|podcasts?|episodes?|blogs?|video series|on-demand (?:video|webcast|replay))\b/i;
+const BROADCAST_BODY = /\b(?:in this|another|the latest)\s+(?:webinar|webcast|podcast|episode|video|blog)\b|\bthis\s+(?:webinar|webcast|podcast|episode|blog)\b|\b(?:watch (?:the )?(?:replay|recording|webcast|video)|listen to (?:the )?(?:episode|podcast|recording)|on-demand (?:video|webcast|replay)|welcome (?:back )?to (?:another )?(?:episode|webinar|webcast)|you(?:'|’)re listening to .{0,80}\bpodcast|originally published .{0,80}\bpodcast)\b/i;
+const EVENT_SCHEDULE = /(?:duration:\s*\d+\s*min(?:ute)?s?|time:\s*\d{1,2}[:.]\d{2}\s*(?:am|pm)?\s*(?:CET|CEST|GMT|BST|UTC|EST|EDT|ET|PST|PDT|PT|SGT|HKT|JST|AEST|AEDT)\b)/i;
+const EVENT_CTA = /\b(?:register (?:now|here|today|to attend|for)|save your (?:seat|spot)|reserve your (?:seat|spot)|sign up to attend|join us (?:on|for|as)|join .{0,60}\bas (?:he|she|they)\b)/i;
+
+/** True for broadcast/event pages (webinar, podcast, video, live event) rather than written research. */
+export function isBroadcastOrEvent(title: string, text: string): boolean {
+  const sample = text.slice(0, 3000);
+  if (BROADCAST_TITLE.test(title) || BROADCAST_BODY.test(sample)) return true;
+  // An invitation with a scheduled time/duration AND a register/join call-to-action.
+  return EVENT_SCHEDULE.test(sample) && EVENT_CTA.test(sample);
+}
+
 /** Topic gate for PDFs discovered without an explicit article page. */
 export function looksLikeResearchTopic(title: string, text: string): boolean {
   const sample = `${title}\n${text.slice(0, 4000)}`;

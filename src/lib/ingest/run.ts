@@ -2,7 +2,7 @@ import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchImage, fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
-import { extractLinks, extractArticle, extractFeedLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { extractLinks, extractArticle, extractFeedLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { ensureAssets, persistArticle, persistArticleFigures, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
@@ -144,8 +144,13 @@ async function ingestInstitution(
   const candidateLimit = Math.min(500, Math.max(perLimit * 3, scanLimit));
   const stage = (raw: RawArticle) => {
     if (isNaN(raw.publishedAt.getTime()) || raw.publishedAt.getTime() > Date.now() + 864e5) { empty++; return false; }
+    // A page can't be published after we discovered it; cap near-future dates (timezone skew,
+    // or an event date scraped as the publish date) so they never pin the newest-first feed.
+    if (raw.publishedAt.getTime() > Date.now()) raw.publishedAt = new Date();
     if (raw.publishedAt < since) { outOfWindow++; return false; }
     if (!articleAllowed(inst.slug, raw.title, raw.text)) { empty++; return false; }
+    // Webinars / podcasts / video / live-event invitations are not written research.
+    if (isBroadcastOrEvent(raw.title, raw.text)) { empty++; return false; }
     if (raw.strict && (!looksLikeArticle(raw.title, raw.text) || !looksLikeResearchTopic(raw.title, raw.text))) { empty++; return false; }
     raws.push(raw);
     return true;

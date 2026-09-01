@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
 import { stripTrailingDisclaimerSegments } from "../articleText";
 
@@ -162,6 +162,20 @@ test("recognizes publisher consent copy and excludes author profile links", () =
   assert.equal(isAccessGateText("Natixis S.A. and its CIB entities worldwide as the Data Controllers use cookies. You can give or not your consent."), true);
   const links = extractLinks(`<a href="/author/171022">Read the complete author profile and publications</a><a href="/Site/en/publication/market-outlook-for-global-investors">Market outlook for global institutional investors</a>`, "https://research.example/Site/");
   assert.deepEqual(links.map((link) => link.url), ["https://research.example/Site/en/publication/market-outlook-for-global-investors"]);
+});
+
+test("rejects webinar / broadcast invitations but keeps written research", () => {
+  // The exact page that slipped in: a Nordea webinar invite dated in the future.
+  const webinar = "The global economy has shown remarkable resilience, but uncertainty remains high. Join Helge J. Pedersen as he explores the key forces shaping the economy in the years ahead. Date: 2 September 2026 Time: 11:00 CET Duration: 30 minutes plus Q&A Language: English";
+  assert.equal(isBroadcastOrEvent("Nordea Economic Outlook September 2026", webinar), true);
+  assert.equal(isBroadcastOrEvent("Q3 Markets Podcast", "Listen to the episode as our strategists discuss rates and FX."), true);
+  assert.equal(isBroadcastOrEvent("On-demand webcast: the year ahead", "Watch the replay of our outlook discussion."), true);
+  assert.equal(isBroadcastOrEvent("Market outlook blog", "In this blog, our strategist discusses inflation."), true);
+  // A genuine written outlook that merely mentions durations/time in prose must survive.
+  const research = "Time: 11:00 CET. Duration: 30 minutes. Our base case sees GDP growth of 1.8% next year as inflation cools. We expect the central bank to hold rates through the second quarter before easing. Equity valuations remain stretched relative to bonds, and we stay neutral on duration while favouring quality credit.";
+  assert.equal(isBroadcastOrEvent("2027 Economic Outlook", research), false);
+  assert.equal(isBroadcastOrEvent("Asset Class Returns Forecasts", "The brief widening episode was quickly reversed. Follow our podcasts for separate interviews."), false);
+  assert.equal(isBroadcastOrEvent("Food inflation in Canada", "A written analysis. To view this video please enable JavaScript. The report continues with six questions about grocery prices."), false);
 });
 
 test("applies durable source discovery exceptions", () => {

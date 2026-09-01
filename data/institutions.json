@@ -238,7 +238,8 @@
     "authorityScore": 0.85,
     "priority": 3,
     "updateFreq": "75–145",
-    "language": "en"
+    "language": "en",
+    "requiresRender": true
   },
   {
     "slug": "pimco",
@@ -391,7 +392,8 @@
     "authorityScore": 0.85,
     "priority": 3,
     "updateFreq": "50–100",
-    "language": "en"
+    "language": "en",
+    "requiresRender": true
   },
   {
     "slug": "commerzbank",

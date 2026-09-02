@@ -360,3 +360,15 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .webhook-form{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-top:10px}
 .webhook-form input{min-width:min(420px,100%)}
 @media(max-width:620px){.webhook-form{align-items:stretch}.webhook-form .minibtn{min-height:40px}}
+
+/* Live feed: appears only when new research arrived while the reader was scrolled down. */
+.livepill{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:70;
+  display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);background:var(--accent);
+  color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  box-shadow:0 6px 20px color-mix(in srgb,var(--accent) 32%,transparent)}
+.livepill:hover{background:var(--accent-ink)}
+.livepill:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.livepill .dot{width:7px;height:7px;border-radius:50%;background:#fff;animation:livepulse 1.8s ease-in-out infinite}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.livepill .dot{animation:none}}

@@ -1,9 +1,8 @@
 import { prisma } from "../db";
 import { urlHash, titleHash, contentHash } from "../hash";
-import { isJunk, looksLikeArticle, type ExtractedFigure, type Segment } from "./extract";
+import { isJunk, looksLikeArticle, type Segment } from "./extract";
 import { ASSETS } from "../assets";
 import { partitionArticleSegments } from "../articleText";
-import { writePrivateFile } from "../documents/storage";
 
 export interface RawArticle {
   title: string;
@@ -13,52 +12,8 @@ export interface RawArticle {
   publishedAt: Date;
   language?: string;
   segments?: Segment[];
-  figures?: ExtractedFigure[];
   disclaimerText?: string | null;
   strict?: boolean; // true for HTML-extracted pages → enforce the full article check
-}
-
-const MIME_EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp", "image/avif": "avif" };
-
-/**
- * Download an article's inline figures and replace its stored figure rows.
- * Network is injected (fetchImage) so this module stays dependency-light; figures
- * are anchored by body-segment index, identical for the English and Chinese renders.
- */
-export async function persistArticleFigures(
-  articleId: string,
-  figures: ExtractedFigure[],
-  fetchImage: (url: string) => Promise<{ buffer: Buffer; mimeType: string } | null>,
-  onFetch?: () => Promise<void>,
-): Promise<number> {
-  const stored: Array<{ afterSegmentPosition: number; ordinal: number; storageKey: string; mimeType: string; sourceUrl: string; alt: string | null; caption: string | null; byteSize: number }> = [];
-  const ordinals = new Map<number, number>();
-  let index = 0;
-  for (const figure of figures) {
-    if (onFetch) await onFetch();
-    const image = await fetchImage(figure.url);
-    if (!image) continue;
-    const ext = MIME_EXT[image.mimeType] ?? "img";
-    const storageKey = `figures/${articleId}/${index++}.${ext}`;
-    await writePrivateFile(storageKey, image.buffer);
-    const ordinal = ordinals.get(figure.afterSegmentPosition) ?? 0;
-    ordinals.set(figure.afterSegmentPosition, ordinal + 1);
-    stored.push({
-      afterSegmentPosition: figure.afterSegmentPosition,
-      ordinal,
-      storageKey,
-      mimeType: image.mimeType,
-      sourceUrl: figure.url,
-      alt: figure.alt,
-      caption: figure.caption,
-      byteSize: image.buffer.byteLength,
-    });
-  }
-  await prisma.$transaction([
-    prisma.articleFigure.deleteMany({ where: { articleId } }),
-    ...(stored.length ? [prisma.articleFigure.createMany({ data: stored.map((figure) => ({ articleId, ...figure })) })] : []),
-  ]);
-  return stored.length;
 }
 
 /** Idempotent seed of the asset dictionary. */

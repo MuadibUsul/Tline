@@ -92,6 +92,7 @@ The `scheduler` service continuously selects due sources. Network-bound sources 
 - `INGEST_CONCURRENCY` — cross-domain discovery concurrency, default 8 and maximum 16; each publisher domain remains serial.
 - `INGEST_SOURCE_SECONDS` — hard budget per source, default 90 seconds, so one slow publisher cannot monopolize a worker.
 - `INGEST_ARTICLE_LIMIT` — per-institution discovery cap, default 6.
+- `INGEST_WINDOW_HOURS` — rolling discovery window, default 24 hours. Anything published earlier is skipped rather than parsed, translated and analysed. `npm run ingest -- --hours=N` or `--since=<date>` overrides it for a one-off backfill.
 - `PROCESS_ARTICLE_LIMIT` — maximum queued articles processed per pass, default 50.
 - `REPARSE_CONCURRENCY` / `TRANSLATION_CONCURRENCY` — bounded AI concurrency, default 3 and maximum 8; size these against provider RPM/TPM limits.
 - `REPARSE_CONCURRENCY` / `TRANSLATION_CONCURRENCY` — bounded model-worker concurrency, default 3 and maximum 8.

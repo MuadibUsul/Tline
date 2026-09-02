@@ -1,9 +1,9 @@
 import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
-import { fetchImage, fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
+import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
 import { extractLinks, extractArticle, extractFeedLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
-import { ensureAssets, persistArticle, persistArticleFigures, type RawArticle } from "./store";
+import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
@@ -310,7 +310,6 @@ async function ingestInstitution(
           author: article.author || item.creator || null,
           publishedAt,
           segments: article.segments,
-          figures: article.figures,
           disclaimerText: article.disclaimerText,
           strict: true,
         });
@@ -388,7 +387,6 @@ async function ingestInstitution(
           author: article.author,
           publishedAt,
           segments: article.segments,
-          figures: article.figures,
           disclaimerText: article.disclaimerText,
           strict: true,
         });
@@ -446,7 +444,6 @@ async function ingestInstitution(
           author: a.author,
           publishedAt,
           segments: a.segments,
-          figures: a.figures,
           disclaimerText: a.disclaimerText,
           strict: true, // HTML-extracted → enforce the full article check
         });
@@ -463,7 +460,6 @@ async function ingestInstitution(
   }
 
   const selectedRaws = newestByPublication(raws, perLimit);
-  let figuresStored = 0;
   for (const r of selectedRaws) {
     const res = await persistArticle(inst.id, r);
     if (res === "created") created++;
@@ -483,17 +479,6 @@ async function ingestInstitution(
         }
       }
     }
-    // Download inline figures (skip when the article already has some on a refresh).
-    if (r.figures?.length && withinBudget()) {
-      const existing = res === "updated" ? await prisma.articleFigure.count({ where: { articleId: article.id } }) : 0;
-      if (existing === 0) {
-        try {
-          figuresStored += await persistArticleFigures(article.id, r.figures, (url) => allowsUrl(url) || new URL(url).origin !== origin ? fetchImage(url) : Promise.resolve(null), async () => { await sleep(delayMs); });
-        } catch (error) {
-          console.warn(`  figures skipped for ${r.sourceUrl}: ${String(error)}`);
-        }
-      }
-    }
   }
   const note = `since ${since.toISOString().slice(0, 10)} · delay ${delayMs}ms${robotsDelaySec ? " (robots)" : ""} · ${renderedCandidates}/${renderLimit} rendered${!withinBudget() ? " · time budget reached" : ""}${outOfWindow ? ` · ${outOfWindow} older` : ""}${blocked ? ` · ${blocked} url blocked` : ""}${nativeRejected ? ` · ${nativeRejected} native PDF rejected` : ""}`;
   console.log(`  ${inst.name.padEnd(26)} +${created} created · ${updated} refreshed · ${dup} dup · ${empty} empty · ${note}`);
@@ -509,7 +494,6 @@ async function ingestInstitution(
     outOfWindow,
     robotsBlocked: blocked,
     nativePdfRejected: nativeRejected,
-    figuresStored,
     delayMs,
   }));
   const accessStatus = lastFetchStatus(inst.researchUrl);
@@ -528,7 +512,7 @@ async function ingestInstitution(
     return finish("succeeded", `source reachable · ${dup} known article${dup === 1 ? "" : "s"} · no new article selected`, created);
   }
   if (raws.length === 0 && outOfWindow > 0) {
-    return finish("succeeded", `source reachable · ${outOfWindow} article${outOfWindow === 1 ? "" : "s"} older than current-month window · no new article selected`, created);
+    return finish("succeeded", `source reachable · ${outOfWindow} article${outOfWindow === 1 ? "" : "s"} older than the ingest window · no new article selected`, created);
   }
   if (raws.length === 0) {
     return finish("empty", `no candidate passed full-body/date/topic gates · ${dup} duplicate · ${empty} rejected · ${blocked} blocked`, created);
@@ -544,9 +528,13 @@ async function executeIngest() {
   const sourceSeconds = Math.min(600, Math.max(30, Number(arg("source-seconds") || 180)));
   const renderLimit = Math.min(20, Math.max(0, Number(arg("render-limit") || 4)));
   const concurrency = Math.min(16, Math.max(1, Number(arg("concurrency") || process.env.INGEST_CONCURRENCY || 8)));
-  const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
-  const requestedSince = arg("since") ? new Date(arg("since")!) : monthStart;
-  const since = !isNaN(requestedSince.getTime()) && requestedSince > monthStart ? requestedSince : monthStart;
+  // Only what a source published in the last day is worth the parse/translate/analysis
+  // spend. A calendar-month floor collapsed to a few hours on the 1st of each month, so
+  // the window is a rolling one; --since still lets an operator reach further back.
+  const windowHours = Math.max(1, Number(arg("hours") || process.env.INGEST_WINDOW_HOURS || 24));
+  const windowStart = new Date(Date.now() - windowHours * 3600_000);
+  const requestedSince = arg("since") ? new Date(arg("since")!) : null;
+  const since = requestedSince && !isNaN(requestedSince.getTime()) ? requestedSince : windowStart;
   const slug = arg("slug");
   const resumeMinutes = Math.max(0, Number(arg("resume-minutes") || 0));
   const due = flag("due") ? { OR: [{ nextCrawlAt: null }, { nextCrawlAt: { lte: new Date() } }] } : {};
@@ -608,7 +596,7 @@ async function executeIngest() {
 }
 
 async function main() {
-  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), scanLimit: Number(arg("scan-limit") || 60), pages: Number(arg("pages") || 3), sourceSeconds: Number(arg("source-seconds") || 180), renderLimit: Number(arg("render-limit") || 4), concurrency: Number(arg("concurrency") || process.env.INGEST_CONCURRENCY || 8), since: arg("since") ?? "current-month", all: flag("all"), due: flag("due"), resumeMinutes: Number(arg("resume-minutes") || 0) };
+  const parameters = { slug: arg("slug") ?? null, limit: Number(arg("limit") || 6), scanLimit: Number(arg("scan-limit") || 60), pages: Number(arg("pages") || 3), sourceSeconds: Number(arg("source-seconds") || 180), renderLimit: Number(arg("render-limit") || 4), concurrency: Number(arg("concurrency") || process.env.INGEST_CONCURRENCY || 8), since: arg("since") ?? `${Math.max(1, Number(arg("hours") || process.env.INGEST_WINDOW_HOURS || 24))}h`, all: flag("all"), due: flag("due"), resumeMinutes: Number(arg("resume-minutes") || 0) };
   await runTrackedJob("ingest", parameters, async () => {
     const metrics = await executeIngest();
     return { result: undefined, metrics };

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ResearchCard } from "@/app/_components/ui";
+import LiveFeed from "@/app/_components/LiveFeed";
 import { prisma } from "@/lib/db";
 import { assetName, getLocale, institutionName, tr } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
+import { feedPulse } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +53,7 @@ export default async function ResearchIndex(
       },
     } : {}),
   });
-  const [feed, total, institutions, assets, countries] = await Promise.all([
+  const [feed, total, institutions, assets, countries, pulse] = await Promise.all([
     prisma.article.findMany({
       where,
       orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
@@ -63,6 +65,7 @@ export default async function ResearchIndex(
     prisma.institution.findMany({ where: { articles: { some: publicationReadyWhere() } }, orderBy: { name: "asc" }, select: { slug: true, name: true } }),
     prisma.asset.findMany({ where: { articleAssets: { some: { article: publicationReadyWhere() } } }, orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
     prisma.institution.findMany({ where: { country: { not: null }, articles: { some: publicationReadyWhere() } }, orderBy: { country: "asc" }, distinct: ["country"], select: { country: true } }),
+    feedPulse(),
   ]);
   const pages = Math.max(1, Math.ceil(total / take));
   const query = new URLSearchParams();
@@ -74,6 +77,11 @@ export default async function ResearchIndex(
 
   return (
     <main className="wrap">
+      <LiveFeed
+        initial={pulse}
+        label={tr(locale, "New research", "有新研报")}
+        ariaLabel={tr(locale, "Load newly published research", "载入新发布的研报")}
+      />
       <div className="page-head"><div className="eyebrow">{tr(locale, "Feed", "研报流")}</div><h1>{tr(locale, "Latest Research", "最新研报")}</h1>
         <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, `${total} structured institutional reports.`, `共 ${total} 篇结构化机构研报。`)}</p>
       </div>

@@ -34,6 +34,35 @@ export async function featuredConsensus(): Promise<ConsensusCard[]> {
   return cards;
 }
 
+export interface FeedPulse {
+  latestId: string | null;
+  latestAt: string | null;
+  total: number;
+}
+
+/**
+ * Identity of the newest published article plus the published total.
+ *
+ * The live feed compares the value a page was rendered with against this, so both must
+ * come from here: deriving the baseline from the first poll instead would swallow
+ * anything published between the render and that poll.
+ */
+export async function feedPulse(): Promise<FeedPulse> {
+  const [newest, total] = await Promise.all([
+    prisma.article.findFirst({
+      where: publicationReadyWhere(),
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+      select: { id: true, publishedAt: true, createdAt: true },
+    }),
+    prisma.article.count({ where: publicationReadyWhere() }),
+  ]);
+  return {
+    latestId: newest?.id ?? null,
+    latestAt: (newest?.publishedAt ?? newest?.createdAt ?? null)?.toISOString() ?? null,
+    total,
+  };
+}
+
 export async function latestFeed(limit = 8) {
   return prisma.article.findMany({
     where: publicationReadyWhere(),

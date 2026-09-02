@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { featuredConsensus, importantReleasesThisWeek, latestFeed, mostActive, viewChanges } from "@/lib/queries";
+import { featuredConsensus, feedPulse, importantReleasesThisWeek, latestFeed, mostActive, viewChanges } from "@/lib/queries";
 import { FeedCard, Delta } from "./_components/ui";
 import SearchBox from "./_components/SearchBox";
+import LiveFeed from "./_components/LiveFeed";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
 
@@ -11,16 +12,22 @@ const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)",
 
 export default async function Home() {
   const locale = await getLocale();
-  const [cards, feed, active, changes, thisWeek] = await Promise.all([
+  const [cards, feed, active, changes, thisWeek, pulse] = await Promise.all([
     featuredConsensus(),
     latestFeed(8),
     mostActive(30, 6),
     viewChanges(6),
     importantReleasesThisWeek(5),
+    feedPulse(),
   ]);
 
   return (
     <main className="wrap">
+      <LiveFeed
+        initial={pulse}
+        label={tr(locale, "New research", "有新研报")}
+        ariaLabel={tr(locale, "Load newly published research", "载入新发布的研报")}
+      />
       <section className="hero">
         <div className="eyebrow">{tr(locale, "Global Institutional Intelligence", "全球机构情报")}</div>
         <h1>{locale === "zh-CN" ? <>追踪全球顶尖<br />机构的<em>观点。</em></> : <>Track what the world&apos;s leading<br />institutions <em>think.</em></>}</h1>

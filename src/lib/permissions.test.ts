@@ -5,7 +5,6 @@ import { can } from "./permissions";
 test("core article and PDF access stays available before the tier matrix is defined", () => {
   assert.equal(can(null, "article.read.original"), true);
   assert.equal(can(null, "document.download.original"), true);
-  assert.equal(can(null, "document.download.translation"), true);
 });
 
 test("stateful user features still require a session", () => {

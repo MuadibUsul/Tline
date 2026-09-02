@@ -18,40 +18,24 @@ export interface ArticlePdfInput {
   author?: string | null;
   publishedAt: Date;
   sourceUrl: string;
-  locale: "en" | "zh-CN";
+  /** English only: the Chinese rendering of a report lives on the page, not in a PDF. */
+  locale: "en";
   segments: DocumentSegment[];
 }
 
-function fontCandidates(locale: ArticlePdfInput["locale"], bold: boolean) {
-  if (locale === "zh-CN") {
-    return [
-      bold ? process.env.PDF_FONT_ZH_BOLD : process.env.PDF_FONT_ZH,
-      bold ? "C:\\Windows\\Fonts\\msyhbd.ttc" : "C:\\Windows\\Fonts\\msyh.ttc",
-      bold ? "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" : "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    ];
-  }
+function fontCandidates(bold: boolean) {
   return [
     bold ? process.env.PDF_FONT_EN_BOLD : process.env.PDF_FONT_EN,
-    bold ? "C:\\Windows\\Fonts\\arialbd.ttf" : "C:\\Windows\\Fonts\\arial.ttf",
+    bold ? "C:/Windows/Fonts/arialbd.ttf" : "C:/Windows/Fonts/arial.ttf",
     bold ? "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" : "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
   ];
 }
 
-function configureFonts(doc: PDFKit.PDFDocument, locale: ArticlePdfInput["locale"]) {
-  const regular = fontCandidates(locale, false).find((candidate) => candidate && existsSync(candidate));
-  const bold = fontCandidates(locale, true).find((candidate) => candidate && existsSync(candidate));
-  if (locale === "zh-CN" && !regular) {
-    throw new Error("No Chinese PDF font found. Configure PDF_FONT_ZH and PDF_FONT_ZH_BOLD.");
-  }
-  const collectionFont = (font: string | undefined, isBold: boolean) => {
-    if (!font?.toLowerCase().endsWith(".ttc")) return undefined;
-    if (font.includes("NotoSansCJK")) return isBold ? "NotoSansCJKsc-Bold" : "NotoSansCJKsc-Regular";
-    return isBold
-      ? process.env.PDF_FONT_ZH_BOLD_FAMILY || "MicrosoftYaHei-Bold"
-      : process.env.PDF_FONT_ZH_FAMILY || "MicrosoftYaHei";
-  };
-  if (regular) doc.registerFont("TlineRegular", regular, collectionFont(regular, false));
-  if (bold || regular) doc.registerFont("TlineBold", bold || regular!, collectionFont(bold || regular, Boolean(bold)));
+function configureFonts(doc: PDFKit.PDFDocument) {
+  const regular = fontCandidates(false).find((candidate) => candidate && existsSync(candidate));
+  const bold = fontCandidates(true).find((candidate) => candidate && existsSync(candidate));
+  if (regular) doc.registerFont("TlineRegular", regular);
+  if (bold || regular) doc.registerFont("TlineBold", bold || regular!);
   return {
     regular: regular ? "TlineRegular" : "Helvetica",
     bold: bold || regular ? "TlineBold" : "Helvetica-Bold",
@@ -76,7 +60,7 @@ export async function createArticlePdf(input: ArticlePdfInput) {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
   });
-  const fonts = configureFonts(doc, input.locale);
+  const fonts = configureFonts(doc);
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
   doc.font(fonts.bold).fontSize(9).fillColor("#2f55d4").text("TLINE · INSTITUTIONAL INTELLIGENCE", { characterSpacing: 0.7 });
@@ -87,7 +71,7 @@ export async function createArticlePdf(input: ArticlePdfInput) {
     input.institution,
     input.author || null,
     input.publishedAt.toISOString().slice(0, 10),
-    input.locale === "zh-CN" ? "中文译文" : "English original",
+    "English original",
   ].filter(Boolean).join(" · ");
   doc.font(fonts.regular).fontSize(9).fillColor("#6a7180").text(meta);
   doc.moveDown(1);
@@ -113,7 +97,7 @@ export async function createArticlePdf(input: ArticlePdfInput) {
   doc.strokeColor("#e4e7ec").lineWidth(0.7).moveTo(doc.x, doc.y).lineTo(doc.x + contentWidth, doc.y).stroke();
   doc.moveDown(0.8);
   doc.font(fonts.regular).fontSize(8.5).fillColor("#6a7180").text(
-    (input.locale === "zh-CN" ? "译文仅用于研究阅读；权威版本以机构原文为准。来源：" : "Source: ") + input.sourceUrl,
+    "Source: " + input.sourceUrl,
     { link: input.sourceUrl, underline: false },
   );
 
@@ -159,8 +143,8 @@ async function markFailed(articleId: string, kind: string, locale: string, stora
 async function storeGenerated(
   articleId: string,
   translationId: string | null,
-  kind: "original_pdf" | "translation_pdf",
-  locale: "en" | "zh-CN",
+  kind: "original_pdf",
+  locale: "en",
   sourceUrl: string,
   input: ArticlePdfInput,
 ) {
@@ -195,10 +179,6 @@ export async function generateArticleDocuments(articleId: string) {
     include: {
       institution: true,
       segments: { orderBy: { position: "asc" } },
-      translations: {
-        where: { locale: "zh-CN" },
-        include: { segments: { orderBy: { position: "asc" } } },
-      },
     },
   });
   if (!article?.rawText) throw new Error("Article has no canonical English body.");
@@ -215,19 +195,9 @@ export async function generateArticleDocuments(articleId: string) {
     segments: sourceSegments,
   });
 
-  const translation = article.translations[0];
-  const translated = translation?.segments.length
-    ? await storeGenerated(article.id, translation.id, "translation_pdf", "zh-CN", article.sourceUrl, {
-        title: translation.title,
-        institution: article.institution.name,
-        author: article.author,
-        publishedAt: article.publishedAt,
-        sourceUrl: article.sourceUrl,
-        locale: "zh-CN",
-        segments: translation.segments,
-      })
-    : null;
-  return { original, translated };
+  // English only. The Chinese rendering of a report lives on the page, where it can be
+  // corrected as the translation improves; a second PDF only froze one revision of it.
+  return { original };
 }
 
 /** Persist a PDF fetched only after the ingestion layer has approved the URL. */

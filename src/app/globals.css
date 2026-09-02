@@ -403,3 +403,12 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .signin-recover summary::before{content:"＋ ";font-size:11px}
 .signin-recover[open] summary::before{content:"－ "}
 .signin-recover p{font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0 12px}
+
+/* Inline PDF preview on a report page. */
+.pdf-preview{margin:16px 0 4px;border:1px solid var(--line);border-radius:9px;background:var(--panel);overflow:hidden}
+.pdf-preview summary{cursor:pointer;padding:10px 13px;font-size:13px;font-weight:600;color:var(--accent-ink);list-style:none}
+.pdf-preview summary::-webkit-details-marker{display:none}
+.pdf-preview summary::before{content:"▸ ";font-size:11px}
+.pdf-preview[open] summary::before{content:"▾ "}
+.pdf-preview iframe{display:block;width:100%;height:min(78vh,860px);border:0;border-top:1px solid var(--line);background:var(--panel-2)}
+@media (max-width:640px){.pdf-preview iframe{height:70vh}}

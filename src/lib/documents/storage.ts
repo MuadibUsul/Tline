@@ -1,12 +1,13 @@
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export interface DocumentStorage {
   put(key: string, data: Buffer): Promise<{ key: string; size: number }>;
   get(key: string): Promise<Buffer>;
   exists(key: string): Promise<boolean>;
+  remove(key: string): Promise<void>;
   signedDownloadUrl?(key: string, filename: string, mimeType: string): Promise<string>;
 }
 
@@ -49,6 +50,15 @@ class LocalDocumentStorage implements DocumentStorage {
       return (await stat(resolveKey(key))).isFile();
     } catch {
       return false;
+    }
+  }
+
+  async remove(key: string) {
+    try {
+      await unlink(resolveKey(key));
+    } catch (error) {
+      // Already gone is the outcome asked for.
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
 }
@@ -98,6 +108,10 @@ class S3DocumentStorage implements DocumentStorage {
     } catch {
       return false;
     }
+  }
+
+  async remove(key: string) {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.key(key) }));
   }
 
   signedDownloadUrl(key: string, filename: string, mimeType: string) {

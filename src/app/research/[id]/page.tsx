@@ -106,6 +106,12 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const translationPoor = (translation?.qualityScore ?? 1) < 0.8;
   const qualityWarning = analysisPoor || translationPoor;
 
+  // The publisher's own PDF reads better than the one generated from extracted text, so
+  // it is preferred when the institution issued one.
+  const previewDocument =
+    a.documents.find((document) => document.kind === "source_native") ??
+    a.documents.find((document) => document.kind === "original_pdf");
+
   const user = await getSessionUser();
   const isOperator = can(user, "admin.review");
   // The retry log is operator-facing: readers get the notice, operators get the audit trail.
@@ -189,10 +195,24 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             <div className="prose article-body" style={{ marginTop: 12 }}>{a.disclaimerText}</div>
           </details>
         )}
+        {previewDocument && (
+          // Reading the report should not require saving it first. Served same-origin and
+          // inline, so it opens in place and the download stays a separate choice.
+          <details className="pdf-preview">
+            <summary>{tr(locale, "Preview PDF", "预览 PDF")}</summary>
+            <iframe
+              src={`/api/documents/${previewDocument.id}?inline=1`}
+              title={tr(locale, "Report preview", "研报预览")}
+              loading="lazy"
+            />
+          </details>
+        )}
         <div className="act">
           {a.documents.map((document) => (
-            <a key={document.id} href={`/api/documents/${document.id}`} className={`minibtn ${document.kind === "translation_pdf" ? "p" : ""}`}>
-              {document.kind === "translation_pdf" ? tr(locale, "Download Chinese PDF", "下载中文 PDF") : document.kind === "source_native" ? tr(locale, "Download institution PDF", "下载机构原始 PDF") : tr(locale, "Download English PDF", "下载英文 PDF")}
+            <a key={document.id} href={`/api/documents/${document.id}`} className={`minibtn ${document.kind === "source_native" ? "p" : ""}`}>
+              {document.kind === "source_native"
+                ? tr(locale, "Download institution PDF", "下载机构原始 PDF")
+                : tr(locale, "Download English PDF", "下载英文 PDF")}
             </a>
           ))}
         </div>

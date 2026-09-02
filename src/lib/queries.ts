@@ -224,7 +224,12 @@ export async function getResearchView(id: string) {
       analysis: true,
       segments: { orderBy: { position: "asc" } },
       figures: { orderBy: [{ afterSegmentPosition: "asc" }, { ordinal: "asc" }] },
-      documents: { where: { status: "ready" }, orderBy: { createdAt: "asc" } },
+      // Only the kinds still produced. A Chinese PDF left from before must not be
+      // offered, least of all under the English label.
+      documents: {
+        where: { status: "ready", kind: { in: ["source_native", "original_pdf"] } },
+        orderBy: { createdAt: "asc" },
+      },
       translations: {
         where: { locale: "zh-CN" },
         take: 1,

@@ -2,7 +2,6 @@ export type PermissionAction =
   | "article.read.original"
   | "article.read.translation"
   | "document.download.original"
-  | "document.download.translation"
   | "watchlist.manage"
   | "alerts.manage"
   | "api.use"
@@ -29,7 +28,6 @@ export function can(user: PermissionUser | null, action: PermissionAction): bool
     case "article.read.original":
     case "article.read.translation":
     case "document.download.original":
-    case "document.download.translation":
       return true;
     case "watchlist.manage":
     case "alerts.manage":

@@ -23,6 +23,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+      - name: Prepare CI database
+        run: npx prisma db push --accept-data-loss
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Lint

@@ -3,7 +3,9 @@ import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
 import { siteUrl } from "@/lib/site";
 
-export const revalidate = 3600;
+// Rendered per request like every other route: the production image is built without a
+// database, so prerendering this at build time cannot reach Prisma.
+export const dynamic = "force-dynamic";
 
 const STATIC_ROUTES: Array<[string, MetadataRoute.Sitemap[number]["changeFrequency"], number]> = [
   ["/", "hourly", 1],

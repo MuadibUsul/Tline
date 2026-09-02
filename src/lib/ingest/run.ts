@@ -4,6 +4,7 @@ import { prisma } from "../db";
 import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
 import { extractLinks, extractArticle, extractFeedLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
+import { resolveDocumentTitle } from "./documentTitle";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
@@ -184,8 +185,12 @@ async function ingestInstitution(
           .replace(/([a-z])([A-Z])/g, "$1 $2")
           .trim();
         const pageLabel = title.split(/[;|]/).at(-1)?.trim() || title;
-        const candidateTitle = pdfCandidate.title && !/^(?:download|pdf|read more)$/i.test(pdfCandidate.title) ? pdfCandidate.title : "";
-        const documentTitle = candidateTitle || (title && !/^(?:research|insights?|publications?|reports?)$/i.test(pageLabel) ? title : filename);
+        const documentTitle = resolveDocumentTitle({
+          linkTitle: pdfCandidate.title,
+          blocks: extracted.blocks,
+          pageTitle: pageLabel,
+          filename,
+        }) || filename;
         if (!looksLikeResearchTopic(documentTitle, extracted.text)) continue;
         const accepted = stage({
           title: documentTitle,
@@ -350,9 +355,10 @@ async function ingestInstitution(
             .trim();
           const publishedAt = candidate.lastModified || inferPublicationDate(candidate.url, filename);
           if (!publishedAt) { empty++; continue; }
-          if (!looksLikeResearchTopic(filename, extracted.text)) { empty++; continue; }
+          const documentTitle = resolveDocumentTitle({ blocks: extracted.blocks, filename }) || filename;
+          if (!looksLikeResearchTopic(documentTitle, extracted.text)) { empty++; continue; }
           stage({
-            title: filename || "Institutional research report",
+            title: documentTitle || "Institutional research report",
             text: extracted.text,
             sourceUrl: candidate.url,
             author: null,
@@ -376,10 +382,12 @@ async function ingestInstitution(
           }
         }
         const publishedAt = inferPublicationDate(candidate.url, article.title, article.publicationDateText, article.text.slice(0, 1200)) || article.publishedAt || candidate.lastModified;
-        if (!publishedAt || !looksLikeArticle(article.title, article.text)) {
-          if (!await stageEmbeddedPdf(artHtml, candidate.url, article.title, publishedAt)) empty++;
-          continue;
-        }
+        // Where a publisher issues the report as a PDF, that PDF is the report: the page
+        // around it is navigation, teaser copy and download furniture. Taking the HTML
+        // first is how a "Download PDF" button ends up as a title with a menu for a body,
+        // so the document is preferred and the page kept only as a fallback.
+        if (await stageEmbeddedPdf(artHtml, candidate.url, article.title, publishedAt)) continue;
+        if (!publishedAt || !looksLikeArticle(article.title, article.text)) { empty++; continue; }
         stage({
           title: article.title,
           text: article.text,

@@ -9,7 +9,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     PDF_FONT_EN_BOLD=/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates fonts-liberation fonts-noto-cjk openssl \
+    && apt-get install -y --no-install-recommends ca-certificates chromium fonts-liberation fonts-noto-cjk openssl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -24,7 +24,7 @@ RUN export DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
     && mkdir -p /app/storage \
     && chown -R node:node /app
 
-ENV NODE_ENV=production PORT=3000
+ENV NODE_ENV=production PORT=3000 PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium
 USER node
 EXPOSE 3000
 

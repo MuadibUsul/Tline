@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.next-*/
 out/
 *.db
 *.db-journal
@@ -13,3 +14,4 @@ storage/
 data/cache/
 data/crawl-probe*.json
 prisma/postgresql/schema.prisma
+backups/

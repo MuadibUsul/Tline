@@ -152,6 +152,9 @@ async function main() {
   }
 
   console.log(`Reparse complete: ${updated} updated · ${unresolved} unresolved · ${failed} failed.`);
+  // A batch where every item failed is a failed run. Exiting 0 there told the scheduler
+  // and the retry queue that a rerun had succeeded when nothing was actually produced.
+  if (failed > 0 && updated === 0) process.exitCode = 1;
 }
 
 main()

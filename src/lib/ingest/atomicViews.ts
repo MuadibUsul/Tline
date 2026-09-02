@@ -1,6 +1,6 @@
 import { ASSETS } from "../assets";
 
-export const ATOMIC_VIEW_PROMPT_VERSION = "atomic-views-v1";
+export const ATOMIC_VIEW_PROMPT_VERSION = "atomic-views-v2";
 
 export const ATOMIC_VIEW_TYPES = ["forecast", "target", "direction", "conditional", "risk", "rationale", "market_impact"] as const;
 export const ATOMIC_VIEW_DIRECTIONS = ["bullish", "bearish", "neutral", "conditional"] as const;
@@ -39,6 +39,20 @@ const stringOrNull = (value: unknown): string | null => typeof value === "string
 const normalized = (value: string) => value.normalize("NFKC").replace(/[\s\u00a0]+/g, " ").trim();
 const numberTokens = (value: string) => value.match(/\d+(?:[,.]\d+)*(?:%|bp|bps)?/gi)?.map((token) => token.replace(/,/g, "").toLowerCase()) ?? [];
 const MODALITY = ["likely", "may", "could", "might", "unless", "subject to"];
+const CLAIM_CONCEPTS: Array<[RegExp, RegExp]> = [
+  [/\b(?:labor market|employment|jobs?|unemployment)\b/i, /\b(?:labor market|employment|jobs?|unemployment)\b/i],
+  [/\b(?:rate hikes?|hiking rates?|raise rates?|raising rates?|tighten(?:ing)? policy)\b/i, /\b(?:rate hikes?|hiking rates?|raise rates?|raising rates?|increase rates?|tighten(?:ing)? policy)\b/i],
+  [/\b(?:rate cuts?|cutting rates?|lower rates?|easing policy)\b/i, /\b(?:rate cuts?|cutting rates?|lower rates?|reducing rates?|easing policy)\b/i],
+  [/\b(?:hold rates?|keep rates? unchanged|maintain rates?)\b/i, /\b(?:hold rates?|keep rates? unchanged|maintain rates?|leave rates? unchanged)\b/i],
+  [/\b(?:recession|economic contraction)\b/i, /\b(?:recession|economic contraction)\b/i],
+];
+const BILINGUAL_CONCEPTS: Array<[RegExp, RegExp]> = [
+  [/劳动力市场|就业|失业/, /\b(?:labor market|employment|jobs?|unemployment)\b/i],
+  [/加息|提高利率|上调利率/, /\b(?:rate hikes?|hiking rates?|raise rates?|raising rates?|increase rates?|tighten(?:ing)? policy)\b/i],
+  [/降息|降低利率|下调利率/, /\b(?:rate cuts?|cutting rates?|lower rates?|reducing rates?|easing policy)\b/i],
+  [/维持利率|利率不变/, /\b(?:hold rates?|keep rates? unchanged|maintain rates?|leave rates? unchanged)\b/i],
+  [/衰退|经济收缩/, /\b(?:recession|economic contraction)\b/i],
+];
 
 function preservesModality(quote: string, view: string, condition: string | null): boolean {
   const source = quote.toLocaleLowerCase();
@@ -46,6 +60,12 @@ function preservesModality(quote: string, view: string, condition: string | null
   if (MODALITY.some((word) => source.includes(word) && !output.includes(word))) return false;
   if (/\bif\b/.test(source) && !/\bif\b/.test(output) && !condition) return false;
   return true;
+}
+
+function preservesSupportedClaims(quote: string, viewEn: string, viewZh: string): boolean {
+  if (CLAIM_CONCEPTS.some(([claim, evidence]) => claim.test(viewEn) && !evidence.test(quote))) return false;
+  if (BILINGUAL_CONCEPTS.some(([claim, english]) => claim.test(viewZh) && !english.test(viewEn))) return false;
+  return numberTokens(viewZh).every((token) => numberTokens(quote).includes(token));
 }
 
 export function supportedAtomicTicker(ticker: string | null, evidence: string): string | null {
@@ -91,6 +111,7 @@ export function validateAtomicViews(value: unknown, sourceText: string): ParsedA
     if (valueText && numberTokens(valueText).some((token) => !numberTokens(quote).includes(token))) continue;
     if (numberTokens(viewEn).some((token) => !numberTokens(quote).includes(token))) continue;
     if (!preservesModality(quote, viewEn, conditionEn)) continue;
+    if (!preservesSupportedClaims(quote, viewEn, viewZh)) continue;
     const key = normalized(viewEn).toLocaleLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

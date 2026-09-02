@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import type { AnyNode, Element } from "domhandler";
 import { partitionArticleSegments } from "../articleText";
 
 export interface CandidateLink {
@@ -254,7 +255,7 @@ const DECORATIVE_CONTEXT = /(author|byline|bio|profile|headshot|avatar|contribut
 const DECORATIVE_HEADING = /^(authors?|about the authors?|meet the (?:author|team)|contributors?|our (?:people|team|experts|authors)|biograph|related|recommended|share this|subscribe|follow us|contact us|disclaimer|important information)/i;
 
 /** True when an image sits inside an author bio, share bar, related/promo or similar non-content block. */
-function isDecorativeFigure($: cheerio.CheerioAPI, img: any): boolean {
+function isDecorativeFigure($: cheerio.CheerioAPI, img: AnyNode): boolean {
   let node = $(img);
   for (let depth = 0; depth < 6 && node.length; depth++) {
     const marker = `${node.attr("class") ?? ""} ${node.attr("id") ?? ""} ${node.attr("data-testid") ?? ""}`;
@@ -265,7 +266,7 @@ function isDecorativeFigure($: cheerio.CheerioAPI, img: any): boolean {
 }
 
 /** Resolve the best real image URL for an <img>/<figure> node, honoring lazy-loading attributes. */
-function pickImageUrl($: cheerio.CheerioAPI, img: any, baseUrl: string | undefined): string | null {
+function pickImageUrl($: cheerio.CheerioAPI, img: AnyNode, baseUrl: string | undefined): string | null {
   const raw =
     $(img).attr("src") ||
     $(img).attr("data-src") ||
@@ -407,12 +408,12 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
   }
 
   // Pick the densest container by PARAGRAPH text (menus have lots of text but few <p>).
-  let bestEl: any = null;
+  let bestEl: Element | null = null;
   let bestScore = 0;
   const candidates = "article,[itemprop=articleBody],main,[class*=article],[class*=post],[class*=content],[class*=rich-text],[class*=body-copy]";
   $(candidates).each((_, el) => {
     const score = $(el).find("p,li").toArray()
-      .filter((node) => (node as any).name !== "li" || $(node).find("p").length === 0)
+      .filter((node) => node.name !== "li" || $(node).find("p").length === 0)
       .map((p) => $(p).text().replace(/\s+/g, " ").trim())
       .filter((t) => t.length > 40)
       .reduce((s, t) => s + t.length, 0);
@@ -422,7 +423,7 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
     let nestedScore = 0;
     $(bestEl).find("article,[itemprop=articleBody],[class~=article]").each((_, el) => {
       const score = $(el).find("p,li").toArray()
-        .filter((node) => (node as any).name !== "li" || $(node).find("p").length === 0)
+        .filter((node) => node.name !== "li" || $(node).find("p").length === 0)
         .map((node) => $(node).text().replace(/\s+/g, " ").trim())
         .filter((text) => text.length > 40)
         .reduce((sum, text) => sum + text.length, 0);
@@ -439,7 +440,7 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
     let cur: { heading: string | null; buf: string[] } = { heading: null, buf: [] };
     const flush = () => { if (cur.buf.length) segments.push({ heading: cur.heading, text: cur.buf.join("\n\n") }); };
     $(bestEl).find("h2,h3,h4,p,li,figure,img").each((_, node) => {
-      const tag = (node as any).name as string;
+      const tag = node.name;
       if (tag === "figure" || tag === "img") {
         if (tag === "img" && $(node).parents("figure").length) return; // the enclosing <figure> handles it
         const imgNode = tag === "img" ? node : $(node).find("img").get(0);

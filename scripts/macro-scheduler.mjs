@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { spawn } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
+import { startWorkerHeartbeat } from "./worker-heartbeat.mjs";
 
 const npm = process.platform === "win32" ? process.execPath : "npm";
 const npmPrefix = process.platform === "win32" ? [process.env.npm_execpath] : [];
@@ -13,12 +14,22 @@ const tasks = [
   task("release-watch", "MACRO_RELEASE_WATCH_INTERVAL_MS", 60_000, ["run", "macro:watch"], "observations"),
   task("revision-sync", "MACRO_REVISION_SYNC_INTERVAL_MS", 24 * 60 * 60_000, ["run", "macro:revision"], "observations"),
   task("policy-sync", "MACRO_POLICY_SYNC_INTERVAL_MS", 6 * 60 * 60_000, ["run", "macro:policy"]),
+  // Skips itself cleanly when no market-data licence is configured.
+  //
+  // 30 minutes, not 15: one pass costs one request per instrument, and Twelve Data's free
+  // tier allows 800 a day. Seven instruments at 15 minutes is 672 requests — technically
+  // under the cap, but with no headroom for a backfill or a manual run. At 30 minutes it is
+  // 336. Institutional research moves in days and weeks, so the faster poll bought nothing.
+  task("market-sync", "MACRO_MARKET_SYNC_INTERVAL_MS", 30 * 60_000, ["run", "macro:market"], "observations"),
+  // Bridges macro/market observations into PriceObservation, then settles what is due.
+  task("forecast-settle", "MACRO_FORECAST_SETTLE_INTERVAL_MS", 6 * 60 * 60_000, ["run", "forecasts"], "observations"),
   task("alerts", "MACRO_ALERT_INTERVAL_MS", 60_000, ["run", "macro:alerts"]),
 ];
 const active = new Map();
 const locks = new Set();
 let stopping = false;
 let wake;
+const stopHeartbeat = await startWorkerHeartbeat("macro", () => ({ activeTasks: [...active.keys()] }));
 
 const prisma = new PrismaClient();
 const recovered = await prisma.jobRun.updateMany({
@@ -94,3 +105,4 @@ while (!stopping) {
   await wait(Math.min(5_000, Math.max(250, Math.min(...tasks.map((job) => job.nextAt)) - Date.now())));
 }
 await Promise.all([...active.values()].map((child) => new Promise((resolve) => child.once("exit", resolve))));
+await stopHeartbeat();

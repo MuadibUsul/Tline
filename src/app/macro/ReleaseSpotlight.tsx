@@ -35,10 +35,10 @@ function countdown(targetMs: number, now: number, zh: boolean) {
   return diff > 0 ? (zh ? `距公布 ${span}` : `in ${span}`) : (zh ? `${span}前公布` : `${span} ago`);
 }
 
-export default function ReleaseSpotlight({ releases, locale }: { releases: SpotlightRelease[]; locale: string }) {
+export default function ReleaseSpotlight({ releases, locale, initialNow }: { releases: SpotlightRelease[]; locale: string; initialNow: number }) {
   const zh = locale === "zh-CN";
   const router = useRouter();
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(initialNow);
 
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 15_000);
@@ -110,7 +110,7 @@ export default function ReleaseSpotlight({ releases, locale }: { releases: Spotl
       {flank(next, "next")}
 
       <style>{`
-        .spotlight{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0 26px}
+        .spotlight{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0 0}
         .spot-flank{display:block;padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:var(--panel);opacity:.5;text-decoration:none;transition:opacity .3s;filter:saturate(.7)}
         .spot-flank:hover{opacity:.85}
         .spot-recent{opacity:.42}
@@ -118,8 +118,11 @@ export default function ReleaseSpotlight({ releases, locale }: { releases: Spotl
         .spot-flank-name{font:600 14px var(--sans);color:var(--ink-2);margin:3px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .spot-flank-meta{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted)}
         .spot-flank-meta .spot-val{color:var(--ink)}
-        .spot-focal{display:block;padding:22px 24px;border:1px solid var(--border);border-radius:14px;background:var(--panel);text-decoration:none;box-shadow:0 6px 30px rgba(0,0,0,.12)}
-        .spot-focal.spot-live{border-color:var(--accent);box-shadow:0 8px 40px color-mix(in srgb, var(--accent) 30%, transparent)}
+        .spot-focal{position:relative;display:block;padding:22px 24px;border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border));border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--panel) 96%,var(--accent)),var(--panel) 48%);text-decoration:none;transform:translateY(-3px);box-shadow:0 18px 45px rgba(0,0,0,.22),0 0 32px color-mix(in srgb,var(--accent) 14%,transparent);transition:transform 180ms cubic-bezier(.23,1,.32,1),border-color 180ms ease}
+        .spot-focal::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;box-shadow:0 0 20px color-mix(in srgb,var(--accent) 22%,transparent),0 0 64px color-mix(in srgb,var(--accent) 12%,transparent);opacity:.62;animation:spotglow 5s ease-in-out infinite}
+        .spot-focal::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(115deg,color-mix(in srgb,#fff 8%,transparent),transparent 24%,transparent 72%,color-mix(in srgb,var(--accent) 7%,transparent))}
+        .spot-focal.spot-live{border-color:color-mix(in srgb,var(--accent) 72%,white);box-shadow:0 20px 52px rgba(0,0,0,.25),0 0 42px color-mix(in srgb,var(--accent) 26%,transparent)}
+        @keyframes spotglow{0%,100%{opacity:.48}50%{opacity:.9}}
         .spot-eyebrow{display:flex;justify-content:space-between;align-items:center;font:10.5px var(--mono);color:var(--faint);letter-spacing:1px}
         .spot-status{padding:2px 9px;border:1px solid var(--border);border-radius:99px;color:var(--muted)}
         .spot-status.on{background:var(--accent);border-color:var(--accent);color:#fff;animation:spotpulse 2s ease-in-out infinite}
@@ -132,6 +135,8 @@ export default function ReleaseSpotlight({ releases, locale }: { releases: Spotl
         .spot-chg{font:600 15px var(--mono)}.spot-chg.up{color:var(--bull)}.spot-chg.down{color:var(--bear)}
         .spot-prev{font:12px var(--mono);color:var(--faint)}
         .spot-analysis{margin:14px 0 0;font:14px/1.7 var(--sans);color:var(--ink-2)}
+        @media(hover:hover) and (pointer:fine){.spot-focal:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--accent) 52%,var(--border))}}
+        @media(prefers-reduced-motion:reduce){.spot-focal::before,.spot-status.on{animation:none}}
         @media(min-width:820px){.spotlight{grid-template-columns:1fr}}
       `}</style>
     </section>

@@ -2,6 +2,7 @@ import { ASSETS, DIRECTION, type DirectionKey } from "../assets";
 import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider";
 import type { Segment } from "./extract";
 import { ATOMIC_VIEW_INSTRUCTIONS, ATOMIC_VIEW_JSON_SHAPE, ATOMIC_VIEW_PROMPT_VERSION, validateAtomicViews, type ParsedAtomicView } from "./atomicViews";
+import { validateAnalysisGrounding } from "./analysisGrounding";
 
 export interface ParsedAsset {
   ticker: string;
@@ -204,28 +205,40 @@ ${ATOMIC_VIEW_JSON_SHAPE}}
 Use tickers only from this list where applicable: ${ASSETS.map((a) => a.ticker).join(", ")}.
 English analysis fields must contain professional English; _zh fields must contain institution-grade Simplified Chinese preserving every number, unit and modality. Summaries must be your own words, never a verbatim copy. If unsure about an asset, omit it.`;
 
-function coerce(json: any, provider: string, model: string, sourceText: string): ParsedArticle | null {
-  if (!json || typeof json !== "object") return null;
+/** Field-by-field shape of one model-proposed asset call, before validation. */
+interface RawAssetCall {
+  ticker?: unknown;
+  direction?: unknown;
+  target?: unknown;
+  previous_target?: unknown;
+  time_horizon?: unknown;
+  confidence?: unknown;
+}
+
+function coerce(input: unknown, provider: string, model: string, sourceText: string): ParsedArticle | null {
+  if (!input || typeof input !== "object") return null;
+  const json = input as Record<string, unknown>;
   const dirMap: Record<string, number> = {
     strong_bull: 2, bull: 1, neutral: 0, bear: -1, strong_bear: -2,
   };
   const tickers = new Set(ASSETS.map((a) => a.ticker));
   const assets: ParsedAsset[] = Array.isArray(json.assets)
-    ? json.assets
-        .filter((a: any) => tickers.has(a?.ticker) && a?.direction in dirMap)
-        .map((a: any) => ({
-          ticker: a.ticker,
+    ? (json.assets as RawAssetCall[])
+        .filter((a) => typeof a?.ticker === "string" && tickers.has(a.ticker)
+          && typeof a?.direction === "string" && a.direction in dirMap)
+        .map((a) => ({
+          ticker: a.ticker as string,
           direction: dirMap[a.direction as DirectionKey],
           target: typeof a.target === "number" ? a.target : null,
           previousTarget: typeof a.previous_target === "number" ? a.previous_target : null,
-          timeHorizon: a.time_horizon ?? null,
+          timeHorizon: typeof a.time_horizon === "string" ? a.time_horizon : null,
           confidence: clamp(Number(a.confidence) || 0.6, 0, 1),
         }))
     : [];
   const summary = typeof json.summary_en === "string" ? json.summary_en : json.summary;
   if (typeof summary !== "string" || !summary) return null;
   const atomicViews = validateAtomicViews(json.atomic_views, sourceText);
-  return {
+  const fields = {
     summary,
     summaryZh: typeof json.summary_zh === "string" ? json.summary_zh : null,
     keyArguments: Array.isArray(json.key_arguments_en) ? json.key_arguments_en.slice(0, 8) : Array.isArray(json.key_arguments) ? json.key_arguments.slice(0, 8) : [],
@@ -236,6 +249,16 @@ function coerce(json: any, provider: string, model: string, sourceText: string):
     risksZh: Array.isArray(json.risks_zh) ? json.risks_zh.slice(0, 8) : [],
     interpretation: typeof json.interpretation_en === "string" ? json.interpretation_en : typeof json.interpretation === "string" ? json.interpretation : null,
     interpretationZh: typeof json.interpretation_zh === "string" ? json.interpretation_zh : null,
+  };
+
+  // Atomic views prove themselves against their own quote. The free-text fields have no
+  // quote, so they are checked against the article body: an analysis that asserts a figure,
+  // an institution or a certainty the article never contains is marked for review. This
+  // flags, it does not withhold — publication still turns on source text and PDF readiness.
+  const grounding = validateAnalysisGrounding(fields, sourceText);
+
+  return {
+    ...fields,
     importanceScore: clamp(Number(json.importance_score) || 0.5, 0, 1),
     confidence: clamp(Number(json.confidence) || 0.6, 0, 1),
     assets,
@@ -245,7 +268,7 @@ function coerce(json: any, provider: string, model: string, sourceText: string):
     provider,
     model,
     promptVersion: ATOMIC_VIEW_PROMPT_VERSION,
-    reviewStatus: atomicViews.length > 0 ? "ok" : "needs_review",
+    reviewStatus: atomicViews.length > 0 && grounding.passed ? "ok" : "needs_review",
   };
 }
 

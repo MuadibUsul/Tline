@@ -30,7 +30,7 @@ export default async function AdminPage() {
   const locale = await getLocale();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [sources, jobs, articles24h, articles7d, analysisReview, translationReview, runningJobs, failedJobs] = await Promise.all([
+  const [sources, jobs, articles24h, articles7d, analysisReview, translationReview, runningJobs, failedJobs, workers, staleJobs] = await Promise.all([
     prisma.institution.findMany({ orderBy: [{ monitoringEnabled: "desc" }, { priority: "asc" }, { name: "asc" }] }),
     prisma.jobRun.findMany({ orderBy: { startedAt: "desc" }, take: 30 }),
     prisma.article.count({ where: { createdAt: { gte: since } } }),
@@ -39,9 +39,11 @@ export default async function AdminPage() {
     prisma.articleTranslation.findMany({ where: { status: "needs_review" }, orderBy: { updatedAt: "desc" }, take: 10, include: { article: { include: { institution: true } } } }),
     prisma.jobRun.count({ where: { status: "running" } }),
     prisma.jobRun.count({ where: { status: "failed", startedAt: { gte: since } } }),
+    prisma.workerHeartbeat.findMany({ orderBy: { name: "asc" } }),
+    prisma.jobRun.count({ where: { status: "running", startedAt: { lt: new Date(Date.now() - 20 * 60_000) } } }),
   ]);
   const enabled = sources.filter((source) => source.monitoringEnabled && ["allowed", "delayed"].includes(source.crawlPolicy)).length;
-  const unhealthy = sources.filter((source) => source.lastCrawlStatus === "failed" || source.lastCrawlStatus === "refused").length;
+  const unhealthy = sources.filter((source) => ["failed", "refused", "paused"].includes(source.lastCrawlStatus ?? "") || (!source.monitoringEnabled && source.consecutiveFailures > 0)).length;
   const reviewCount = analysisReview.length + translationReview.length;
 
   return <main className="wrap admin-page">
@@ -54,18 +56,19 @@ export default async function AdminPage() {
       <div className="admin-stat"><span>{tr(locale, "Monitored sources", "监控来源")}</span><b>{enabled}</b><small>{sources.length} total</small></div>
       <div className="admin-stat"><span>{tr(locale, "New research · 24h", "24 小时新增研报")}</span><b>{articles24h}</b><small>{articles7d} / 7d</small></div>
       <div className="admin-stat"><span>{tr(locale, "Needs review", "待审核")}</span><b>{reviewCount}</b><small>{tr(locale, "analysis + translation", "分析与翻译")}</small></div>
-      <div className="admin-stat"><span>{tr(locale, "Pipeline health", "流水线状态")}</span><b>{runningJobs}</b><small>{failedJobs} failed / 24h · {unhealthy} sources</small></div>
+      <div className="admin-stat"><span>{tr(locale, "Pipeline health", "流水线状态")}</span><b>{staleJobs ? "!" : runningJobs}</b><small>{failedJobs} failed / 24h · {staleJobs} stale · {unhealthy} sources</small></div>
     </section>
 
     <div className="admin-columns">
       <section className="blk"><div className="section-t"><span>{tr(locale, "Source monitoring", "来源监控")}</span><span className="chip gray">{sources.length}</span></div>
         <div className="tbl-wrap"><table className="admin-table"><thead><tr><th>{tr(locale, "Institution", "机构")}</th><th>{tr(locale, "Status", "状态")}</th><th>{tr(locale, "Last success", "最近成功")}</th><th>{tr(locale, "Policy", "合规策略")}</th><th>{tr(locale, "Action", "操作")}</th></tr></thead><tbody>{sources.map((source) => {
           const compliant = ["allowed", "delayed"].includes(source.crawlPolicy);
-          return <tr key={source.id}><td className="inst"><Link href={`/institution/${source.slug}`}>{source.name}</Link><small>{source.updateFreq ?? "—"}</small></td><td><span className={`chip ${tone(source.lastCrawlStatus)}`}>{source.monitoringEnabled ? source.lastCrawlStatus ?? "new" : "paused"}</span></td><td className="mono-cell">{age(source.lastSuccessAt, locale)}</td><td><span className={`chip ${compliant ? "gray" : "bear"}`}>{source.crawlPolicy}</span></td><td><div className="admin-actions">{user.role === "admin" && compliant && <><form action={setSourceMonitoring}><input type="hidden" name="id" value={source.id}/><input type="hidden" name="enabled" value={source.monitoringEnabled ? "false" : "true"}/><button className="minibtn" type="submit">{source.monitoringEnabled ? tr(locale, "Pause", "暂停") : tr(locale, "Resume", "恢复")}</button></form>{source.lastCrawlStatus === "failed" && <form action={queueSourceRetry}><input type="hidden" name="id" value={source.id}/><button className="minibtn p" type="submit">{tr(locale, "Next run", "加入下一轮")}</button></form>}</>}</div></td></tr>;
+          return <tr key={source.id}><td className="inst"><Link href={`/institution/${source.slug}`}>{source.name}</Link><small>{source.updateFreq ?? "—"}</small></td><td><span className={`chip ${tone(source.lastCrawlStatus)}`}>{source.monitoringEnabled ? source.lastCrawlStatus ?? "new" : source.consecutiveFailures > 0 ? "circuit_open" : "paused"}</span>{source.lastCrawlMessage && <small title={source.lastCrawlMessage}>{source.consecutiveFailures ? `${source.consecutiveFailures}× · ` : ""}{source.lastCrawlMessage}</small>}</td><td className="mono-cell">{age(source.lastSuccessAt, locale)}</td><td><span className={`chip ${compliant ? "gray" : "bear"}`}>{source.crawlPolicy}</span></td><td><div className="admin-actions">{user.role === "admin" && compliant && <><form action={setSourceMonitoring}><input type="hidden" name="id" value={source.id}/><input type="hidden" name="enabled" value={source.monitoringEnabled ? "false" : "true"}/><button className="minibtn" type="submit">{source.monitoringEnabled ? tr(locale, "Pause", "暂停") : tr(locale, "Resume", "恢复")}</button></form>{["failed", "paused"].includes(source.lastCrawlStatus ?? "") && <form action={queueSourceRetry}><input type="hidden" name="id" value={source.id}/><button className="minibtn p" type="submit">{tr(locale, "Next run", "加入下一轮")}</button></form>}</>}</div></td></tr>;
         })}</tbody></table></div>
       </section>
 
-      <aside><section className="blk"><div className="section-t">{tr(locale, "Needs review", "待审核")}</div><div className="admin-review-list">{reviewCount ? <>{analysisReview.map((item) => <Link href={`/research/${item.article.id}`} key={`a-${item.id}`}><span><b>{item.article.title}</b><small>{item.article.institution.name} · analysis</small></span><span className="chip bear">needs_review</span></Link>)}{translationReview.map((item) => <Link href={`/research/${item.article.id}`} key={`t-${item.id}`}><span><b>{item.article.title}</b><small>{item.article.institution.name} · translation</small></span><span className="chip bear">needs_review</span></Link>)}</> : <div className="empty-state">{tr(locale, "Nothing is waiting for review.", "当前没有待审核内容。")}</div>}</div></section>
+      <aside><section className="blk"><div className="section-t">{tr(locale, "Workers", "调度器心跳")}</div><div className="admin-workers">{["research", "macro"].map((name) => { const worker = workers.find((item) => item.name === name); const healthy = worker?.status === "running" && Date.now() - worker.lastSeenAt.getTime() < 120_000; return <div key={name}><b>{name}</b><span className={`chip ${healthy ? "bull" : "bear"}`}>{healthy ? "ok" : "stale"}</span><small>{age(worker?.lastSeenAt ?? null, locale)}</small></div>; })}</div></section>
+        <section className="blk"><div className="section-t">{tr(locale, "Needs review", "待审核")}</div><div className="admin-review-list">{reviewCount ? <>{analysisReview.map((item) => <Link href={`/research/${item.article.id}`} key={`a-${item.id}`}><span><b>{item.article.title}</b><small>{item.article.institution.name} · analysis</small></span><span className="chip bear">needs_review</span></Link>)}{translationReview.map((item) => <Link href={`/research/${item.article.id}`} key={`t-${item.id}`}><span><b>{item.article.title}</b><small>{item.article.institution.name} · translation</small></span><span className="chip bear">needs_review</span></Link>)}</> : <div className="empty-state">{tr(locale, "Nothing is waiting for review.", "当前没有待审核内容。")}</div>}</div></section>
         <section className="blk"><div className="section-t">{tr(locale, "Recent jobs", "最近任务")}</div><div className="admin-jobs">{jobs.map((job) => { const metrics = json(job.metrics); return <div className="admin-job" key={job.id}><div><b>{job.name}</b><small>{age(job.startedAt, locale)} · attempt {job.attempt}</small></div><div className="admin-job-state"><span className={`chip ${tone(job.status)}`}>{job.status}</span>{Object.keys(metrics).length > 0 && <span className="mono admin-metric">{Object.entries(metrics).slice(0, 2).map(([key, value]) => `${key}:${String(value)}`).join(" · ")}</span>}</div>{job.error && <details><summary>{tr(locale, "Error", "错误")}</summary><p>{job.error}</p></details>}</div>; })}</div></section></aside>
     </div>
   </main>;

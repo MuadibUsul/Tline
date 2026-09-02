@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider";
+import { completeJSON, getLLMProvider } from "../llm/provider";
 import { getReleaseConsensus } from "./releaseConsensus";
 
 const SYSTEM = `You are a macro strategist writing a concise professional read-out of an economic data release for institutional readers.

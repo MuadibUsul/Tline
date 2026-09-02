@@ -3,12 +3,14 @@ import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { startWorkerHeartbeat } from "./worker-heartbeat.mjs";
 
 const intervalMs = Math.max(60_000, Number(process.env.INGEST_INTERVAL_MS || 60_000));
 const processingIntervalMs = Math.max(60_000, Number(process.env.PROCESS_INTERVAL_MS || 5 * 60 * 1000));
 const limit = Math.max(1, Number(process.env.INGEST_ARTICLE_LIMIT || 6));
 const processLimit = Math.max(1, Number(process.env.PROCESS_ARTICLE_LIMIT || 50));
 const retryLimit = Math.max(1, Number(process.env.JOB_RETRY_LIMIT || 3));
+const retryBatch = Math.max(1, Number(process.env.CONTENT_RETRY_BATCH || 5));
 const retryDelayMs = Math.max(10_000, Number(process.env.JOB_RETRY_DELAY_MS || 60_000));
 const sourceConcurrency = Math.min(16, Math.max(1, Number(process.env.INGEST_CONCURRENCY || 8)));
 const sourceSeconds = Math.min(600, Math.max(30, Number(process.env.INGEST_SOURCE_SECONDS || 90)));
@@ -17,6 +19,7 @@ const npmPrefix = process.platform === "win32" ? [process.env.npm_execpath] : []
 let stopping = false;
 const activeChildren = new Set();
 const waiters = new Set();
+const stopHeartbeat = await startWorkerHeartbeat("research", () => ({ activeChildren: activeChildren.size }));
 
 const runtimeDir = path.resolve(process.env.RUNTIME_DIR || path.join(process.cwd(), ".runtime"));
 const lockPath = path.join(runtimeDir, "research-scheduler.lock");
@@ -93,6 +96,9 @@ const runIngest = (attempt) => runCommand(["run", "ingest", "--", "--all", "--du
 
 async function processPending() {
   for (const args of [
+    // Operator-requested reruns come first: someone looked at a specific report, judged its
+    // AI output poor and asked for it again. Ahead of the routine backlog, not behind it.
+    ["run", "retries", "--", `--batch=${retryBatch}`],
     ["run", "reparse", "--", `--limit=${processLimit}`],
     ["run", "translate", "--", `--limit=${processLimit}`],
     ["run", "documents", "--", `--limit=${processLimit}`],
@@ -145,3 +151,4 @@ async function processingLoop() {
 }
 
 await Promise.all([ingestLoop(), processingLoop()]);
+await stopHeartbeat();

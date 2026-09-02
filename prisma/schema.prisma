@@ -69,8 +69,11 @@ model Article {
   atomicViews    AtomicView[]
   figures        ArticleFigure[]
   macroForecasts MacroForecast[]
+  contentRetries ContentRetry[]
 
   @@index([institutionId, publishedAt])
+  // The home feed and /research order globally by recency; without this the planner sorts the whole table.
+  @@index([publishedAt])
   @@index([titleHash])
   @@index([contentHash])
 }
@@ -228,6 +231,29 @@ model ArticleDocument {
 
   @@unique([articleId, kind, locale])
   @@index([status, createdAt])
+}
+
+/// Operator-requested reprocessing of one article's AI output, with the outcome recorded.
+/// Without the outcome a "retry" is just a wish: the point is being able to say whether the
+/// rerun actually improved the score, left it alone, or failed.
+model ContentRetry {
+  id            String    @id @default(cuid())
+  articleId     String
+  kind          String // analysis | translation
+  status        String    @default("queued") // queued | running | succeeded | failed
+  requestedById String?
+  requestedAt   DateTime  @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  attempt       Int       @default(0)
+  scoreBefore   Float?
+  scoreAfter    Float?
+  error         String?
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, kind])
+  @@index([status, requestedAt])
 }
 
 model Asset {
@@ -574,6 +600,7 @@ model User {
   image         String?
   tier          String    @default("free") // matrix is configured later
   role          String    @default("member") // member | reviewer | admin; independent of commercial tier
+  alertWebhookUrl String? // https destination for fired alerts; validated before every POST
   createdAt     DateTime  @default(now())
 
   watchlist WatchlistItem[]
@@ -666,10 +693,18 @@ model AlertEvent {
   assetTicker String?
   score       Int?
 
+  // An alert nobody is told about is a log line. Delivery state is tracked so an
+  // undelivered alert is visible as a failure instead of silently sitting in the table.
+  deliveryStatus   String    @default("pending") // pending | sent | failed | skipped
+  deliveryAttempts Int       @default(0)
+  deliveredAt      DateTime?
+  deliveryError    String?
+
   rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
   @@index([ruleId, firedAt])
   @@index([ruleId, targetId])
+  @@index([deliveryStatus, firedAt])
 }
 
 model AuditLog {

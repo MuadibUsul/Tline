@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
+import { formatDate, getLocale, tr } from "@/lib/i18n";
 import { beijingDateTime, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
 import IndicatorChart from "./IndicatorChart";
 

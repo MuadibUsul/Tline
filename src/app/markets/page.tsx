@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { computeConsensusMany } from "@/lib/consensus";
 import { assetName, formatDate, getLocale, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return { title: tr(locale, "Markets", "市场"), description: tr(locale, "Market instruments tracked alongside institutional views.", "与机构观点并列跟踪的市场标的。") };
+}
 
 const CLASSES = ["equity", "rate", "fx", "commodity", "crypto", "macro"] as const;
 export default async function MarketsPage() {

@@ -36,7 +36,16 @@
     "scheduler": "node scripts/scheduler.mjs",
     "env:check": "node scripts/validate-env.mjs",
     "env:check:production": "node scripts/validate-env.mjs --production",
-    "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo-user.ts"
+    "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo-user.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "backup": "node scripts/backup.mjs",
+    "backup:verify": "node scripts/backup.mjs --verify",
+    "retries": "tsx scripts/content-retries.ts",
+    "analysis:grounding": "tsx scripts/analysis-grounding.ts",
+    "translate:rescore": "tsx scripts/translation-quality.ts",
+    "macro:market": "tsx scripts/market-sync.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -64,6 +73,9 @@
     "@types/pdfkit": "^0.17.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "domhandler": "^5.0.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^15.5.25",
     "prisma": "^5.22.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"

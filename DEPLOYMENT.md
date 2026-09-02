@@ -39,7 +39,44 @@ Official macro sync is available both on demand and through the dedicated `macro
 
 Run `npm run macro:calendar` to refresh future releases. It is safe to repeat: official event identities are deterministic, reschedules update the existing row, and events missing from a later feed are retained for review instead of silently cancelled. `FRED_API_KEY` enables date-level fallback when an agency calendar is unavailable; a FRED release date is not treated as proof that observations are already available from FRED. The command reports release families with no future candidate and records its metrics in `JobRun`.
 
-Health: `GET /api/health` returns `200` only when the database responds and the private-storage adapter configuration initializes. It also exposes crawlable-source status, latest ingest metadata, Macro job freshness, and provider/release-watcher sync states. A failed or stale Macro job is reported as `macro.status=degraded` without taking the web application out of service.
+Health: `GET /api/health` returns `200` only when the database responds and the private-storage adapter configuration initializes. A failed or stale Macro job is reported as `status=degraded` without taking the web application out of service.
+
+**The detailed body is gated.** Anonymous callers — including the container healthcheck and any uptime probe — receive `{ "status": "ok" | "degraded" }` and nothing else, because job errors, provider names and sync states describe internal infrastructure. Crawlable-source status, latest ingest metadata, Macro job freshness and provider/release-watcher sync states are returned only to an admin session, or to a caller presenting `Authorization: Bearer $HEALTH_DETAIL_TOKEN`. The gate also keeps the anonymous path down to three cheap queries instead of ten.
+
+## Alert delivery
+
+Fired alerts are POSTed as JSON to the rule owner's webhook (`/watchlist` → Alert delivery),
+falling back to `ALERT_WEBHOOK_URL`. Delivery state lives on `AlertEvent`
+(`deliveryStatus`, `deliveryAttempts`, `deliveryError`) and is shown next to each trigger, so
+an alert that never reached anyone reads as `failed` rather than looking delivered. A rule
+whose owner set no destination is marked `skipped`, which is not a failure.
+
+Destinations are user-supplied, so every POST is fenced: https only, no embedded
+credentials, no redirect following, and the hostname is rejected if it resolves to loopback,
+private, link-local or carrier-grade-NAT space — `169.254.169.254` included. Delivery runs in
+the same pass as evaluation (`macro:alerts`) and retries up to `ALERT_DELIVERY_ATTEMPTS`.
+
+## Content reprocessing
+
+Analyses are graded against the article body at parse time (`validateAnalysisGrounding`): a
+figure, institution or absolute claim the article never contains marks the analysis
+`needs_review`. This flags, it never withholds — publication still turns only on source text
+and PDF readiness.
+
+Operators re-run a specific report from the quality notice on its page. The request is
+queued on `ContentRetry` and drained by the scheduler ahead of the routine backlog, and the
+outcome is recorded with the score before and after, so a rerun that did not help is visible
+as such.
+
+```bash
+npm run analysis:grounding            # report; --apply writes reviewStatus
+npm run translate:rescore             # report; --apply rewrites qualityScore/status
+npm run retries -- --enqueue-backlog  # queue everything below the quality bar
+npm run retries -- --batch=5          # drain (also runs each scheduler pass)
+```
+
+Re-score after any change to `validateTranslation` or `validateAnalysisGrounding`: stored
+scores are written at generation time and otherwise keep reflecting the retired rules.
 
 ## Macro Intelligence scheduler
 
@@ -87,9 +124,53 @@ The email-only session is a preview mechanism and is disabled in production unle
 
 Register `${NEXTAUTH_URL}/api/auth/callback/azure-ad` for Microsoft Entra ID or `${NEXTAUTH_URL}/api/auth/callback/google` for Google. Only one provider is enabled per deployment by the current configuration.
 
+## Market data
+
+`macro:market` provisions the instrument table and pulls one quote per enabled symbol into
+`MarketObservation`. It requires `TWELVE_DATA_API_KEY`; without one it reports
+`configured: false` and skips, which is a configuration state rather than a failed job.
+`TWELVE_DATA_QUALITY` must match the account entitlement (`DELAYED` by default). The
+scheduler runs it on `MACRO_MARKET_SYNC_INTERVAL_MS`, 30 minutes by default.
+
+**Watch the request budget.** One pass costs one request per instrument. Twelve Data's
+free tier allows 800 a day, which seven instruments at 30 minutes uses ~336 of, leaving
+room for a backfill and manual runs. At 15 minutes it is 672 — under the cap with no
+headroom. Only raise the frequency on a paid plan.
+
+The recurring pass stores one current quote per instrument. Settlement also needs history,
+so backfill a daily series once per deployment:
+
+```bash
+npm run macro:market -- --from=2026-01-01
+```
+
+`MarketObservation` and `MacroObservation` are both raw provider tables; settlement reads
+only `PriceObservation`. `src/lib/prices/bridge.ts` is the join, and it is deliberately
+narrow: only macro series that are genuinely the price of a tradeable asset are bridged
+(`DCOILWTICO` → WTI), because a CPI index or an unemployment rate is not the price of
+anything. Market quotes are rolled up to one price per UTC day, taken from the last quote
+observed that day. Each asset draws from exactly one source, since settlement matches a base
+and an actual from the same `source` string.
+
 ## Forecast settlement
 
-Import licensed end-of-day observations as `ticker,timestamp,value`, then run settlement:
+Forecast rows are created from each extracted asset call whose time horizon can be resolved
+to a date (`src/lib/forecastHorizon.ts`). Institutions write horizons in prose —
+`short_term`, `3-6 months`, `H2 2026`, `2026年12月` — so ranges settle at their midpoint and
+qualitative bands use the conventional reading (near/short 30d, medium 90d, long 365d). A
+horizon the institution never actually gave (`coming quarters`, `over time`) yields no
+forecast: inventing a date would fabricate the accuracy record the table exists to measure.
+
+**Scope.** Only `equity`, `fx`, `commodity` and `crypto` forecasts are scored
+(`SETTLEABLE_ASSET_CLASSES`). `rate` and `macro` are excluded on purpose: an institution
+"bullish on 10Y Treasuries" means yields *fall*, but the only available series is the yield
+itself, so scoring direction against it inverts the verdict; and a Fed or inflation stance
+has no price to settle against at all. Those forecasts stay pending and the accuracy page
+reports them as out of scope rather than publishing a confidently backwards number.
+
+Settlement itself needs prices. FRED and the market feed cover commodities and FX; equity
+indices (SPX, NDX) need a paid index licence. Import licensed end-of-day observations as
+`ticker,timestamp,value`, then run it:
 
 ```bash
 npm run prices:import -- --file=/private/path/prices.csv --source=vendor-name
@@ -98,15 +179,48 @@ npm run forecasts
 
 The settlement job uses observations from the same named source at forecast start and target, rejects gaps beyond `PRICE_SETTLEMENT_TOLERANCE_DAYS` (default 7), and leaves unmatched forecasts pending. The CSV importer is an operational boundary, not a market-data license or downloader.
 
+## Backup and restore
+
+`npm run backup` writes a timestamped snapshot to `backups/<UTC stamp>/` containing the
+database, the local document volume, and a `manifest.json` with SHA-256 checksums.
+
+```bash
+npm run backup                      # snapshot, then prune to the newest 7
+npm run backup -- --out /srv/backups --keep 30
+npm run backup:verify -- backups/20260902T102516Z
+```
+
+**Consistency rule.** The database is captured *before* the documents. Documents are
+content-addressed and never rewritten, so a file created between the two steps is an
+orphan the next snapshot picks up. The reverse order would produce the failure that
+actually hurts: rows referencing documents the snapshot never captured.
+
+- **SQLite** uses `VACUUM INTO`, which is consistent while the schedulers keep writing.
+- **PostgreSQL** uses `pg_dump --format=custom` (requires `pg_dump` on PATH).
+- **S3 document storage** is *not* copied — bucket versioning and replication own it.
+  The manifest records this as a skip rather than pretending the files were captured.
+
+Restore checklist:
+
+1. `npm run backup:verify -- <snapshot>` — refuse to restore an unverified snapshot.
+2. Stop `app`, `scheduler`, and `macro-scheduler` so nothing writes during the restore.
+3. Database — SQLite: copy `database.sqlite` over `prisma/dev.db`. PostgreSQL:
+   `pg_restore --clean --if-exists --no-owner -d "$DATABASE_URL" database.dump`.
+4. Documents: copy `documents/` back over `DOCUMENT_STORAGE_ROOT`.
+5. `npx prisma migrate deploy --schema prisma/postgresql/schema.prisma` to reapply any
+   migrations newer than the snapshot.
+6. Restart the services and confirm `/api/health` reports both workers `ok`.
+
 ## Operational checks
 
 Before release:
 
 ```bash
 npm test
+npm run lint
 npx tsc --noEmit
 npm run build
 npm run env:check:production
 ```
 
-The final environment check intentionally fails when production still uses SQLite, a weak session secret, or an unregistered storage driver.
+The final environment check intentionally fails when production still uses SQLite, a weak session secret, or an unregistered storage driver. CI (`.github/workflows/ci.yml`) runs the same checks on every push and pull request.

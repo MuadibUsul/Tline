@@ -45,3 +45,11 @@ test("does not label another central bank as the Federal Reserve", () => {
   const boc = { ...valid, asset: "Bank of Canada policy", asset_ticker: "FED", topic: "central bank", view_en: "The Bank of Canada is expected to hold rates.", view_zh: "加拿大央行预计将维持利率不变。", value: null, source_quote: "The Bank of Canada is expected to hold rates." };
   assert.equal(validateAtomicViews([boc], boc.source_quote)[0]?.assetTicker, null);
 });
+
+test("drops policy claims and Chinese additions unsupported by the quote", () => {
+  const quote = "We must be confident that underlying inflation is moving to our objective, clearly and at sufficient speed; otherwise, we have work to do.";
+  const unsupported = { ...valid, view_en: "The Fed is inclined to hike unless the labor market weakens.", view_zh: "美联储倾向加息，除非劳动力市场恶化。", asset: "Federal Reserve policy", asset_ticker: "FED", topic: "monetary policy", value: null, source_quote: quote };
+  const inventedChinese = { ...valid, view_en: "The bank expects gold to reach $5,000 by year-end.", view_zh: "测试银行预计失业率上升后黄金将在年底前达到5,000美元。" };
+  assert.deepEqual(validateAtomicViews([unsupported], quote), []);
+  assert.deepEqual(validateAtomicViews([inventedChinese], valid.source_quote), []);
+});

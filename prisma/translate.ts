@@ -19,18 +19,19 @@ async function main() {
   }
   const articleIds = (arg("ids") || arg("id") || "").split(",").filter(Boolean);
   const limit = Math.max(1, Number(arg("limit") || 20));
+  const qualityBelow = Math.max(0, Math.min(1, Number(arg("quality-below") || 0.8)));
   const concurrency = Math.min(8, Math.max(1, Number(arg("concurrency") || process.env.TRANSLATION_CONCURRENCY || 3)));
   const rows = await prisma.article.findMany({
     where: articleIds.length ? { id: { in: articleIds }, rawText: { not: null } } : { rawText: { not: null } },
     select: {
       id: true,
       title: true,
-      translations: { where: { locale: "zh-CN" }, select: { status: true } },
+      translations: { where: { locale: "zh-CN" }, select: { status: true, qualityScore: true } },
     },
     orderBy: { publishedAt: "desc" },
   });
   const candidates = rows
-    .filter((article) => flag("all") || article.translations.length === 0 || (flag("retry-review") && article.translations[0].status === "needs_review"))
+    .filter((article) => flag("all") || article.translations.length === 0 || (flag("retry-review") && article.translations[0].status === "needs_review") || (flag("retry-low-quality") && (article.translations[0].qualityScore ?? 0) < qualityBelow))
     .slice(0, limit);
 
   let translated = 0;
@@ -68,6 +69,9 @@ async function main() {
     }));
   }
   console.log(`Translation complete: ${translated} reviewed · ${needsReview} needs review · ${failed} failed · ${nativeLayouts} native layouts · ${nativeFallbacks} layout fallbacks.`);
+  // A batch where every item failed is a failed run. Exiting 0 there told the scheduler
+  // and the retry queue that a rerun had succeeded when nothing was actually produced.
+  if (failed > 0 && translated === 0 && needsReview === 0) process.exitCode = 1;
 }
 
 main()

@@ -38,6 +38,14 @@ if (production) {
     }
   }
   if (authProvider && !process.env.NEXTAUTH_URL) errors.push("NEXTAUTH_URL is required when production OAuth is enabled.");
+  // robots.txt, sitemap.xml and Open Graph URLs are wrong without a real origin.
+  const siteUrl = process.env.SITE_URL || process.env.NEXTAUTH_URL || "";
+  if (!siteUrl) warnings.push("SITE_URL is unset; robots.txt, sitemap.xml and share previews will point at localhost.");
+  else if (!/^https:\/\//.test(siteUrl)) errors.push("Production SITE_URL must use https.");
+  const alertWebhook = process.env.ALERT_WEBHOOK_URL || "";
+  if (alertWebhook && !/^https:\/\//.test(alertWebhook)) errors.push("ALERT_WEBHOOK_URL must use https.");
+  const healthToken = process.env.HEALTH_DETAIL_TOKEN || "";
+  if (healthToken && healthToken.length < 24) errors.push("HEALTH_DETAIL_TOKEN must be at least 24 characters.");
 }
 
 for (const warning of warnings) console.warn(`WARN: ${warning}`);

@@ -21,6 +21,7 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
         <h1>{institutionName(data.institution.name, locale)}</h1>
         <div className="deltas">
           <span>{tr(locale, "Settled", "已结算")} <b className="mono">{data.forecasts.length}</b></span>
+          <span>{tr(locale, "Awaiting prices", "等待价格")} <b className="mono">{data.pending}</b></span>
           <span>{tr(locale, "Direction", "方向") } <b className="mono">{data.directionAccuracy === null ? "—" : `${(data.directionAccuracy * 100).toFixed(1)}%`}</b></span>
           <span>{tr(locale, "Mean target error", "平均目标误差")} <b className="mono">{data.meanPercentageError === null ? "—" : `${data.meanPercentageError.toFixed(2)}%`}</b></span>
         </div>
@@ -41,6 +42,14 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
           </tr>)}</tbody>
         </table></div> : <div className="empty-state">{tr(locale, "No forecasts have enough licensed price observations to settle yet.", "暂无具备足够授权价格观测值、可供结算的预测。")}</div>}
       </section>
+      {data.outOfScope > 0 && <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>
+        {tr(
+          locale,
+          `${data.outOfScope} rate and macro calls are excluded from this score. "Bullish on 10Y Treasuries" means yields fall, and a policy or inflation stance has no price to settle against, so scoring them against the available series would invert the verdict rather than measure it.`,
+          `另有 ${data.outOfScope} 条利率与宏观类判断不纳入本评分。"看多十年期美债"指的是收益率下行，而政策或通胀立场本身没有可结算的价格；用现有序列去打分会得出方向相反的结论，而不是真实的准确率。`,
+        )}
+      </p>}
+
       <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>
         {tr(locale, "Method: first same-source observation on/after target date, with a matching observation on/before forecast date; maximum gap is configurable and defaults to 7 days.", "方法：取目标日期当天或之后同一来源的首个观测值，并匹配预测日期当天或之前的观测值；最大间隔可配置，默认 7 天。")}
       </p>

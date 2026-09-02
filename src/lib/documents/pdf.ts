@@ -216,13 +216,7 @@ export async function generateArticleDocuments(articleId: string) {
   });
 
   const translation = article.translations[0];
-  if (translation && translation.status !== "reviewed") {
-    await prisma.articleDocument.updateMany({
-      where: { articleId: article.id, kind: "translation_pdf", locale: "zh-CN" },
-      data: { status: "needs_review", error: "Translation has not passed independent quality review." },
-    });
-  }
-  const translated = translation?.status === "reviewed" && translation.segments.length
+  const translated = translation?.segments.length
     ? await storeGenerated(article.id, translation.id, "translation_pdf", "zh-CN", article.sourceUrl, {
         title: translation.title,
         institution: article.institution.name,

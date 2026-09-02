@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAssetView, getAssetTimeline } from "@/lib/queries";
@@ -6,6 +8,25 @@ import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
+export async function generateMetadata(props: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
+  const { ticker } = await props.params;
+  const locale = await getLocale();
+  const asset = await prisma.asset.findUnique({
+    where: { ticker: ticker.toUpperCase() },
+    select: { ticker: true, name: true },
+  });
+  if (!asset) return { title: tr(locale, "Asset not found", "资产未找到") };
+  const name = assetName(asset.name, locale, asset.ticker);
+  return {
+    title: `${name} · ${asset.ticker}`,
+    description: tr(
+      locale,
+      `Cross-institution consensus and recent views on ${name} (${asset.ticker}).`,
+      `${name}（${asset.ticker}）的跨机构共识与近期观点。`,
+    ),
+  };
+}
+
 
 export default async function AssetPage(props: { params: Promise<{ ticker: string }> }) {
   const params = await props.params;

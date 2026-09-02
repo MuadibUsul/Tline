@@ -1,11 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { formatDate, getLocale, tr, type Locale } from "@/lib/i18n";
+import { formatDate, getLocale, tr } from "@/lib/i18n";
 import { beijingDateTime, unitLabel } from "@/lib/macro/presentation";
 import ReleaseSpotlight, { type SpotlightRelease } from "./ReleaseSpotlight";
 import { getReleaseConsensusMap } from "@/lib/macro/releaseConsensus";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return { title: tr(locale, "Economic Data", "经济数据"), description: tr(locale, "Macro releases, indicators and the calendar ahead.", "宏观发布、指标与前瞻日历。") };
+}
 
 const toNum = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? null : Number(value.toString()));
 
@@ -63,16 +69,12 @@ export default async function MacroPage() {
 
   return (
     <main className="wrap">
-      <ReleaseSpotlight releases={spotlight} locale={locale} />
-      <div className="page-head">
-        <div className="eyebrow">Macro Intelligence</div>
-        <h1>{tr(locale, "Economic Data", "经济数据")}</h1>
-        <p className="sub">{tr(locale, "Official releases, point-in-time vintages and source-backed central-bank policy — release times in Beijing time.", "官方发布、时点版本与有原文依据的央行政策数据——发布时间以北京时间为准。")}</p>
-        <div className="tag-row"><Link className="minibtn p" href="/macro/calendar">{tr(locale, "Full economic calendar", "完整经济日历")}</Link></div>
-      </div>
-
+      <ReleaseSpotlight releases={spotlight} locale={locale} initialNow={Date.now()} />
       <section className="blk">
-        <div className="section-t">{tr(locale, "Economic calendar · Beijing time", "经济日历 · 北京时间")}</div>
+        <div className="macro-calendar-head">
+          <div className="section-t">{tr(locale, "Economic calendar · Beijing time", "经济日历 · 北京时间")}</div>
+          <Link className="minibtn" href="/macro/calendar">{tr(locale, "Full calendar ↗", "完整日历 ↗")}</Link>
+        </div>
         <div className="tbl-wrap"><table>
           <thead><tr>
             <th>{tr(locale, "Time", "时间")}</th>

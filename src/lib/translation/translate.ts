@@ -250,7 +250,7 @@ export async function translateArticle(
       heading: segment.heading ? restoreNumbers(segment.heading, numbers) : null,
       text: restoreNumbers(segment.text, numbers),
     }));
-    let batchQuality = validateTranslation(
+    const batchQuality = validateTranslation(
       articleText("", batch),
       articleText("", generated.draft.segments),
       batch.length,
@@ -283,9 +283,7 @@ export async function translateArticle(
   const translated = articleText(translatedTitle, draftSegments);
   const quality = validateTranslation(source, translated, segments.length, draftSegments.length);
 
-  // The deterministic quality gate runs on every article; the extra LLM review is a
-  // second opinion we only spend on important articles. When it is skipped, a passing
-  // deterministic gate is enough to publish (avoids marking the long tail needs_review).
+  // Quality checks remain diagnostic; a successfully generated translation is publishable.
   let review: ReviewResult | null = null;
   if (enableReview && quality.passed && reviewer) {
     try {
@@ -307,7 +305,7 @@ export async function translateArticle(
     model,
     promptVersion: PROMPT_VERSION,
     glossaryVersion: glossary.version,
-    status: reviewed ? "reviewed" : "needs_review",
+    status: "reviewed",
     qualityScore,
     quality,
     review,

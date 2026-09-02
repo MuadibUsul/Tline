@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getWatchlistView, getAlertsView } from "@/lib/user";
 import { getSessionUser } from "@/lib/auth";
 import { Delta, relTime } from "@/app/_components/ui";
-import { addWatch, removeWatch, toggleRule, deleteRule } from "@/app/actions";
+import { addWatch, removeWatch, toggleRule, deleteRule, setAlertWebhook } from "@/app/actions";
 import MonitoringRuleForm from "@/app/_components/MonitoringRuleForm";
 import { describeRule } from "@/lib/alerts";
 import { prisma } from "@/lib/db";
@@ -10,6 +10,17 @@ import { assetName, formatDate, getLocale, institutionName, localeSafeText, tr, 
 import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
+
+/** "skipped" means no destination was configured — nothing failed, there was nowhere to send. */
+function deliveryLabel(status: string) {
+  const labels: Record<string, string> = {
+    sent: "已送达 / sent",
+    failed: "送达失败 / failed",
+    skipped: "未配置地址 / no destination",
+    pending: "待送达 / pending",
+  };
+  return labels[status] ?? status;
+}
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
 
 function SignInGate({ locale }: { locale: Locale }) {
@@ -107,13 +118,37 @@ export default async function WatchlistPage() {
 
       <section className="blk"><div className="section-t">{tr(locale, "Create monitoring rule", "创建监控规则")}</div><MonitoringRuleForm assets={assetOptions} institutions={institutionOptions} themes={themes} macroIndicators={macroIndicators.map((item) => ({ value: item.canonicalKey, label: locale === "zh-CN" ? item.nameZh ?? item.nameEn : item.nameEn }))} centralBanks={policyBanks.map((item) => ({ value: item.centralBank, label: item.centralBank }))} locale={locale} /></section>
 
+      <section className="blk">
+        <div className="section-t">{tr(locale, "Alert delivery", "提醒送达")}</div>
+        <p className="mono monitor-empty">
+          {tr(
+            locale,
+            "Fired alerts are POSTed as JSON to this https endpoint. Without one they are recorded here only.",
+            "触发的提醒会以 JSON POST 到该 https 地址；未配置时仅在本页留存记录。",
+          )}
+        </p>
+        <form action={setAlertWebhook} className="webhook-form">
+          <label className="field" style={{ flex: 1 }}>
+            <span>{tr(locale, "Webhook URL", "Webhook 地址")}</span>
+            <input
+              name="url"
+              type="url"
+              inputMode="url"
+              placeholder="https://hooks.example.com/..."
+              defaultValue={user.alertWebhookUrl ?? ""}
+            />
+          </label>
+          <button className="minibtn p">{tr(locale, "Save", "保存")}</button>
+        </form>
+      </section>
+
       <section className="blk monitor-object-grid">
         <div><div className="section-t">{tr(locale, "Active rules", "监控规则")} · {rules.length}</div><div className="rowlist">
           {rules.map((rule) => <div key={rule.id} className="r monitor-rule-row"><span><b>{localeSafeText(rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><small>{describeRule(rule, locale)}</small></span><span className="monitor-actions"><form action={toggleRule}><input type="hidden" name="id" value={rule.id} /><button className={`chip ${rule.active ? "acc" : "gray"}`}>{rule.active ? tr(locale, "active", "启用") : tr(locale, "paused", "暂停")}</button></form><form action={deleteRule}><input type="hidden" name="id" value={rule.id} /><button className="iconbtn" title={tr(locale, "Delete", "删除")}>✕</button></form></span></div>)}
           {rules.length === 0 && <div className="r monitor-empty">{tr(locale, "No monitoring rules yet.", "尚未创建监控规则。")}</div>}
         </div></div>
         <div><div className="section-t">{tr(locale, "Recent triggers", "近期触发")} · {events.length}</div><div className="feed">
-          {events.map((event) => { const readyTarget = event.targetId ? eventArticleById.has(event.targetId) : false; const macroTarget = event.targetId ? eventReleaseIds.has(event.targetId) : false; return <div key={event.id} className="fcard"><div className="top"><b>{localeSafeText(event.rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{alertMessage(event)}</div>{(readyTarget || macroTarget || event.assetTicker) && <Link href={readyTarget ? `/research/${event.targetId}` : macroTarget ? `/macro/release/${event.targetId}` : `/asset/${event.assetTicker}`} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>; })}
+          {events.map((event) => { const readyTarget = event.targetId ? eventArticleById.has(event.targetId) : false; const macroTarget = event.targetId ? eventReleaseIds.has(event.targetId) : false; return <div key={event.id} className="fcard"><div className="top"><b>{localeSafeText(event.rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{alertMessage(event)}</div><span className={`chip ${event.deliveryStatus === "sent" ? "bull" : event.deliveryStatus === "failed" ? "bear" : "gray"}`} title={event.deliveryError ?? undefined}>{deliveryLabel(event.deliveryStatus)}</span>{(readyTarget || macroTarget || event.assetTicker) && <Link href={readyTarget ? `/research/${event.targetId}` : macroTarget ? `/macro/release/${event.targetId}` : `/asset/${event.assetTicker}`} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>; })}
           {events.length === 0 && <p className="mono monitor-empty">{tr(locale, "No triggers yet.", "尚未触发提醒。")}</p>}
         </div></div>
       </section>

@@ -28,6 +28,7 @@ const UNIT_LABELS: Record<string, { en: string; zh: string }> = {
   THOUSANDS_OF_BARRELS: { en: "K barrels", zh: "千桶" },
   MILLIONS_OF_BARRELS: { en: "M barrels", zh: "百万桶" },
   BASIS_POINTS: { en: "bps", zh: "基点" },
+  USD_PER_BARREL: { en: "USD/bbl", zh: "美元/桶" },
 };
 
 /** Human-readable unit label, e.g. "THOUSANDS_OF_PERSONS" → "千人" / "K persons". */

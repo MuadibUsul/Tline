@@ -9,6 +9,8 @@ interface Result {
   title: string;
   subtitle: string;
   snippet?: string;
+  snippetMatch?: string;
+  matchKind?: "content";
   href: string;
 }
 
@@ -50,7 +52,7 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-    }, 180);
+    }, 100);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
@@ -61,8 +63,8 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
     if (result) router.push(result.href);
   };
   const labels = locale === "zh-CN"
-    ? { institution: "机构", asset: "资产", article: "研报", empty: "没有找到相关内容", hint: "输入至少两个字符", loading: "搜索中…" }
-    : { institution: "Institution", asset: "Asset", article: "Research", empty: "No matching content", hint: "Type at least two characters", loading: "Searching…" };
+    ? { institution: "机构", asset: "资产", article: "研报", content: "正文命中", empty: "没有找到相关内容", hint: "输入至少两个字符", loading: "搜索中…" }
+    : { institution: "Institution", asset: "Asset", article: "Research", content: "Content match", empty: "No matching content", hint: "Type at least two characters", loading: "Searching…" };
 
   return (
     <div className="site-search" onBlur={(event) => {
@@ -108,8 +110,8 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
               <span className="search-kind">{labels[result.kind]}</span>
               <span className="search-copy">
                 <strong><Highlight text={result.title} query={q} /></strong>
-                <small>{result.subtitle}</small>
-                {result.snippet && <span><Highlight text={result.snippet} query={q} /></span>}
+                <small>{result.subtitle}{result.matchKind === "content" && <em>{labels.content}</em>}</small>
+                {result.snippet && <span><Highlight text={result.snippet} query={result.snippetMatch || q} /></span>}
               </span>
               <span className="search-arrow" aria-hidden="true">→</span>
             </Link>

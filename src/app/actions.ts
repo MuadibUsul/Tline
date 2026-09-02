@@ -7,6 +7,8 @@ import { prisma } from "@/lib/db";
 import { COOKIE, makeToken, getSessionUser, SESSION_COOKIE_OPTS } from "@/lib/auth";
 import { describeRule, evaluateRules } from "@/lib/alerts";
 import { writeAudit } from "@/lib/audit";
+import { can } from "@/lib/permissions";
+import { checkWebhookUrl } from "@/lib/alertDelivery";
 
 function str(fd: FormData, key: string): string {
   return (fd.get(key)?.toString() ?? "").trim();
@@ -139,5 +141,32 @@ export async function deleteRule(fd: FormData) {
   const id = str(fd, "id");
   const deleted = await prisma.alertRule.deleteMany({ where: { id, userId: user!.id } });
   if (deleted.count) await writeAudit({ actorId: user!.id, action: "alert.delete", targetType: "alert_rule", targetId: id });
+  revalidatePath("/watchlist");
+}
+
+/**
+ * Set (or clear) the destination fired alerts are POSTed to. Validated here so an invalid
+ * or private-range URL is rejected at the point of entry, not discovered at delivery time.
+ */
+export async function setAlertWebhook(fd: FormData) {
+  const user = await getSessionUser();
+  if (!user || !can(user, "alerts.manage")) return;
+  const raw = fd.get("url")?.toString().trim() ?? "";
+  if (!raw) {
+    await prisma.user.update({ where: { id: user.id }, data: { alertWebhookUrl: null } });
+    await writeAudit({ actorId: user.id, action: "alerts.webhook.clear", targetType: "user", targetId: user.id });
+    revalidatePath("/watchlist");
+    return;
+  }
+  const verdict = checkWebhookUrl(raw);
+  if (!verdict.ok) return;
+  await prisma.user.update({ where: { id: user.id }, data: { alertWebhookUrl: raw } });
+  await writeAudit({
+    actorId: user.id,
+    action: "alerts.webhook.set",
+    targetType: "user",
+    targetId: user.id,
+    metadata: { host: new URL(raw).host },
+  });
   revalidatePath("/watchlist");
 }

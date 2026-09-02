@@ -81,6 +81,12 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "scripts/check-worker-health.mjs", "research"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
 
   macro-scheduler:
     build: .
@@ -106,6 +112,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "scripts/check-worker-health.mjs", "macro"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
 
 volumes:
   postgres-data:

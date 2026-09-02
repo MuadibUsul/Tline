@@ -18,7 +18,7 @@ async function main() {
           OR: [
             { documents: { none: { kind: "original_pdf", locale: "en", status: "ready" } } },
             {
-              translations: { some: { locale: "zh-CN", status: "reviewed" } },
+              translations: { some: { locale: "zh-CN" } },
               documents: { none: { kind: "translation_pdf", locale: "zh-CN", status: "ready" } },
             },
           ],

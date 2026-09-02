@@ -1,10 +1,12 @@
 import { prisma } from "./db";
+import { horizonTargetDate } from "./forecastHorizon";
 
-const HORIZON_DAYS: Record<string, number> = { "1W": 7, "1M": 30, "3M": 90, "12M": 365 };
-
+/**
+ * The extractor stores the institution's own wording ("short_term", "3-6 months",
+ * "H2 2026"), never a canonical code, so horizon parsing lives in `forecastHorizon`.
+ */
 export function targetDateForHorizon(start: Date, horizon: string | null) {
-  const days = horizon ? HORIZON_DAYS[horizon.toUpperCase()] : undefined;
-  return days ? new Date(start.getTime() + days * 86_400_000) : null;
+  return horizonTargetDate(start, horizon);
 }
 
 export function calculateSettlement(input: {
@@ -84,10 +86,26 @@ export async function syncAllForecasts() {
   return total;
 }
 
+/**
+ * Asset classes whose forecasts can be scored against a price.
+ *
+ * `rate` and `macro` are excluded deliberately. An institution that is "bullish on US 10Y
+ * Treasuries" means yields fall, but the only series available is the yield itself, so
+ * scoring direction against it inverts the verdict. "Bullish on the Fed" or "on inflation"
+ * is a policy stance, not a price call, and has no price to settle against at all. Rather
+ * than publish an accuracy figure that is confidently backwards, those forecasts stay
+ * pending and are reported as out of scope.
+ */
+export const SETTLEABLE_ASSET_CLASSES = ["equity", "fx", "commodity", "crypto"] as const;
+
 export async function settleDueForecasts(now = new Date()) {
   const toleranceMs = Math.max(1, Number(process.env.PRICE_SETTLEMENT_TOLERANCE_DAYS || 7)) * 86_400_000;
   const forecasts = await prisma.forecast.findMany({
-    where: { status: "pending", targetDate: { not: null, lte: now } },
+    where: {
+      status: "pending",
+      targetDate: { not: null, lte: now },
+      asset: { assetClass: { in: [...SETTLEABLE_ASSET_CLASSES] } },
+    },
   });
   let settled = 0;
   for (const forecast of forecasts) {
@@ -135,9 +153,30 @@ export async function getInstitutionAccuracy(slug: string) {
   });
   const directional = forecasts.filter((forecast) => forecast.directionCorrect !== null);
   const targetErrors = forecasts.map((forecast) => forecast.percentageError).filter((value): value is number => value !== null);
+
+  // A bare "0 settled" reads as "this institution has made no calls". These two counts say
+  // which it actually is: still waiting, or never scoreable in the first place.
+  const [pending, outOfScope] = await Promise.all([
+    prisma.forecast.count({
+      where: {
+        institutionId: institution.id,
+        status: "pending",
+        asset: { assetClass: { in: [...SETTLEABLE_ASSET_CLASSES] } },
+      },
+    }),
+    prisma.forecast.count({
+      where: {
+        institutionId: institution.id,
+        asset: { assetClass: { notIn: [...SETTLEABLE_ASSET_CLASSES] } },
+      },
+    }),
+  ]);
+
   return {
     institution,
     forecasts,
+    pending,
+    outOfScope,
     directionAccuracy: directional.length ? directional.filter((forecast) => forecast.directionCorrect).length / directional.length : null,
     meanPercentageError: targetErrors.length ? targetErrors.reduce((sum, value) => sum + value, 0) / targetErrors.length : null,
   };

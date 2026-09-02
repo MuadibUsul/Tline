@@ -1,4 +1,4 @@
-import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider";
+import { completeJSON, getLLMProvider } from "../llm/provider";
 
 // Generic expectations engine: turn any institution's research preview into normalized
 // numeric forecasts for tracked releases, and aggregate them into a consensus + distribution.

@@ -11,6 +11,8 @@ export interface SearchResult {
   title: string;
   subtitle: string;
   snippet?: string;
+  snippetMatch?: string;
+  matchKind?: "content";
   href: string;
   publishedAt?: string;
 }
@@ -21,6 +23,9 @@ export interface SearchCandidate {
   aliases?: string[];
   secondary?: string[];
   content?: string[];
+  normalizedContent?: string;
+  contentWords?: string[];
+  contentTrigrams?: Set<string>;
 }
 
 export function normalizeSearchText(value: string) {
@@ -58,6 +63,12 @@ function bigrams(value: string) {
   return result;
 }
 
+function trigrams(value: string) {
+  const result: string[] = [];
+  for (let i = 0; i < value.length - 2; i += 1) result.push(value.slice(i, i + 3));
+  return result;
+}
+
 function diceSimilarity(a: string, b: string) {
   const aa = bigrams(a);
   const bb = bigrams(b);
@@ -75,9 +86,7 @@ function diceSimilarity(a: string, b: string) {
   return (2 * overlap) / (aa.length + bb.length);
 }
 
-function scoreText(query: string, value: string) {
-  const q = normalizeSearchText(query);
-  const text = normalizeSearchText(value);
+function scoreNormalizedText(q: string, text: string, cachedWords?: string[], cachedTrigrams?: Set<string>) {
   if (!q || !text) return 0;
   if (text === q) return 160;
   if (text.startsWith(q)) return 125;
@@ -87,8 +96,14 @@ function scoreText(query: string, value: string) {
   const compactText = text.replace(/\s/g, "");
   if (compactText.includes(compactQ)) return 95;
 
+  if (cachedTrigrams && /^[a-z0-9]{4,}$/i.test(q)) {
+    const queryTrigrams = trigrams(q);
+    const overlap = queryTrigrams.filter((part) => cachedTrigrams.has(part)).length;
+    if (overlap < Math.ceil(queryTrigrams.length / 2)) return 0;
+  }
+
   const queryWords = q.split(" ");
-  const words = text.split(" ");
+  const words = cachedWords ?? text.split(" ");
   let total = 0;
   let matched = 0;
   for (const term of queryWords) {
@@ -116,31 +131,37 @@ function scoreText(query: string, value: string) {
 
 function candidateScore(query: string, candidate: SearchCandidate) {
   const max = (values: string[] | undefined, weight: number) =>
-    Math.max(0, ...(values ?? []).map((value) => scoreText(query, value) * weight));
+    Math.max(0, ...(values ?? []).map((value) => scoreNormalizedText(query, normalizeSearchText(value)) * weight));
   const combined = [
     ...candidate.primary,
     ...(candidate.aliases ?? []),
     ...(candidate.secondary ?? []),
-    ...(candidate.content ?? []),
   ].join(" ");
+  const content = candidate.normalizedContent ?? normalizeSearchText((candidate.content ?? []).join(" "));
   const score = Math.max(
     max(candidate.primary, 4),
     max(candidate.aliases, 3.4),
     max(candidate.secondary, 2),
-    max(candidate.content, 0.75),
-    scoreText(query, combined) * 1.35,
+    scoreNormalizedText(query, content, candidate.contentWords, candidate.contentTrigrams) * 0.75,
+    scoreNormalizedText(query, normalizeSearchText(combined)) * 1.35,
   );
   return candidate.result.kind === "article" ? score : score * 1.2;
 }
 
 export function rankSearchCandidates(query: string, candidates: SearchCandidate[], limit = 12) {
+  const normalizedQuery = normalizeSearchText(query);
   return candidates
-    .map((candidate) => ({ candidate, score: candidateScore(query, candidate) }))
+    .map((candidate) => ({ candidate, score: candidateScore(normalizedQuery, candidate) }))
     .filter(({ score }) => score >= 18)
     .sort((a, b) => b.score - a.score ||
       (b.candidate.result.publishedAt ?? "").localeCompare(a.candidate.result.publishedAt ?? ""))
     .slice(0, limit)
-    .map(({ candidate }) => candidate.result);
+    .map(({ candidate }) => {
+      const context = matchingSnippet(candidate.content, query);
+      return context
+        ? { ...candidate.result, snippet: context.text, snippetMatch: context.match, matchKind: "content" as const }
+        : candidate.result;
+    });
 }
 
 function parseAliases(value: string) {
@@ -152,21 +173,35 @@ function parseAliases(value: string) {
   }
 }
 
-function snippet(values: Array<string | null | undefined>, query: string) {
-  const text = values.find((value) => value?.trim())?.replace(/\s+/g, " ").trim();
-  if (!text) return undefined;
-  const index = text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
-  const start = index > 70 ? index - 60 : 0;
-  const excerpt = text.slice(start, start + 190).trim();
-  return `${start ? "…" : ""}${excerpt}${start + 190 < text.length ? "…" : ""}`;
+export function matchingSnippet(values: Array<string | null | undefined> | undefined, query: string) {
+  const texts = (values ?? []).map((value) => value?.replace(/\s+/g, " ").trim() ?? "").filter(Boolean);
+  const lowerQuery = query.trim().toLocaleLowerCase();
+  const exact = texts.map((text) => ({ text, index: text.toLocaleLowerCase().indexOf(lowerQuery) })).find(({ index }) => index >= 0);
+  let best = exact ? { ...exact, match: exact.text.slice(exact.index, exact.index + lowerQuery.length), score: 160 } : undefined;
+
+  if (!best) {
+    const normalizedQuery = normalizeSearchText(query);
+    for (const text of texts) {
+      for (const word of text.matchAll(/[\p{L}\p{N}]+/gu)) {
+        const score = scoreNormalizedText(normalizedQuery, normalizeSearchText(word[0]));
+        if (score >= 24 && (!best || score > best.score)) best = { text, index: word.index ?? 0, match: word[0], score };
+      }
+    }
+  }
+  if (!best) return undefined;
+  const start = best.index > 70 ? best.index - 60 : 0;
+  const excerpt = best.text.slice(start, start + 190).trim();
+  return {
+    text: `${start ? "…" : ""}${excerpt}${start + 190 < best.text.length ? "…" : ""}`,
+    match: best.match,
+  };
 }
 
-export async function searchSite(query: string, limit = 12, locale: Locale = "en"): Promise<SearchResult[]> {
-  const q = query.trim().slice(0, 120);
-  if (normalizeSearchText(q).length < 2) return [];
-  const useChinese = locale === "zh-CN";
+// The index holds every article's full body in memory, so it is bounded explicitly.
+// Beyond this the oldest articles fall out of search rather than the process falling over.
+const INDEX_MAX_ARTICLES = Math.max(100, Number(process.env.SEARCH_INDEX_MAX_ARTICLES || 5000));
 
-  const [institutions, assets, articles] = await Promise.all([
+const loadSearchData = async () => Promise.all([
     prisma.institution.findMany({
       select: { id: true, slug: true, name: true, country: true, _count: { select: { articles: { where: publicationReadyWhere() } } } },
     }),
@@ -176,6 +211,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
     prisma.article.findMany({
       where: publicationReadyWhere(),
       orderBy: { publishedAt: "desc" },
+      take: INDEX_MAX_ARTICLES,
       select: {
         id: true,
         title: true,
@@ -190,6 +226,59 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
       },
     }),
   ]);
+
+// ponytail: an in-process index fits the current corpus; use database full-text search at tens of thousands of articles.
+const candidateCache = new Map<Locale, { version: string; candidates: SearchCandidate[] }>();
+
+// How long a computed version fingerprint is trusted before it is probed again. The
+// fingerprint itself is cheap; rebuilding the index is not — so the probe is throttled
+// and the rebuild happens only when the data genuinely moved.
+const VERSION_PROBE_TTL_MS = Math.max(1_000, Number(process.env.SEARCH_VERSION_PROBE_MS || 10_000));
+let versionProbe: { checkedAt: number; version: string } | null = null;
+
+/**
+ * Fingerprint of everything the index reads. Counts catch deletions, the max timestamps
+ * catch inserts and edits, and document readiness is included because it decides whether
+ * an article is publishable at all.
+ */
+async function dataVersion(): Promise<string> {
+  const now = Date.now();
+  if (versionProbe && now - versionProbe.checkedAt < VERSION_PROBE_TTL_MS) return versionProbe.version;
+  const [articles, views, newestArticle, newestTranslation, newestDocument, newestAnalysis] = await Promise.all([
+    prisma.article.count(),
+    prisma.atomicView.count(),
+    prisma.article.aggregate({ _max: { createdAt: true, publishedAt: true } }),
+    prisma.articleTranslation.aggregate({ _max: { updatedAt: true } }),
+    prisma.articleDocument.aggregate({ _max: { updatedAt: true } }),
+    prisma.analysis.aggregate({ _max: { createdAt: true } }),
+  ]);
+  const version = [
+    articles,
+    views,
+    newestArticle._max.createdAt?.getTime() ?? 0,
+    newestArticle._max.publishedAt?.getTime() ?? 0,
+    newestTranslation._max.updatedAt?.getTime() ?? 0,
+    newestDocument._max.updatedAt?.getTime() ?? 0,
+    newestAnalysis._max.createdAt?.getTime() ?? 0,
+  ].join(":");
+  versionProbe = { checkedAt: now, version };
+  return version;
+}
+
+/** Invalidate immediately after a write in this process, without waiting for the probe. */
+export function invalidateSearchIndex() {
+  candidateCache.clear();
+  versionProbe = null;
+}
+
+export async function searchSite(query: string, limit = 12, locale: Locale = "en"): Promise<SearchResult[]> {
+  const q = query.trim().slice(0, 120);
+  if (normalizeSearchText(q).length < 2) return [];
+  const useChinese = locale === "zh-CN";
+  const version = await dataVersion();
+  const cached = candidateCache.get(locale);
+  if (cached && cached.version === version) return rankSearchCandidates(q, cached.candidates, limit);
+  const [institutions, assets, articles] = await loadSearchData();
 
   const candidates: SearchCandidate[] = [
     ...institutions.map((institution) => ({
@@ -232,9 +321,6 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
           kind: "article" as const,
           title,
           subtitle: institutionName(article.institution.name, locale),
-          snippet: snippet(useChinese
-            ? [...article.atomicViews.map((view) => view.viewZh), article.analysis?.summaryZh, translation?.text, translation?.title, article.analysis?.summary, article.rawText]
-            : [...article.atomicViews.map((view) => view.viewEn), article.analysis?.summary, article.rawText, translation?.text], q),
           href: `/research/${article.id}`,
           publishedAt: article.publishedAt.toISOString(),
         },
@@ -245,6 +331,13 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
       }];
     }),
   ];
+
+  for (const candidate of candidates) {
+    candidate.normalizedContent = normalizeSearchText((candidate.content ?? []).join(" "));
+    candidate.contentWords = [...new Set(candidate.normalizedContent.split(" "))];
+    candidate.contentTrigrams = new Set(candidate.contentWords.flatMap(trigrams));
+  }
+  candidateCache.set(locale, { version, candidates });
 
   return rankSearchCandidates(q, candidates, limit);
 }

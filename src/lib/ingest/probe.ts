@@ -10,6 +10,7 @@ import { lastRenderReason, renderHtml } from "./render";
 import { fetchRobots, robotsAllows, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
 import { candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
+import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 
 const UA = "InstitutionalIntelligenceBot";
 const rss = new Parser({ timeout: 15000 });
@@ -40,6 +41,46 @@ interface ProbeResult {
   examples: Array<{ url: string; title: string; publishedAt: string }>;
 }
 
+/** Acceptance check for sources discovered through a publisher JSON API. */
+async function probeApiSource(
+  inst: { slug: string; name: string },
+  base: Omit<ProbeResult, "status" | "reason">,
+): Promise<ProbeResult> {
+  const sampleLimit = Math.max(1, Number(arg("sample") || 3));
+  const since = new Date(Date.now() - 45 * 24 * 3600 * 1000);
+  const { candidates, unreachable } = await discoverFromApi(inst.slug, { since, limit: Math.max(sampleLimit * 4, 20), delayMs: 500 });
+  if (unreachable) return { ...base, status: "paused", reason: unreachable };
+  const examples: ProbeResult["examples"] = [];
+  const failures: Record<string, number> = {};
+  const fail = (reason: string) => { failures[reason] = (failures[reason] ?? 0) + 1; };
+  let sampled = 0;
+  for (const candidate of candidates) {
+    if (examples.length >= sampleLimit) break;
+    sampled++;
+    const pdf = await candidate.pdf();
+    if (!pdf) { fail("pdf_fetch"); continue; }
+    try {
+      const extracted = await extractPdf(pdf);
+      if (!extracted.text.trim()) fail("body_empty");
+      else if (!looksLikeResearchTopic(candidate.title, extracted.text)) fail("not_research");
+      else examples.push({ url: candidate.url, title: candidate.title, publishedAt: candidate.publishedAt.toISOString() });
+    } catch { fail("pdf_invalid"); }
+  }
+  const accepted = examples.length;
+  return {
+    ...base,
+    status: accepted > 0 ? "ready" : "empty",
+    listingCandidates: candidates.length,
+    sampled,
+    accepted,
+    reason: accepted > 0
+      ? `${accepted}/${sampled} API publications passed full-body gates`
+      : `${candidates.length} API publications in the last 45 days; none passed${Object.keys(failures).length ? ` (${Object.entries(failures).map(([key, value]) => `${key}:${value}`).join(", ")})` : ""}`,
+    failures,
+    examples,
+  };
+}
+
 async function probeInstitution(inst: {
   slug: string;
   name: string;
@@ -65,14 +106,19 @@ async function probeInstitution(inst: {
   try {
     const source = new URL(inst.researchUrl);
     const robots = await fetchRobots(source.origin);
-    if (robots === null) return { ...base, status: "paused", reason: "robots unavailable and no valid cache" };
-    if (!robotsAllows(robots, UA, source.pathname)) return { ...base, status: "refused", reason: "robots disallows research path" };
+    // Mirrors run.ts: an unavailable robots.txt is treated as allowed, while an
+    // explicit Disallow in a robots.txt we DID retrieve is still respected.
+    if (robots !== null && !robotsAllows(robots, UA, source.pathname)) return { ...base, status: "refused", reason: "robots disallows research path" };
     const allows = (url: string) => {
       try {
         const target = new URL(url);
-        return target.origin === source.origin && robotsAllows(robots, UA, target.pathname);
+        return target.origin === source.origin && (robots === null || robotsAllows(robots, UA, target.pathname));
       } catch { return false; }
     };
+
+    // API-backed sources serve an app shell for every path, so HTML/sitemap
+    // discovery cannot see them; probe the same JSON listing the crawler uses.
+    if (apiDiscoveryEnabled(inst.slug)) return probeApiSource(inst, base);
 
     let accessReason: string | undefined;
     const renderPublic = async (url: string) => {
@@ -88,7 +134,7 @@ async function probeInstitution(inst: {
       if (listingHtml) listingCandidates.push(...extractLinks(listingHtml, listingUrl).filter((link) => candidateAllowed(inst.slug, link.url)));
     }
     let rendered = false;
-    if (flag("render") && listingCandidates.length === 0) {
+    if (inst.requiresRender || (flag("render") && listingCandidates.length === 0)) {
       const renderedHtml = await renderPublic(inst.researchUrl);
       if (renderedHtml) {
         html = renderedHtml;
@@ -97,7 +143,7 @@ async function probeInstitution(inst: {
       }
     }
     const declaredSitemaps = [
-      ...robotsSitemaps(robots),
+      ...(robots ? robotsSitemaps(robots) : []),
       ...(inst.sitemapUrl ? [inst.sitemapUrl] : []),
     ];
     const sitemapCandidates = sitemapEnabled(inst.slug)

@@ -26,8 +26,8 @@ export async function extractPdf(source: Buffer): Promise<ExtractedPdf> {
     const content = await page.getTextContent();
     const texts: string[] = [];
     let blockIndex = 0;
-    for (const raw of content.items as any[]) {
-      if (typeof raw.str !== "string" || !raw.str.trim() || !Array.isArray(raw.transform)) continue;
+    for (const raw of content.items) {
+      if (!("str" in raw) || typeof raw.str !== "string" || !raw.str.trim() || !Array.isArray(raw.transform)) continue;
       const fontSize = Math.max(6, Number(raw.height) || Math.abs(Number(raw.transform[3])) || 10);
       const sourceText = raw.str.trim();
       texts.push(sourceText);

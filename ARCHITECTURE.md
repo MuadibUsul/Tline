@@ -145,7 +145,7 @@ Playwright 仅用于正常呈现公开 JS 页面：
 - `Institution.lastCrawl*`：记录 `running/succeeded/empty/paused/refused/failed`，零候选不再伪装成成功。
 - `JobRun`：记录一次全局任务的参数、尝试、耗时、结果指标和错误。
 - `/admin`：复用单体认证、权限和 Prisma 事实库的运营界面；来源暂停与重试不会覆盖 robots 合规策略，并写入 `AuditLog`。
-- `GET /api/health`：返回数据库、存储、来源状态分布、24 小时内成功数和最近一次 ingest 结果。
+- `GET /api/health`：匿名调用只返回 `{ status }`（容器健康检查与外部探针够用）；数据库、存储、来源状态分布、24 小时内成功数、最近一次 ingest 结果与 Macro 同步状态仅对管理员会话或持 `HEALTH_DETAIL_TOKEN` 的调用返回，避免把内部运维细节和错误串暴露给公网。
 
 `ingest:probe` 只用于首次接入、规则变更和故障验收，不能成为 scheduler 的发现依赖。正式采集默认把时间窗口硬限制在当月月初之后；历史内容不主动回溯，已入库正文永久积累。抓取只写英文事实源与 segments，结构化、翻译和 PDF 由 scheduler 后续独立命令处理，任何模型故障都不会阻塞采集。
 

@@ -1,10 +1,45 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
 import { formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale } from "@/lib/i18n";
 import { stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
+import { getSessionUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
+import { prisma } from "@/lib/db";
+import { queueContentRetry } from "@/app/admin/actions";
 
 export const dynamic = "force-dynamic";
+export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await props.params;
+  const locale = await getLocale();
+  const article = await prisma.article.findUnique({
+    where: { id },
+    select: {
+      title: true,
+      publishedAt: true,
+      institution: { select: { name: true } },
+      analysis: { select: { summary: true, summaryZh: true } },
+      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
+    },
+  });
+  if (!article) return { title: tr(locale, "Report not found", "研报未找到") };
+  const zh = locale === "zh-CN";
+  const title = zh && article.translations[0] ? localizeChineseContent(article.translations[0].title) : article.title;
+  const description = (zh ? article.analysis?.summaryZh : article.analysis?.summary)
+    ?? institutionName(article.institution.name, locale);
+  return {
+    title,
+    description: description.slice(0, 300),
+    openGraph: {
+      type: "article",
+      title,
+      description: description.slice(0, 300),
+      publishedTime: article.publishedAt.toISOString(),
+    },
+  };
+}
+
 
 function parseJson<T>(s: string | undefined, fallback: T): T {
   if (!s) return fallback;
@@ -67,6 +102,16 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
   const date = formatDate(a.publishedAt, locale);
   const translation = a.translations[0];
+  const analysisPoor = an?.reviewStatus === "needs_review";
+  const translationPoor = (translation?.qualityScore ?? 1) < 0.8;
+  const qualityWarning = analysisPoor || translationPoor;
+
+  const user = await getSessionUser();
+  const isOperator = can(user, "admin.review");
+  // The retry log is operator-facing: readers get the notice, operators get the audit trail.
+  const retries = qualityWarning && isOperator
+    ? await prisma.contentRetry.findMany({ where: { articleId: a.id }, orderBy: { requestedAt: "desc" } })
+    : [];
 
   return (
     <main className="wrap" style={{ maxWidth: 820 }}>
@@ -78,6 +123,36 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title}</h1>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p" style={{ alignSelf: "flex-start" }}>{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
       </div>
+
+      {qualityWarning && <div className="quality-notice" role="status">
+        <b>{tr(locale, "Automated quality notice", "自动质量提示")}</b>
+        <span>{tr(locale, "This report remains available, but its AI analysis or translation scored below the preferred quality threshold and is queued for improvement. Verify material decisions against the official source.", "本研报仍可阅读，但 AI 分析或译文低于优选质量阈值，已进入改进队列。重要判断请同时核对官网原文。")}</span>
+        {isOperator && <div className="retry-controls">
+          {(["analysis", "translation"] as const)
+            .filter((kind) => (kind === "analysis" ? analysisPoor : translationPoor))
+            .map((kind) => {
+              const retry = retries.find((row) => row.kind === kind);
+              const pending = retry?.status === "queued" || retry?.status === "running";
+              return (
+                <form action={queueContentRetry} key={kind}>
+                  <input type="hidden" name="articleId" value={a.id} />
+                  <input type="hidden" name="kind" value={kind} />
+                  <button type="submit" className="minibtn" disabled={pending}>
+                    {kind === "analysis" ? tr(locale, "Re-run analysis", "重跑分析") : tr(locale, "Re-run translation", "重跑译文")}
+                  </button>
+                </form>
+              );
+            })}
+          {retries.map((retry) => (
+            <span className="retry-log mono" key={retry.id}>
+              {retry.kind} · {retry.status}
+              {retry.scoreBefore !== null ? ` · ${retry.scoreBefore.toFixed(2)}` : ""}
+              {retry.scoreAfter !== null ? ` → ${retry.scoreAfter.toFixed(2)}` : ""}
+              {retry.error ? ` · ${retry.error.slice(0, 80)}` : ""}
+            </span>
+          ))}
+        </div>}
+      </div>}
 
       <section className="blk">
         <div className="section-t">{tr(locale, "Complete Research", "完整研报正文")}</div>
@@ -124,7 +199,16 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
       </section>
 
       {(keyArgs.length > 0 || risks.length > 0) && <section className="blk">
-        <div className="section-t">{tr(locale, "Optional analysis", "按需分析")}</div>
+        <div className="section-t">{tr(locale, "AI analysis", "AI 分析")}</div>
+        {/* The body above is the institution's own text. Everything in this block is
+            model-written about that text, and the distinction has to be legible. */}
+        <div className="ai-analysis-label">
+          {tr(
+            locale,
+            "AI-generated from the report above · not a translation and not the institution's wording · verify against the official source",
+            "由 AI 依据上文研报生成 · 非原文直译、非机构原话 · 重要判断请核对官网原文",
+          )}
+        </div>
         {keyArgs.length > 0 && <details className="article-original"><summary>{tr(locale, "Key arguments", "关键论点")}</summary><ul className="prose">{keyArgs.map((item, index) => <li key={index}>{locale === "zh-CN" ? localizeChineseContent(item) : item}</li>)}</ul></details>}
         {risks.length > 0 && <details className="article-original"><summary>{tr(locale, "Risks", "风险")}</summary><ul className="prose">{risks.map((item, index) => <li key={index}>{locale === "zh-CN" ? localizeChineseContent(item) : item}</li>)}</ul></details>}
       </section>}

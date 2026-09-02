@@ -13,6 +13,7 @@ import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
 import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
+import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
 // Usage:
@@ -204,6 +205,36 @@ async function ingestInstitution(
     return staged;
   };
 
+  // 0) Publisher JSON API (client-rendered sources whose HTML is only an app shell).
+  if (apiDiscoveryEnabled(inst.slug)) {
+    const api = await discoverFromApi(inst.slug, { since, limit: candidateLimit, delayMs });
+    if (api.unreachable) accessReason ??= api.unreachable;
+    for (const candidate of api.candidates) {
+      if (raws.length >= perLimit || !withinBudget()) break;
+      if (!allowsUrl(candidate.url) || !candidateAllowed(inst.slug, candidate.url)) { blocked++; continue; }
+      if (await skipCandidate(candidate.url)) continue;
+      await sleep(delayMs);
+      const pdf = await candidate.pdf();
+      if (!pdf) { empty++; continue; }
+      try {
+        const extracted = await extractPdf(pdf);
+        if (!extracted.text.trim() || !looksLikeResearchTopic(candidate.title, extracted.text)) { empty++; continue; }
+        // Title/date/author come from publisher metadata, so the HTML-shaped strict check does not apply.
+        const accepted = stage({
+          title: candidate.title || "Institutional research report",
+          text: extracted.text,
+          sourceUrl: candidate.url,
+          author: candidate.author,
+          publishedAt: candidate.publishedAt,
+          segments: [{ heading: null, text: extracted.text }],
+        });
+        if (accepted) nativePdfs.set(candidate.url, pdf);
+      } catch {
+        empty++;
+      }
+    }
+  }
+
   // 1) Publisher-declared RSS/Atom feeds. Fetch through the same compliant client.
   const feedUrls: string[] = [];
   if (inst.rssUrl && allowsUrl(inst.rssUrl)) feedUrls.push(inst.rssUrl);
@@ -366,7 +397,9 @@ async function ingestInstitution(
   }
 
   // 3) HTML listings and explicit pagination → per-article extraction.
-  {
+  // Skipped for API-backed sources: their pages are app shells, so HTML extraction
+  // only yields consent/gate boilerplate and would mask a healthy crawl as blocked.
+  if (!apiDiscoveryEnabled(inst.slug)) {
     const beforeListing = raws.length;
     const pages = [...sourceListings];
     const visitedPages = new Set<string>();
@@ -476,6 +509,7 @@ async function ingestInstitution(
     outOfWindow,
     robotsBlocked: blocked,
     nativePdfRejected: nativeRejected,
+    figuresStored,
     delayMs,
   }));
   const accessStatus = lastFetchStatus(inst.researchUrl);

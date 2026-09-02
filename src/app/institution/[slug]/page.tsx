@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getInstitutionView } from "@/lib/queries";
@@ -6,6 +8,25 @@ import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, getLocale, institutionName, tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await props.params;
+  const locale = await getLocale();
+  const institution = await prisma.institution.findUnique({
+    where: { slug },
+    select: { name: true, country: true },
+  });
+  if (!institution) return { title: tr(locale, "Institution not found", "机构未找到") };
+  const name = institutionName(institution.name, locale);
+  return {
+    title: name,
+    description: tr(
+      locale,
+      `Published research and extracted views from ${name}${institution.country ? ` (${institution.country})` : ""}.`,
+      `${name}${institution.country ? `（${institution.country}）` : ""}的公开研报与提取观点。`,
+    ),
+  };
+}
+
 
 export default async function InstitutionPage(props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;

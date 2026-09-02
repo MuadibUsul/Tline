@@ -124,7 +124,10 @@ const RULES: Record<string, SourceRule> = {
     articleRejected: /^Independent Research and Market Analysis by Citi\s*$/i,
   },
   natixis: {
+    // Angular SPA: every path returns the same shell and there is no sitemap.
+    // Discovery runs through the site's own public API (see apiSources.ts).
     candidatePath: /^\/Site\/en\/publication\//i,
+    skipSitemap: true,
   },
   "cr-dit-cib": {
     // The global sitemap also contains corporate transaction announcements.

@@ -14,7 +14,7 @@ export function parseRobots(text: string): Group[] {
   let cur: Group | null = null;
   let expectingAgents = false;
 
-  for (let raw of text.split(/\r?\n/)) {
+  for (const raw of text.split(/\r?\n/)) {
     const line = raw.replace(/#.*$/, "").trim();
     if (!line) continue;
     const idx = line.indexOf(":");

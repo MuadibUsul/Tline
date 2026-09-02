@@ -608,6 +608,7 @@ model User {
   auditLogs AuditLog[]
   accounts  Account[]
   sessions  Session[]
+  apiKeys   ApiKey[]
 }
 
 model Account {
@@ -745,4 +746,25 @@ model WorkerHeartbeat {
   lastSeenAt DateTime @updatedAt
 
   @@index([lastSeenAt])
+}
+
+// A machine consumer of the public API. The secret itself is never stored: only its
+// SHA-256 digest, so a database leak cannot be replayed against the API. `prefix` is the
+// short visible half an operator recognises a key by in the admin screen.
+model ApiKey {
+  id           String    @id @default(cuid())
+  name         String // who the key was issued to
+  prefix       String    @unique
+  tokenHash    String    @unique
+  scopes       String    @default("[\"research:read\"]") // JSON array
+  rateLimit    Int       @default(60) // requests per minute
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  requestCount Int       @default(0)
+  revokedAt    DateTime? // set instead of deleting, so past usage stays auditable
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([revokedAt])
 }

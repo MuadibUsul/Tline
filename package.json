@@ -34,6 +34,8 @@
     "prices:import": "tsx prisma/prices.ts",
     "alerts": "tsx prisma/demo-user.ts",
     "scheduler": "node scripts/scheduler.mjs",
+    "dataset:export": "tsx scripts/dataset.ts export",
+    "dataset:import": "tsx scripts/dataset.ts import",
     "env:check": "node scripts/validate-env.mjs",
     "env:check:production": "node scripts/validate-env.mjs --production",
     "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo-user.ts",

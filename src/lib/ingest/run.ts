@@ -21,7 +21,7 @@ import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, 
 //   npm run ingest -- --slug=ubs   -> one institution
 //   npm run ingest -- --all        -> every crawlable institution
 //   npm run ingest -- --limit=3    -> cap articles per institution
-//   npm run ingest -- --scan-limit=60 --pages=3 -> inspect deeper current-month listings
+//   npm run ingest -- --scan-limit=60 --pages=3 -> inspect deeper listings
 //   npm run ingest -- --source-seconds=180 --render-limit=4 -> bound slow public rendering
 //   npm run ingest -- --all --resume-minutes=60 -> skip sources completed in the last hour
 
@@ -572,7 +572,7 @@ async function executeIngest() {
     }
   }
 
-  console.log(`Ingesting ${institutions.length} compliant institution(s), up to ${perLimit} current-month articles each (scan ${scanLimit}, pages ${maxPages})…`);
+  console.log(`Ingesting ${institutions.length} compliant institution(s), up to ${perLimit} articles each from the last ${windowHours}h (scan ${scanLimit}, pages ${maxPages})…`);
   let total = 0;
   let failedSources = 0;
   await runSourcesByOrigin(institutions, concurrency, async (inst) => {

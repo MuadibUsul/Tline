@@ -3,11 +3,14 @@ import { ASSETS } from "./assets";
 import { publicationReadyWhere } from "./publication";
 import { assetName, domainTerm, institutionName, localizeChineseContent, type Locale } from "./i18n";
 
-export type SearchResultKind = "institution" | "asset" | "article";
+export type SearchResultKind = "institution" | "asset" | "article" | "view";
 
 export interface SearchResult {
   id: string;
   kind: SearchResultKind;
+  /** Set on view results: the report a view was extracted from, used to keep one report
+   * from filling the list with its own views. */
+  articleId?: string;
   title: string;
   subtitle: string;
   snippet?: string;
@@ -145,16 +148,30 @@ function candidateScore(query: string, candidate: SearchCandidate) {
     scoreNormalizedText(query, content, candidate.contentWords, candidate.contentTrigrams) * 0.75,
     scoreNormalizedText(query, normalizeSearchText(combined)) * 1.35,
   );
-  return candidate.result.kind === "article" ? score : score * 1.2;
+  const isEntity = candidate.result.kind === "institution" || candidate.result.kind === "asset";
+  return isEntity ? score * 1.2 : score;
 }
+
+// A report carrying a dozen views on the searched asset would otherwise fill the whole
+// list with itself and bury every other source.
+const MAX_VIEWS_PER_ARTICLE = 2;
 
 export function rankSearchCandidates(query: string, candidates: SearchCandidate[], limit = 12) {
   const normalizedQuery = normalizeSearchText(query);
+  const perArticle = new Map<string, number>();
   return candidates
     .map((candidate) => ({ candidate, score: candidateScore(normalizedQuery, candidate) }))
     .filter(({ score }) => score >= 18)
     .sort((a, b) => b.score - a.score ||
       (b.candidate.result.publishedAt ?? "").localeCompare(a.candidate.result.publishedAt ?? ""))
+    .filter(({ candidate }) => {
+      const article = candidate.result.kind === "view" ? candidate.result.articleId : undefined;
+      if (!article) return true;
+      const used = perArticle.get(article) ?? 0;
+      if (used >= MAX_VIEWS_PER_ARTICLE) return false;
+      perArticle.set(article, used + 1);
+      return true;
+    })
     .slice(0, limit)
     .map(({ candidate }) => {
       const context = matchingSnippet(candidate.content, query);
@@ -222,7 +239,7 @@ const loadSearchData = async () => Promise.all([
         analysis: { select: { summary: true, summaryZh: true } },
         translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } },
         articleAssets: { select: { asset: { select: { ticker: true, name: true, aliases: true } } } },
-        atomicViews: { select: { viewEn: true, viewZh: true, asset: true, assetTicker: true, topic: true, type: true, direction: true, timeHorizon: true, value: true } },
+        atomicViews: { select: { id: true, viewEn: true, viewZh: true, asset: true, assetTicker: true, topic: true, type: true, direction: true, timeHorizon: true, value: true, rationaleEn: true, rationaleZh: true, conditionEn: true, conditionZh: true, confidence: true } },
       },
     }),
   ]);
@@ -315,12 +332,13 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         ...(ASSETS.find((definition) => definition.ticker === asset.ticker)?.aliases ?? []),
       ]);
       const atomicText = article.atomicViews.flatMap((view) => [view.viewEn, view.viewZh, view.asset, view.assetTicker ?? "", view.topic, view.type, view.direction, view.timeHorizon, view.value ?? ""]);
+      const institution = institutionName(article.institution.name, locale);
       return [{
         result: {
           id: article.id,
           kind: "article" as const,
           title,
-          subtitle: institutionName(article.institution.name, locale),
+          subtitle: institution,
           href: `/research/${article.id}`,
           publishedAt: article.publishedAt.toISOString(),
         },
@@ -328,7 +346,37 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         aliases: [...assetTerms, ...article.atomicViews.flatMap((view) => [view.asset, view.assetTicker ?? "", view.topic])],
         secondary: [article.institution.name, article.institution.slug, article.author ?? ""],
         content: [article.analysis?.summary ?? "", article.analysis?.summaryZh ?? "", article.rawText ?? "", translation?.text ?? "", ...atomicText],
-      }];
+      },
+      // Each extracted view is searchable in its own right: someone looking for "gold"
+      // usually wants the stance an institution took, not only the report carrying it.
+      ...article.atomicViews.flatMap((view): SearchCandidate[] => {
+        const text = (useChinese ? view.viewZh || view.viewEn : view.viewEn || view.viewZh).trim();
+        if (!text) return [];
+        const asset = assetName(view.asset, locale, view.assetTicker, "相关资产");
+        // The view stores its asset in English, so a Chinese query only reaches it
+        // through the dictionary aliases for that one ticker. Taking the parent report's
+        // whole asset list instead would let an oil view answer a query about gold.
+        const definition = ASSETS.find((entry) => entry.ticker === view.assetTicker);
+        return [{
+          result: {
+            id: view.id,
+            kind: "view" as const,
+            articleId: article.id,
+            title: text,
+            subtitle: [institution, asset, domainTerm(view.direction, locale), view.timeHorizon].filter(Boolean).join(" · "),
+            // Views have no page of their own; the site links them to their report, and
+            // so does this.
+            href: `/research/${article.id}`,
+            publishedAt: article.publishedAt.toISOString(),
+          },
+          primary: [view.viewEn, view.viewZh],
+          // Only this view's own asset: inheriting the report's other tickers would make
+          // an oil view answer a query about gold just because they shared a report.
+          aliases: [view.asset, view.assetTicker ?? "", view.topic, ...(definition ? [definition.name, ...definition.aliases] : [])],
+          secondary: [article.institution.name, view.type, view.direction, view.timeHorizon, view.value ?? ""],
+          content: [view.rationaleEn ?? "", view.rationaleZh ?? "", view.conditionEn ?? "", view.conditionZh ?? ""],
+        }];
+      })];
     }),
   ];
 

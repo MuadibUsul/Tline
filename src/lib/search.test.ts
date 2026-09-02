@@ -41,3 +41,41 @@ test("content matches return the relevant highlighted excerpt", () => {
   assert.equal(fuzzy[0]?.matchKind, "content");
   assert.equal(fuzzy[0]?.snippetMatch, "forecast");
 });
+
+const withViews: SearchCandidate[] = [
+  ...candidates,
+  ...[1, 2, 3].map((n) => ({
+    result: {
+      id: `view-${n}`,
+      kind: "view" as const,
+      articleId: "article",
+      title: `黄金在避险需求下走高 ${n}`,
+      subtitle: "Goldman Sachs · 黄金",
+      href: "/research/article",
+    },
+    primary: [`Gold rallies on haven demand ${n}`, `黄金在避险需求下走高 ${n}`],
+    aliases: ["黄金", "XAUUSD"],
+  })),
+  {
+    result: { id: "view-other", kind: "view" as const, articleId: "other", title: "黄金承压", subtitle: "UBS · 黄金", href: "/research/other" },
+    primary: ["Gold under pressure", "黄金承压"],
+    aliases: ["黄金", "XAUUSD"],
+  },
+];
+
+test("extracted views are searchable in their own right", () => {
+  const results = rankSearchCandidates("黄金", withViews);
+  assert.ok(results.some((result) => result.kind === "view"), "a view should surface for an asset query");
+  assert.ok(results.some((result) => result.kind === "article"), "reports should still surface alongside views");
+});
+
+test("one report cannot fill the list with its own views", () => {
+  const results = rankSearchCandidates("黄金", withViews);
+  const fromOneArticle = results.filter((result) => result.kind === "view" && result.articleId === "article");
+  assert.ok(fromOneArticle.length <= 2, `expected at most 2 views from one report, got ${fromOneArticle.length}`);
+  assert.ok(results.some((result) => result.id === "view-other"), "a view from another report should still get through");
+});
+
+test("an asset still outranks the views that mention it", () => {
+  assert.equal(rankSearchCandidates("黄金", withViews)[0]?.id, "gold");
+});

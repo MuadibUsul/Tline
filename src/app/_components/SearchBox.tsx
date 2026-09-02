@@ -5,7 +5,7 @@ import { Fragment, useEffect, useState } from "react";
 
 interface Result {
   id: string;
-  kind: "institution" | "asset" | "article";
+  kind: "institution" | "asset" | "article" | "view";
   title: string;
   subtitle: string;
   snippet?: string;
@@ -63,8 +63,8 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
     if (result) router.push(result.href);
   };
   const labels = locale === "zh-CN"
-    ? { institution: "机构", asset: "资产", article: "研报", content: "正文命中", empty: "没有找到相关内容", hint: "输入至少两个字符", loading: "搜索中…" }
-    : { institution: "Institution", asset: "Asset", article: "Research", content: "Content match", empty: "No matching content", hint: "Type at least two characters", loading: "Searching…" };
+    ? { institution: "机构", asset: "资产", article: "研报", view: "观点", content: "正文命中", empty: "没有找到相关内容", hint: "输入至少两个字符", loading: "搜索中…" }
+    : { institution: "Institution", asset: "Asset", article: "Research", view: "View", content: "Content match", empty: "No matching content", hint: "Type at least two characters", loading: "Searching…" };
 
   return (
     <div className="site-search" onBlur={(event) => {

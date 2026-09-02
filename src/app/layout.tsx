@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
 import ThemeToggle from "./_components/ThemeToggle";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { doSignOut } from "./actions";
 import { isFormalAuthConfigured } from "@/lib/auth-config";
@@ -35,6 +37,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const user = await getSessionUser();
   const formalAuth = isFormalAuthConfigured();
   const locale = await getLocale();
+
+  // An account enrolled by email link has no password yet. Sending it straight to the
+  // page that sets one is what keeps email down to enrolment and recovery: without this
+  // the next sign-in would need another message.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  // An empty path means the middleware did not run; redirecting on that guess would
+  // loop the page onto itself, so the gate stays shut rather than trapping the browser.
+  if (pathname && user && formalAuth && !user.passwordHash && !pathname.startsWith("/account/password")) {
+    redirect("/account/password");
+  }
 
   const navItems: MobileNavItem[] = [
     { href: "/", label: tr(locale, "Home", "首页") },

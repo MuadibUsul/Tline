@@ -38,7 +38,14 @@ function readToken(token: string): { uid: string; email: string } | null {
 export async function getSessionUser() {
   if (isFormalAuthConfigured()) {
     const session = await getServerSession(authOptions);
-    return session?.user?.email ? prisma.user.findUnique({ where: { email: session.user.email } }) : null;
+    if (!session?.user?.email) return null;
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) return null;
+    // A token minted before the password last changed belongs to a session the owner has
+    // since revoked by changing it.
+    const issuedAt = (session as { issuedAt?: number }).issuedAt;
+    if (user.passwordChangedAt && (!issuedAt || issuedAt < user.passwordChangedAt.getTime())) return null;
+    return user;
   }
   const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;

@@ -5,6 +5,7 @@ import { DEMO_EMAIL } from "@/lib/user";
 import { formalAuthLabel, isEmailAuthConfigured, isFormalAuthConfigured } from "@/lib/auth-config";
 import { getLocale, tr } from "@/lib/i18n";
 import { EmailSignInForm } from "./email-sign-in-form";
+import { PasswordSignInForm } from "./password-sign-in-form";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
           ? tr(locale, "Preview sign-in identifies your watchlist and alerts without a password.", "预览登录无需密码，用于识别你的关注列表和提醒。")
           : formalAuth
             ? emailAuth
-              ? tr(locale, "Enter your email and we'll send you a secure sign-in link.", "输入邮箱，我们会向你发送安全登录链接。")
+              ? tr(locale, "Sign in with your email and password.", "使用邮箱和密码登录。")
               : tr(locale, `Continue with ${formalAuthLabel()} to access your account.`, `使用 ${formalAuthLabel()} 继续访问账户。`)
           : tr(locale, "Account sign-in is unavailable until the production OAuth provider is configured.", "配置生产 OAuth 提供商后方可使用账户登录。")}</p>
       </div>
@@ -39,13 +40,35 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
         <p className="chip bear" style={{ display: "inline-block" }}>{tr(locale, "Preview sign-in is disabled in production.", "生产环境已禁用预览登录。")}</p>
       )}
 
-      {emailAuth && <EmailSignInForm
-        callbackUrl={next}
-        emailLabel={tr(locale, "Email", "电子邮箱")}
-        placeholder="you@example.com"
-        submitLabel={tr(locale, "Email me a sign-in link", "发送登录链接")}
-        sendingLabel={tr(locale, "Sending", "发送中")}
-      />}
+      {emailAuth && <>
+        <PasswordSignInForm
+          callbackUrl={next}
+          labels={{
+            email: tr(locale, "Email", "电子邮箱"),
+            password: tr(locale, "Password", "密码"),
+            submit: tr(locale, "Sign in", "登录"),
+            signingIn: tr(locale, "Signing in", "登录中"),
+            failed: tr(locale, "That email and password do not match an account.", "邮箱与密码不匹配。"),
+          }}
+        />
+        {/* Folded away on purpose: each use sends a message, and the quota for those is
+            worth keeping for enrolling an account and recovering one. */}
+        <details className="signin-recover">
+          <summary>{tr(locale, "First time here, or forgotten your password?", "首次登录,或忘记密码?")}</summary>
+          <p>{tr(
+            locale,
+            "We will email you a one-time link. Use it to sign in, then set a password so later sign-ins need no message.",
+            "我们会发送一次性登录链接。用它登录后请设置密码,之后登录就不再需要收信。",
+          )}</p>
+          <EmailSignInForm
+            callbackUrl="/account/password"
+            emailLabel={tr(locale, "Email", "电子邮箱")}
+            placeholder="you@example.com"
+            submitLabel={tr(locale, "Email me a sign-in link", "发送登录链接")}
+            sendingLabel={tr(locale, "Sending", "发送中")}
+          />
+        </details>
+      </>}
 
       {formalAuth && !emailAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={`/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`}>{tr(locale, `Continue with ${formalAuthLabel()}`, `使用 ${formalAuthLabel()} 继续`)} →</a>}
 

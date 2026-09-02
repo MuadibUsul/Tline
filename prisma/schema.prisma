@@ -600,6 +600,12 @@ model User {
   image         String?
   tier          String    @default("free") // matrix is configured later
   role          String    @default("member") // member | reviewer | admin; independent of commercial tier
+  // Email is for enrolling and for recovery only; day-to-day sign-in is by password, so
+  // routine access never spends the mail provider's quota.
+  passwordHash      String?
+  // Doubles as revocation: sessions issued before this moment are refused, so changing a
+  // password signs out every other device.
+  passwordChangedAt DateTime?
   alertWebhookUrl String? // https destination for fired alerts; validated before every POST
   createdAt     DateTime  @default(now())
 

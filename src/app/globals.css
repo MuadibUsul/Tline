@@ -395,3 +395,11 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .apikey-docs ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:6px}
 .apikey-docs p{margin:0}
 .apikey-note{padding-top:7px;border-top:1px solid var(--line);line-height:1.55}
+
+/* Sign-in: the email route is available but not the first thing offered. */
+.signin-recover{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.signin-recover summary{cursor:pointer;font-size:12.5px;color:var(--accent-ink);list-style:none}
+.signin-recover summary::-webkit-details-marker{display:none}
+.signin-recover summary::before{content:"＋ ";font-size:11px}
+.signin-recover[open] summary::before{content:"－ "}
+.signin-recover p{font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0 12px}

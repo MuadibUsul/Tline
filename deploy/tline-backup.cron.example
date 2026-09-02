@@ -1,0 +1,3 @@
+# Install with: crontab deploy/tline-backup.cron.example
+# This is only an on-VPS snapshot. Add an offsite sync after choosing object storage.
+30 3 * * * cd /home/deploy/tline && docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app npm run backup -- --out /app/storage/backups --keep 14 >> /home/deploy/tline/backup.log 2>&1

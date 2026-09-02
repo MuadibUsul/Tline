@@ -2,8 +2,9 @@ import { doSignIn } from "@/app/actions";
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DEMO_EMAIL } from "@/lib/user";
-import { formalAuthLabel, isFormalAuthConfigured } from "@/lib/auth-config";
+import { formalAuthLabel, isEmailAuthConfigured, isFormalAuthConfigured } from "@/lib/auth-config";
 import { getLocale, tr } from "@/lib/i18n";
+import { EmailSignInForm } from "./email-sign-in-form";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
   const user = await getSessionUser();
   if (user) redirect(next);
   const formalAuth = isFormalAuthConfigured();
+  const emailAuth = isEmailAuthConfigured();
   const demoAuthEnabled = !formalAuth && (process.env.NODE_ENV !== "production" || process.env.ALLOW_INSECURE_DEMO_AUTH === "true");
 
   return (
@@ -24,7 +26,9 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
         <p className="sub" style={{ color: "var(--muted)" }}>{demoAuthEnabled
           ? tr(locale, "Preview sign-in identifies your watchlist and alerts without a password.", "预览登录无需密码，用于识别你的关注列表和提醒。")
           : formalAuth
-            ? tr(locale, `Continue with ${formalAuthLabel()} to access your account.`, `使用 ${formalAuthLabel()} 继续访问账户。`)
+            ? emailAuth
+              ? tr(locale, "Enter your email and we'll send you a secure sign-in link.", "输入邮箱，我们会向你发送安全登录链接。")
+              : tr(locale, `Continue with ${formalAuthLabel()} to access your account.`, `使用 ${formalAuthLabel()} 继续访问账户。`)
           : tr(locale, "Account sign-in is unavailable until the production OAuth provider is configured.", "配置生产 OAuth 提供商后方可使用账户登录。")}</p>
       </div>
 
@@ -35,7 +39,15 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
         <p className="chip bear" style={{ display: "inline-block" }}>{tr(locale, "Preview sign-in is disabled in production.", "生产环境已禁用预览登录。")}</p>
       )}
 
-      {formalAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={`/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`}>{tr(locale, `Continue with ${formalAuthLabel()}`, `使用 ${formalAuthLabel()} 继续`)} →</a>}
+      {emailAuth && <EmailSignInForm
+        callbackUrl={next}
+        emailLabel={tr(locale, "Email", "电子邮箱")}
+        placeholder="you@example.com"
+        submitLabel={tr(locale, "Email me a sign-in link", "发送登录链接")}
+        sendingLabel={tr(locale, "Sending", "发送中")}
+      />}
+
+      {formalAuth && !emailAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={`/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`}>{tr(locale, `Continue with ${formalAuthLabel()}`, `使用 ${formalAuthLabel()} 继续`)} →</a>}
 
       {demoAuthEnabled && <><form action={doSignIn} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <input type="hidden" name="next" value={next} />

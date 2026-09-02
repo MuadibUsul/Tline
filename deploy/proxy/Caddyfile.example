@@ -1,0 +1,4 @@
+tline.example.com {
+    encode zstd gzip
+    reverse_proxy tline-app:3000
+}

@@ -17,12 +17,15 @@ if (production && storageDriver === "local" && !path.isAbsolute(storageRoot)) {
 }
 if (storageDriver === "s3" && !process.env.S3_BUCKET) errors.push("S3_BUCKET is required for S3 document storage.");
 if (storageDriver === "s3" && !process.env.S3_REGION) errors.push("S3_REGION is required for S3 document storage.");
-if (authProvider && !["azure-ad", "google"].includes(authProvider)) errors.push("AUTH_PROVIDER must be azure-ad or google.");
+if (authProvider && !["azure-ad", "email", "google"].includes(authProvider)) errors.push("AUTH_PROVIDER must be azure-ad, email or google.");
 if (authProvider === "azure-ad" && (!process.env.AZURE_AD_CLIENT_ID || !process.env.AZURE_AD_CLIENT_SECRET)) {
   errors.push("Azure AD OAuth requires AZURE_AD_CLIENT_ID and AZURE_AD_CLIENT_SECRET.");
 }
 if (authProvider === "google" && (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)) {
   errors.push("Google OAuth requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
+}
+if (authProvider === "email" && (!process.env.EMAIL_SERVER || !process.env.EMAIL_FROM)) {
+  errors.push("Email authentication requires EMAIL_SERVER and EMAIL_FROM.");
 }
 
 if (production) {
@@ -37,7 +40,7 @@ if (production) {
       warnings.push("Account sign-in is disabled; set AUTH_PROVIDER when accounts are ready.");
     }
   }
-  if (authProvider && !process.env.NEXTAUTH_URL) errors.push("NEXTAUTH_URL is required when production OAuth is enabled.");
+  if (authProvider && !process.env.NEXTAUTH_URL) errors.push("NEXTAUTH_URL is required when production authentication is enabled.");
   // robots.txt, sitemap.xml and Open Graph URLs are wrong without a real origin.
   const siteUrl = process.env.SITE_URL || process.env.NEXTAUTH_URL || "";
   if (!siteUrl) warnings.push("SITE_URL is unset; robots.txt, sitemap.xml and share previews will point at localhost.");

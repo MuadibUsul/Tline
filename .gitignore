@@ -15,3 +15,5 @@ data/cache/
 data/crawl-probe*.json
 prisma/postgresql/schema.prisma
 backups/
+.deploy-tag
+backup.log

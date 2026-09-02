@@ -1,26 +1,32 @@
 import type { NextAuthOptions } from "next-auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
+import EmailProvider from "next-auth/providers/email";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "./db";
 import { writeAudit } from "./audit";
 
-export type OAuthProviderId = "azure-ad" | "google";
+export type AuthProviderId = "azure-ad" | "email" | "google";
 
-function selectedProvider(): OAuthProviderId | null {
+function selectedProvider(): AuthProviderId | null {
   const value = process.env.AUTH_PROVIDER?.toLowerCase();
-  return value === "azure-ad" || value === "google" ? value : null;
+  return value === "azure-ad" || value === "email" || value === "google" ? value : null;
 }
 
 export function isFormalAuthConfigured() {
   const provider = selectedProvider();
   if (provider === "azure-ad") return Boolean(process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET);
+  if (provider === "email") return Boolean(process.env.EMAIL_SERVER && process.env.EMAIL_FROM);
   if (provider === "google") return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   return false;
 }
 
 export function formalAuthLabel() {
-  return selectedProvider() === "azure-ad" ? "Microsoft Entra ID" : selectedProvider() === "google" ? "Google" : "OAuth";
+  return selectedProvider() === "azure-ad" ? "Microsoft Entra ID" : selectedProvider() === "email" ? "Email" : selectedProvider() === "google" ? "Google" : "OAuth";
+}
+
+export function isEmailAuthConfigured() {
+  return selectedProvider() === "email" && isFormalAuthConfigured();
 }
 
 function providers() {
@@ -30,6 +36,12 @@ function providers() {
       clientId: process.env.AZURE_AD_CLIENT_ID!,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
       tenantId: process.env.AZURE_AD_TENANT_ID || "common",
+    })];
+  }
+  if (provider === "email" && isFormalAuthConfigured()) {
+    return [EmailProvider({
+      server: process.env.EMAIL_SERVER!,
+      from: process.env.EMAIL_FROM!,
     })];
   }
   if (provider === "google" && isFormalAuthConfigured()) {

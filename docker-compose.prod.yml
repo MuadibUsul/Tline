@@ -1,0 +1,36 @@
+services:
+  db:
+    mem_limit: 512m
+    command: >-
+      postgres -c shared_buffers=128MB -c effective_cache_size=384MB
+      -c max_connections=50 -c work_mem=4MB
+
+  app:
+    image: ghcr.io/muadibusul/tline:${TAG:-latest}
+    build: !reset null
+    container_name: tline-app
+    mem_limit: 768m
+    environment:
+      SITE_URL: ${SITE_URL:?Set SITE_URL}
+      NEXTAUTH_URL: ${SITE_URL:?Set SITE_URL}
+      AUTH_PROVIDER: email
+      EMAIL_SERVER: ${EMAIL_SERVER:?Set EMAIL_SERVER}
+      EMAIL_FROM: ${EMAIL_FROM:?Set EMAIL_FROM}
+      HEALTH_DETAIL_TOKEN: ${HEALTH_DETAIL_TOKEN:?Set HEALTH_DETAIL_TOKEN}
+    networks:
+      - default
+      - web
+
+  scheduler:
+    image: ghcr.io/muadibusul/tline:${TAG:-latest}
+    build: !reset null
+    mem_limit: 1g
+
+  macro-scheduler:
+    image: ghcr.io/muadibusul/tline:${TAG:-latest}
+    build: !reset null
+    mem_limit: 384m
+
+networks:
+  web:
+    external: true

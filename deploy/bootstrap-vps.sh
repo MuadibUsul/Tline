@@ -7,10 +7,13 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl ufw
+apt-get install -y --no-install-recommends ca-certificates curl sudo ufw
 
 id deploy >/dev/null 2>&1 || adduser --disabled-password --gecos "" deploy
 usermod -aG sudo deploy
+printf 'deploy ALL=(ALL:ALL) NOPASSWD:ALL\n' > /etc/sudoers.d/deploy
+chmod 0440 /etc/sudoers.d/deploy
+visudo -cf /etc/sudoers.d/deploy >/dev/null
 
 if [ ! -s /home/deploy/.ssh/authorized_keys ]; then
   if [ ! -s /root/.ssh/authorized_keys ]; then

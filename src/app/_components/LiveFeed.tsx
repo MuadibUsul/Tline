@@ -33,6 +33,7 @@ export default function LiveFeed({
   // Seeded with what the server actually rendered, so an article published between that
   // render and the first poll still registers as new.
   const baseline = useRef<FeedPulse>(initial);
+  const instance = useRef<string | null>(null);
   const [pending, setPending] = useState(false);
 
   const apply = useCallback(() => {
@@ -57,6 +58,16 @@ export default function LiveFeed({
         const response = await fetch("/api/feed/pulse", { cache: "no-store" });
         if (!response.ok || cancelled) return;
         const pulse: FeedPulse = await response.json();
+        // A release replaces the scripts this page is running. Refreshing in place would
+        // ask for a chunk that is no longer served and leave the reader on an error
+        // screen, so the page is reloaded outright instead.
+        if (pulse.instance) {
+          if (!instance.current) instance.current = pulse.instance;
+          else if (instance.current !== pulse.instance) {
+            window.location.reload();
+            return;
+          }
+        }
         const previous = baseline.current;
         if (pulse.latestId === previous.latestId && pulse.total === previous.total) return;
         baseline.current = pulse;

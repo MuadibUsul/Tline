@@ -39,6 +39,8 @@ export interface FeedPulse {
   latestId: string | null;
   latestAt: string | null;
   total: number;
+  /** Set by the route, not the query: which server answered. */
+  instance?: string;
 }
 
 /**

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
 import { formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale } from "@/lib/i18n";
-import { stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
+import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
 import { getSessionUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
@@ -85,7 +85,17 @@ function ArticleBody({ segments, fallback, locale, translated = false, figures =
       {sections.map((segment, index) => (
         <section className="article-section" key={segment.id}>
           {segment.heading && <h3>{display(segment.heading)}</h3>}
-          <div className="article-body">{display(segment.text)}</div>
+          <div className="article-body">
+            {articleBlocks(display(segment.text)).map((block, blockIndex) =>
+              block.kind === "list" ? (
+                <ul key={blockIndex}>
+                  {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+                </ul>
+              ) : (
+                <p key={blockIndex}>{block.text}</p>
+              ),
+            )}
+          </div>
           <Figures items={index === sections.length - 1 ? [...at(index), ...tail] : at(index)} />
         </section>
       ))}

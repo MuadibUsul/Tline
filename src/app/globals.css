@@ -303,7 +303,14 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .system-state{min-height:55vh;padding-top:clamp(64px,12vh,130px);padding-bottom:64px}
 .system-state h1{font-family:var(--serif);font-size:clamp(28px,4vw,42px);font-weight:500;margin-top:8px}
 .system-state p{max-width:56ch;color:var(--muted);margin:10px 0 22px}
-.article-body{white-space:pre-wrap;line-height:1.75}
+/* Laid out as the publisher wrote it: paragraphs and lists, not one preformatted run. */
+.article-body{line-height:1.75}
+.article-body p{margin:0 0 14px}
+.article-body p:last-child{margin-bottom:0}
+.article-body ul{margin:0 0 14px;padding-left:22px;display:flex;flex-direction:column;gap:7px}
+.article-body ul:last-child{margin-bottom:0}
+.article-body li{padding-left:2px}
+.article-body li::marker{color:var(--muted)}
 .article-section + .article-section{margin-top:20px}
 .article-section h3{margin:0 0 8px;color:var(--ink);font-size:17px;line-height:1.4}
 .article-figure{margin:18px 0;text-align:center}

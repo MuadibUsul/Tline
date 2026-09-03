@@ -461,6 +461,10 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
       const t = $(node).text().replace(/\s+/g, " ").trim();
       if (!t) return;
       if (/^h[234]$/.test(tag)) { flush(); cur = { heading: t.slice(0, 160), buf: [] }; }
+      // Bullets are marked so the page can lay them out as a list again, and kept even
+      // when short: the length rule below exists to drop navigation dressing, and a
+      // three-word forecast is exactly the kind of line it was throwing away.
+      else if (tag === "li") { if (t.length >= 2) cur.buf.push("• " + t); }
       else if (t.length > 40) cur.buf.push(t);
     });
     flush();

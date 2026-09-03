@@ -89,3 +89,39 @@ export function stripTrailingDisclaimer(text: string, priorContentLength = 0): s
 export function stripTrailingDisclaimerSegments<T extends { text: string }>(segments: T[]): T[] {
   return partitionArticleSegments(segments).body;
 }
+
+/** A run of body text as it should be laid out: a paragraph, or a list of items. */
+export type ArticleBlock = { kind: "paragraph"; text: string } | { kind: "list"; items: string[] };
+
+// Publishers mark bullets with any of these, and the ingest layer writes its own.
+const BULLET = /^\s*[•·▪◦‣–—*+]\s+|^\s*[-]\s+/;
+
+/**
+ * Groups a stored body into the blocks it was written as.
+ *
+ * The text arrives as one string because that is what a database column holds, but a
+ * report is paragraphs and bullet lists, and rendering it as a single run of preformatted
+ * text is what makes a page read as a wall. Consecutive bullets become one list, so the
+ * shape of the publisher's page survives the round trip.
+ */
+export function articleBlocks(text: string): ArticleBlock[] {
+  const blocks: ArticleBlock[] = [];
+  for (const raw of text.split(/\n{2,}/)) {
+    for (const line of raw.split("\n")) {
+      const value = line.trim();
+      if (!value) continue;
+      const bullet = BULLET.test(value);
+      const content = bullet ? value.replace(BULLET, "").trim() : value;
+      if (!content) continue;
+
+      const last = blocks[blocks.length - 1];
+      if (bullet) {
+        if (last?.kind === "list") last.items.push(content);
+        else blocks.push({ kind: "list", items: [content] });
+      } else {
+        blocks.push({ kind: "paragraph", text: content });
+      }
+    }
+  }
+  return blocks;
+}

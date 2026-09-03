@@ -323,3 +323,22 @@ test("follows only explicit same-origin listing pagination", () => {
   const html = `<a rel="next" href="/insights?page=2">Next</a><a href="https://vendor.example/insights?page=2">Next</a><a href="/careers?page=2">Next</a>`;
   assert.deepEqual(extractPaginationLinks(html, "https://bank.example/insights?page=1", "https://bank.example/insights"), ["https://bank.example/insights?page=2"]);
 });
+
+test("bullet lists survive extraction, short items included", () => {
+  const lead = "Policy is restrictive and the committee has signalled patience through the autumn. ".repeat(5);
+  const tail = "We keep the front end anchored and add duration on any concession into the auction. ".repeat(5);
+  const article = extractArticle(
+    `<html><head><title>Rates outlook | Bank</title></head><body><main><article><h1>Rates outlook</h1>` +
+      `<p>${lead}</p>` +
+      `<ul><li>Cut in December</li><li>Terminal rate 3.25%</li><li>Balance sheet runoff continues through the first quarter of next year</li></ul>` +
+      `<p>${tail}</p>` +
+      `</article></main></body></html>`,
+    "https://bank.example/research/rates-outlook",
+  );
+  const body = article.segments.map((segment) => segment.text).join("\n\n");
+  // Each item is marked so the page can lay the list out again, and the two short ones
+  // are kept — the length rule exists to drop navigation, not three-word forecasts.
+  assert.match(body, /• Cut in December/);
+  assert.match(body, /• Terminal rate 3\.25%/);
+  assert.match(body, /• Balance sheet runoff continues/);
+});

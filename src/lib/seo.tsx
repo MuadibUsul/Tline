@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LOCALES, localePath, type Locale } from "./i18n";
 import { siteUrl } from "./site";
 
 /**
@@ -11,8 +12,24 @@ import { siteUrl } from "./site";
  * which is not the same as keeping it out of the index if it is linked from elsewhere.
  */
 
-export function canonical(path: string): Metadata {
-  return { alternates: { canonical: new URL(path, siteUrl()).toString() } };
+/**
+ * The canonical address of a page, and the same page in the other language.
+ *
+ * Both languages have to be declared to each other, or a search engine treats them as
+ * unrelated pages and picks one. x-default points at English, which is what an address
+ * without a language resolves to for a reader with no stated preference.
+ */
+export function canonical(path: string, locale?: Locale): Metadata {
+  const base = siteUrl();
+  if (!locale) return { alternates: { canonical: new URL(path, base).toString() } };
+  const languages: Record<string, string> = {};
+  for (const other of LOCALES) {
+    languages[other === "zh-CN" ? "zh-Hans" : other] = new URL(localePath(other, path), base).toString();
+  }
+  languages["x-default"] = new URL(localePath("en", path), base).toString();
+  return {
+    alternates: { canonical: new URL(localePath(locale, path), base).toString(), languages },
+  };
 }
 
 /** For authenticated surfaces: keep them out of the index however they were reached. */

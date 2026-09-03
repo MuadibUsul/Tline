@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { formatDate, getLocale, tr } from "@/lib/i18n";
+import { formatDate, getLocale, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime, unitLabel } from "@/lib/macro/presentation";
 import ReleaseSpotlight, { type SpotlightRelease } from "./ReleaseSpotlight";
 import { getReleaseConsensusMap } from "@/lib/macro/releaseConsensus";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { ...canonical("/macro"), title: tr(locale, "Economic Data", "经济数据"), description: tr(locale, "Macro releases, indicators and the calendar ahead.", "宏观发布、指标与前瞻日历。") };
+  return { ...canonical("/macro", locale), title: tr(locale, "Economic Data", "经济数据"), description: tr(locale, "Macro releases, indicators and the calendar ahead.", "宏观发布、指标与前瞻日历。") };
 }
 
 const toNum = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? null : Number(value.toString()));
@@ -74,7 +74,7 @@ export default async function MacroPage() {
       <section className="blk">
         <div className="macro-calendar-head">
           <div className="section-t">{tr(locale, "Economic calendar · Beijing time", "经济日历 · 北京时间")}</div>
-          <Link className="minibtn" href="/macro/calendar">{tr(locale, "Full calendar ↗", "完整日历 ↗")}</Link>
+          <Link className="minibtn" href={localePath(locale, "/macro/calendar")}>{tr(locale, "Full calendar ↗", "完整日历 ↗")}</Link>
         </div>
         <div className="tbl-wrap"><table>
           <thead><tr>
@@ -94,7 +94,7 @@ export default async function MacroPage() {
                 <tr key={release.id} className={released ? "" : "macro-upcoming"}>
                   <td className="mono-cell">{beijingDateTime(release.scheduledAt, locale)}</td>
                   <td className="mono-cell">{release.countryCode}</td>
-                  <td className="inst"><Link href={`/macro/release/${release.id}`}>{nm(release.titleEn, release.titleZh)}</Link></td>
+                  <td className="inst"><Link href={localePath(locale, `/macro/release/${release.id}`)}>{nm(release.titleEn, release.titleZh)}</Link></td>
                   <td className="ctr" title={`${release.importance}/5`}>{"●".repeat(release.importance)}</td>
                   <td className="mono-cell num"><b>{released ? dec(value?.actualInitial) : tr(locale, "—", "—")}</b></td>
                   <td className="mono-cell num">{dec(value?.revisedPreviousAtRelease ?? value?.previousAtRelease)}</td>
@@ -121,7 +121,7 @@ export default async function MacroPage() {
               <tbody>
                 {rows.filter((row) => row.indicator.category === category).map(({ indicator, last, previous }) => (
                   <tr key={indicator.id}>
-                    <td className="inst"><Link href={`/macro/indicator/${indicator.canonicalKey}`}>{nm(indicator.nameEn, indicator.nameZh)}</Link><small className="mono" style={{ display: "block", color: "var(--faint)" }}>{unitLabel(indicator.unit, locale)}</small></td>
+                    <td className="inst"><Link href={localePath(locale, `/macro/indicator/${indicator.canonicalKey}`)}>{nm(indicator.nameEn, indicator.nameZh)}</Link><small className="mono" style={{ display: "block", color: "var(--faint)" }}>{unitLabel(indicator.unit, locale)}</small></td>
                     <td className="mono-cell num"><b>{dec(last?.value)}</b></td>
                     <td className="mono-cell num" style={{ color: "var(--faint)" }}>{dec(previous?.value)}</td>
                     <td className="mono-cell">{last ? formatDate(last.period, locale) : "—"}</td>

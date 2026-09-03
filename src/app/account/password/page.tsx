@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { noIndex } from "@/lib/seo";
 import { getSessionUser } from "@/lib/auth";
-import { getLocale, tr } from "@/lib/i18n";
+import { getLocale, tr, localePath } from "@/lib/i18n";
 import { PASSWORD_MIN_LENGTH } from "@/lib/password";
 import PasswordForm from "./PasswordForm";
 
@@ -37,6 +37,7 @@ export default async function PasswordPage() {
 
       <PasswordForm
         hasPassword={hasPassword}
+        home={localePath(locale, "/")}
         labels={{
           current: tr(locale, "Current password", "当前密码"),
           next: tr(locale, `New password (at least ${PASSWORD_MIN_LENGTH} characters)`, `新密码(至少 ${PASSWORD_MIN_LENGTH} 位)`),

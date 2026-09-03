@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getInstitutionAccuracy } from "@/lib/forecast";
-import { assetName, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
+import { assetName, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { prisma } from "@/lib/db";
 import { canonical } from "@/lib/seo";
 
@@ -21,7 +21,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
       `How ${name}'s published forecasts have settled against what actually happened: direction, target and error, forecast by forecast.`,
       `${name}已发布的预测与实际结果的对照:方向、目标价与误差,逐条可查。`,
     ),
-    ...canonical(`/institution/${slug}/accuracy`),
+    ...canonical(`/institution/${slug}/accuracy`, locale),
   };
 }
 
@@ -45,7 +45,7 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
           <span>{tr(locale, "Direction", "方向") } <b className="mono">{data.directionAccuracy === null ? "—" : `${(data.directionAccuracy * 100).toFixed(1)}%`}</b></span>
           <span>{tr(locale, "Mean target error", "平均目标误差")} <b className="mono">{data.meanPercentageError === null ? "—" : `${data.meanPercentageError.toFixed(2)}%`}</b></span>
         </div>
-        <Link className="minibtn" href={`/institution/${params.slug}`}>← {tr(locale, "Institution", "机构")}</Link>
+        <Link className="minibtn" href={localePath(locale, `/institution/${params.slug}`)}>← {tr(locale, "Institution", "机构")}</Link>
       </div>
 
       <section className="blk">

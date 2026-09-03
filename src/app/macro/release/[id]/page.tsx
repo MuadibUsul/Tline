@@ -3,7 +3,7 @@ import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, type Locale } from "@/lib/i18n";
+import { getLocale, tr, type Locale, localePath } from "@/lib/i18n";
 import { actualText, consensusText, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
 import { getReleaseConsensus } from "@/lib/macro/releaseConsensus";
 import type { ForecastConsensus } from "@/lib/macro/forecasts";
@@ -27,7 +27,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
       `${title}: consensus before the release, the figures as published, and how they revised.`,
       `${title}:发布前的市场共识、实际公布值,以及后续修订。`,
     ),
-    ...canonical(`/macro/release/${id}`),
+    ...canonical(`/macro/release/${id}`, locale),
   };
 }
 const parsed = (value: string | null) => { try { return value ? JSON.parse(value) as ParsedPolicyDocument : null; } catch { return null; } };
@@ -88,9 +88,9 @@ export default async function MacroReleasePage(props: { params: Promise<{ id: st
   const surpriseLabel = surprise === null ? "" : surprise > 0 ? tr(locale, "above consensus", "高于共识") : surprise < 0 ? tr(locale, "below consensus", "低于共识") : tr(locale, "in line", "符合共识");
   const analysis = locale === "zh-CN" ? release.analysisZh ?? release.analysisEn : release.analysisEn;
 
-  return <main className="wrap"><div className="page-head"><div className="eyebrow">{release.countryCode} · {release.agency} · {release.status}</div><h1>{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}</h1><div className="deltas"><span>{tr(locale, "Scheduled", "计划")}: {macroDateTime(release.scheduledAt, locale, release.sourceTimezone)}</span><span>{tr(locale, "Released", "发布")}: {release.releasedAt ? macroDateTime(release.releasedAt, locale, release.sourceTimezone) : tr(locale, "Not released", "尚未发布")}</span></div><div className="tag-row"><Link className="minibtn" href="/macro/calendar">← {tr(locale, "Calendar", "日历")}</Link>{release.sourceUrl && <a className="minibtn p" href={release.sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Official source ↗", "官方来源 ↗")}</a>}</div></div>
+  return <main className="wrap"><div className="page-head"><div className="eyebrow">{release.countryCode} · {release.agency} · {release.status}</div><h1>{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}</h1><div className="deltas"><span>{tr(locale, "Scheduled", "计划")}: {macroDateTime(release.scheduledAt, locale, release.sourceTimezone)}</span><span>{tr(locale, "Released", "发布")}: {release.releasedAt ? macroDateTime(release.releasedAt, locale, release.sourceTimezone) : tr(locale, "Not released", "尚未发布")}</span></div><div className="tag-row"><Link className="minibtn" href={localePath(locale, "/macro/calendar")}>← {tr(locale, "Calendar", "日历")}</Link>{release.sourceUrl && <a className="minibtn p" href={release.sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Official source ↗", "官方来源 ↗")}</a>}</div></div>
 
-    <section className="blk"><div className="section-t">{tr(locale, "Release values", "发布值")}</div><div className="tbl-wrap"><table><thead><tr><th>{tr(locale, "Indicator", "指标")}</th><th>{tr(locale, "Period", "数据期")}</th><th>{tr(locale, "Previous", "前值")}</th><th>{tr(locale, "Revised previous", "修订前值")}</th><th>{tr(locale, "Consensus", "共识")}</th><th>{tr(locale, "Actual initial", "实际初值")}</th></tr></thead><tbody>{release.values.map((value) => <tr key={value.id}><td className="inst"><Link href={`/macro/indicator/${value.indicator.canonicalKey}`}>{locale === "zh-CN" ? value.indicator.nameZh ?? value.indicator.nameEn : value.indicator.nameEn}</Link></td><td className="mono-cell">{value.observationPeriod.toISOString().slice(0, 10)}</td><td className="mono-cell">{macroNumber(value.previousAtRelease, locale)}</td><td className="mono-cell">{macroNumber(value.revisedPreviousAtRelease, locale)}</td><td className="mono-cell">{consensusText(value.consensusAtRelease, locale)}</td><td className="mono-cell">{actualText(value.actualInitial, released, locale)}</td></tr>)}</tbody></table></div></section>
+    <section className="blk"><div className="section-t">{tr(locale, "Release values", "发布值")}</div><div className="tbl-wrap"><table><thead><tr><th>{tr(locale, "Indicator", "指标")}</th><th>{tr(locale, "Period", "数据期")}</th><th>{tr(locale, "Previous", "前值")}</th><th>{tr(locale, "Revised previous", "修订前值")}</th><th>{tr(locale, "Consensus", "共识")}</th><th>{tr(locale, "Actual initial", "实际初值")}</th></tr></thead><tbody>{release.values.map((value) => <tr key={value.id}><td className="inst"><Link href={localePath(locale, `/macro/indicator/${value.indicator.canonicalKey}`)}>{locale === "zh-CN" ? value.indicator.nameZh ?? value.indicator.nameEn : value.indicator.nameEn}</Link></td><td className="mono-cell">{value.observationPeriod.toISOString().slice(0, 10)}</td><td className="mono-cell">{macroNumber(value.previousAtRelease, locale)}</td><td className="mono-cell">{macroNumber(value.revisedPreviousAtRelease, locale)}</td><td className="mono-cell">{consensusText(value.consensusAtRelease, locale)}</td><td className="mono-cell">{actualText(value.actualInitial, released, locale)}</td></tr>)}</tbody></table></div></section>
 
     <section className="blk"><div className="section-t">{tr(locale, "Institutional consensus (mined from bank research)", "机构预期共识（自投行研报清洗）")}</div>
       {consensus ? <>

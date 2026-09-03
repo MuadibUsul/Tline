@@ -4,7 +4,7 @@ import { featuredConsensus, feedPulse, importantReleasesThisWeek, latestFeed, mo
 import { FeedCard, Delta } from "./_components/ui";
 import SearchBox from "./_components/SearchBox";
 import LiveFeed from "./_components/LiveFeed";
-import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
+import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
 import { JsonLd, canonical, siteJsonLd } from "@/lib/seo";
 
@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   );
   return {
     description,
-    ...canonical("/"),
+    ...canonical("/", locale),
     openGraph: { type: "website", description },
   };
 }
@@ -56,7 +56,7 @@ export default async function Home() {
         <div className="section-t">{tr(locale, "Market Consensus · current or latest available 24h", "市场共识 · 当前或最近可用24小时")}</div>
         <div className="ctiles">
           {cards.map((c) => (
-            <Link key={c.ticker} href={`/asset/${c.ticker}`} className="ctile">
+            <Link key={c.ticker} href={localePath(locale, `/asset/${c.ticker}`)} className="ctile">
               <div className="a">{assetName(c.name, locale, c.ticker)}</div>
               <div className="s tnum">
                 {c.score}
@@ -89,7 +89,7 @@ export default async function Home() {
             <div className="section-t">{tr(locale, "Key Data This Week · Beijing time", "本周重要数据 · 北京时间")}</div>
             <div className="rowlist">
               {thisWeek.map((release) => (
-                <Link key={release.id} href={`/macro/release/${release.id}`} className="r" style={{ textDecoration: "none" }}>
+                <Link key={release.id} href={localePath(locale, `/macro/release/${release.id}`)} className="r" style={{ textDecoration: "none" }}>
                   <span className="inst">{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}<small className="mono" style={{ display: "block", color: "var(--faint)" }}>{release.countryCode} · {"●".repeat(release.importance)}</small></span>
                   <span className="mono" style={{ whiteSpace: "nowrap", color: "var(--muted)" }}>{beijingDateTime(release.scheduledAt, locale)}</span>
                 </Link>
@@ -101,7 +101,7 @@ export default async function Home() {
             <div className="section-t">{tr(locale, "Largest View Changes · 24h", "最大观点变化 · 24小时")}</div>
             <div className="rowlist">
               {changes.map((c) => (
-                <Link key={c.ticker} href={`/asset/${c.ticker}`} className="r" style={{ textDecoration: "none" }}>
+                <Link key={c.ticker} href={localePath(locale, `/asset/${c.ticker}`)} className="r" style={{ textDecoration: "none" }}>
                   <span className="inst">{assetName(c.name, locale, c.ticker)}</span>
                   <span className={`n ${c.change > 0 ? "up" : "down"}`}>{c.change > 0 ? "+" : "−"}{Math.abs(c.change)}</span>
                 </Link>
@@ -113,7 +113,7 @@ export default async function Home() {
             <div className="section-t">{tr(locale, "Most Active · 30d", "最活跃机构 · 30天")}</div>
             <div className="rowlist">
               {active.map((x) => (
-                <Link key={x.inst.id} href={`/institution/${x.inst.slug}`} className="r">
+                <Link key={x.inst.id} href={localePath(locale, `/institution/${x.inst.slug}`)} className="r">
                   <span className="inst">{institutionName(x.inst.name, locale)}</span>
                   <span className="n">{x.count}</span>
                 </Link>

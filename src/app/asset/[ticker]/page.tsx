@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getAssetView, getAssetTimeline } from "@/lib/queries";
 import { FeedCard, DirChip, Delta, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
-import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
+import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
@@ -71,7 +71,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
             <tbody>
               {consensus.contributors.map((c, i) => (
                 <tr key={i}>
-                  <td className="inst"><Link href={`/institution/${c.slug}`}>{institutionName(c.institutionName, locale)}</Link></td>
+                  <td className="inst"><Link href={localePath(locale, `/institution/${c.slug}`)}>{institutionName(c.institutionName, locale)}</Link></td>
                   <td><DirChip direction={c.direction} locale={locale} showLabel={false} /></td>
                   <td className="mono-cell">{c.target ? `$${c.target.toLocaleString()}` : "—"}</td>
                   <td className="mono-cell" style={{ color: "var(--faint)" }}>{c.previousTarget ? `$${c.previousTarget.toLocaleString()}` : "—"}</td>
@@ -89,7 +89,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
           <div className="changes">
             {timeline.map((t) => (
               <div key={t.slug} className="chg">
-                <Link href={`/institution/${t.slug}`} className="chg-inst">{institutionName(t.institution, locale)}</Link>
+                <Link href={localePath(locale, `/institution/${t.slug}`)} className="chg-inst">{institutionName(t.institution, locale)}</Link>
                 <div className="chg-body">
                   {t.hasTargetMove && (
                     <div className="chain">

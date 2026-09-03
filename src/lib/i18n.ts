@@ -8,8 +8,45 @@ export function resolveLocale(cookie?: string, acceptLanguage?: string | null): 
   return /^zh\b/i.test(acceptLanguage?.trim() ?? "") ? "zh-CN" : "en";
 }
 
+export const LOCALES: Locale[] = ["en", "zh-CN"];
+/** How each locale is written in a URL: /en/research, /zh/research. */
+export const LOCALE_SEGMENT: Record<Locale, string> = { en: "en", "zh-CN": "zh" };
+
+/** The locale a path names, or null when it names none. */
+export function localeFromPath(pathname: string): Locale | null {
+  const segment = pathname.split("/")[1];
+  if (segment === "zh") return "zh-CN";
+  if (segment === "en") return "en";
+  return null;
+}
+
+/** A path with any language prefix removed, for comparing against a route. */
+export function stripLocale(pathname: string): string {
+  if (!localeFromPath(pathname)) return pathname;
+  const rest = pathname.split("/").slice(2).join("/");
+  return rest ? "/" + rest : "/";
+}
+
+/** The same page under a given locale, with any prefix already there replaced. */
+export function localePath(locale: Locale, path: string): string {
+  if (!path.startsWith("/")) return path;
+  const bare = localeFromPath(path) ? `/${path.split("/").slice(2).join("/")}` : path;
+  const suffix = bare === "/" ? "" : bare.replace(/\/$/, "");
+  return `/${LOCALE_SEGMENT[locale]}${suffix}`;
+}
+
+/**
+ * The locale for this request, taken from the address.
+ *
+ * It used to come from a cookie, so one address served either language depending on who
+ * asked — which meant a search engine could only ever index one of them, and every
+ * Chinese translation was out of reach of search entirely. The path decides now; the
+ * cookie is consulted only to choose where an address without a prefix should go.
+ */
 export async function getLocale(): Promise<Locale> {
   const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
+  const fromPath = localeFromPath(headerStore.get("x-pathname") ?? "");
+  if (fromPath) return fromPath;
   return resolveLocale(cookieStore.get(LOCALE_COOKIE)?.value, headerStore.get("accept-language"));
 }
 

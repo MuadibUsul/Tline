@@ -3,13 +3,13 @@ import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { computeConsensusMany } from "@/lib/consensus";
-import { assetName, formatDate, getLocale, tr } from "@/lib/i18n";
+import { assetName, formatDate, getLocale, tr, localePath } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { ...canonical("/markets"), title: tr(locale, "Markets", "市场"), description: tr(locale, "Market instruments tracked alongside institutional views.", "与机构观点并列跟踪的市场标的。") };
+  return { ...canonical("/markets", locale), title: tr(locale, "Markets", "市场"), description: tr(locale, "Market instruments tracked alongside institutional views.", "与机构观点并列跟踪的市场标的。") };
 }
 
 const CLASSES = ["equity", "rate", "fx", "commodity", "crypto", "macro"] as const;
@@ -32,7 +32,7 @@ export default async function MarketsPage() {
               <div className="section-t">{labels[cls]}</div>
               <div className="rowlist">
                 {group.map(({ a, c }) => (
-                  <Link key={a.ticker} href={`/asset/${a.ticker}`} className="r">
+                  <Link key={a.ticker} href={localePath(locale, `/asset/${a.ticker}`)} className="r">
                     <span className="inst">{assetName(a.name, locale, a.ticker)} <span className="mono" style={{ color: "var(--faint)", fontSize: 11 }}>{a.ticker}</span></span>
                     {c ? <span className={`n ${c.tone === "bull" ? "up" : c.tone === "bear" ? "down" : "flat"}`}>{c.score} · {c.tone === "bull" ? tr(locale, c.label, "看多") : c.tone === "bear" ? tr(locale, c.label, "看空") : tr(locale, c.label, "中性")}{c.isFallback ? ` · ${tr(locale, "as of", "截至")} ${formatDate(c.windowEnd, locale)}` : ""}</span>
                        : <span className="mono" style={{ color: "var(--faint)" }}>{tr(locale, "no data", "暂无数据")}</span>}

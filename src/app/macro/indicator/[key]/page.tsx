@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { formatDate, getLocale, tr } from "@/lib/i18n";
+import { formatDate, getLocale, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
 import IndicatorChart from "./IndicatorChart";
 import { canonical } from "@/lib/seo";
@@ -25,7 +25,7 @@ export async function generateMetadata(props: { params: Promise<{ key: string }>
       `${name}: the released series, each revision, and what institutions forecast before it landed.`,
       `${name}:历史发布序列、每次修订,以及发布前各机构的预测。`,
     ),
-    ...canonical(`/macro/indicator/${key}`),
+    ...canonical(`/macro/indicator/${key}`, locale),
   };
 }
 
@@ -107,7 +107,7 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
           <span>{tr(locale, "Updated", "更新")}: {latest ? formatDate(latest.period, locale) : "N/A"}</span>
           {nextRelease && <span>{tr(locale, "Next release", "下次发布")}: {beijingDateTime(nextRelease.scheduledAt, locale)} ({tr(locale, "Beijing", "北京时间")})</span>}
         </div>
-        <Link href="/macro" className="minibtn" style={{ alignSelf: "flex-start" }}>← {tr(locale, "Economic data", "经济数据")}</Link>
+        <Link href={localePath(locale, "/macro")} className="minibtn" style={{ alignSelf: "flex-start" }}>← {tr(locale, "Economic data", "经济数据")}</Link>
       </div>
 
       {series.length >= 2 && (

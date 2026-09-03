@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { directionLabel } from "@/lib/assets";
-import { articleTimestamp, assetName, institutionName, localizeChineseContent, relativeTime, tr, type Locale } from "@/lib/i18n";
+import { articleTimestamp, assetName, institutionName, localizeChineseContent, relativeTime, tr, type Locale, localePath } from "@/lib/i18n";
 
 export const relTime = (d: Date, locale: Locale = "en") => relativeTime(d, locale);
 
@@ -42,12 +42,12 @@ export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale
       <div className="top">
         <b>{institutionName(a.institution.name, locale)}</b> · <span>{relTime(articleTimestamp(a.publishedAt, a.createdAt), locale)}</span>
       </div>
-      <h3 className="ttl"><Link href={`/research/${a.id}`}>{locale === "zh-CN" && a.translations?.[0] ? localizeChineseContent(a.translations[0].title) : a.title}</Link></h3>
+      <h3 className="ttl"><Link href={localePath(locale, `/research/${a.id}`)}>{locale === "zh-CN" && a.translations?.[0] ? localizeChineseContent(a.translations[0].title) : a.title}</Link></h3>
       <div className="tags">
         {a.articleAssets.slice(0, 4).map((aa) => {
           const direction = directionLabel(aa.direction);
           const arrow = direction.tone === "bull" ? "▲" : direction.tone === "bear" ? "▼" : "◆";
-          return <Link key={aa.asset.ticker} href={`/asset/${aa.asset.ticker}`} className={`chip ${direction.tone}`}>{aa.asset.ticker} {arrow}</Link>;
+          return <Link key={aa.asset.ticker} href={localePath(locale, `/asset/${aa.asset.ticker}`)} className={`chip ${direction.tone}`}>{aa.asset.ticker} {arrow}</Link>;
         })}
       </div>
       {(primary?.target || primary?.previousTarget) && (
@@ -61,7 +61,7 @@ export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale
         </div>
       )}
       <div className="act">
-        <Link href={`/research/${a.id}`} className="minibtn p">{tr(locale, "View analysis", "查看分析")}</Link>
+        <Link href={localePath(locale, `/research/${a.id}`)} className="minibtn p">{tr(locale, "View analysis", "查看分析")}</Link>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Official source ↗", "官网原文 ↗")}</a>
       </div>
     </article>
@@ -86,11 +86,11 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
   return (
     <article className="research-card">
       <div className="research-card-meta">
-        <Link href={`/institution/${a.institution.slug}`}>{institutionName(a.institution.name, locale)}</Link>
+        <Link href={localePath(locale, `/institution/${a.institution.slug}`)}>{institutionName(a.institution.name, locale)}</Link>
         <span>·</span>
         <span>{relTime(articleTimestamp(a.publishedAt, a.createdAt), locale)}</span>
       </div>
-      <h2><Link href={`/research/${a.id}`}>{title}</Link></h2>
+      <h2><Link href={localePath(locale, `/research/${a.id}`)}>{title}</Link></h2>
       {localizedPreview && <p>{localizedPreview}</p>}
       <div className="research-card-assets">
         {a.articleAssets.slice(0, 4).map((articleAsset) => {
@@ -100,7 +100,7 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
           return (
             <Link
               key={articleAsset.asset.ticker}
-              href={`/asset/${articleAsset.asset.ticker}`}
+              href={localePath(locale, `/asset/${articleAsset.asset.ticker}`)}
               className={`chip ${direction.tone}`}
               title={`${assetName(articleAsset.asset.name, locale, articleAsset.asset.ticker)} · ${label}`}
               aria-label={`${assetName(articleAsset.asset.name, locale, articleAsset.asset.ticker)} · ${label}`}
@@ -112,7 +112,7 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
         {a.articleAssets.length > 4 && <span className="chip gray">+{a.articleAssets.length - 4}</span>}
       </div>
       <div className="research-card-actions">
-        <Link href={`/research/${a.id}`} className="minibtn p">{tr(locale, "Read", "阅读")}</Link>
+        <Link href={localePath(locale, `/research/${a.id}`)} className="minibtn p">{tr(locale, "Read", "阅读")}</Link>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Source ↗", "官网 ↗")}</a>
       </div>
     </article>

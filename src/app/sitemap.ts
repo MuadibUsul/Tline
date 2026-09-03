@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
 import { siteUrl } from "@/lib/site";
+import { LOCALES, localePath } from "@/lib/i18n";
 
 // Rendered per request like every other route: the production image is built without a
 // database, so prerendering this at build time cannot reach Prisma.
@@ -31,7 +32,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     prisma.macroIndicator.findMany({ where: { enabled: true }, select: { canonicalKey: true, updatedAt: true } }),
   ]);
 
-  return [
+  /**
+   * Every page in both languages.
+   *
+   * Each language has its own address now, so listing only one would leave the other
+   * undiscoverable — which is the whole reason the addresses were split.
+   */
+  const pages: MetadataRoute.Sitemap = [
     ...STATIC_ROUTES.map(([path, changeFrequency, priority]) => ({
       url: `${base}${path}`,
       lastModified: new Date(),
@@ -77,4 +84,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     })),
   ];
+
+  return pages.flatMap((page) => {
+    const path = page.url.startsWith(base) ? page.url.slice(base.length) || "/" : page.url;
+    return LOCALES.map((locale) => ({ ...page, url: base + localePath(locale, path) }));
+  });
 }

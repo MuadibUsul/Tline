@@ -4,7 +4,7 @@ import { noIndex } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
+import { getLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { queueContentRetry, queueSourceRetry, setSourceMonitoring } from "./actions";
 import { pipelineHealth } from "@/../scripts/watchdog";
@@ -58,7 +58,7 @@ export default async function AdminPage() {
   return <main className="wrap admin-page">
     <header className="page-head admin-head">
       <div><div className="eyebrow">Operations Console</div><h1>{tr(locale, "Operations", "运营后台")}</h1><p className="sub">{tr(locale, "Source health, pipeline runs and editorial review in one place.", "统一查看来源健康度、流水线任务和内容审核。")}</p></div>
-      <div className="tag-row"><span className="chip acc">{user.role}</span><Link className="minibtn" href="/admin/api-keys">{tr(locale, "API keys", "API 密钥")} →</Link><a className="minibtn" href="/api/health" target="_blank" rel="noreferrer">Health JSON ↗</a></div>
+      <div className="tag-row"><span className="chip acc">{user.role}</span><Link className="minibtn" href={localePath(locale, "/admin/api-keys")}>{tr(locale, "API keys", "API 密钥")} →</Link><a className="minibtn" href={localePath(locale, "/api/health")} target="_blank" rel="noreferrer">Health JSON ↗</a></div>
     </header>
 
     <section className="admin-stats" aria-label={tr(locale, "Operations summary", "运营概览")}>
@@ -79,7 +79,7 @@ export default async function AdminPage() {
       <section className="blk"><div className="section-t"><span>{tr(locale, "Source monitoring", "来源监控")}</span><span className="chip gray">{sources.length}</span></div>
         <div className="tbl-wrap"><table className="admin-table"><thead><tr><th>{tr(locale, "Institution", "机构")}</th><th>{tr(locale, "Status", "状态")}</th><th>{tr(locale, "Last success", "最近成功")}</th><th>{tr(locale, "Policy", "合规策略")}</th><th>{tr(locale, "Action", "操作")}</th></tr></thead><tbody>{sources.map((source) => {
           const compliant = ["allowed", "delayed"].includes(source.crawlPolicy);
-          return <tr key={source.id}><td className="inst"><Link href={`/institution/${source.slug}`}>{source.name}</Link><small>{source.updateFreq ?? "—"}</small></td><td><span className={`chip ${tone(source.lastCrawlStatus)}`}>{source.monitoringEnabled ? source.lastCrawlStatus ?? "new" : source.consecutiveFailures > 0 ? "circuit_open" : "paused"}</span>{source.lastCrawlMessage && <small title={source.lastCrawlMessage}>{source.consecutiveFailures ? `${source.consecutiveFailures}× · ` : ""}{source.lastCrawlMessage}</small>}</td><td className="mono-cell">{age(source.lastSuccessAt, locale)}</td><td><span className={`chip ${compliant ? "gray" : "bear"}`}>{source.crawlPolicy}</span></td><td><div className="admin-actions">{user.role === "admin" && compliant && <><form action={setSourceMonitoring}><input type="hidden" name="id" value={source.id}/><input type="hidden" name="enabled" value={source.monitoringEnabled ? "false" : "true"}/><button className="minibtn" type="submit">{source.monitoringEnabled ? tr(locale, "Pause", "暂停") : tr(locale, "Resume", "恢复")}</button></form>{["failed", "paused"].includes(source.lastCrawlStatus ?? "") && <form action={queueSourceRetry}><input type="hidden" name="id" value={source.id}/><button className="minibtn p" type="submit">{tr(locale, "Next run", "加入下一轮")}</button></form>}</>}</div></td></tr>;
+          return <tr key={source.id}><td className="inst"><Link href={localePath(locale, `/institution/${source.slug}`)}>{source.name}</Link><small>{source.updateFreq ?? "—"}</small></td><td><span className={`chip ${tone(source.lastCrawlStatus)}`}>{source.monitoringEnabled ? source.lastCrawlStatus ?? "new" : source.consecutiveFailures > 0 ? "circuit_open" : "paused"}</span>{source.lastCrawlMessage && <small title={source.lastCrawlMessage}>{source.consecutiveFailures ? `${source.consecutiveFailures}× · ` : ""}{source.lastCrawlMessage}</small>}</td><td className="mono-cell">{age(source.lastSuccessAt, locale)}</td><td><span className={`chip ${compliant ? "gray" : "bear"}`}>{source.crawlPolicy}</span></td><td><div className="admin-actions">{user.role === "admin" && compliant && <><form action={setSourceMonitoring}><input type="hidden" name="id" value={source.id}/><input type="hidden" name="enabled" value={source.monitoringEnabled ? "false" : "true"}/><button className="minibtn" type="submit">{source.monitoringEnabled ? tr(locale, "Pause", "暂停") : tr(locale, "Resume", "恢复")}</button></form>{["failed", "paused"].includes(source.lastCrawlStatus ?? "") && <form action={queueSourceRetry}><input type="hidden" name="id" value={source.id}/><button className="minibtn p" type="submit">{tr(locale, "Next run", "加入下一轮")}</button></form>}</>}</div></td></tr>;
         })}</tbody></table></div>
       </section>
 
@@ -88,7 +88,7 @@ export default async function AdminPage() {
           ...analysisReview.map((item) => ({ key: `a-${item.id}`, article: item.article, kind: "analysis" as const })),
           ...translationReview.map((item) => ({ key: `t-${item.id}`, article: item.article, kind: "translation" as const })),
         ].map((item) => <div className="admin-review-row" key={item.key}>
-          <Link href={`/research/${item.article.id}`}><span><b>{item.article.title}</b><small>{item.article.institution.name} · {item.kind}</small></span><span className="chip bear">needs_review</span></Link>
+          <Link href={localePath(locale, `/research/${item.article.id}`)}><span><b>{item.article.title}</b><small>{item.article.institution.name} · {item.kind}</small></span><span className="chip bear">needs_review</span></Link>
           {/* The rerun lives here rather than only on the report: this list is where an
               operator decides, and a decision that costs a page visit is not taken. */}
           {user.role === "admin" && <form action={queueContentRetry}>

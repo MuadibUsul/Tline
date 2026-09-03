@@ -37,6 +37,8 @@ function countdown(targetMs: number, now: number, zh: boolean) {
 
 export default function ReleaseSpotlight({ releases, locale, initialNow }: { releases: SpotlightRelease[]; locale: string; initialNow: number }) {
   const zh = locale === "zh-CN";
+  // The address carries the language, so links from here must keep it.
+  const localePrefix = zh ? "/zh" : "/en";
   const router = useRouter();
   const [now, setNow] = useState(initialNow);
 
@@ -69,7 +71,7 @@ export default function ReleaseSpotlight({ releases, locale, initialNow }: { rel
 
   const flank = (r: (typeof items)[number] | null, side: string) =>
     r && (
-      <a className={`spot-flank spot-${side}`} href={`/macro/release/${r.id}`}>
+      <a className={`spot-flank spot-${side}`} href={`${localePrefix}/macro/release/${r.id}`}>
         <div className="spot-flank-top">{r.countryCode} · {"●".repeat(r.importance)}</div>
         <div className="spot-flank-name">{name(r)}</div>
         <div className="spot-flank-meta">
@@ -82,7 +84,7 @@ export default function ReleaseSpotlight({ releases, locale, initialNow }: { rel
   return (
     <section className="spotlight" aria-label={zh ? "重点数据聚焦" : "Data spotlight"}>
       {flank(recent, "recent")}
-      <a className={`spot-focal ${live ? "spot-live" : ""}`} href={`/macro/release/${focal.id}`}>
+      <a className={`spot-focal ${live ? "spot-live" : ""}`} href={`${localePrefix}/macro/release/${focal.id}`}>
         <div className="spot-eyebrow">
           <span>{focal.countryCode} · {"●".repeat(focal.importance)}</span>
           <span className={`spot-status ${live ? "on" : ""}`}>{live ? (zh ? "聚焦中" : "LIVE") : released(focal) ? (zh ? "已公布" : "released") : (zh ? "即将公布" : "upcoming")}</span>

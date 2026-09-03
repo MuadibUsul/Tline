@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ResearchCard } from "@/app/_components/ui";
 import LiveFeed from "@/app/_components/LiveFeed";
 import { prisma } from "@/lib/db";
-import { assetName, getLocale, institutionName, tr } from "@/lib/i18n";
+import { assetName, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
 import { feedPulse } from "@/lib/queries";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { ...canonical("/research"), title: tr(locale, "Research", "研报"), description: tr(locale, "Every published institutional report the pipeline has verified.", "流水线已核验的全部公开机构研报。") };
+  return { ...canonical("/research", locale), title: tr(locale, "Research", "研报"), description: tr(locale, "Every published institutional report the pipeline has verified.", "流水线已核验的全部公开机构研报。") };
 }
 
 const ASSET_CLASSES: Array<[string, string]> = [["equity", "股票"], ["rate", "利率"], ["fx", "外汇"], ["commodity", "大宗商品"], ["crypto", "加密资产"], ["macro", "宏观"]];
@@ -117,9 +117,9 @@ export default async function ResearchIndex(
         {feed.length ? <div className="research-grid">{feed.map((article) => <ResearchCard key={article.id} a={article} locale={locale} />)}</div> : <div className="empty-state">{tr(locale, "No research matches these filters.", "没有符合筛选条件的研报。")}</div>}
         {pages > 1 && (
           <nav className="pagination" aria-label={tr(locale, "Research pages", "研报分页")}>
-            {page > 1 && <Link href={`/research?${query.toString()}&page=${page - 1}`}>← {tr(locale, "Previous", "上一页")}</Link>}
+            {page > 1 && <Link href={localePath(locale, `/research?${query.toString()}&page=${page - 1}`)}>← {tr(locale, "Previous", "上一页")}</Link>}
             <span>{tr(locale, `Page ${page} / ${pages}`, `第 ${page} / ${pages} 页`)}</span>
-            {page < pages && <Link href={`/research?${query.toString()}&page=${page + 1}`}>{tr(locale, "Next", "下一页")} →</Link>}
+            {page < pages && <Link href={localePath(locale, `/research?${query.toString()}&page=${page + 1}`)}>{tr(locale, "Next", "下一页")} →</Link>}
           </nav>
         )}
       </section>

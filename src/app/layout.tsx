@@ -10,7 +10,7 @@ import { isFormalAuthConfigured } from "@/lib/auth-config";
 import OAuthSignOutButton from "./_components/OAuthSignOutButton";
 import LanguageToggle from "./_components/LanguageToggle";
 import MobileNav, { type MobileNavItem } from "./_components/MobileNav";
-import { getLocale, tr } from "@/lib/i18n";
+import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { siteUrl } from "@/lib/site";
 
@@ -41,14 +41,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // An account enrolled by email link has no password yet. Sending it straight to the
   // page that sets one is what keeps email down to enrolment and recovery: without this
   // the next sign-in would need another message.
-  const pathname = (await headers()).get("x-pathname") ?? "";
+  // Compared without its language prefix: the header carries the address as asked for,
+  // so "/zh/account/password" would otherwise never match the page it redirects to.
+  const pathname = stripLocale((await headers()).get("x-pathname") ?? "");
   // An empty path means the middleware did not run; redirecting on that guess would
   // loop the page onto itself, so the gate stays shut rather than trapping the browser.
   if (pathname && user && formalAuth && !user.passwordHash && !pathname.startsWith("/account/password")) {
-    redirect("/account/password");
+    redirect(localePath(locale, "/account/password"));
   }
 
-  const navItems: MobileNavItem[] = [
+  const navItems: MobileNavItem[] = ([
     { href: "/", label: tr(locale, "Home", "首页") },
     { href: "/markets", label: tr(locale, "Markets", "市场") },
     { href: "/macro", label: tr(locale, "Economic Data", "经济数据") },
@@ -57,7 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     { href: "/consensus", label: tr(locale, "Consensus", "共识") },
     { href: "/watchlist", label: tr(locale, "Monitoring", "监控") },
     ...(can(user, "admin.review") ? [{ href: "/admin", label: tr(locale, "Operations", "运营") }] : []),
-  ];
+  ] as MobileNavItem[]).map((item) => ({ ...item, href: localePath(locale, item.href) }));
 
   const account = user && formalAuth ? (
     <div className="account-controls">
@@ -70,7 +72,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <button type="submit" className="minibtn">{tr(locale, "Sign out", "退出")}</button>
     </form>
   ) : (
-    <Link href="/signin" className="minibtn">{tr(locale, "Sign in", "登录")}</Link>
+    <Link href={localePath(locale, "/signin")} className="minibtn">{tr(locale, "Sign in", "登录")}</Link>
   );
 
   return (
@@ -78,7 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <div className="topbar">
           <div className="wrap inner">
-            <Link href="/" className="brand">
+            <Link href={localePath(locale, "/")} className="brand">
               <span className="glyph">II</span> <span className="brand-name">{tr(locale, "Institutional Intelligence", "全球机构情报")}</span>
             </Link>
             <nav className="nav" aria-label={tr(locale, "Primary", "主导航")}>

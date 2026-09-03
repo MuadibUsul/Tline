@@ -3,7 +3,7 @@ import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { relTime } from "@/app/_components/ui";
-import { articleTimestamp, assetName, domainTerm, formatDate, getLocale, institutionName, localizeChineseContent, localizedDataValue, tr, type Locale } from "@/lib/i18n";
+import { articleTimestamp, assetName, domainTerm, formatDate, getLocale, institutionName, localizeChineseContent, localizedDataValue, tr, type Locale, localePath } from "@/lib/i18n";
 import { clusterViewsNewestFirst, rankAtomicViews, VIEW_WINDOW_DAYS, type MarketEvent } from "@/lib/viewRanking";
 import marketEvents from "../../../data/market-events.json";
 import { publicationReadyWhere } from "@/lib/publication";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { ...canonical("/institutions"), title: tr(locale, "Views", "观点"), description: tr(locale, "Atomic institutional views ranked by heat, authority and freshness.", "按热度、机构权威与新鲜度排序的机构原子观点。") };
+  return { ...canonical("/institutions", locale), title: tr(locale, "Views", "观点"), description: tr(locale, "Atomic institutional views ranked by heat, authority and freshness.", "按热度、机构权威与新鲜度排序的机构原子观点。") };
 }
 
 const TYPE_ZH: Record<string, string> = {
@@ -60,15 +60,15 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
               <div className="view-rank"><b>#{(page - 1) * take + viewIndex + 1}</b><time dateTime={view.article.publishedAt.toISOString()} title={formatDate(view.article.publishedAt, locale)}>{relTime(articleTimestamp(view.article.publishedAt, view.article.createdAt), locale)}</time></div>
               <div className="view-flash-main">
                 <div className="view-flash-meta">
-                  <Link href={`/institution/${view.article.institution.slug}`}>{institutionName(view.article.institution.name, locale)}</Link>
+                  <Link href={localePath(locale, `/institution/${view.article.institution.slug}`)}>{institutionName(view.article.institution.name, locale)}</Link>
                   <span className={`chip ${tone}`}>{directionLabel(view.direction, locale)}</span>
                   <span className="chip gray">{locale === "zh-CN" ? TYPE_ZH[view.type] ?? domainTerm(view.type, locale) : domainTerm(view.type, locale)}</span>
-                  {view.assetTicker ? <Link href={`/asset/${view.assetTicker}`} className="chip acc">{assetName(view.asset, locale, view.assetTicker, "相关资产")} · {view.assetTicker}</Link> : <span className="chip acc">{assetName(view.asset, locale, null, "相关资产")}</span>}
+                  {view.assetTicker ? <Link href={localePath(locale, `/asset/${view.assetTicker}`)} className="chip acc">{assetName(view.asset, locale, view.assetTicker, "相关资产")} · {view.assetTicker}</Link> : <span className="chip acc">{assetName(view.asset, locale, null, "相关资产")}</span>}
                   {view.matchedEvent && <a href={view.matchedEvent.sourceUrl} target="_blank" rel="noopener noreferrer" className="chip bear">{locale === "zh-CN" ? view.matchedEvent.titleZh : view.matchedEvent.titleEn}</a>}
                   <span className="view-horizon">{domainTerm(view.timeHorizon, locale, "时间范围见观点")}</span>
                 </div>
                 <div className="ai-analysis-label">{tr(locale, "AI-generated analytical summary · not a direct translation", "AI 观点摘要 · 非原文直译")}</div>
-                <h2><Link href={`/research/${view.articleId}`}>{copy}</Link></h2>
+                <h2><Link href={localePath(locale, `/research/${view.articleId}`)}>{copy}</Link></h2>
                 <div className="view-flash-foot">
                   {displayValue && <b>{displayValue}</b>}
                   <span>{domainTerm(view.topic, locale, "相关主题")}</span><span>{"★".repeat(view.importance)}</span>
@@ -85,9 +85,9 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
       </section>
 
       {pages > 1 && <nav className="pagination" aria-label={tr(locale, "View pages", "观点分页")}>
-        {page > 1 && <Link href={`/institutions?page=${page - 1}`}>← {tr(locale, "Previous", "上一页")}</Link>}
+        {page > 1 && <Link href={localePath(locale, `/institutions?page=${page - 1}`)}>← {tr(locale, "Previous", "上一页")}</Link>}
         <span>{tr(locale, `Page ${page} / ${pages}`, `第 ${page} / ${pages} 页`)}</span>
-        {page < pages && <Link href={`/institutions?page=${page + 1}`}>{tr(locale, "Next", "下一页")} →</Link>}
+        {page < pages && <Link href={localePath(locale, `/institutions?page=${page + 1}`)}>{tr(locale, "Next", "下一页")} →</Link>}
       </nav>}
     </main>
   );

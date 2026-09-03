@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DEMO_EMAIL } from "@/lib/user";
 import { formalAuthLabel, isEmailAuthConfigured, isFormalAuthConfigured } from "@/lib/auth-config";
-import { getLocale, tr } from "@/lib/i18n";
+import { getLocale, tr, localePath } from "@/lib/i18n";
 import { EmailSignInForm } from "./email-sign-in-form";
 import { PasswordSignInForm } from "./password-sign-in-form";
 
@@ -77,7 +77,7 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
         </details>
       </>}
 
-      {formalAuth && !emailAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={`/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`}>{tr(locale, `Continue with ${formalAuthLabel()}`, `使用 ${formalAuthLabel()} 继续`)} →</a>}
+      {formalAuth && !emailAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={localePath(locale, `/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`)}>{tr(locale, `Continue with ${formalAuthLabel()}`, `使用 ${formalAuthLabel()} 继续`)} →</a>}
 
       {demoAuthEnabled && <><form action={doSignIn} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <input type="hidden" name="next" value={next} />

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
-import { formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale } from "@/lib/i18n";
+import { formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale, localePath } from "@/lib/i18n";
 import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
 import { getSessionUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -33,7 +33,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   return {
     title,
     description: description.slice(0, 300),
-    ...canonical(`/research/${id}`),
+    ...canonical(`/research/${id}`, locale),
     openGraph: {
       type: "article",
       title,
@@ -153,7 +153,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
       ])} />
       <div className="page-head">
         <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
-          <Link href={`/institution/${a.institution.slug}`}>{institutionName(a.institution.name, locale)}</Link>
+          <Link href={localePath(locale, `/institution/${a.institution.slug}`)}>{institutionName(a.institution.name, locale)}</Link>
           {a.author ? ` · ${a.author}` : ""} · {date}
         </div>
         <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title}</h1>
@@ -264,7 +264,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         )}
         <div className="act">
           {a.documents.map((document) => (
-            <a key={document.id} href={`/api/documents/${document.id}`} className={`minibtn ${document.kind === "source_native" ? "p" : ""}`}>
+            <a key={document.id} href={localePath(locale, `/api/documents/${document.id}`)} className={`minibtn ${document.kind === "source_native" ? "p" : ""}`}>
               {document.kind === "source_native"
                 ? tr(locale, "Download institution PDF", "下载机构原始 PDF")
                 : tr(locale, "Download English PDF", "下载英文 PDF")}

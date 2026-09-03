@@ -6,9 +6,11 @@ import { setPassword, type PasswordFormState } from "./actions";
 
 export default function PasswordForm({
   hasPassword,
+  home,
   labels,
 }: {
   hasPassword: boolean;
+  home: string;
   labels: Record<string, string>;
 }) {
   const [state, action, pending] = useActionState<PasswordFormState, FormData>(setPassword, {});
@@ -25,7 +27,7 @@ export default function PasswordForm({
             {labels.signIn}
           </button>
         ) : (
-          <Link className="minibtn p" href="/">{labels.continue}</Link>
+          <Link className="minibtn p" href={home}>{labels.continue}</Link>
         )}
       </div>
     );

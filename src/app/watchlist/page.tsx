@@ -8,7 +8,7 @@ import { addWatch, removeWatch, toggleRule, deleteRule, setAlertWebhook } from "
 import MonitoringRuleForm from "@/app/_components/MonitoringRuleForm";
 import { describeRule } from "@/lib/alerts";
 import { prisma } from "@/lib/db";
-import { assetName, formatDate, getLocale, institutionName, localeSafeText, tr, type Locale } from "@/lib/i18n";
+import { assetName, formatDate, getLocale, institutionName, localeSafeText, tr, type Locale, localePath } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ function SignInGate({ locale }: { locale: Locale }) {
         <div className="eyebrow">{tr(locale, "Monitoring Center", "监控中心")}</div>
         <h1>{tr(locale, "Sign in to monitor the market", "登录后建立市场监控")}</h1>
         <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Track assets, institutions, themes and consensus signals in one place.", "在同一处关注资产、机构、交易主线与共识信号。")}</p>
-        <Link href="/signin?next=/watchlist" className="minibtn p" style={{ alignSelf: "flex-start", padding: "9px 14px" }}>{tr(locale, "Sign in", "登录")} →</Link>
+        <Link href={localePath(locale, "/signin?next=/watchlist")} className="minibtn p" style={{ alignSelf: "flex-start", padding: "9px 14px" }}>{tr(locale, "Sign in", "登录")} →</Link>
       </div>
     </main>
   );
@@ -106,7 +106,7 @@ export default async function WatchlistPage() {
           {assets.map((asset) => (
             <div key={asset.ticker} className="ctile monitor-asset">
               <div className="monitor-remove"><RemoveButton kind="asset" refId={asset.ticker} locale={locale} /></div>
-              <Link href={`/asset/${asset.ticker}`} style={{ display: "block" }}>
+              <Link href={localePath(locale, `/asset/${asset.ticker}`)} style={{ display: "block" }}>
                 <div className="a">{assetName(asset.name, locale, asset.ticker)}</div>
                 {asset.score === null || asset.tone === null || asset.label === null ? <><div className="s tnum">—</div><div className="meta"><span>{tr(locale, "No consensus in the latest 24h", "最近24小时暂无共识")}</span></div></> : <>
                   <div className="s tnum">{asset.score}<span className={`dir ${asset.tone === "bull" ? "up" : asset.tone === "bear" ? "down" : "flat"}`}>{asset.tone === "bull" ? "↑" : asset.tone === "bear" ? "↓" : "→"} {tr(locale, asset.label, asset.tone === "bull" ? "看多" : asset.tone === "bear" ? "看空" : "中性")}</span></div>
@@ -118,7 +118,7 @@ export default async function WatchlistPage() {
           {assets.length === 0 && <p className="mono monitor-empty">{tr(locale, "No followed assets yet.", "尚未关注资产。")}</p>}
         </div>
         <div className="monitor-object-grid">
-          <div><div className="section-t">{tr(locale, "Institutions", "机构")} · {institutions.length}</div><div className="rowlist">{institutions.map((institution) => <div key={institution.id} className="r"><Link href={`/institution/${institution.slug}`} className="inst">{institutionName(institution.name, locale)}</Link><RemoveButton kind="institution" refId={institution.slug} locale={locale} /></div>)}{institutions.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed institutions.", "尚未关注机构。")}</div>}</div></div>
+          <div><div className="section-t">{tr(locale, "Institutions", "机构")} · {institutions.length}</div><div className="rowlist">{institutions.map((institution) => <div key={institution.id} className="r"><Link href={localePath(locale, `/institution/${institution.slug}`)} className="inst">{institutionName(institution.name, locale)}</Link><RemoveButton kind="institution" refId={institution.slug} locale={locale} /></div>)}{institutions.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed institutions.", "尚未关注机构。")}</div>}</div></div>
           <div><div className="section-t">{tr(locale, "Trading themes", "交易主线")} · {themes.length}</div><div className="rowlist">{themes.map((theme) => <div key={theme} className="r"><span>{localeSafeText(theme, locale, tr(locale, "Custom theme", "自定义主题"))}</span><RemoveButton kind="theme" refId={theme} locale={locale} /></div>)}{themes.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed themes.", "尚未关注交易主线。")}</div>}</div></div>
         </div>
       </section>

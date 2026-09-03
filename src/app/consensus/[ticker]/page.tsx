@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { computeConsensus } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
-import { assetName, formatDate, getLocale, institutionName, tr, type Locale } from "@/lib/i18n";
+import { assetName, formatDate, getLocale, institutionName, tr, type Locale, localePath } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
 import { canonical } from "@/lib/seo";
 
@@ -22,7 +22,7 @@ export async function generateMetadata(props: { params: Promise<{ ticker: string
       `Where the world's institutions stand on ${name} (${asset.ticker}): the current consensus score, how it has moved, and which institution said what.`,
       `全球机构对${name}(${asset.ticker})的立场:当前共识分数、变化趋势,以及各家机构的具体观点。`,
     ),
-    ...canonical(`/consensus/${asset.ticker}`),
+    ...canonical(`/consensus/${asset.ticker}`, locale),
   };
 }
 
@@ -104,7 +104,7 @@ export default async function ConsensusTrendPage(
 
       <section className="blk">
         <div className="range-tabs" aria-label={tr(locale, "Trend range", "趋势范围")}>
-          {Object.keys(ranges).map((range) => <Link key={range} href={`/consensus/${asset.ticker}?range=${range}`} className={range === selected ? "active" : ""}>{range.toUpperCase()}</Link>)}
+          {Object.keys(ranges).map((range) => <Link key={range} href={localePath(locale, `/consensus/${asset.ticker}?range=${range}`)} className={range === selected ? "active" : ""}>{range.toUpperCase()}</Link>)}
         </div>
         {points.length ? <TrendChart points={points} ticker={asset.ticker} locale={locale} /> : <div className="empty-state">{tr(locale, "No consensus history in this range yet.", "该范围内暂无共识历史。")}</div>}
       </section>
@@ -113,7 +113,7 @@ export default async function ConsensusTrendPage(
         <div className="section-t">{tr(locale, "Related Research", "相关研报")}</div>
         <div className="rowlist">
           {articles.map((article) => (
-            <Link key={article.id} href={`/research/${article.id}`}>
+            <Link key={article.id} href={localePath(locale, `/research/${article.id}`)}>
               <span><b>{institutionName(article.institution.name, locale)}</b> · {locale === "zh-CN" && article.translations[0] ? article.translations[0].title : article.title}</span>
               <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{formatDate(article.publishedAt, locale)}</span>
             </Link>

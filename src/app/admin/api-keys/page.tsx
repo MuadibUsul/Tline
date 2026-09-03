@@ -4,7 +4,7 @@ import { noIndex } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
+import { getLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { API_SCOPES, parseScopes } from "@/lib/apiKeys";
 import { revokeApiKey } from "../actions";
@@ -53,7 +53,7 @@ export default async function ApiKeysPage() {
         </div>
         <div className="tag-row">
           <span className="chip acc">{active} {tr(locale, "active", "启用中")}</span>
-          <Link className="minibtn" href="/admin">{tr(locale, "← Operations", "← 运营后台")}</Link>
+          <Link className="minibtn" href={localePath(locale, "/admin")}>{tr(locale, "← Operations", "← 运营后台")}</Link>
         </div>
       </header>
 

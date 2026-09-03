@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getInstitutionView } from "@/lib/queries";
 import { FeedCard, DirChip, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
-import { assetName, domainTerm, getLocale, institutionName, tr } from "@/lib/i18n";
+import { assetName, domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -48,7 +48,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <a href={inst.researchUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Research homepage ↗", "研报主页 ↗")}</a>
-          <Link href={`/institution/${inst.slug}/accuracy`} className="minibtn">{tr(locale, "Forecast accuracy", "预测准确率")}</Link>
+          <Link href={localePath(locale, `/institution/${inst.slug}/accuracy`)} className="minibtn">{tr(locale, "Forecast accuracy", "预测准确率")}</Link>
           <form action={addWatch}>
             <input type="hidden" name="kind" value="institution" />
             <input type="hidden" name="refId" value={inst.slug} />
@@ -67,7 +67,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
               <tbody>
                 {views.map((v) => (
                   <tr key={v.ticker}>
-                    <td className="inst"><Link href={`/asset/${v.ticker}`}>{assetName(v.name, locale, v.ticker)}</Link></td>
+                    <td className="inst"><Link href={localePath(locale, `/asset/${v.ticker}`)}>{assetName(v.name, locale, v.ticker)}</Link></td>
                     <td><DirChip direction={v.direction} locale={locale} /></td>
                     <td className="mono-cell">{v.target ? `$${v.target.toLocaleString()}` : "—"}</td>
                     <td className="mono-cell">{relTime(v.when, locale)}</td>

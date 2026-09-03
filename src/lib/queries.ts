@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { computeConsensus, computeConsensusMany, consensusDeltas, type ConsensusResult } from "./consensus";
 import { ASSETS, directionLabel } from "./assets";
 import { publicationReadyWhere } from "./publication";
+import { articleTimestamp } from "./i18n";
 
 const FEATURED = ASSETS.filter((a) => a.featured).map((a) => a.ticker);
 
@@ -63,11 +64,21 @@ export async function feedPulse(): Promise<FeedPulse> {
   };
 }
 
+/** Newest first by the timestamp the card actually shows. */
+export function byDisplayRecency<T extends { publishedAt: Date; createdAt: Date }>(a: T, b: T) {
+  return articleTimestamp(b.publishedAt, b.createdAt).getTime() - articleTimestamp(a.publishedAt, a.createdAt).getTime();
+}
+
+// Enough of the recent tail to reorder honestly: a report published with a date but no
+// time is shown at the hour it was discovered, which can place it ahead of one whose
+// stated time is earlier in the day.
+const FEED_POOL_MULTIPLE = 8;
+
 export async function latestFeed(limit = 8) {
-  return prisma.article.findMany({
+  const pool = await prisma.article.findMany({
     where: publicationReadyWhere(),
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    take: limit,
+    take: Math.max(limit * FEED_POOL_MULTIPLE, 40),
     include: {
       institution: true,
       analysis: true,
@@ -75,6 +86,8 @@ export async function latestFeed(limit = 8) {
       articleAssets: { include: { asset: true } },
     },
   });
+  // Sorted on the value the reader sees, so the feed cannot read as out of order.
+  return pool.sort(byDisplayRecency).slice(0, limit);
 }
 
 export async function mostActive(days = 7, limit = 6) {

@@ -8,6 +8,7 @@ import { getSessionUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { queueContentRetry } from "@/app/admin/actions";
+import PdfPreview from "@/app/_components/PdfPreview";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -106,11 +107,11 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const translationPoor = (translation?.qualityScore ?? 1) < 0.8;
   const qualityWarning = analysisPoor || translationPoor;
 
-  // The publisher's own PDF reads better than the one generated from extracted text, so
-  // it is preferred when the institution issued one.
-  const previewDocument =
-    a.documents.find((document) => document.kind === "source_native") ??
-    a.documents.find((document) => document.kind === "original_pdf");
+  // The publisher's own document. Where one exists it is the report — the page around it
+  // was navigation and teaser copy — so it is shown open and in full, and the text
+  // extracted from that same PDF is not repeated underneath it.
+  const publisherPdf = a.documents.find((document) => document.kind === "source_native");
+  const previewDocument = publisherPdf ?? a.documents.find((document) => document.kind === "original_pdf");
 
   const user = await getSessionUser();
   const isOperator = can(user, "admin.review");
@@ -161,14 +162,37 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
       </div>}
 
       <section className="blk">
-        <div className="section-t">{tr(locale, "Complete Research", "完整研报正文")}</div>
-        {locale === "en" && a.rawText && (
+        <div className="section-t">{publisherPdf ? tr(locale, "The report", "研报原件") : tr(locale, "Complete Research", "完整研报正文")}</div>
+        {publisherPdf && (
+          <PdfPreview
+            src={`/api/documents/${publisherPdf.id}?inline=1`}
+            labels={{
+              loading: tr(locale, "Loading the document…", "正在载入文档……"),
+              failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
+              page: tr(locale, "Page", "第"),
+              of: tr(locale, "of", "/"),
+              previous: tr(locale, "Previous page", "上一页"),
+              next: tr(locale, "Next page", "下一页"),
+              zoomIn: tr(locale, "Zoom in", "放大"),
+              zoomOut: tr(locale, "Zoom out", "缩小"),
+            }}
+          />
+        )}
+        {publisherPdf && locale === "zh-CN" && translation && (
+          // Kept, but behind a disclosure: the document above is the report, and this is
+          // a reading aid beside it.
+          <details className="article-original" style={{ marginTop: 18 }}>
+            <summary>完整中文译文</summary>
+            <ArticleBody segments={translation.segments} fallback={translation.text} locale={locale} translated figures={a.figures} />
+          </details>
+        )}
+        {!publisherPdf && locale === "en" && a.rawText && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
           </div>
         )}
-        {locale === "zh-CN" && translation && (
+        {!publisherPdf && locale === "zh-CN" && translation && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
               完整中文译文
@@ -177,13 +201,13 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             <ArticleBody segments={translation.segments} fallback={translation.text} locale={locale} translated figures={a.figures} />
           </div>
         )}
-        {locale === "zh-CN" && !translation && a.rawText && (
+        {!publisherPdf && locale === "zh-CN" && !translation && a.rawText && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
           </div>
         )}
-        {locale === "zh-CN" && translation && a.rawText && (
+        {!publisherPdf && locale === "zh-CN" && translation && a.rawText && (
           <details className="article-original">
             <summary>完整英文原文</summary>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
@@ -195,15 +219,21 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             <div className="prose article-body" style={{ marginTop: 12 }}>{a.disclaimerText}</div>
           </details>
         )}
-        {previewDocument && (
-          // Reading the report should not require saving it first. Served same-origin and
-          // inline, so it opens in place and the download stays a separate choice.
+        {!publisherPdf && previewDocument && (
           <details className="pdf-preview">
             <summary>{tr(locale, "Preview PDF", "预览 PDF")}</summary>
-            <iframe
+            <PdfPreview
               src={`/api/documents/${previewDocument.id}?inline=1`}
-              title={tr(locale, "Report preview", "研报预览")}
-              loading="lazy"
+              labels={{
+                loading: tr(locale, "Loading the document…", "正在载入文档……"),
+                failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
+                page: tr(locale, "Page", "第"),
+                of: tr(locale, "of", "/"),
+                previous: tr(locale, "Previous page", "上一页"),
+                next: tr(locale, "Next page", "下一页"),
+                zoomIn: tr(locale, "Zoom in", "放大"),
+                zoomOut: tr(locale, "Zoom out", "缩小"),
+              }}
             />
           </details>
         )}

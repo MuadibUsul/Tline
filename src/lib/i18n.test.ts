@@ -44,3 +44,19 @@ test("localizes canonical institution, asset and domain names without contaminat
   assert.equal(localizedDataValue("USD 503bn", "zh-CN"), "USD 503bn");
   assert.equal(localizeChineseContent("Isabel Schnabel at Westpac IQ"), "伊莎贝尔·施纳贝尔 at 西太平洋银行研究平台");
 });
+
+test("the feed orders on the timestamp the card shows, not the stored one", async () => {
+  const { byDisplayRecency } = await import("./queries");
+  const dateOnly = {
+    // Published with a date but no time, discovered late in the evening.
+    publishedAt: new Date("2026-09-02T00:00:00.000Z"),
+    createdAt: new Date("2026-09-02T20:00:00.000Z"),
+  };
+  const timed = {
+    publishedAt: new Date("2026-09-02T14:30:00.000Z"),
+    createdAt: new Date("2026-09-02T14:35:00.000Z"),
+  };
+  // Sorting on publishedAt alone would put the timed one first, though the other is
+  // displayed as six hours newer.
+  assert.deepEqual([timed, dateOnly].sort(byDisplayRecency), [dateOnly, timed]);
+});

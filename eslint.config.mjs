@@ -10,6 +10,8 @@ const config = [
       ".next-tline/**",
       ".runtime/**",
       "storage/**",
+      // Vendored pdf.js assets: shipped as published, not ours to lint.
+      "public/pdfjs/**",
       "prisma/postgresql/**",
       "next-env.d.ts",
     ],

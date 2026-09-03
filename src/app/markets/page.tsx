@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { computeConsensusMany } from "@/lib/consensus";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { title: tr(locale, "Markets", "市场"), description: tr(locale, "Market instruments tracked alongside institutional views.", "与机构观点并列跟踪的市场标的。") };
+  return { ...canonical("/markets"), title: tr(locale, "Markets", "市场"), description: tr(locale, "Market instruments tracked alongside institutional views.", "与机构观点并列跟踪的市场标的。") };
 }
 
 const CLASSES = ["equity", "rate", "fx", "commodity", "crypto", "macro"] as const;

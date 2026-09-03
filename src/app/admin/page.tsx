@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { noIndex } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -8,6 +10,11 @@ import { queueContentRetry, queueSourceRetry, setSourceMonitoring } from "./acti
 import { pipelineHealth } from "@/../scripts/watchdog";
 
 export const dynamic = "force-dynamic";
+
+// Behind a sign-in: robots.txt asks a crawler not to fetch this, which does not keep
+// it out of an index if something links to it. This does.
+export const metadata: Metadata = { title: "Operations", ...noIndex };
+
 
 function json(value: string) {
   try { return JSON.parse(value) as Record<string, unknown>; } catch { return {}; }

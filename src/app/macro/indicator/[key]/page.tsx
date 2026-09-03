@@ -1,11 +1,33 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr } from "@/lib/i18n";
 import { beijingDateTime, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
 import IndicatorChart from "./IndicatorChart";
+import { canonical } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(props: { params: Promise<{ key: string }> }): Promise<Metadata> {
+  const { key } = await props.params;
+  const locale = await getLocale();
+  const indicator = await prisma.macroIndicator.findUnique({
+    where: { canonicalKey: key },
+    select: { nameEn: true, nameZh: true },
+  });
+  if (!indicator) return { title: tr(locale, "Indicator not found", "指标未找到") };
+  const name = locale === "zh-CN" ? indicator.nameZh ?? indicator.nameEn : indicator.nameEn;
+  return {
+    title: name,
+    description: tr(
+      locale,
+      `${name}: the released series, each revision, and what institutions forecast before it landed.`,
+      `${name}:历史发布序列、每次修订,以及发布前各机构的预测。`,
+    ),
+    ...canonical(`/macro/indicator/${key}`),
+  };
+}
 
 const dec = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? "—" : value.toString());
 const fmtChange = (value: number) => `${value >= 0 ? "+" : "−"}${Math.abs(value) >= 100 ? Math.abs(value).toFixed(0) : Math.abs(value).toFixed(2)}`;

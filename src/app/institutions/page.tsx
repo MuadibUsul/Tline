@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { relTime } from "@/app/_components/ui";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { title: tr(locale, "Views", "观点"), description: tr(locale, "Atomic institutional views ranked by heat, authority and freshness.", "按热度、机构权威与新鲜度排序的机构原子观点。") };
+  return { ...canonical("/institutions"), title: tr(locale, "Views", "观点"), description: tr(locale, "Atomic institutional views ranked by heat, authority and freshness.", "按热度、机构权威与新鲜度排序的机构原子观点。") };
 }
 
 const TYPE_ZH: Record<string, string> = {

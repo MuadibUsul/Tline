@@ -105,7 +105,40 @@ export async function fetchText(url: string, timeoutMs = 15000): Promise<string 
 
 export async function fetchPdf(url: string, timeoutMs = 30000): Promise<Buffer | null> {
   lastReasons.delete(url);
-  const result = await fetchResource(url, timeoutMs);
+  let result = await fetchResource(url, timeoutMs);
+  // Intesa's public PDFs redirect once through a disclaimer. The publisher's own
+  // acceptance flow records the document id as an "accepted" cookie.
+  try {
+    const final = new URL(result.finalUrl);
+    const documentId = final.pathname.includes("/research/disclaimer/") && final.searchParams.get("NEXT_URL");
+    if (documentId && /^[\da-f-]{36}$/i.test(documentId)) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          headers: {
+            "user-agent": UA,
+            accept: "application/pdf,*/*",
+            cookie: `${documentId}=accepted`,
+          },
+          signal: ctrl.signal,
+          redirect: "follow",
+        });
+        result = {
+          ok: res.ok,
+          status: res.status,
+          body: Buffer.from(await res.arrayBuffer()),
+          contentType: res.headers.get("content-type") || "",
+          etag: res.headers.get("etag"),
+          lastModified: res.headers.get("last-modified"),
+          retryAfter: res.headers.get("retry-after"),
+          finalUrl: res.url,
+        };
+      } finally {
+        clearTimeout(t);
+      }
+    }
+  } catch { /* keep the original response */ }
   if (!result.ok || !result.body || result.body.byteLength > 50 * 1024 * 1024) return null;
   if (!/pdf/i.test(result.contentType) && !result.body.subarray(0, 1024).includes(Buffer.from("%PDF-"))) {
     if (/html/i.test(result.contentType)) lastReasons.set(url, "PDF request returned an HTML access or disclaimer page");

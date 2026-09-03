@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { featuredConsensus, feedPulse, importantReleasesThisWeek, latestFeed, mostActive, viewChanges } from "@/lib/queries";
 import { FeedCard, Delta } from "./_components/ui";
@@ -5,8 +6,23 @@ import SearchBox from "./_components/SearchBox";
 import LiveFeed from "./_components/LiveFeed";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
+import { JsonLd, canonical, siteJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const description = tr(
+    locale,
+    "Institutional research from the world's banks and asset managers, turned into comparable, traceable signals: consensus by asset, each institution's stated view, and its record.",
+    "汇集全球银行与资产管理机构的研报，转换为可比较、可追溯的信号：分资产的市场共识、各机构的明确观点，以及它们的历史准确率。",
+  );
+  return {
+    description,
+    ...canonical("/"),
+    openGraph: { type: "website", description },
+  };
+}
 
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
 
@@ -23,6 +39,7 @@ export default async function Home() {
 
   return (
     <main className="wrap">
+      <JsonLd data={siteJsonLd(tr(locale, "Institutional Intelligence", "全球机构情报"), tr(locale, "Institutional research turned into comparable signals.", "把机构研报转换为可比较的信号。"))} />
       <LiveFeed
         initial={pulse}
         label={tr(locale, "New research", "有新研报")}

@@ -1,11 +1,30 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { computeConsensus } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
 import { assetName, formatDate, getLocale, institutionName, tr, type Locale } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
+import { canonical } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(props: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
+  const { ticker } = await props.params;
+  const locale = await getLocale();
+  const asset = await prisma.asset.findUnique({ where: { ticker: ticker.toUpperCase() }, select: { ticker: true, name: true } });
+  if (!asset) return { title: tr(locale, "Asset not found", "资产未找到") };
+  const name = assetName(asset.name, locale, asset.ticker);
+  return {
+    title: tr(locale, `${name} consensus`, `${name} 市场共识`),
+    description: tr(
+      locale,
+      `Where the world's institutions stand on ${name} (${asset.ticker}): the current consensus score, how it has moved, and which institution said what.`,
+      `全球机构对${name}(${asset.ticker})的立场:当前共识分数、变化趋势,以及各家机构的具体观点。`,
+    ),
+    ...canonical(`/consensus/${asset.ticker}`),
+  };
+}
 
 function TrendChart({ points, ticker, locale }: { points: { timestamp: Date; consensusScore: number }[]; ticker: string; locale: Locale }) {
   const width = 900;

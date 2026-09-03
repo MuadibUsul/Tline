@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr } from "@/lib/i18n";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { title: tr(locale, "Economic Data", "经济数据"), description: tr(locale, "Macro releases, indicators and the calendar ahead.", "宏观发布、指标与前瞻日历。") };
+  return { ...canonical("/macro"), title: tr(locale, "Economic Data", "经济数据"), description: tr(locale, "Macro releases, indicators and the calendar ahead.", "宏观发布、指标与前瞻日历。") };
 }
 
 const toNum = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? null : Number(value.toString()));

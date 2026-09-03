@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { ResearchCard } from "@/app/_components/ui";
 import LiveFeed from "@/app/_components/LiveFeed";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { title: tr(locale, "Research", "研报"), description: tr(locale, "Every published institutional report the pipeline has verified.", "流水线已核验的全部公开机构研报。") };
+  return { ...canonical("/research"), title: tr(locale, "Research", "研报"), description: tr(locale, "Every published institutional report the pipeline has verified.", "流水线已核验的全部公开机构研报。") };
 }
 
 const ASSET_CLASSES: Array<[string, string]> = [["equity", "股票"], ["rate", "利率"], ["fx", "外汇"], ["commodity", "大宗商品"], ["crypto", "加密资产"], ["macro", "宏观"]];

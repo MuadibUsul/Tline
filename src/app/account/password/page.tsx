@@ -1,10 +1,17 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { noIndex } from "@/lib/seo";
 import { getSessionUser } from "@/lib/auth";
 import { getLocale, tr } from "@/lib/i18n";
 import { PASSWORD_MIN_LENGTH } from "@/lib/password";
 import PasswordForm from "./PasswordForm";
 
 export const dynamic = "force-dynamic";
+
+// Behind a sign-in: robots.txt asks a crawler not to fetch this, which does not keep
+// it out of an index if something links to it. This does.
+export const metadata: Metadata = { title: "Password", ...noIndex };
+
 
 export default async function PasswordPage() {
   const user = await getSessionUser();

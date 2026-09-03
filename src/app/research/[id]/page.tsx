@@ -9,6 +9,7 @@ import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { queueContentRetry } from "@/app/admin/actions";
 import PdfPreview from "@/app/_components/PdfPreview";
+import { JsonLd, breadcrumbJsonLd, canonical, reportJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -32,6 +33,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   return {
     title,
     description: description.slice(0, 300),
+    ...canonical(`/research/${id}`),
     openGraph: {
       type: "article",
       title,
@@ -130,8 +132,25 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
     ? await prisma.contentRetry.findMany({ where: { articleId: a.id }, orderBy: { requestedAt: "desc" } })
     : [];
 
+  const heading = locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title;
+  const summary = (locale === "zh-CN" ? an?.summaryZh : an?.summary) ?? institutionName(a.institution.name, locale);
+
   return (
     <main className="wrap" style={{ maxWidth: 820 }}>
+      <JsonLd data={reportJsonLd({
+        id: a.id,
+        title: heading,
+        description: summary,
+        publishedAt: a.publishedAt,
+        institution: a.institution.name,
+        sourceUrl: a.sourceUrl,
+        locale,
+      })} />
+      <JsonLd data={breadcrumbJsonLd([
+        { name: tr(locale, "Research", "研报"), path: "/research" },
+        { name: institutionName(a.institution.name, locale), path: `/institution/${a.institution.slug}` },
+        { name: heading, path: `/research/${a.id}` },
+      ])} />
       <div className="page-head">
         <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
           <Link href={`/institution/${a.institution.slug}`}>{institutionName(a.institution.name, locale)}</Link>

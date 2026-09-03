@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getLocale, tr } from "@/lib/i18n";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { title: tr(locale, "Economic Calendar", "经济日历"), description: tr(locale, "Scheduled macro releases with consensus and prior values.", "已排期的宏观发布，含共识值与前值。") };
+  return { ...canonical("/macro/calendar"), title: tr(locale, "Economic Calendar", "经济日历"), description: tr(locale, "Scheduled macro releases with consensus and prior values.", "已排期的宏观发布，含共识值与前值。") };
 }
 
 export default async function MacroCalendarPage() {

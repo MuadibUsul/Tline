@@ -1,4 +1,6 @@
 import { doSignIn } from "@/app/actions";
+import type { Metadata } from "next";
+import { noIndex } from "@/lib/seo";
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DEMO_EMAIL } from "@/lib/user";
@@ -8,6 +10,11 @@ import { EmailSignInForm } from "./email-sign-in-form";
 import { PasswordSignInForm } from "./password-sign-in-form";
 
 export const dynamic = "force-dynamic";
+
+// Behind a sign-in: robots.txt asks a crawler not to fetch this, which does not keep
+// it out of an index if something links to it. This does.
+export const metadata: Metadata = { title: "Sign in", ...noIndex };
+
 
 export default async function SignInPage(props: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const searchParams = await props.searchParams;

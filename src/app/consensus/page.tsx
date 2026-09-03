@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { computeConsensusMany } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { title: tr(locale, "Consensus", "共识"), description: tr(locale, "Cross-institution consensus scores by asset.", "按资产汇总的跨机构共识分数。") };
+  return { ...canonical("/consensus"), title: tr(locale, "Consensus", "共识"), description: tr(locale, "Cross-institution consensus scores by asset.", "按资产汇总的跨机构共识分数。") };
 }
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
 

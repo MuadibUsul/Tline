@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { canonical } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -8,6 +10,26 @@ import type { ForecastConsensus } from "@/lib/macro/forecasts";
 import type { ParsedPolicyDocument } from "@/lib/macro/policy/types";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await props.params;
+  const locale = await getLocale();
+  const release = await prisma.macroRelease.findUnique({
+    where: { id },
+    select: { titleEn: true, titleZh: true, scheduledAt: true },
+  });
+  if (!release) return { title: tr(locale, "Release not found", "发布未找到") };
+  const title = locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn;
+  return {
+    title,
+    description: tr(
+      locale,
+      `${title}: consensus before the release, the figures as published, and how they revised.`,
+      `${title}:发布前的市场共识、实际公布值,以及后续修订。`,
+    ),
+    ...canonical(`/macro/release/${id}`),
+  };
+}
 const parsed = (value: string | null) => { try { return value ? JSON.parse(value) as ParsedPolicyDocument : null; } catch { return null; } };
 
 // Trim a numeric forecast for display: keep meaningful decimals, drop trailing zeros.

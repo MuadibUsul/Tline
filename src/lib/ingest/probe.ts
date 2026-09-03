@@ -232,7 +232,7 @@ async function probeInstitution(inst: {
 
       let articleHtml = await fetchText(candidate.url);
       let article = articleHtml ? extractArticle(articleHtml) : null;
-      if (flag("render") && (!article || article.text.length < 700)) {
+      if ((inst.requiresRender || flag("render")) && (!article || article.text.length < 700)) {
         const renderedArticle = await renderPublic(candidate.url);
         if (renderedArticle) {
           articleHtml = renderedArticle;

@@ -56,6 +56,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily" as const,
       priority: 0.6,
     })),
+    // The consensus view of each asset, and each institution's settled record: pages that
+    // exist nowhere else and were absent from the map entirely.
+    ...assets.map((asset) => ({
+      url: `${base}/consensus/${asset.ticker}`,
+      lastModified: new Date(),
+      changeFrequency: "daily" as const,
+      priority: 0.7,
+    })),
+    ...institutions.map((institution) => ({
+      url: `${base}/institution/${institution.slug}/accuracy`,
+      lastModified: institution.lastDiscoveredAt ?? new Date(),
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
+    })),
     ...indicators.map((indicator) => ({
       url: `${base}/macro/indicator/${indicator.canonicalKey}`,
       lastModified: indicator.updatedAt,

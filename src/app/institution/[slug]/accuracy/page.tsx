@@ -1,9 +1,29 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getInstitutionAccuracy } from "@/lib/forecast";
 import { assetName, formatDate, getLocale, institutionName, tr } from "@/lib/i18n";
+import { prisma } from "@/lib/db";
+import { canonical } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await props.params;
+  const locale = await getLocale();
+  const institution = await prisma.institution.findUnique({ where: { slug }, select: { name: true } });
+  if (!institution) return { title: tr(locale, "Institution not found", "机构未找到") };
+  const name = institutionName(institution.name, locale);
+  return {
+    title: tr(locale, `${name} forecast record`, `${name} 预测准确率`),
+    description: tr(
+      locale,
+      `How ${name}'s published forecasts have settled against what actually happened: direction, target and error, forecast by forecast.`,
+      `${name}已发布的预测与实际结果的对照:方向、目标价与误差,逐条可查。`,
+    ),
+    ...canonical(`/institution/${slug}/accuracy`),
+  };
+}
 
 function value(value: number | null) {
   return value === null ? "—" : value.toLocaleString(undefined, { maximumFractionDigits: 4 });

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { noIndex } from "@/lib/seo";
 import { getWatchlistView, getAlertsView } from "@/lib/user";
 import { getSessionUser } from "@/lib/auth";
 import { Delta, relTime } from "@/app/_components/ui";
@@ -10,6 +12,11 @@ import { assetName, formatDate, getLocale, institutionName, localeSafeText, tr, 
 import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
+
+// Behind a sign-in: robots.txt asks a crawler not to fetch this, which does not keep
+// it out of an index if something links to it. This does.
+export const metadata: Metadata = { title: "Monitoring", ...noIndex };
+
 
 /** "skipped" means no destination was configured — nothing failed, there was nowhere to send. */
 function deliveryLabel(status: string) {

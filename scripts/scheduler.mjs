@@ -102,10 +102,17 @@ async function processPending() {
     ["run", "reparse", "--", `--limit=${processLimit}`],
     ["run", "translate", "--", `--limit=${processLimit}`],
     ["run", "documents", "--", `--limit=${processLimit}`],
+    // Last, so it judges the pass that has just finished. A non-zero exit here means the
+    // pipeline is quiet rather than broken, which no other signal reports.
+    ["run", "watchdog"],
   ]) {
     if (stopping) return;
     const code = await runCommand(args);
-    if (code !== 0) console.error(JSON.stringify({ event: "scheduler.processing.failed", command: args.join(" "), code }));
+    // The watchdog exits non-zero to report a quiet pipeline; it has already said so in
+    // its own output and is not a failed command.
+    if (code !== 0 && !args.includes("watchdog")) {
+      console.error(JSON.stringify({ event: "scheduler.processing.failed", command: args.join(" "), code }));
+    }
   }
 }
 

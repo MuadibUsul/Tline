@@ -71,16 +71,20 @@ export function byDisplayRecency<T extends { publishedAt: Date; createdAt: Date 
   return articleTimestamp(b.publishedAt, b.createdAt).getTime() - articleTimestamp(a.publishedAt, a.createdAt).getTime();
 }
 
-// Enough of the recent tail to reorder honestly: a report published with a date but no
-// time is shown at the hour it was discovered, which can place it ahead of one whose
-// stated time is earlier in the day.
-const FEED_POOL_MULTIPLE = 8;
-
+/**
+ * The home feed answers "what is new here", so it is ordered by when a report arrived,
+ * not by when its publisher dated it.
+ *
+ * The two came apart once discovery looked back a week: a report published six days ago
+ * and fetched an hour ago belongs at the top as far as a reader is concerned, but dated
+ * ordering buried it six days down, and a day's worth of new research could land without
+ * anything visibly changing.
+ */
 export async function latestFeed(limit = 8) {
-  const pool = await prisma.article.findMany({
+  return prisma.article.findMany({
     where: publicationReadyWhere(),
-    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    take: Math.max(limit * FEED_POOL_MULTIPLE, 40),
+    orderBy: [{ createdAt: "desc" }, { publishedAt: "desc" }],
+    take: limit,
     include: {
       institution: true,
       analysis: true,
@@ -88,8 +92,6 @@ export async function latestFeed(limit = 8) {
       articleAssets: { include: { asset: true } },
     },
   });
-  // Sorted on the value the reader sees, so the feed cannot read as out of order.
-  return pool.sort(byDisplayRecency).slice(0, limit);
 }
 
 export async function mostActive(days = 7, limit = 6) {

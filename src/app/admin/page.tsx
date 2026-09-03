@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getLocale, tr } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { queueContentRetry, queueSourceRetry, setSourceMonitoring } from "./actions";
+import { pipelineHealth } from "@/../scripts/watchdog";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function AdminPage() {
   const locale = await getLocale();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [sources, jobs, articles24h, articles7d, analysisReview, translationReview, runningJobs, failedJobs, workers, staleJobs] = await Promise.all([
+  const [sources, jobs, articles24h, articles7d, analysisReview, translationReview, runningJobs, failedJobs, workers, staleJobs, health] = await Promise.all([
     prisma.institution.findMany({ orderBy: [{ monitoringEnabled: "desc" }, { priority: "asc" }, { name: "asc" }] }),
     prisma.jobRun.findMany({ orderBy: { startedAt: "desc" }, take: 30 }),
     prisma.article.count({ where: { createdAt: { gte: since } } }),
@@ -41,6 +42,7 @@ export default async function AdminPage() {
     prisma.jobRun.count({ where: { status: "failed", startedAt: { gte: since } } }),
     prisma.workerHeartbeat.findMany({ orderBy: { name: "asc" } }),
     prisma.jobRun.count({ where: { status: "running", startedAt: { lt: new Date(Date.now() - 20 * 60_000) } } }),
+    pipelineHealth(),
   ]);
   const enabled = sources.filter((source) => source.monitoringEnabled && ["allowed", "delayed"].includes(source.crawlPolicy)).length;
   const unhealthy = sources.filter((source) => ["failed", "refused", "paused"].includes(source.lastCrawlStatus ?? "") || (!source.monitoringEnabled && source.consecutiveFailures > 0)).length;
@@ -57,6 +59,13 @@ export default async function AdminPage() {
       <div className="admin-stat"><span>{tr(locale, "New research · 24h", "24 小时新增研报")}</span><b>{articles24h}</b><small>{articles7d} / 7d</small></div>
       <div className="admin-stat"><span>{tr(locale, "Needs review", "待审核")}</span><b>{reviewCount}</b><small>{tr(locale, "analysis + translation", "分析与翻译")}</small></div>
       <div className="admin-stat"><span>{tr(locale, "Pipeline health", "流水线状态")}</span><b>{staleJobs ? "!" : runningJobs}</b><small>{failedJobs} failed / 24h · {staleJobs} stale · {unhealthy} sources</small></div>
+      {/* A pipeline that succeeds while bringing nothing back reports as healthy
+          everywhere else; this is the one place it shows. */}
+      <div className={`admin-stat${health.stalled.length ? " admin-stat-alarm" : ""}`}>
+        <span>{tr(locale, "Newest research", "最近入库")}</span>
+        <b>{health.articleAgeHours === null ? "—" : health.articleAgeHours < 1 ? tr(locale, "<1h", "1 小时内") : `${health.articleAgeHours.toFixed(0)}h`}</b>
+        <small>{health.stalled.length ? health.stalled.join(" · ") : tr(locale, `${health.workingSources}/${health.crawlableSources} sources succeeded / 24h`, `24 小时内 ${health.workingSources}/${health.crawlableSources} 家来源成功`)}</small>
+      </div>
     </section>
 
     <div className="admin-columns">

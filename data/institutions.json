@@ -68,7 +68,8 @@
     "authorityScore": 0.85,
     "priority": 1,
     "updateFreq": "220–380",
-    "language": "en"
+    "language": "en",
+    "requiresRender": true
   },
   {
     "slug": "rbc",
@@ -266,7 +267,7 @@
   {
     "slug": "abn",
     "name": "ABN AMRO Research",
-    "researchUrl": "https://www.abnamro.com/research/en/",
+    "researchUrl": "https://www.abnamro.com/research/en/home",
     "rating": 3,
     "authorityScore": 0.7,
     "priority": 3,

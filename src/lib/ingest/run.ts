@@ -536,10 +536,11 @@ async function executeIngest() {
   const sourceSeconds = Math.min(600, Math.max(30, Number(arg("source-seconds") || 180)));
   const renderLimit = Math.min(20, Math.max(0, Number(arg("render-limit") || 4)));
   const concurrency = Math.min(16, Math.max(1, Number(arg("concurrency") || process.env.INGEST_CONCURRENCY || 8)));
-  // Only what a source published in the last day is worth the parse/translate/analysis
-  // spend. A calendar-month floor collapsed to a few hours on the 1st of each month, so
-  // the window is a rolling one; --since still lets an operator reach further back.
-  const windowHours = Math.max(1, Number(arg("hours") || process.env.INGEST_WINDOW_HOURS || 24));
+  // A rolling window rather than a calendar-month floor, which collapsed to a few hours
+  // on the 1st of each month. Seven days rather than one: most desks do not publish
+  // daily, and a day-long window silently excluded every source that does not — one
+  // publisher alone had 62 reports fall outside it. --since still reaches further back.
+  const windowHours = Math.max(1, Number(arg("hours") || process.env.INGEST_WINDOW_HOURS || 24 * 7));
   const windowStart = new Date(Date.now() - windowHours * 3600_000);
   const requestedSince = arg("since") ? new Date(arg("since")!) : null;
   const since = requestedSince && !isNaN(requestedSince.getTime()) ? requestedSince : windowStart;

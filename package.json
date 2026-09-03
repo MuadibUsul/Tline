@@ -26,6 +26,7 @@
     "macro:forecasts": "tsx prisma/macro-forecasts.ts",
     "macro:audit": "tsx scripts/macro-audit.ts",
     "reparse": "tsx prisma/reparse.ts",
+    "retitle": "tsx prisma/retitle.ts",
     "translate": "tsx prisma/translate.ts",
     "translate:eval": "tsx prisma/translate-eval.ts",
     "documents": "tsx prisma/documents.ts",

@@ -86,3 +86,15 @@ test("sources are consulted in order of how much each can be trusted", () => {
   // Neither the link nor the document helps: the filename is all that is left.
   assert.equal(resolveDocumentTitle({ linkTitle: "Download PDF", filename: "jacksonhole" }), "jacksonhole");
 });
+
+test("a paragraph sharing the heading's size is not mistaken for the title", () => {
+  const long = "The business equipment subcomponent of the report has taken on added importance in recent years due to its strong correlation with capital spending.";
+  const blocks = [
+    { id: "h", page: 0, x: 0, y: 700, width: 100, height: 16, fontSize: 16, text: "", sourceText: "CapEx Signals Remain Constructive" },
+    // Same size, immediately below, but plainly prose.
+    { id: "p", page: 0, x: 0, y: 660, width: 100, height: 16, fontSize: 16, text: "", sourceText: long },
+    ...Array.from({ length: 12 }, (_, i) => ({ id: `b${i}`, page: 0, x: 0, y: 600 - i * 12, width: 100, height: 10, fontSize: 10, text: "", sourceText: `body ${i}` })),
+  ];
+  const title = titleFromPdfBlocks(blocks);
+  assert.ok(!title.includes("strong correlation"), `body text leaked into the title: ${title}`);
+});

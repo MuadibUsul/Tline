@@ -42,6 +42,21 @@ export function cleanLinkTitle(raw: string | null | undefined): string {
   return stripped;
 }
 
+/**
+ * Whether text is only an instruction or a section label — "Download PDF", "Insights".
+ *
+ * Separate from cleanLinkTitle because that also rejects slugs, which is right when
+ * judging anchor text but wrong when judging a title already in hand: "US Rates Weekly
+ * 20260821" names its report perfectly well.
+ */
+export function isCallToActionOnly(value: string) {
+  const stripped = (value ?? "").replace(/\s+/g, " ").trim()
+    .replace(CALL_TO_ACTION, "")
+    .replace(CHINESE_CALL_TO_ACTION, "")
+    .trim();
+  return !stripped || stripped.length < 3 || GENERIC_LABEL.test(stripped);
+}
+
 /** A filename that names nothing: a slug, a code, or a date stamp. */
 export function isOpaqueFilename(name: string) {
   const value = name.trim();
@@ -59,7 +74,9 @@ export function isOpaqueFilename(name: string) {
 // Roughly the top third of a portrait page, in PDF points.
 const TOP_BAND_POINTS = 250;
 const TITLE_MIN = 6;
-const TITLE_MAX = 200;
+const TITLE_MAX = 160;
+// A heading longer than this is a paragraph the type hierarchy failed to separate.
+const LEVEL_MAX = 100;
 
 /**
  * The title as the document itself sets it, read from the type hierarchy of page one.
@@ -99,6 +116,8 @@ export function titleFromPdfBlocks(blocks: PdfSourceBlock[]): string {
       .join(" ")
       .replace(/\s+/g, " ")
       .trim();
+    // A run this long is body text sharing the heading's size, not a heading.
+    if (line.length > LEVEL_MAX) continue;
     // A masthead repeated inside the title below it adds nothing.
     if (line && !parts.some((part) => part.toLowerCase().includes(line.toLowerCase()))) parts.push(line);
   }

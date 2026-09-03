@@ -137,12 +137,13 @@
   {
     "slug": "pictet",
     "name": "Pictet",
-    "researchUrl": "https://www.pictet.com/insights",
+    "researchUrl": "https://www.pictet.com/us/en/insights",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 1,
     "updateFreq": "110–190",
-    "language": "en"
+    "language": "en",
+    "requiresRender": true
   },
   {
     "slug": "bmo",

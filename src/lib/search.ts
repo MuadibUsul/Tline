@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { ASSETS } from "./assets";
 import { publicationReadyWhere } from "./publication";
 import { assetName, domainTerm, institutionName, localizeChineseContent, type Locale } from "./i18n";
+import { hasChinese, looksLikePinyinQuery, pinyinForms, scorePinyin, type PinyinForms } from "./pinyin";
 
 export type SearchResultKind = "institution" | "asset" | "article" | "view";
 
@@ -29,6 +30,11 @@ export interface SearchCandidate {
   normalizedContent?: string;
   contentWords?: string[];
   contentTrigrams?: Set<string>;
+  /** Display names as the reader sees them, kept apart from the composed result title
+   * so a ticker appended for display cannot dilute the name's pronunciation. */
+  displayNames?: string[];
+  /** Pronunciations of the naming fields, so a Latin-keyboard query can reach them. */
+  pinyin?: PinyinForms[];
 }
 
 export function normalizeSearchText(value: string) {
@@ -152,6 +158,28 @@ function candidateScore(query: string, candidate: SearchCandidate) {
   return isEntity ? score * 1.2 : score;
 }
 
+/**
+ * The best pronunciation match among a candidate's names.
+ *
+ * Only consulted for a query that is plain Latin letters: Chinese text is matched
+ * directly, and a query with digits or punctuation is not someone typing pinyin.
+ */
+// A pronunciation match is a match on the name, so it is weighted as one. Below that it
+// lost to an incidental English match: "yuanyou" begins with the word "yuan", which was
+// enough to put currency commentary above the oil contract the reader asked for.
+const PINYIN_NAME_WEIGHT = 4;
+
+function pinyinScore(query: string, candidate: SearchCandidate) {
+  if (!candidate.pinyin?.length || !looksLikePinyinQuery(query)) return 0;
+  let best = 0;
+  for (const forms of candidate.pinyin) best = Math.max(best, scorePinyin(query, forms));
+  if (best === 0) return 0;
+  // The same preference text matching applies: an asset outranks the reports that merely
+  // mention it, whichever script the reader typed.
+  const isEntity = candidate.result.kind === "institution" || candidate.result.kind === "asset";
+  return best * PINYIN_NAME_WEIGHT * (isEntity ? 1.2 : 1);
+}
+
 // A report carrying a dozen views on the searched asset would otherwise fill the whole
 // list with itself and bury every other source.
 const MAX_VIEWS_PER_ARTICLE = 2;
@@ -160,7 +188,10 @@ export function rankSearchCandidates(query: string, candidates: SearchCandidate[
   const normalizedQuery = normalizeSearchText(query);
   const perArticle = new Map<string, number>();
   return candidates
-    .map((candidate) => ({ candidate, score: candidateScore(normalizedQuery, candidate) }))
+    .map((candidate) => ({
+      candidate,
+      score: Math.max(candidateScore(normalizedQuery, candidate), pinyinScore(normalizedQuery, candidate)),
+    }))
     .filter(({ score }) => score >= 18)
     .sort((a, b) => b.score - a.score ||
       (b.candidate.result.publishedAt ?? "").localeCompare(a.candidate.result.publishedAt ?? ""))
@@ -307,6 +338,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         href: `/institution/${institution.slug}`,
       },
       primary: [institution.name, institution.slug],
+      displayNames: [institutionName(institution.name, locale)],
     })),
     ...assets.map((asset) => {
       const canonicalAliases = ASSETS.find((definition) => definition.ticker === asset.ticker)?.aliases ?? [];
@@ -319,6 +351,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
           href: `/asset/${asset.ticker}`,
         },
         primary: [asset.name, asset.ticker],
+        displayNames: [assetName(asset.name, locale, asset.ticker)],
         aliases: [...new Set([...parseAliases(asset.aliases), ...canonicalAliases])],
       };
     }),
@@ -381,6 +414,11 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
   ];
 
   for (const candidate of candidates) {
+    // Names only. Running the whole body through a dictionary would cost far more than it
+    // could return: nobody searches an article's twentieth paragraph by its sound.
+    const names = [...(candidate.displayNames ?? []), ...candidate.primary, ...(candidate.aliases ?? [])]
+      .filter((value) => value && hasChinese(value));
+    if (names.length) candidate.pinyin = [...new Set(names)].map(pinyinForms);
     candidate.normalizedContent = normalizeSearchText((candidate.content ?? []).join(" "));
     candidate.contentWords = [...new Set(candidate.normalizedContent.split(" "))];
     candidate.contentTrigrams = new Set(candidate.contentWords.flatMap(trigrams));

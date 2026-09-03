@@ -74,6 +74,7 @@ jobs:
           script: |
             set -eu
             cd ~/tline
+            IMAGE='${{ needs.build.outputs.image }}'
             NEW_TAG='${{ needs.build.outputs.tag }}'
             PREVIOUS_TAG=$(cat .deploy-tag 2>/dev/null || true)
             export TAG="$NEW_TAG"
@@ -90,6 +91,23 @@ jobs:
               if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
                 node -e "fetch('http://127.0.0.1:3000/api/health').then(async r=>{const b=await r.json();if(!r.ok||b.status!=='ok')process.exit(1)}).catch(()=>process.exit(1))"; then
                 echo "$NEW_TAG" > .deploy-tag
+
+                # Retain the three most recent images: the one now running, the rollback
+                # target, and one spare. Every deploy leaves behind a fully tagged image,
+                # and `docker image prune` only removes DANGLING ones, so nothing here is
+                # ever untagged and nothing was ever reclaimed. Measured cost of skipping
+                # this: 22 stale images, 31.8 GB.
+                #
+                # Not `prune -af`: other projects share this host and -a would delete their
+                # rollback images too. `prune` has no reference filter, so scoping to one
+                # repository requires listing and removing explicitly. Plain `docker rmi`
+                # (no -f) refuses an image that is in use, which is the safety net.
+                docker image ls --filter=reference="${IMAGE}:sha-*" --format '{{.ID}} {{.CreatedAt}}' \
+                  | sort -k2 -r \
+                  | tail -n +4 \
+                  | awk '{print $1}' \
+                  | xargs -r docker rmi || true
+
                 echo "Deployment is healthy"
                 exit 0
               fi

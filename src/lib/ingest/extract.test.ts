@@ -205,13 +205,17 @@ test("applies durable source discovery exceptions", () => {
   assert.equal(articleAllowed("rbc", "Featured Analysis", "A collection of featured reports"), false);
   assert.equal(articleAllowed("commerzbank", "Newsletters | Corporate Clients", "Newsletter archive"), false);
   assert.equal(articleAllowed("citi", "View Transcript", "A complete podcast transcript with substantive research."), true);
+  assert.equal(candidateAllowed("rabobank", "https://www.rabobank.com/knowledge/q011543889-seven-so-far-seven-more-to-come"), true);
+  assert.equal(candidateAllowed("rabobank", "https://www.rabobank.com/knowledge/all-articles"), false);
+  assert.equal(articleAllowed("bmo", "BMO Named Official Bank of the Los Angeles Lakers", "Sponsorship announcement"), false);
   // Newly registered sub-topic listing pages are crawled alongside the main research URL.
-  assert.deepEqual(listingUrls("nomura", "https://www.nomuraconnects.com/about-asia"), [
-    "https://www.nomuraconnects.com/about-asia",
-    "https://www.nomuraconnects.com/economics",
-    "https://www.nomuraconnects.com/emerging-markets",
-    "https://www.nomuraconnects.com/annual-outlook",
-  ]);
+  // Pinned to a day because the extras rotate; the sections themselves are asserted by
+  // the rotation test rather than by their order here.
+  const nomura = listingUrls("nomura", "https://www.nomuraconnects.com/about-asia", 0);
+  assert.equal(nomura[0], "https://www.nomuraconnects.com/about-asia");
+  for (const section of ["economics", "emerging-markets", "annual-outlook", "rates", "sustainability"]) {
+    assert.ok(nomura.includes(`https://www.nomuraconnects.com/${section}`), `${section} is crawled`);
+  }
 });
 
 test("discovers nested article pages and embedded same-origin PDFs", () => {
@@ -394,7 +398,40 @@ test("a six-digit date is read the way that does not fall in the future", () => 
   );
 });
 
+test("discovers Danske UUID article routes", () => {
+  const html = `<main><div class="card"><img alt="Right Arrow"><p>2.9.2026</p><p>Euro Area Macro Monitor - Growth resilience takes rate cuts off the table</p><a href="/research/article/5d0bf2b0-3d66-44bc-80a5-09358f838cf6/EN">Read more</a></div></main>`;
+  const link = extractLinks(html, "https://research.danskebank.com/research/home")[0];
+  assert.equal(link?.url, "https://research.danskebank.com/research/article/5d0bf2b0-3d66-44bc-80a5-09358f838cf6/EN");
+  assert.equal(link?.title, "Euro Area Macro Monitor - Growth resilience takes rate cuts off the table");
+});
+
 test("continental dotted dates are understood", () => {
   assert.deepEqual(inferPublicationDate("Veröffentlicht am 02.09.2026"), new Date("2026-09-02T00:00:00.000Z"));
   assert.deepEqual(inferPublicationDate("31.12.2025"), new Date("2025-12-31T00:00:00.000Z"));
+});
+
+test("listings rotate so every section is reached across runs", () => {
+  const research = "https://www.nomuraconnects.com/articles";
+  const first = listingUrls("nomura", research, 0);
+  assert.equal(first[0], research, "the source's own page stays first");
+
+  const sections = first.slice(1);
+  assert.ok(sections.length > 3, "this publisher has more sections than one run visits");
+
+  // Each day starts the extras at a different point, and no run loses or repeats one.
+  for (const day of [0, 1, 5, sections.length, sections.length + 3]) {
+    const order = listingUrls("nomura", research, day);
+    assert.equal(order[0], research);
+    assert.deepEqual([...order.slice(1)].sort(), [...sections].sort(), `day ${day} covers every section once`);
+  }
+
+  // A run reads only its first few pages, so what those are has to change by the day.
+  const headOne = listingUrls("nomura", research, 1).slice(1, 4);
+  const headTwo = listingUrls("nomura", research, 2).slice(1, 4);
+  assert.notDeepEqual(headOne, headTwo, "consecutive days must not read the same sections");
+});
+
+test("a source without extra listings is unaffected by rotation", () => {
+  const only = listingUrls("no-such-source", "https://bank.example/research");
+  assert.deepEqual(only, ["https://bank.example/research"]);
 });

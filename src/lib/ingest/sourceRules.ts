@@ -57,10 +57,22 @@ const RULES: Record<string, SourceRule> = {
     ],
   },
   nomura: {
+    // Every section carries different reports, so all of them are listed; the rotation
+    // in listingUrls covers them across runs rather than in one.
     listingUrls: [
       "https://www.nomuraconnects.com/economics",
       "https://www.nomuraconnects.com/emerging-markets",
       "https://www.nomuraconnects.com/annual-outlook",
+      "https://www.nomuraconnects.com/central-banks",
+      "https://www.nomuraconnects.com/rates",
+      "https://www.nomuraconnects.com/geopolitics",
+      "https://www.nomuraconnects.com/technology",
+      "https://www.nomuraconnects.com/volatility",
+      "https://www.nomuraconnects.com/sustainability",
+      "https://www.nomuraconnects.com/asia",
+      "https://www.nomuraconnects.com/americas",
+      "https://www.nomuraconnects.com/emea",
+      "https://www.nomuraconnects.com/japan",
     ],
   },
   ocbc: {
@@ -125,6 +137,13 @@ const RULES: Record<string, SourceRule> = {
     candidatePath: /^(?:\/global\/insights\/(?!research\/?$).+|\/rcs\/citigpa\/storage\/public\/.+\.pdf$)/i,
     articleRejected: /^Independent Research and Market Analysis by Citi\s*$/i,
   },
+  rabobank: {
+    listingUrls: ["https://www.rabobank.com/knowledge/all-articles"],
+    candidatePath: /^\/knowledge\/[qd]\d+-/i,
+  },
+  bmo: {
+    articleRejected: /^BMO Named Official Bank\b/i,
+  },
   natixis: {
     // Angular SPA: every path returns the same shell and there is no sitemap.
     // Discovery runs through the site's own public API (see apiSources.ts).
@@ -143,8 +162,20 @@ const RULES: Record<string, SourceRule> = {
   },
 };
 
-export function listingUrls(slug: string, researchUrl: string): string[] {
-  return [researchUrl, ...(RULES[slug]?.listingUrls ?? [])];
+/**
+ * The listings to visit, with the extras rotated.
+ *
+ * A crawl visits only the first few pages it is given, so a publisher with more sections
+ * than that budget would have had its later ones read on no run at all — they sat at the
+ * end of a fixed list and were never reached. Rotating by the day covers every section
+ * within a few days while each run stays the same size. The research URL stays first,
+ * since it is the page the source is defined by.
+ */
+export function listingUrls(slug: string, researchUrl: string, day = Math.floor(Date.now() / 864e5)): string[] {
+  const extras = RULES[slug]?.listingUrls ?? [];
+  if (extras.length === 0) return [researchUrl];
+  const offset = day % extras.length;
+  return [researchUrl, ...extras.slice(offset), ...extras.slice(0, offset)];
 }
 
 /**

@@ -32,8 +32,11 @@ interface Labels {
 type PdfDocument = {
   numPages: number;
   getPage: (index: number) => Promise<PdfPage>;
-  destroy: () => Promise<void>;
 };
+/** What getDocument returns. The document it resolves to has no destroy of its own —
+ *  calling one there threw on unmount and took the page with it, so going back from a
+ *  report landed on an error instead of the page behind it. */
+type PdfLoadingTask = { promise: Promise<unknown>; destroy: () => Promise<void> };
 type PdfPage = {
   getViewport: (options: { scale: number }) => { width: number; height: number };
   render: (options: { canvas: HTMLCanvasElement; viewport: unknown }) => { promise: Promise<void>; cancel: () => void };
@@ -56,21 +59,20 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
 
   useEffect(() => {
     let cancelled = false;
+    let task: PdfLoadingTask | null = null;
     let loaded: PdfDocument | null = null;
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
-        loaded = (await pdfjs.getDocument({
+        task = pdfjs.getDocument({
           url: src,
           cMapUrl: "/pdfjs/cmaps/",
           cMapPacked: true,
           standardFontDataUrl: "/pdfjs/standard_fonts/",
-        }).promise) as unknown as PdfDocument;
-        if (cancelled) {
-          void loaded.destroy();
-          return;
-        }
+        }) as unknown as PdfLoadingTask;
+        loaded = (await task.promise) as PdfDocument;
+        if (cancelled) return;
         // Every page's natural size up front, so the column has its real height from the
         // start and scrolling does not jump as pages are drawn into it.
         const measured = [];
@@ -89,7 +91,14 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
     return () => {
       cancelled = true;
       if (documentRef.current === loaded) documentRef.current = null;
-      void loaded?.destroy();
+      // Guarded because this runs while the browser is navigating away: anything thrown
+      // here surfaces as a failed navigation rather than as a viewer that failed to tidy
+      // up, which is how the back button came to land on an error page.
+      try {
+        void task?.destroy().catch(() => {});
+      } catch {
+        /* the document is going away regardless */
+      }
     };
   }, [src]);
 

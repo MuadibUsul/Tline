@@ -181,8 +181,6 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
               failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
               page: tr(locale, "Page", "第"),
               of: tr(locale, "of", "/"),
-              previous: tr(locale, "Previous page", "上一页"),
-              next: tr(locale, "Next page", "下一页"),
               zoomIn: tr(locale, "Zoom in", "放大"),
               zoomOut: tr(locale, "Zoom out", "缩小"),
             }}
@@ -239,8 +237,6 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
                 failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
                 page: tr(locale, "Page", "第"),
                 of: tr(locale, "of", "/"),
-                previous: tr(locale, "Previous page", "上一页"),
-                next: tr(locale, "Next page", "下一页"),
                 zoomIn: tr(locale, "Zoom in", "放大"),
                 zoomOut: tr(locale, "Zoom out", "缩小"),
               }}

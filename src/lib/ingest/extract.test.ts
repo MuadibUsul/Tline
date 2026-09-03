@@ -435,3 +435,28 @@ test("a source without extra listings is unaffected by rotation", () => {
   const only = listingUrls("no-such-source", "https://bank.example/research");
   assert.deepEqual(only, ["https://bank.example/research"]);
 });
+
+test("months are read abbreviated as well as in full", () => {
+  // "02 Sep 2026" is among the commonest forms a publisher uses; only full names were
+  // matched, so those reports carried no date and were treated as undated.
+  for (const text of ["02 Sep 2026", "Sep 2, 2026", "2 Sept 2026", "2 September 2026", "September 2, 2026"]) {
+    assert.deepEqual(inferPublicationDate(text), new Date("2026-09-02T00:00:00.000Z"), text);
+  }
+  assert.deepEqual(inferPublicationDate("15 Aug 2026"), new Date("2026-08-15T00:00:00.000Z"));
+  assert.deepEqual(inferPublicationDate("Jan 9, 2026"), new Date("2026-01-09T00:00:00.000Z"));
+});
+
+test("a word that merely begins like a month is not a date", () => {
+  // "Marathon" starts with "mar" and "Mayor" with "may"; neither states a day.
+  assert.equal(inferPublicationDate("Marathon 12 2026 report"), null);
+  assert.equal(inferPublicationDate("Mayor 3 2026 speech"), null);
+});
+
+test("a date is found even where a card runs its words together", () => {
+  // Card text arrives without spaces between elements — "View24 August 2026" — so a word
+  // boundary before the day is the wrong guard: there is none between "w" and "2".
+  assert.deepEqual(inferPublicationDate("Weekly Macro View24 August 2026Download PDF"), new Date("2026-08-24T00:00:00.000Z"));
+  assert.deepEqual(inferPublicationDate("Macroeconomics · 02 Sep 2026Barometer"), new Date("2026-09-02T00:00:00.000Z"));
+  // A day inside a longer number is still not a day.
+  assert.equal(inferPublicationDate("reference 1234 August 2026"), null);
+});

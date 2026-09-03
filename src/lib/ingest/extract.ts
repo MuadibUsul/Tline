@@ -48,6 +48,7 @@ const DENY = /(\/about|\/contact|\/careers?|\/privacy|\/terms|\/cookie|\/sitemap
 // A link that looks like an actual article: a date in the path, or a long slug.
 function looksLikeArticleUrl(path: string): boolean {
   if (/\/20\d\d\//.test(path)) return true; // /2026/
+  if (/\/research\/article\/[\da-f-]{36}\/\w+\/?$/i.test(path)) return true;
   const slug = path.split("/").filter(Boolean).pop() ?? "";
   const hyphens = (slug.match(/-/g) || []).length;
   return hyphens >= 3 && slug.length >= 20; // long, wordy slug
@@ -86,7 +87,11 @@ export function extractLinks(html: string, baseUrl: string, limit = 60): Candida
     let text = $(el).text().replace(/\s+/g, " ").trim();
     if (text.length < 12) {
       const card = $(el).closest("article,[class*=card],[class*=tile],[class*=teaser]");
-      const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim();
+      const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim()
+        || card.find("img[alt]").toArray()
+          .map((node) => ($(node).attr("alt") || "").trim())
+          .find((value) => value.length >= 12 && !/^(?:right|left|up|down)?\s*(?:arrow|icon)|logo$/i.test(value))
+        || card.find("p").toArray().map((node) => $(node).text().replace(/\s+/g, " ").trim()).find((value) => value.length >= 20);
       if (heading) text = heading;
     }
     if (text.length < 12 || text.length > 500) return;
@@ -307,9 +312,19 @@ export function newestByPublication<T extends { publishedAt: Date }>(articles: T
   return [...articles].sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime()).slice(0, limit);
 }
 
+// Months as publishers write them: in full, or abbreviated. Only full names were
+// matched before, so "02 Sep 2026" — one of the commonest forms there is — carried no
+// date at all and the report was treated as undated.
+const MONTH_PATTERN = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+const MONTH_INDEX = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** The month a matched name refers to, identified by its first three letters. */
+function monthOf(name: string): number {
+  return MONTH_INDEX.indexOf(name.slice(0, 3).toLowerCase());
+}
+
 /** Conservative date inference for URLs/titles that carry an explicit calendar date or quarter. */
 export function inferPublicationDate(...values: Array<string | null | undefined>): Date | null {
-  const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
   const decoded = values.filter(Boolean).map((value) => {
     try { return decodeURIComponent(value!); } catch { return value!; }
   });
@@ -349,20 +364,20 @@ export function inferPublicationDate(...values: Array<string | null | undefined>
       ].filter((value) => !isNaN(value) && value <= tomorrow);
       if (readings.length) return new Date(Math.max(...readings));
     }
-    const named = input.match(new RegExp(`(?:${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[,]?[-_\\s]+(20\\d{2})`, "i"));
-    if (named) return new Date(Date.UTC(Number(named[2]), months.indexOf(named[0].match(/[a-z]+/i)![0].toLowerCase()), Number(named[1])));
-    const dayNamed = input.match(new RegExp(`(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[-_\\s]+(${months.join("|")})[,]?[-_\\s]+(20\\d{2})`, "i"));
-    if (dayNamed) return new Date(Date.UTC(Number(dayNamed[3]), months.indexOf(dayNamed[2].toLowerCase()), Number(dayNamed[1])));
+    const named = input.match(new RegExp(`(?<![a-z])(${MONTH_PATTERN})[-_\\s]+(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[,]?[-_\\s]+(20\\d{2})`, "i"));
+    if (named) return new Date(Date.UTC(Number(named[3]), monthOf(named[1]), Number(named[2])));
+    const dayNamed = input.match(new RegExp(`(?<!\\d)(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[-_\\s]+(${MONTH_PATTERN})[,]?[-_\\s]+(20\\d{2})`, "i"));
+    if (dayNamed) return new Date(Date.UTC(Number(dayNamed[3]), monthOf(dayNamed[2]), Number(dayNamed[1])));
   }
 
   // Some publishers put the year in the URL/card and only "22 June" in the body.
   const years = [...new Set(decoded.flatMap((value) => value.match(/\b20\d{2}\b/g) || []))];
   if (years.length === 1) {
     for (const input of decoded) {
-      const named = input.match(new RegExp(`\\b(${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?\\b`, "i"));
-      if (named) return new Date(Date.UTC(Number(years[0]), months.indexOf(named[1].toLowerCase()), Number(named[2])));
-      const dayNamed = input.match(new RegExp(`\\b(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[-_\\s]+(${months.join("|")})\\b`, "i"));
-      if (dayNamed) return new Date(Date.UTC(Number(years[0]), months.indexOf(dayNamed[2].toLowerCase()), Number(dayNamed[1])));
+      const named = input.match(new RegExp(`(?<![a-z])(${MONTH_PATTERN})[-_\\s]+(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?(?![\\d])`, "i"));
+      if (named) return new Date(Date.UTC(Number(years[0]), monthOf(named[1]), Number(named[2])));
+      const dayNamed = input.match(new RegExp(`(?<!\\d)(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[-_\\s]+(${MONTH_PATTERN})(?![a-z])`, "i"));
+      if (dayNamed) return new Date(Date.UTC(Number(years[0]), monthOf(dayNamed[2]), Number(dayNamed[1])));
     }
   }
   return null;

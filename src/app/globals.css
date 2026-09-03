@@ -1,3 +1,6 @@
+/* Type comes from the reader's own system: the web fonts this replaced carried no
+   Chinese glyphs at all, so they styled a minority of the text while blocking first
+   paint on a third party much of the audience cannot reach. */
 :root{
   --paper:#fff;--bg:#f7f8fa;--panel:#fff;--panel-2:#f2f4f7;--panel-3:#eceef2;
   --ink:#14161b;--ink-2:#3d424d;--muted:#6a7180;--faint:#98a0ad;
@@ -6,9 +9,9 @@
   --bull:#0e9a6c;--bull-wash:#e6f4ee;--bear:#d22d2d;--bear-wash:#fbeaea;
   --neu:#b7791f;--neu-wash:#f7efe0;
   --shadow:0 1px 2px rgba(20,22,27,.04),0 8px 24px -12px rgba(20,22,27,.10);
-  --serif:"Newsreader",Georgia,"Times New Roman",serif;
-  --sans:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --serif:Georgia,"Times New Roman","Songti SC",STSong,serif;
+  --sans:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
 }
 :root:not([data-theme="light"]){@media (prefers-color-scheme:dark){
   --paper:#12151c;--bg:#0c0e13;--panel:#14181f;--panel-2:#1b202a;--panel-3:#222836;
@@ -410,5 +413,15 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .pdf-preview summary::-webkit-details-marker{display:none}
 .pdf-preview summary::before{content:"▸ ";font-size:11px}
 .pdf-preview[open] summary::before{content:"▾ "}
-.pdf-preview iframe{display:block;width:100%;height:min(78vh,860px);border:0;border-top:1px solid var(--line);background:var(--panel-2)}
-@media (max-width:640px){.pdf-preview iframe{height:70vh}}
+.pdf-viewer{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+.pdf-preview .pdf-viewer{border:0;border-top:1px solid var(--line);border-radius:0}
+.pdf-viewer-bar{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--panel-2);
+  border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pdf-viewer-bar .minibtn{padding:3px 9px;min-width:30px;justify-content:center}
+.pdf-viewer-page,.pdf-viewer-zoom{font-size:12px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.pdf-viewer-spacer{flex:1}
+.pdf-viewer-page-area{max-height:min(78vh,860px);overflow:auto;background:var(--panel-3);
+  display:flex;justify-content:center;padding:14px}
+.pdf-viewer-page-area canvas{box-shadow:0 2px 12px rgba(0,0,0,.18);background:#fff;max-width:100%}
+.pdf-viewer-state{margin:0;padding:26px 12px;font-size:13px;color:var(--muted);text-align:center}
+@media (max-width:640px){.pdf-viewer-page-area{max-height:70vh;padding:8px}}

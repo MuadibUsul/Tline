@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 
-// Google Fonts is the only external origin the app loads. Next's App Router injects
+// No external origin is loaded: fonts are built into the bundle. Next's App Router injects
 // inline bootstrap/hydration scripts and React emits inline styles, so those two
 // directives keep 'unsafe-inline'; every other origin is closed.
 const csp = [
@@ -10,8 +10,11 @@ const csp = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   "script-src 'self' 'unsafe-inline'" + (process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"),
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com data:",
+  "style-src 'self' 'unsafe-inline'",
+  // Fonts are self-hosted now, so no third-party origin is admitted. blob: is for pdf.js,
+  // which materialises a PDF's embedded fonts as blob URLs to render it; without it the
+  // font never loads and the render silently never finishes.
+  "font-src 'self' data: blob:",
   "img-src 'self' data: blob:",
   "connect-src 'self'",
   "manifest-src 'self'",

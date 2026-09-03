@@ -319,6 +319,18 @@ test("discovers articles and full bodies in public structured JSON", () => {
   assert.match(article.text, /policy normalization/);
 });
 
+test("discovers article links exposed by web-component card metadata", () => {
+  const html = `<jb-article-card
+    link='{"href":"/en/insights/market-insights/rates/higher-bond-yields/"}'
+    teaserheader='{"headline":"Can equities withstand higher bond yields?"}'
+    teasermeta='{"date":"02.09.2026"}'></jb-article-card>`;
+  assert.deepEqual(extractLinks(html, "https://example.com/en/insights/"), [{
+    url: "https://example.com/en/insights/market-insights/rates/higher-bond-yields/",
+    title: "Can equities withstand higher bond yields?",
+    publishedAt: new Date("2026-09-02T00:00:00.000Z"),
+  }]);
+});
+
 test("follows only explicit same-origin listing pagination", () => {
   const html = `<a rel="next" href="/insights?page=2">Next</a><a href="https://vendor.example/insights?page=2">Next</a><a href="/careers?page=2">Next</a>`;
   assert.deepEqual(extractPaginationLinks(html, "https://bank.example/insights?page=1", "https://bank.example/insights"), ["https://bank.example/insights?page=2"]);
@@ -341,4 +353,48 @@ test("bullet lists survive extraction, short items included", () => {
   assert.match(body, /• Cut in December/);
   assert.match(body, /• Terminal rate 3\.25%/);
   assert.match(body, /• Balance sheet runoff continues/);
+});
+
+test("recordings are excluded wherever they are published, articles are not", () => {
+  const rejected = [
+    "https://www.ib.barclays/our-insights/the-flip-side-podcast/if-the-fed-goes-quiet.html",
+    "https://cibccm.com/en/insights/podcasts/economic-insights-for-institutional-investors/",
+    "https://bank.example/research/video/market-update",
+    "https://bank.example/insights/webinar-outlook-2026",
+    "https://bank.example/episodes/42",
+  ];
+  for (const url of rejected) {
+    assert.equal(candidateAllowed("barclays", url), false, `${url} is a recording`);
+  }
+
+  // A written report must survive, including one whose words merely contain a rejected
+  // one — "watchlist" and "Podcaster" are not recordings.
+  const kept = [
+    "https://www.ib.barclays/our-insights/barclays-brief/ai-goes-economy-wide.html",
+    "https://www.ib.barclays/our-insights/3-point-perspective/hedge-fund-outlook-2026.html",
+    "https://bank.example/research/fed-watchlist-september",
+    "https://bank.example/research/videography-market-note",
+  ];
+  for (const url of kept) {
+    assert.equal(candidateAllowed("barclays", url), true, `${url} is a report`);
+  }
+});
+
+test("a six-digit date is read the way that does not fall in the future", () => {
+  // 260828 is 28 August 2026 written year-first, not 26 August 2028. Read the other way
+  // the report is dated two years ahead and discarded as never published.
+  assert.deepEqual(
+    inferPublicationDate("https://bank.example/publications/260828-wif-economic-cycle-e.html"),
+    new Date("2026-08-28T00:00:00.000Z"),
+  );
+  // Day-first still works where that is the reading that lands in the past.
+  assert.deepEqual(
+    inferPublicationDate("https://bank.example/notes/280826-outlook.html"),
+    new Date("2026-08-28T00:00:00.000Z"),
+  );
+});
+
+test("continental dotted dates are understood", () => {
+  assert.deepEqual(inferPublicationDate("Veröffentlicht am 02.09.2026"), new Date("2026-09-02T00:00:00.000Z"));
+  assert.deepEqual(inferPublicationDate("31.12.2025"), new Date("2025-12-31T00:00:00.000Z"));
 });

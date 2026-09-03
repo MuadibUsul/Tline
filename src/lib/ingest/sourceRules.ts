@@ -52,6 +52,8 @@ const RULES: Record<string, SourceRule> = {
       "https://www.ib.barclays/our-insights/series.html",
       "https://www.ib.barclays/our-insights/themes/macro-shifts.html",
       "https://www.ib.barclays/our-insights/themes/innovation-edge.html",
+      // The quarterly outlook, kept for when an edition appears rather than for daily flow.
+      "https://www.ib.barclays/research/global-outlook.html",
     ],
   },
   nomura: {
@@ -145,10 +147,22 @@ export function listingUrls(slug: string, researchUrl: string): string[] {
   return [researchUrl, ...(RULES[slug]?.listingUrls ?? [])];
 }
 
+/**
+ * Recordings, wherever they are published.
+ *
+ * A podcast or video page carries a blurb, not a report, so it can never pass the article
+ * gates — but it is fetched, rendered and examined first, and on a desk that publishes
+ * mostly recordings that consumes the whole crawl budget before a written report is
+ * reached. Excluding them by path costs nothing and is true of every publisher.
+ */
+const RECORDING_PATH = /(?:^|[/-])(?:podcasts?|videos?|webinars?|webcasts?|episodes?|listen|watch)(?:$|[/-])/i;
+
 export function candidateAllowed(slug: string, url: string): boolean {
+  let pathname: string;
+  try { pathname = new URL(url).pathname; } catch { return false; }
+  if (RECORDING_PATH.test(pathname)) return false;
   const path = RULES[slug]?.candidatePath;
-  if (!path) return true;
-  try { return path.test(new URL(url).pathname); } catch { return false; }
+  return path ? path.test(pathname) : true;
 }
 
 export function sitemapEnabled(slug: string): boolean {

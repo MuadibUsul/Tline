@@ -84,7 +84,8 @@
   {
     "slug": "charles-schwab",
     "name": "Charles Schwab",
-    "researchUrl": "https://www.schwab.com/learn/topic/markets-and-economy",
+    "researchUrl": "https://www.schwab.com/learn/market-commentary",
+    "requiresRender": true,
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -115,6 +116,7 @@
     "slug": "goldman-sachs",
     "name": "Goldman Sachs",
     "researchUrl": "https://www.goldmansachs.com/insights",
+    "requiresRender": true,
     "rating": 5,
     "authorityScore": 1,
     "priority": 1,
@@ -125,6 +127,7 @@
     "slug": "morgan-stanley",
     "name": "Morgan Stanley",
     "researchUrl": "https://www.morganstanley.com/insights",
+    "requiresRender": true,
     "rating": 5,
     "authorityScore": 1,
     "priority": 1,
@@ -145,6 +148,7 @@
     "slug": "bmo",
     "name": "BMO Capital Markets",
     "researchUrl": "https://capitalmarkets.bmo.com/en/insights/",
+    "requiresRender": true,
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -164,17 +168,19 @@
   {
     "slug": "cibc",
     "name": "CIBC Capital Markets",
-    "researchUrl": "https://cibccm.com/en/insights/",
+    "researchUrl": "https://cibccm.com/en/insights/all-insights/",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
     "updateFreq": "95–170",
-    "language": "en"
+    "language": "en",
+    "requiresRender": true
   },
   {
     "slug": "rabobank",
     "name": "Rabobank / RaboResearch",
     "researchUrl": "https://www.rabobank.com/knowledge",
+    "requiresRender": true,
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -298,6 +304,7 @@
     "slug": "danske",
     "name": "Danske Bank",
     "researchUrl": "https://research.danskebank.com/research/home",
+    "requiresRender": true,
     "rating": 3,
     "authorityScore": 0.7,
     "priority": 3,
@@ -399,12 +406,13 @@
   {
     "slug": "commerzbank",
     "name": "Commerzbank",
-    "researchUrl": "https://www.commerzbank.com/research-insights/",
+    "researchUrl": "https://www.commerzbank.de/group/research/week-in-focus/",
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
     "updateFreq": "50–100",
-    "language": "en"
+    "language": "en",
+    "requiresRender": true
   },
   {
     "slug": "state-street",
@@ -420,6 +428,7 @@
     "slug": "julius",
     "name": "Julius Baer",
     "researchUrl": "https://www.juliusbaer.com/en/insights/",
+    "requiresRender": true,
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,
@@ -474,7 +483,8 @@
     "authorityScore": 1,
     "priority": 3,
     "updateFreq": "30–75",
-    "language": "en"
+    "language": "en",
+    "requiresRender": true
   },
   {
     "slug": "deutsche",
@@ -540,6 +550,7 @@
     "slug": "lloyds",
     "name": "Lloyds Bank",
     "researchUrl": "https://www.lloydsbankinggroup.com/insights.f0-5.html",
+    "requiresRender": true,
     "rating": 3,
     "authorityScore": 0.7,
     "priority": 3,

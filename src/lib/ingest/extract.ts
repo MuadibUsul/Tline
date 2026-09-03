@@ -63,6 +63,22 @@ export function extractLinks(html: string, baseUrl: string, limit = 60): Candida
     : pathname.replace(/\.[a-z0-9]+$/i, "");
   const out = new Map<string, { title: string; underSection: boolean; date: number; publishedAt: Date | null; research: boolean }>();
 
+  // Some design systems render links inside web-component shadow DOM. Their
+  // server HTML still exposes the public link/card metadata as JSON attributes.
+  $("[link]").each((_, element) => {
+    try {
+      const link = JSON.parse($(element).attr("link") || "null");
+      const header = JSON.parse($(element).attr("teaserheader") || "null");
+      const meta = JSON.parse($(element).attr("teasermeta") || "null");
+      const href = link?.href;
+      const title = $(element).attr("articletitle") || header?.headline;
+      if (typeof href !== "string" || typeof title !== "string") return;
+      const card = $("<article>").append($("<a>").attr("href", href).text(title));
+      if (typeof meta?.date === "string") card.append($("<time>").text(meta.date));
+      $("body").append(card);
+    } catch { /* not publisher card metadata */ }
+  });
+
   $("a[href]").each((_, el) => {
     const chrome = $(el).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]");
     if (chrome.length && !$(el).closest("article").length) return;
@@ -310,10 +326,29 @@ export function inferPublicationDate(...values: Array<string | null | undefined>
     }
     const quarter = input.match(/(?:q([1-4])|([1-4])q)[\s_-]*(?:20)?(\d{2})(?!\d)/i);
     if (quarter) return new Date(Date.UTC(2000 + Number(quarter[3]), (Number(quarter[1] || quarter[2]) - 1) * 3, 1));
+    // Day-first with dots, as most of continental Europe writes a date: 02.09.2026.
+    const dotted = input.match(/(?:^|\D)(0?[1-9]|[12]\d|3[01])\.(0?[1-9]|1[0-2])\.(20\d{2})(?!\d)/);
+    if (dotted) {
+      const date = new Date(Date.UTC(Number(dotted[3]), Number(dotted[2]) - 1, Number(dotted[1])));
+      if (!isNaN(date.getTime())) return date;
+    }
     const compact = input.match(/(?:^|[-_/\s])(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(20\d{2})(?!\d)/);
     if (compact) return new Date(Date.UTC(Number(compact[3]), Number(compact[2]) - 1, Number(compact[1])));
-    const shortCompact = input.match(/(?:^|[-_/\s])(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(\d{2})(?!\d)/);
-    if (shortCompact) return new Date(Date.UTC(2000 + Number(shortCompact[3]), Number(shortCompact[2]) - 1, Number(shortCompact[1])));
+    // Six digits are ambiguous: 260828 is 28 August 2026 to one publisher and 26 August
+    // 2028 to another. A report cannot be published in the future, so the reading that
+    // lands there is the wrong one — before this, a whole desk's output was dated two
+    // years ahead and discarded as unpublished.
+    const shortCompact = input.match(/(?:^|[-_/\s])(\d{2})(\d{2})(\d{2})(?!\d)/);
+    if (shortCompact) {
+      const [, a, b, c] = shortCompact.map(Number);
+      const tomorrow = Date.now() + 864e5;
+      const readings = [
+        // DDMMYY, then YYMMDD.
+        a! <= 31 && b! >= 1 && b! <= 12 ? Date.UTC(2000 + c!, b! - 1, a!) : NaN,
+        b! >= 1 && b! <= 12 && c! <= 31 ? Date.UTC(2000 + a!, b! - 1, c!) : NaN,
+      ].filter((value) => !isNaN(value) && value <= tomorrow);
+      if (readings.length) return new Date(Math.max(...readings));
+    }
     const named = input.match(new RegExp(`(?:${months.join("|")})[-_\\s]+(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[,]?[-_\\s]+(20\\d{2})`, "i"));
     if (named) return new Date(Date.UTC(Number(named[2]), months.indexOf(named[0].match(/[a-z]+/i)![0].toLowerCase()), Number(named[1])));
     const dayNamed = input.match(new RegExp(`(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[-_\\s]+(${months.join("|")})[,]?[-_\\s]+(20\\d{2})`, "i"));

@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getLocale, tr } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
-import { queueSourceRetry, setSourceMonitoring } from "./actions";
+import { queueContentRetry, queueSourceRetry, setSourceMonitoring } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export default async function AdminPage() {
   return <main className="wrap admin-page">
     <header className="page-head admin-head">
       <div><div className="eyebrow">Operations Console</div><h1>{tr(locale, "Operations", "运营后台")}</h1><p className="sub">{tr(locale, "Source health, pipeline runs and editorial review in one place.", "统一查看来源健康度、流水线任务和内容审核。")}</p></div>
-      <div className="tag-row"><span className="chip acc">{user.role}</span><a className="minibtn" href="/api/health" target="_blank" rel="noreferrer">Health JSON ↗</a></div>
+      <div className="tag-row"><span className="chip acc">{user.role}</span><Link className="minibtn" href="/admin/api-keys">{tr(locale, "API keys", "API 密钥")} →</Link><a className="minibtn" href="/api/health" target="_blank" rel="noreferrer">Health JSON ↗</a></div>
     </header>
 
     <section className="admin-stats" aria-label={tr(locale, "Operations summary", "运营概览")}>
@@ -68,7 +68,19 @@ export default async function AdminPage() {
       </section>
 
       <aside><section className="blk"><div className="section-t">{tr(locale, "Workers", "调度器心跳")}</div><div className="admin-workers">{["research", "macro"].map((name) => { const worker = workers.find((item) => item.name === name); const healthy = worker?.status === "running" && Date.now() - worker.lastSeenAt.getTime() < 120_000; return <div key={name}><b>{name}</b><span className={`chip ${healthy ? "bull" : "bear"}`}>{healthy ? "ok" : "stale"}</span><small>{age(worker?.lastSeenAt ?? null, locale)}</small></div>; })}</div></section>
-        <section className="blk"><div className="section-t">{tr(locale, "Needs review", "待审核")}</div><div className="admin-review-list">{reviewCount ? <>{analysisReview.map((item) => <Link href={`/research/${item.article.id}`} key={`a-${item.id}`}><span><b>{item.article.title}</b><small>{item.article.institution.name} · analysis</small></span><span className="chip bear">needs_review</span></Link>)}{translationReview.map((item) => <Link href={`/research/${item.article.id}`} key={`t-${item.id}`}><span><b>{item.article.title}</b><small>{item.article.institution.name} · translation</small></span><span className="chip bear">needs_review</span></Link>)}</> : <div className="empty-state">{tr(locale, "Nothing is waiting for review.", "当前没有待审核内容。")}</div>}</div></section>
+        <section className="blk"><div className="section-t">{tr(locale, "Needs review", "待审核")}</div><div className="admin-review-list">{reviewCount ? <>{[
+          ...analysisReview.map((item) => ({ key: `a-${item.id}`, article: item.article, kind: "analysis" as const })),
+          ...translationReview.map((item) => ({ key: `t-${item.id}`, article: item.article, kind: "translation" as const })),
+        ].map((item) => <div className="admin-review-row" key={item.key}>
+          <Link href={`/research/${item.article.id}`}><span><b>{item.article.title}</b><small>{item.article.institution.name} · {item.kind}</small></span><span className="chip bear">needs_review</span></Link>
+          {/* The rerun lives here rather than only on the report: this list is where an
+              operator decides, and a decision that costs a page visit is not taken. */}
+          {user.role === "admin" && <form action={queueContentRetry}>
+            <input type="hidden" name="articleId" value={item.article.id} />
+            <input type="hidden" name="kind" value={item.kind} />
+            <button className="minibtn" type="submit">{tr(locale, "Re-run", "重跑")}</button>
+          </form>}
+        </div>)}</> : <div className="empty-state">{tr(locale, "Nothing is waiting for review.", "当前没有待审核内容。")}</div>}</div></section>
         <section className="blk"><div className="section-t">{tr(locale, "Recent jobs", "最近任务")}</div><div className="admin-jobs">{jobs.map((job) => { const metrics = json(job.metrics); return <div className="admin-job" key={job.id}><div><b>{job.name}</b><small>{age(job.startedAt, locale)} · attempt {job.attempt}</small></div><div className="admin-job-state"><span className={`chip ${tone(job.status)}`}>{job.status}</span>{Object.keys(metrics).length > 0 && <span className="mono admin-metric">{Object.entries(metrics).slice(0, 2).map(([key, value]) => `${key}:${String(value)}`).join(" · ")}</span>}</div>{job.error && <details><summary>{tr(locale, "Error", "错误")}</summary><p>{job.error}</p></details>}</div>; })}</div></section></aside>
     </div>
   </main>;

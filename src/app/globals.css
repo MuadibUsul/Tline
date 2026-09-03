@@ -436,3 +436,8 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .pdf-viewer-sheet canvas{display:block;width:100%;height:auto}
 .pdf-viewer-state{margin:0;padding:26px 12px;font-size:13px;color:var(--muted);text-align:center}
 @media (max-width:640px){.pdf-viewer-page-area{max-height:70vh;padding:8px}}
+
+/* Needs-review queue: the decision and the action sit together. */
+.admin-review-row{display:flex;align-items:center;gap:10px}
+.admin-review-row > a{flex:1;min-width:0}
+.admin-review-row form{flex:none}

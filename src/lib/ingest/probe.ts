@@ -105,14 +105,25 @@ async function probeInstitution(inst: {
   };
   try {
     const source = new URL(inst.researchUrl);
-    const robots = await fetchRobots(source.origin);
-    // Mirrors run.ts: an unavailable robots.txt is treated as allowed, while an
-    // explicit Disallow in a robots.txt we DID retrieve is still respected.
+    // Mirrors run.ts: an institution may publish across several hosts, each checked
+    // against its own robots.txt. An unavailable robots.txt is treated as allowed, while
+    // an explicit Disallow in one we DID retrieve is still respected.
+    const originOf = (url: string) => { try { return new URL(url).origin; } catch { return null; } };
+    const allowedOrigins = new Set([
+      source.origin,
+      ...listingUrls(inst.slug, inst.researchUrl).map(originOf).filter((o): o is string => o !== null),
+    ]);
+    const robotsByOrigin = new Map<string, string | null>();
+    for (const target of allowedOrigins) robotsByOrigin.set(target, await fetchRobots(target));
+
+    const robots = robotsByOrigin.get(source.origin) ?? null;
     if (robots !== null && !robotsAllows(robots, UA, source.pathname)) return { ...base, status: "refused", reason: "robots disallows research path" };
     const allows = (url: string) => {
       try {
         const target = new URL(url);
-        return target.origin === source.origin && (robots === null || robotsAllows(robots, UA, target.pathname));
+        if (!allowedOrigins.has(target.origin)) return false;
+        const rules = robotsByOrigin.get(target.origin) ?? null;
+        return rules === null || robotsAllows(rules, UA, target.pathname);
       } catch { return false; }
     };
 

@@ -20,6 +20,21 @@ const RULES: Record<string, SourceRule> = {
     candidatePath: /^\/en\/news\/[^/]+\/?$/i,
     articleRejected: /^(?:All news stories\s*|Stock exchange release:.*|(?:Half-year report.*Nordea Hypotek|Nordea Hypotek.*half-year report).*)$/i,
   },
+  mufg: {
+    // MUFG publishes on two hosts: bk.mufg.jp issues occasional PDF briefs, while
+    // mufgresearch.com carries the daily FX/rates/macro/credit desk output. Both are
+    // listed so the crawler keeps the PDFs and picks up the far larger HTML stream.
+    listingUrls: [
+      "https://www.mufgresearch.com/fx/",
+      "https://www.mufgresearch.com/rates/",
+      "https://www.mufgresearch.com/macro/",
+      "https://www.mufgresearch.com/credit/",
+      "https://www.mufgresearch.com/forecasts/",
+    ],
+    // Article pages sit one segment below each desk; the bare desk paths are listings.
+    // The second alternative keeps the bk.mufg.jp PDF briefs reachable.
+    candidatePath: /^\/(?:fx|rates|macro|credit|forecasts)\/[^/]+\/?$|^\/report\//i,
+  },
   westpac: {
     // Sub-topic listing pages under Westpac IQ economics.
     listingUrls: [

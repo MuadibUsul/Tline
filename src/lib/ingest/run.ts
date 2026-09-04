@@ -93,27 +93,45 @@ async function ingestInstitution(
     return created;
   };
   const origin = new URL(inst.researchUrl).origin;
-  const sourceListings = listingUrls(inst.slug, inst.researchUrl).filter((url) => new URL(url).origin === origin);
+  // An institution may publish across more than one host — a corporate site plus a
+  // dedicated research portal, say. Configured listing URLs define that set; nothing
+  // else widens it, so a stray off-site link is still refused.
+  const originOf = (url: string) => { try { return new URL(url).origin; } catch { return null; } };
+  const configuredListings = listingUrls(inst.slug, inst.researchUrl);
+  const allowedOrigins = new Set([origin, ...configuredListings.map(originOf).filter((o): o is string => o !== null)]);
+  const sourceListings = configuredListings.filter((url) => allowedOrigins.has(originOf(url) ?? ""));
   const deadline = Date.now() + sourceSeconds * 1000;
   const withinBudget = () => Date.now() < deadline;
 
   // --- Runtime robots.txt compliance check ---
+  // Robots is per host, so each origin is checked against its own file. Sharing one
+  // host's rules across another host would be a compliance claim we cannot make.
   // When robots.txt cannot be fetched we proceed (treat as allowed) rather than pausing;
   // an explicit Disallow in a robots.txt we DID retrieve is still respected.
-  const robotsTxt = await fetchRobots(origin);
+  const robotsByOrigin = new Map<string, string | null>();
+  for (const target of allowedOrigins) robotsByOrigin.set(target, await fetchRobots(target));
+
+  const robotsTxt = robotsByOrigin.get(origin) ?? null;
   if (robotsTxt === null) {
     console.log(`  ${inst.name.padEnd(26)} robots unavailable — proceeding (treated as allowed)`);
   } else if (!robotsAllows(robotsTxt, UA, new URL(inst.researchUrl).pathname)) {
     console.log(`  ${inst.name.padEnd(26)} SKIP · robots disallows research path`);
     return finish("refused", "robots disallows research path", 0);
   }
-  const robotsDelaySec = robotsTxt ? robotsCrawlDelay(robotsTxt, UA) : undefined;
+  // The slowest host sets the pace; a delay honoured on one host is not a licence to
+  // hammer another.
+  const robotsDelaySec = [...robotsByOrigin.values()]
+    .map((txt) => (txt ? robotsCrawlDelay(txt, UA) : undefined))
+    .reduce<number | undefined>((slowest, value) =>
+      value === undefined ? slowest : Math.max(slowest ?? 0, value), undefined);
   const delayMs = Math.max(MIN_DELAY_MS, (robotsDelaySec ?? inst.crawlDelay ?? 0) * 1000);
 
   const allowsUrl = (u: string) => {
     try {
       const url = new URL(u);
-      return url.origin === origin && (robotsTxt === null || robotsAllows(robotsTxt, UA, url.pathname));
+      if (!allowedOrigins.has(url.origin)) return false;
+      const rules = robotsByOrigin.get(url.origin) ?? null;
+      return rules === null || robotsAllows(rules, UA, url.pathname);
     } catch {
       return false;
     }
@@ -441,8 +459,16 @@ async function ingestInstitution(
           }
         }
         const publishedAt = inferPublicationDate(link.url, a.title || link.title, a.publicationDateText, a.text.slice(0, 1200)) || a.publishedAt || link.publishedAt;
+        // Same policy as the candidate path above: where a publisher issues the report as
+        // a PDF, that PDF IS the report and the page around it is teaser copy. This branch
+        // used to reach for the PDF only after the HTML failed looksLikeArticle, which a
+        // 1,500-character intro passes easily — so the teaser was published as the report
+        // and the actual document was never fetched. 131 of 345 articles carried a body
+        // under 5,000 characters as a result, with analysis and translation derived from
+        // the teaser rather than the research.
+        if (await stageEmbeddedPdf(artHtml, link.url, a.title || link.title, publishedAt)) continue;
         if (!publishedAt || !looksLikeArticle(a.title || link.title, a.text)) {
-          if (!await stageEmbeddedPdf(artHtml, link.url, a.title || link.title, publishedAt)) empty++;
+          empty++;
           continue;
         }
         stage({

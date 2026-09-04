@@ -95,8 +95,21 @@ export async function persistArticle(
     return "updated";
   }
 
+  // Identical body text is a duplicate wherever it appears — the same report reachable at
+  // two URLs.
+  //
+  // An identical TITLE is not. Research desks publish recurring columns: "FX Daily
+  // Snapshot", "Asia FX Talk", "Economic Weekly". Matching on title alone, globally,
+  // meant a publisher contributed exactly one article per column name and every later
+  // edition was silently discarded as a duplicate. A repeated title is only evidence of
+  // duplication when it is the same institution on the same day.
   const duplicateContent = await prisma.article.findFirst({
-    where: { OR: [{ titleHash: tHash }, { contentHash: cHash }] },
+    where: {
+      OR: [
+        { contentHash: cHash },
+        { titleHash: tHash, institutionId, publishedAt: raw.publishedAt },
+      ],
+    },
     select: { id: true },
   });
   if (duplicateContent) return "duplicate";

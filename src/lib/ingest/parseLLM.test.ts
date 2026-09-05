@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { heuristicParse, type ParseInput } from "./parseLLM";
+import { coerceModelResponse, heuristicParse, type ParseInput } from "./parseLLM";
 import type { Segment } from "./extract";
 
 const input = (title: string, text: string): ParseInput => ({
@@ -67,4 +67,9 @@ test("does not assign another commodity's target to the detected asset", () => {
   const parsed = heuristicParse(input("Metals Outlook: Copper, Steel and Aluminum", text));
   assert.equal(parsed.assets[0]?.ticker, "COPPER");
   assert.equal(parsed.assets[0]?.target, null);
+});
+
+test("rejects a one-word provider response instead of publishing it as analysis", () => {
+  const parsed = coerceModelResponse({ summary_en: "Schroders", summary_zh: "施罗德", atomic_views: [] }, "test", "test", "Global equities gained in August.");
+  assert.equal(parsed, null);
 });

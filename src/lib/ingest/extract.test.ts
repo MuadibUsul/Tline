@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
-import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
+import { articleAllowed, candidateAllowed, listingUrls, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { stripTrailingDisclaimerSegments } from "../articleText";
 
 test("captures inline figures in document order and anchors them to body segments", () => {
@@ -67,6 +67,12 @@ test("prefers a real h1 when publisher open graph metadata is only a URL slug", 
   const prose = "Cross-border investment and trade flows are expanding as supply chains diversify. ".repeat(12);
   const article = extractArticle(`<html><head><meta property="og:title" content="corridors-in-focus-us-india"></head><body><main><h1>US-India: Enabling the next wave of corporate growth</h1><p>${prose}</p></main></body></html>`);
   assert.equal(article.title, "US-India: Enabling the next wave of corporate growth");
+});
+
+test("preserves a dated subtitle confirmed by the semantic headline", () => {
+  const prose = "Global equities gained while bond markets focused on changing rate expectations. ".repeat(20);
+  const article = extractArticle(`<html><head><meta property="og:title" content="Monthly markets review - August 2026"><script type="application/ld+json">{"@type":"Article","headline":"Monthly markets review - August 2026","articleBody":"${prose}"}</script></head><body><main><h1>Monthly markets review - August 2026</h1><p>${prose}</p></main></body></html>`);
+  assert.equal(article.title, "Monthly markets review - August 2026");
 });
 
 test("does not truncate a long article body", () => {
@@ -195,6 +201,9 @@ test("applies durable source discovery exceptions", () => {
   assert.equal(articleAllowed("nordea", "Stock exchange release: Half-year report 2026 for Nordea Hypotek AB published", "Issuer report"), false);
   assert.equal(candidateAllowed("schroders", "https://www.schroders.com/en-au/au/individual/insights/market-view/"), true);
   assert.equal(candidateAllowed("schroders", "https://www.schroders.com/en-au/au/individual/funds/global-shares/example/"), false);
+  assert.deepEqual(sitemapUrls("schroders"), ["https://www.schroders.com/en/global/individual/sitemap.xml"]);
+  assert.equal(refreshKnownCandidate("schroders", "Monthly markets review"), true);
+  assert.equal(refreshKnownCandidate("schroders", "Monthly markets review - August 2026"), false);
   assert.equal(candidateAllowed("cr-dit-cib", "https://www.ca-cib.com/en/news/project-finance-transaction"), false);
   assert.equal(candidateAllowed("cr-dit-cib", "https://www.ca-cib.com/en/insights/global-markets-research"), true);
   assert.equal(candidateAllowed("saxo", "https://www.home.saxo/insights/saxostrats-experts"), false);

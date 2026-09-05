@@ -1,8 +1,10 @@
 type SourceRule = {
   listingUrls?: string[];
+  sitemapUrls?: string[];
   candidatePath?: RegExp;
   skipSitemap?: boolean;
   articleRejected?: RegExp;
+  refreshKnownTitle?: RegExp;
 };
 
 // Publisher-specific exceptions discovered during source acceptance. Scheduled
@@ -112,7 +114,15 @@ const RULES: Record<string, SourceRule> = {
     ],
   },
   schroders: {
+    // The listing is a client-rendered shell with no article links. Schroders publishes
+    // the complete global/individual inventory in this locale-specific sitemap; naming it
+    // directly avoids the root sitemap's dozens of locale indexes and catches new pieces
+    // without browser rendering.
+    sitemapUrls: ["https://www.schroders.com/en/global/individual/sitemap.xml"],
     candidatePath: /\/insights\//i,
+    // Revisit legacy rows whose dated suffix was lost by the old title cleaner. Once the
+    // corrected title is stored they return to the normal URL-hash fast path.
+    refreshKnownTitle: /^(?:Monthly|Quarterly) markets review$/i,
   },
   rbc: {
     // The registered source is Canadian analysis; the US Week Ahead section carries the
@@ -215,7 +225,15 @@ export function sitemapEnabled(slug: string): boolean {
   return !RULES[slug]?.skipSitemap;
 }
 
+export function sitemapUrls(slug: string): string[] {
+  return RULES[slug]?.sitemapUrls ?? [];
+}
+
 export function articleAllowed(slug: string, title: string, text: string): boolean {
   const rejected = RULES[slug]?.articleRejected;
   return !rejected || (!rejected.test(title) && !rejected.test(text));
+}
+
+export function refreshKnownCandidate(slug: string, title: string): boolean {
+  return RULES[slug]?.refreshKnownTitle?.test(title) ?? false;
 }

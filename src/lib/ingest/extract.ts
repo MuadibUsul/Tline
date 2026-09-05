@@ -423,13 +423,20 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
   const ogTitle = $('meta[property="og:title"]').attr("content")?.trim() || "";
   const headingTitle = $("h1").first().text().replace(/\s+/g, " ").trim();
   const slugLikeTitle = /^[a-z0-9]+(?:-[a-z0-9]+){2,}$/i.test(ogTitle) && !/\s/.test(ogTitle);
-  const title = (
+  const rawTitle = (
     (slugLikeTitle ? headingTitle : ogTitle) ||
     headingTitle ||
     structuredTitle ||
     $("title").text() ||
     ""
-  ).replace(/\s+/g, " ").replace(/\s+[|–—-]\s+[^|–—-]{0,40}$/, "").trim();
+  ).replace(/\s+/g, " ").trim();
+  // A dash is often part of the actual headline ("Monthly markets review - August
+  // 2026"), not a publisher suffix. Preserve it when the page's semantic h1 or JSON-LD
+  // headline confirms the complete value; only strip the generic browser-title suffix.
+  const semanticTitles = [headingTitle, structuredTitle].map((value) => value.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const title = semanticTitles.includes(rawTitle)
+    ? rawTitle
+    : rawTitle.replace(/\s+[|–—-]\s+[^|–—-]{0,40}$/, "").trim();
 
   const author =
     $('meta[name="author"]').attr("content") ||

@@ -2,6 +2,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { parseArticle } from "../src/lib/ingest/parseLLM";
 import { syncForecastsForArticle } from "../src/lib/forecast";
+import { queueRetry } from "../src/lib/contentRetry";
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
 const articleIds = (process.argv.find((arg) => arg.startsWith("--ids="))?.slice(6) || process.argv.find((arg) => arg.startsWith("--id="))?.slice(5) || "").split(",").filter(Boolean);
@@ -141,6 +142,9 @@ async function main() {
           },
         })),
       ]);
+      // One automatic second pass for low-quality model output. During that retry the
+      // queue row is already "running", so queueRetry is a no-op and cannot loop forever.
+      if (parsed.reviewStatus === "needs_review") await queueRetry(article.id, "analysis");
       await syncForecastsForArticle(article.id);
         updated++;
         console.log(`  ${parsed.needsLLM ? "HOLD" : "OK  "} ${article.id} · ${article.title}`);

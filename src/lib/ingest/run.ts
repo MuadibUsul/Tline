@@ -13,7 +13,7 @@ import { saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
-import { articleAllowed, candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
+import { articleAllowed, candidateAllowed, listingUrls, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
@@ -156,10 +156,10 @@ async function ingestInstitution(
   const raws: RawArticle[] = [];
   const nativePdfs = new Map<string, Buffer>();
   const seenCandidates = new Set<string>();
-  const knownCandidates = new Set((await prisma.article.findMany({
+  const knownCandidates = new Map((await prisma.article.findMany({
     where: { institutionId: inst.id },
-    select: { urlHash: true },
-  })).map((article) => article.urlHash));
+    select: { urlHash: true, title: true },
+  })).map((article) => [article.urlHash, article.title]));
   let listingHtml: string | null = null;
   const candidateLimit = Math.min(500, Math.max(perLimit * 3, scanLimit));
   const stage = (raw: RawArticle) => {
@@ -179,7 +179,8 @@ async function ingestInstitution(
     const clean = url.split("#")[0];
     if (seenCandidates.has(clean)) return true;
     seenCandidates.add(clean);
-    if (knownCandidates.has(urlHash(clean))) { dup++; return true; }
+    const knownTitle = knownCandidates.get(urlHash(clean));
+    if (knownTitle && !refreshKnownCandidate(inst.slug, knownTitle)) { dup++; return true; }
     return false;
   };
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
@@ -348,6 +349,7 @@ async function ingestInstitution(
       inst.sitemapUrl = declaredSitemaps[0];
     }
     const sitemapSeeds = [
+      ...sitemapUrls(inst.slug),
       ...declaredSitemaps,
       ...(inst.sitemapUrl ? [inst.sitemapUrl] : []),
       `${origin}/sitemap.xml`,

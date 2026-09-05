@@ -44,6 +44,24 @@ test("produces a reviewed structured translation through the provider boundary",
   assert.equal(result.segments[0].position, 0);
 });
 
+test("keeps a rejected independent review in the retryable state", async () => {
+  class RejectingReviewer extends FakeProvider {
+    async complete(input: CompletionInput): Promise<CompletionResult> {
+      if (input.system.includes("independent bilingual quality reviewer")) {
+        return { provider: this.name, model: this.model, text: JSON.stringify({ pass: false, score: 0.4, issues: ["meaning"] }) };
+      }
+      return super.complete(input);
+    }
+  }
+  const result = await translateArticle("Test Bank", "Gold target raised to $4,900", [{
+    id: "segment-1",
+    position: 0,
+    heading: "Core view",
+    text: "We raise the XAUUSD target from $4,700 to $4,900 and retain 2.5% upside.",
+  }], new RejectingReviewer());
+  assert.equal(result.status, "needs_review");
+});
+
 test("chunks a very long source segment and restores its database structure", async () => {
   let draftCalls = 0;
   const provider: LLMProvider = {

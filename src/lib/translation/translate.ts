@@ -283,7 +283,8 @@ export async function translateArticle(
   const translated = articleText(translatedTitle, draftSegments);
   const quality = validateTranslation(source, translated, segments.length, draftSegments.length);
 
-  // Quality checks remain diagnostic; a successfully generated translation is publishable.
+  // A successfully generated translation remains readable, but failed independent review
+  // must stay in the retryable state instead of being mislabeled as reviewed.
   let review: ReviewResult | null = null;
   if (enableReview && quality.passed && reviewer) {
     try {
@@ -305,7 +306,7 @@ export async function translateArticle(
     model,
     promptVersion: PROMPT_VERSION,
     glossaryVersion: glossary.version,
-    status: "reviewed",
+    status: reviewed ? "reviewed" : "needs_review",
     qualityScore,
     quality,
     review,

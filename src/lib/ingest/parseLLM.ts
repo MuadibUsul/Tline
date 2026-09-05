@@ -215,7 +215,7 @@ interface RawAssetCall {
   confidence?: unknown;
 }
 
-function coerce(input: unknown, provider: string, model: string, sourceText: string): ParsedArticle | null {
+export function coerceModelResponse(input: unknown, provider: string, model: string, sourceText: string): ParsedArticle | null {
   if (!input || typeof input !== "object") return null;
   const json = input as Record<string, unknown>;
   const dirMap: Record<string, number> = {
@@ -236,11 +236,15 @@ function coerce(input: unknown, provider: string, model: string, sourceText: str
         }))
     : [];
   const summary = typeof json.summary_en === "string" ? json.summary_en : json.summary;
-  if (typeof summary !== "string" || !summary) return null;
+  const summaryZh = typeof json.summary_zh === "string" ? json.summary_zh.trim() : null;
+  // A syntactically valid JSON object is not necessarily an analysis. Provider glitches
+  // have returned only the institution name; rejecting these here lets realParse retry
+  // instead of publishing a one-word conclusion beside a complete article.
+  if (typeof summary !== "string" || summary.trim().length < 40 || !summaryZh || summaryZh.length < 12) return null;
   const atomicViews = validateAtomicViews(json.atomic_views, sourceText);
   const fields = {
     summary,
-    summaryZh: typeof json.summary_zh === "string" ? json.summary_zh : null,
+    summaryZh,
     keyArguments: Array.isArray(json.key_arguments_en) ? json.key_arguments_en.slice(0, 8) : Array.isArray(json.key_arguments) ? json.key_arguments.slice(0, 8) : [],
     keyArgumentsZh: Array.isArray(json.key_arguments_zh) ? json.key_arguments_zh.slice(0, 8) : [],
     keyNumbers: Array.isArray(json.key_numbers_en) ? json.key_numbers_en.slice(0, 8) : Array.isArray(json.key_numbers) ? json.key_numbers.slice(0, 8) : [],
@@ -275,6 +279,7 @@ function coerce(input: unknown, provider: string, model: string, sourceText: str
 async function realParse(input: ParseInput, provider: LLMProvider): Promise<ParsedArticle | null> {
   const sourceText = input.text.slice(0, 50000);
   const user = `INSTITUTION: ${input.institution}\nPUBLISHED: ${input.publishedAt}\nTITLE: ${input.title}\n\nARTICLE:\n${sourceText}`;
+  let best: ParsedArticle | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const result = await completeJSON<unknown>(provider, {
@@ -282,13 +287,17 @@ async function realParse(input: ParseInput, provider: LLMProvider): Promise<Pars
         user,
         maxTokens: 5000,
       });
-      const parsed = coerce(result.value, result.meta.provider, result.meta.model, sourceText);
-      if (parsed) return parsed;
+      const parsed = coerceModelResponse(result.value, result.meta.provider, result.meta.model, sourceText);
+      if (parsed?.reviewStatus === "ok") return parsed;
+      // A grounded summary without any validated atomic views is still incomplete. Retry
+      // it in the same run; if both attempts are partial, retain the richer candidate so
+      // the review queue has useful output rather than an empty page.
+      if (parsed && (!best || parsed.atomicViews.length > best.atomicViews.length)) best = parsed;
     } catch {
       // Fall through to retry, then preserve the safe heuristic result.
     }
   }
-  return null;
+  return best;
 }
 
 /** Use the configured model for evidence-backed atomic views; fall back safely to heuristics. */

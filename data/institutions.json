@@ -192,6 +192,8 @@
     "slug": "schroders",
     "name": "Schroders",
     "researchUrl": "https://www.schroders.com/en/global/individual/insights/",
+    "sitemapUrl": "https://www.schroders.com/en/global/individual/sitemap.xml",
+    "crawlIntervalSec": 300,
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 3,

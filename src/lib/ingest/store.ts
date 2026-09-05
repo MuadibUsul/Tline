@@ -58,6 +58,12 @@ export async function persistArticle(
           if (titleChanged) {
             await tx.articleTranslation.deleteMany({ where: { articleId: sameUrl.id } });
             await tx.articleDocument.deleteMany({ where: { articleId: sameUrl.id, kind: { not: "source_native" } } });
+            // Title is part of every analysis/translation prompt. Keeping derived output
+            // after correcting a truncated title leaves the article permanently attached
+            // to the bad parse because routine processing only selects missing rows.
+            await tx.analysis.deleteMany({ where: { articleId: sameUrl.id } });
+            await tx.articleAsset.deleteMany({ where: { articleId: sameUrl.id } });
+            await tx.atomicView.deleteMany({ where: { articleId: sameUrl.id } });
           }
           await tx.article.update({ where: { id: sameUrl.id }, data: {
             ...(titleChanged ? { title: raw.title, titleHash: tHash } : {}),

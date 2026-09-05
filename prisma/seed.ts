@@ -16,6 +16,7 @@ interface InstSeed {
   rssUrl?: string;
   sitemapUrl?: string;
   requiresRender?: boolean;
+  crawlIntervalSec?: number;
 }
 
 interface Policy { policy: string; crawlDelay: number | null }
@@ -50,6 +51,7 @@ async function main() {
         rssUrl: i.rssUrl ?? null,
         sitemapUrl: i.sitemapUrl ?? null,
         requiresRender: i.requiresRender ?? false,
+        crawlIntervalSec: i.crawlIntervalSec ?? null,
         crawlPolicy,
         crawlDelay,
       },
@@ -62,6 +64,7 @@ async function main() {
         rssUrl: i.rssUrl ?? null,
         sitemapUrl: i.sitemapUrl ?? null,
         requiresRender: i.requiresRender ?? false,
+        crawlIntervalSec: i.crawlIntervalSec ?? null,
         crawlPolicy,
         crawlDelay,
       },

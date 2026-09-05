@@ -15,9 +15,20 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const SEGMENTS = new Set(["en", "zh"]);
 const LOCALE_COOKIE = "tline_locale";
+const PRIVATE_PREFIXES = ["/admin", "/alerts", "/watchlist", "/signin", "/account"];
+
+function cacheHeaders(response: NextResponse, request: NextRequest, pathname: string) {
+  const authenticated = request.cookies.get("ii_session") || request.cookies.get("next-auth.session-token") || request.cookies.get("__Secure-next-auth.session-token");
+  const privatePage = PRIVATE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  response.headers.set("Vary", "Cookie, Accept-Language");
+  response.headers.set("Cache-Control", request.method === "GET" && !authenticated && !privatePage
+    ? "public, s-maxage=60, stale-while-revalidate=300"
+    : "private, no-store");
+  return response;
+}
 
 /** Paths that are not pages and must never be given a language prefix. */
-const UNPREFIXED = /^\/(?:api|_next|pdfjs|sitemap\.xml|robots\.txt|favicon\.ico|icon|opengraph-image|apple-icon)(?:\/|$|\.)/;
+export const MACHINE_PATH = /^\/(?:api|_next|pdfjs|sitemap\.xml|robots\.txt|llms(?:-full)?\.txt|(?:rss|feed)\.xml|favicon\.ico|icon|opengraph-image|apple-icon)(?:\/|$|\.)/;
 
 function preferredSegment(request: NextRequest): string {
   const cookie = request.cookies.get(LOCALE_COOKIE)?.value;
@@ -29,7 +40,7 @@ function preferredSegment(request: NextRequest): string {
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  if (UNPREFIXED.test(pathname)) return NextResponse.next();
+  if (MACHINE_PATH.test(pathname)) return NextResponse.next();
 
   const [, first, ...rest] = pathname.split("/");
   if (SEGMENTS.has(first ?? "")) {
@@ -38,7 +49,7 @@ export function middleware(request: NextRequest) {
     url.pathname = `/${rest.join("/")}` || "/";
     const headers = new Headers(request.headers);
     headers.set("x-pathname", pathname);
-    return NextResponse.rewrite(url, { request: { headers } });
+    return cacheHeaders(NextResponse.rewrite(url, { request: { headers } }), request, `/${rest.join("/")}` || "/");
   }
 
   // No language in the address: send the reader to the one they are likely to want. A
@@ -46,7 +57,7 @@ export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   url.pathname = `/${preferredSegment(request)}${pathname === "/" ? "" : pathname}`;
   url.search = search;
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, 308);
 }
 
 export const config = {

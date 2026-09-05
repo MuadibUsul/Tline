@@ -9,7 +9,8 @@ import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { queueContentRetry } from "@/app/admin/actions";
 import PdfPreview from "@/app/_components/PdfPreview";
-import { JsonLd, breadcrumbJsonLd, canonical, reportJsonLd } from "@/lib/seo";
+import { JsonLd, breadcrumbJsonLd, canonical, ogImage, reportJsonLd } from "@/lib/seo";
+import { contentQuality } from "@/lib/contentQuality";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -19,10 +20,13 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
     where: { id },
     select: {
       title: true,
+      rawText: true,
+      sourceUrl: true,
+      language: true,
       publishedAt: true,
       institution: { select: { name: true } },
-      analysis: { select: { summary: true, summaryZh: true } },
-      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
+      analysis: { select: { summary: true, summaryZh: true, reviewStatus: true } },
+      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true, qualityScore: true, status: true } },
     },
   });
   if (!article) return { title: tr(locale, "Report not found", "研报未找到") };
@@ -30,16 +34,20 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   const title = zh && article.translations[0] ? localizeChineseContent(article.translations[0].title) : article.title;
   const description = (zh ? article.analysis?.summaryZh : article.analysis?.summary)
     ?? institutionName(article.institution.name, locale);
+  const quality = contentQuality(article, locale);
   return {
     title,
-    description: description.slice(0, 300),
+    description: description.slice(0, 160),
+    robots: quality.indexable ? { index: true, follow: true } : { index: false, follow: true },
     ...canonical(`/research/${id}`, locale),
     openGraph: {
       type: "article",
       title,
-      description: description.slice(0, 300),
+      description: description.slice(0, 160),
       publishedTime: article.publishedAt.toISOString(),
+      images: [{ url: ogImage("Research", article.title, article.institution.name), width: 1200, height: 630 }],
     },
+    twitter: { card: "summary_large_image", images: [ogImage("Research", article.title, article.institution.name)] },
   };
 }
 
@@ -113,11 +121,13 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const an = a.analysis;
   const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
   const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
+  const keyNumbers = parseJson<Array<{ label?: string; value?: string }>>(locale === "zh-CN" ? an?.keyNumbersZh : an?.keyNumbers, []);
   const date = formatDate(a.publishedAt, locale);
   const translation = a.translations[0];
   const analysisPoor = an?.reviewStatus === "needs_review";
   const translationPoor = (translation?.qualityScore ?? 1) < 0.8;
-  const qualityWarning = analysisPoor || translationPoor;
+  const quality = contentQuality(a, locale);
+  const qualityWarning = !quality.indexable;
 
   // The publisher's own document. Where one exists it is the report — the page around it
   // was navigation and teaser copy — so it is shown open and in full, and the text
@@ -145,8 +155,9 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         institution: a.institution.name,
         sourceUrl: a.sourceUrl,
         locale,
+        author: a.author,
       })} />
-      <JsonLd data={breadcrumbJsonLd([
+      <JsonLd data={breadcrumbJsonLd(locale, [
         { name: tr(locale, "Research", "研报"), path: "/research" },
         { name: institutionName(a.institution.name, locale), path: `/institution/${a.institution.slug}` },
         { name: heading, path: `/research/${a.id}` },
@@ -159,6 +170,22 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title}</h1>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p" style={{ alignSelf: "flex-start" }}>{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
       </div>
+
+      <section className="citation-card" aria-labelledby="citation-summary">
+        <div className="section-t">{tr(locale, "Citable research brief", "可引用研究简报")}</div>
+        <h2 id="citation-summary">{tr(locale, "One-sentence conclusion", "一句话结论")}</h2>
+        <p>{summary}</p>
+        <dl className="citation-facts">
+          <div><dt>{tr(locale, "Institution", "机构")}</dt><dd>{institutionName(a.institution.name, locale)}</dd></div>
+          <div><dt>{tr(locale, "Published", "发布时间")}</dt><dd>{date}</dd></div>
+          <div><dt>{tr(locale, "Time horizon", "时间范围")}</dt><dd>{[...new Set(a.atomicViews.map((view) => view.timeHorizon))].join(" · ") || tr(locale, "Not explicitly stated", "原文未明确说明")}</dd></div>
+        </dl>
+        {keyNumbers.length > 0 && <div><b>{tr(locale, "Key numbers: ", "关键数字：")}</b>{keyNumbers.map((item) => `${item.label ?? ""} ${item.value ?? ""}`.trim()).join("; ")}</div>}
+        {risks.length > 0 && <div><b>{tr(locale, "Main risks: ", "主要风险：")}</b>{risks.join("; ")}</div>}
+        {a.atomicViews.some((view) => view.conditionEn || view.conditionZh) && <div><b>{tr(locale, "Conditions / invalidation: ", "条件 / 失效条件：")}</b>{a.atomicViews.map((view) => locale === "zh-CN" ? view.conditionZh : view.conditionEn).filter(Boolean).join("; ")}</div>}
+        <p className="citation-source">{tr(locale, "Context: this is Tlines' automated structure of a public institutional report, not the institution's wording. Scope and date above travel with the conclusion.", "上下文：这是 Tlines 对公开机构研报的自动结构化结果，并非机构原话；引用结论时须同时保留上述机构与日期范围。")}</p>
+        <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Verify at the original source ↗", "在原始来源核验 ↗")}</a>
+      </section>
 
       {qualityWarning && <div className="quality-notice" role="status">
         <b>{tr(locale, "Automated quality notice", "自动质量提示")}</b>

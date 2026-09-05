@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LOCALES, localePath, type Locale } from "./i18n";
-import { siteUrl } from "./site";
+import { ORGANIZATION_ID_PATH, SITE_NAME, SITE_NAME_ZH, siteUrl } from "./site";
 
 /**
  * The parts of a page's metadata that are the same reasoning everywhere.
@@ -45,7 +45,28 @@ interface ReportSchema {
   updatedAt?: Date | null;
   institution: string;
   sourceUrl: string;
-  locale: string;
+  locale: Locale;
+  author?: string | null;
+}
+
+export const brandName = (locale: Locale) => locale === "zh-CN" ? SITE_NAME_ZH : SITE_NAME;
+export const localizedUrl = (path: string, locale: Locale) => new URL(localePath(locale, path), siteUrl()).toString();
+export const organizationId = () => `${siteUrl()}${ORGANIZATION_ID_PATH}`;
+export function ogImage(kind: string, title: string, subtitle?: string) {
+  const url = new URL("/api/og", siteUrl());
+  url.searchParams.set("kind", kind); url.searchParams.set("title", title);
+  if (subtitle) url.searchParams.set("subtitle", subtitle);
+  return url.toString();
+}
+
+export function organizationJsonLd(locale: Locale) {
+  const base = siteUrl();
+  const sameAs = (process.env.BRAND_SAME_AS ?? "").split(",").map((url) => url.trim()).filter((url) => /^https:\/\//.test(url));
+  return {
+    "@context": "https://schema.org", "@type": "Organization", "@id": organizationId(),
+    name: brandName(locale), alternateName: locale === "zh-CN" ? SITE_NAME : SITE_NAME_ZH,
+    url: base, logo: { "@type": "ImageObject", url: `${base}/icon.svg` }, sameAs,
+  };
 }
 
 /**
@@ -56,7 +77,8 @@ interface ReportSchema {
  * are ours. isAccessibleForFree is stated because the page genuinely is.
  */
 export function reportJsonLd(report: ReportSchema) {
-  const url = new URL(`/research/${report.id}`, siteUrl()).toString();
+  const url = localizedUrl(`/research/${report.id}`, report.locale);
+  const otherLocale: Locale = report.locale === "en" ? "zh-CN" : "en";
   return {
     "@context": "https://schema.org",
     "@type": "AnalysisNewsArticle",
@@ -68,36 +90,41 @@ export function reportJsonLd(report: ReportSchema) {
     dateModified: (report.updatedAt ?? report.publishedAt).toISOString(),
     inLanguage: report.locale,
     isAccessibleForFree: true,
-    author: { "@type": "Organization", name: report.institution },
-    publisher: { "@type": "Organization", name: "Tline", url: siteUrl() },
+    author: report.author ? { "@type": "Person", name: report.author } : { "@type": "Organization", name: report.institution },
+    publisher: { "@id": organizationId() },
+    accountablePerson: { "@type": "Organization", name: report.institution },
+    abstract: report.description.slice(0, 300),
     // The publisher's own page is the authority for the research itself.
     isBasedOn: report.sourceUrl,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    ...(report.locale === "en"
+      ? { workTranslation: { "@id": localizedUrl(`/research/${report.id}`, otherLocale) } }
+      : { translationOfWork: { "@id": localizedUrl(`/research/${report.id}`, otherLocale) } }),
   };
 }
 
 /** The site itself, with the search box a result page can offer. */
-export function siteJsonLd(name: string, description: string) {
-  const base = siteUrl();
+export function siteJsonLd(locale: Locale, description: string) {
+  const url = localizedUrl("/", locale);
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "@id": `${base}/#website`,
-    url: base,
-    name,
+    "@id": `${url}#website`,
+    url,
+    name: brandName(locale),
     description,
-    publisher: { "@type": "Organization", name, url: base },
+    inLanguage: locale,
+    publisher: { "@id": organizationId() },
     potentialAction: {
       "@type": "SearchAction",
-      target: { "@type": "EntryPoint", urlTemplate: `${base}/research?q={search_term_string}` },
+      target: { "@type": "EntryPoint", urlTemplate: `${localizedUrl("/research", locale)}?q={search_term_string}` },
       "query-input": "required name=search_term_string",
     },
   };
 }
 
 /** A trail a search engine can show instead of a bare URL. */
-export function breadcrumbJsonLd(trail: Array<{ name: string; path: string }>) {
-  const base = siteUrl();
+export function breadcrumbJsonLd(locale: Locale, trail: Array<{ name: string; path: string }>) {
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -105,9 +132,19 @@ export function breadcrumbJsonLd(trail: Array<{ name: string; path: string }>) {
       "@type": "ListItem",
       position: index + 1,
       name: step.name,
-      item: new URL(step.path, base).toString(),
+      item: localizedUrl(step.path, locale),
     })),
   };
+}
+
+export function webPageJsonLd(locale: Locale, path: string, name: string, description: string, type = "WebPage") {
+  const url = localizedUrl(path, locale);
+  return { "@context": "https://schema.org", "@type": type, "@id": `${url}#webpage`, url, name, description, inLanguage: locale, isPartOf: { "@id": `${localizedUrl("/", locale)}#website` }, publisher: { "@id": organizationId() } };
+}
+
+export function datasetJsonLd(locale: Locale, path: string, name: string, description: string, dateModified?: Date) {
+  const url = localizedUrl(path, locale);
+  return { "@context": "https://schema.org", "@type": "Dataset", "@id": `${url}#dataset`, name, description, url, inLanguage: locale, isAccessibleForFree: true, creator: { "@id": organizationId() }, ...(dateModified ? { dateModified: dateModified.toISOString() } : {}) };
 }
 
 /** Renders structured data. Server-only: the payload is built from trusted fields. */

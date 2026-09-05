@@ -252,6 +252,7 @@ export async function getResearchView(id: string) {
         take: 1,
         include: { segments: { orderBy: { position: "asc" } } },
       },
+      atomicViews: { where: { reviewStatus: "ok" }, orderBy: { position: "asc" } },
     },
   });
 }

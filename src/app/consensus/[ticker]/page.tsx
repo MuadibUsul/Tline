@@ -5,7 +5,7 @@ import { computeConsensus } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
 import { assetName, formatDate, getLocale, institutionName, tr, type Locale, localePath } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
-import { canonical } from "@/lib/seo";
+import { canonical, datasetJsonLd, JsonLd, ogImage, webPageJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,7 @@ export async function generateMetadata(props: { params: Promise<{ ticker: string
       `全球机构对${name}(${asset.ticker})的立场:当前共识分数、变化趋势,以及各家机构的具体观点。`,
     ),
     ...canonical(`/consensus/${asset.ticker}`, locale),
+    openGraph: { images: [{ url: ogImage("Consensus", `${asset.name} - ${asset.ticker}`), width: 1200, height: 630 }] },
   };
 }
 
@@ -89,6 +90,8 @@ export default async function ConsensusTrendPage(
 
   return (
     <main className="wrap">
+      <JsonLd data={webPageJsonLd(locale, `/consensus/${asset.ticker}`, tr(locale, `${asset.name} consensus history`, `${assetName(asset.name, locale, asset.ticker)}共识历史`), tr(locale, "A time series of the aggregated institutional consensus score.", "机构共识汇总评分的时间序列。"))} />
+      <JsonLd data={datasetJsonLd(locale, `/consensus/${asset.ticker}`, tr(locale, `${asset.name} consensus time series`, `${assetName(asset.name, locale, asset.ticker)}共识时间序列`), tr(locale, "Historical consensus observations derived from public institutional research.", "源自公开机构研报的历史共识观测。"), points.at(-1)?.timestamp)} />
       <div className="page-head">
         <div className="eyebrow">{current?.isFallback ? tr(locale, `Consensus Index · latest available 24h · as of ${formatDate(current.windowEnd, locale)}`, `共识指数 · 最近可用24小时 · 截至 ${formatDate(current.windowEnd, locale)}`) : tr(locale, "Consensus Index · rolling 24h", "共识指数 · 滚动24小时")} · {asset.ticker}</div>
         <div className="big-score">

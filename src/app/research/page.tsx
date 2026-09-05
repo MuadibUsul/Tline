@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { canonical } from "@/lib/seo";
+import { canonical, ogImage } from "@/lib/seo";
 import Link from "next/link";
 import { ResearchCard } from "@/app/_components/ui";
 import LiveFeed from "@/app/_components/LiveFeed";
@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { ...canonical("/research", locale), title: tr(locale, "Research", "研报"), description: tr(locale, "Every published institutional report the pipeline has verified.", "流水线已核验的全部公开机构研报。") };
+  const title = tr(locale, "Verified Institutional Research & Structured Views", "已验证机构研报与结构化观点");
+  const description = tr(locale, "Source-linked public research with comparable asset views, horizons, risks and institutional context.", "带原始来源的公开研报，包含可比较的资产观点、期限、风险与机构上下文。");
+  return { ...canonical("/research", locale), title, description, openGraph: { images: [{ url: ogImage("Research", "Verified Institutional Research", "Sources, horizons, risks and comparable views"), width: 1200, height: 630 }] } };
 }
 
 const ASSET_CLASSES: Array<[string, string]> = [["equity", "股票"], ["rate", "利率"], ["fx", "外汇"], ["commodity", "大宗商品"], ["crypto", "加密资产"], ["macro", "宏观"]];

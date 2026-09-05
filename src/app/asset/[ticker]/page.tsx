@@ -6,6 +6,7 @@ import { getAssetView, getAssetTimeline } from "@/lib/queries";
 import { FeedCard, DirChip, Delta, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
+import { canonical, datasetJsonLd, JsonLd, ogImage, webPageJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
@@ -24,6 +25,8 @@ export async function generateMetadata(props: { params: Promise<{ ticker: string
       `Cross-institution consensus and recent views on ${name} (${asset.ticker}).`,
       `${name}（${asset.ticker}）的跨机构共识与近期观点。`,
     ),
+    ...canonical(`/asset/${asset.ticker}`, locale),
+    openGraph: { images: [{ url: ogImage("Asset Intelligence", `${asset.name} - ${asset.ticker}`), width: 1200, height: 630 }] },
   };
 }
 
@@ -39,6 +42,8 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
 
   return (
     <main className="wrap">
+      <JsonLd data={webPageJsonLd(locale, `/asset/${asset.ticker}`, assetName(asset.name, locale, asset.ticker), tr(locale, `Cross-institution views and consensus for ${asset.name}.`, `${assetName(asset.name, locale, asset.ticker)}的跨机构观点与共识。`))} />
+      <JsonLd data={datasetJsonLd(locale, `/asset/${asset.ticker}`, tr(locale, `${asset.name} institutional consensus`, `${assetName(asset.name, locale, asset.ticker)}机构共识`), tr(locale, "Authority-weighted, time-decayed public institutional views.", "按权威度加权并经时间衰减的公开机构观点。"), consensus?.windowEnd)} />
       <div className="page-head">
         <div className="eyebrow">{consensus?.isFallback ? tr(locale, `Institutional Consensus · latest available 24h · as of ${formatDate(consensus.windowEnd, locale)}`, `机构共识 · 最近可用24小时 · 截至 ${formatDate(consensus.windowEnd, locale)}`) : tr(locale, "Institutional Consensus · last 24h", "机构共识 · 最近24小时")} · {domainTerm(asset.assetClass, locale)}</div>
         <h1>{assetName(asset.name, locale, asset.ticker)}</h1>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { canonical } from "@/lib/seo";
+import { canonical, datasetJsonLd, JsonLd, ogImage, webPageJsonLd } from "@/lib/seo";
 import Link from "next/link";
 import { computeConsensusMany } from "@/lib/consensus";
 import { prisma } from "@/lib/db";
@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { ...canonical("/consensus", locale), title: tr(locale, "Consensus", "共识"), description: tr(locale, "Cross-institution consensus scores by asset.", "按资产汇总的跨机构共识分数。") };
+  const title = tr(locale, "Institutional Consensus by Asset", "按资产汇总的机构共识"); const description = tr(locale, "Authority-weighted, time-aware consensus scores derived from source-linked institutional research.", "从带来源的机构研报生成、按权威度加权并包含时间上下文的共识评分。");
+  return { ...canonical("/consensus", locale), title, description, openGraph: { images: [{ url: ogImage("Consensus", "Institutional Consensus by Asset", "Authority-weighted, time-aware market signals"), width: 1200, height: 630 }] } };
 }
 const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
 
@@ -28,6 +29,8 @@ export default async function ConsensusPage() {
 
   return (
     <main className="wrap">
+      <JsonLd data={webPageJsonLd(locale, "/consensus", tr(locale, "Institutional Consensus", "机构共识"), tr(locale, "Comparable consensus signals aggregated from public institutional research.", "从公开机构研报汇总的可比较共识信号。"))} />
+      <JsonLd data={datasetJsonLd(locale, "/consensus", tr(locale, "Tlines Institutional Consensus Dataset", "Tlines 机构共识数据集"), tr(locale, "Asset-level consensus scores with institution count and time context.", "包含机构数量与时间上下文的资产级共识评分。"))} />
       <div className="page-head"><div className="eyebrow">{tr(locale, "Institutional Consensus Engine", "机构共识引擎")}</div><h1>{tr(locale, "Consensus", "共识")}</h1>
         <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Authority-weighted direction from the rolling last 24 hours; assets without current research use their latest available 24-hour window (0–100).", "按机构权威度计算滚动最近24小时的方向评分；没有新研报的资产沿用其最近可用24小时窗口（0–100）。")}</p></div>
       <section style={{ paddingTop: 22 }}>

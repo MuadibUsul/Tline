@@ -6,6 +6,7 @@ import { getInstitutionView } from "@/lib/queries";
 import { FeedCard, DirChip, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
+import { canonical, JsonLd, ogImage, webPageJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -24,6 +25,8 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
       `Published research and extracted views from ${name}${institution.country ? ` (${institution.country})` : ""}.`,
       `${name}${institution.country ? `（${institution.country}）` : ""}的公开研报与提取观点。`,
     ),
+    ...canonical(`/institution/${slug}`, locale),
+    openGraph: { images: [{ url: ogImage("Institution", institution.name, institution.country ?? undefined), width: 1200, height: 630 }] },
   };
 }
 
@@ -37,6 +40,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
 
   return (
     <main className="wrap">
+      <JsonLd data={webPageJsonLd(locale, `/institution/${inst.slug}`, institutionName(inst.name, locale), tr(locale, `Structured public research, current views and source links for ${inst.name}.`, `${institutionName(inst.name, locale)}的结构化公开研报、当前观点与来源链接。`), "ProfilePage")} />
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Institution", "机构")}</div>
         <h1>{institutionName(inst.name, locale)}</h1>

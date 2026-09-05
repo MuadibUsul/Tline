@@ -13,6 +13,7 @@ import MobileNav, { type MobileNavItem } from "./_components/MobileNav";
 import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { siteUrl } from "@/lib/site";
+import { ogImage } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -27,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: title, template: `%s · ${title}` },
     description,
     applicationName: title,
-    openGraph: { type: "website", siteName: title, title, description, locale },
-    twitter: { card: "summary", title, description },
+    openGraph: { type: "website", siteName: title, title, description, locale, images: [{ url: ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Consensus / Signal"), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Consensus / Signal")] },
     robots: { index: true, follow: true },
   };
 }
@@ -103,7 +104,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {children}
         <footer className="footer wrap">
           <span>{tr(locale, "Research → Data → Consensus → Signal", "研报 → 数据 → 共识 → 信号")}</span>
-          <span>{tr(locale, "Phase-1 · verified public research", "第一阶段 · 已验证公开研究")}</span>
+          <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{["about", "methodology", "editorial-policy", "ai-usage", "sources", "corrections"].map((path) => <Link key={path} href={localePath(locale, `/${path}`)}>{path.replaceAll("-", " ")}</Link>)}</nav>
         </footer>
       </body>
     </html>

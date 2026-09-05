@@ -6,7 +6,7 @@ import SearchBox from "./_components/SearchBox";
 import LiveFeed from "./_components/LiveFeed";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
-import { JsonLd, canonical, siteJsonLd } from "@/lib/seo";
+import { JsonLd, canonical, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +18,10 @@ export async function generateMetadata(): Promise<Metadata> {
     "汇集全球银行与资产管理机构的研报，转换为可比较、可追溯的信号：分资产的市场共识、各机构的明确观点，以及它们的历史准确率。",
   );
   return {
+    title: tr(locale, "Institutional Research Consensus & Market Signals", "全球机构研报共识与市场信号"),
     description,
     ...canonical("/", locale),
-    openGraph: { type: "website", description },
+    openGraph: { type: "website", description, images: [{ url: ogImage("Institutional Intelligence", "Institutional Research Consensus & Market Signals", "Comparable, traceable, source-linked views"), width: 1200, height: 630 }] },
   };
 }
 
@@ -39,7 +40,8 @@ export default async function Home() {
 
   return (
     <main className="wrap">
-      <JsonLd data={siteJsonLd(tr(locale, "Institutional Intelligence", "全球机构情报"), tr(locale, "Institutional research turned into comparable signals.", "把机构研报转换为可比较的信号。"))} />
+      <JsonLd data={organizationJsonLd(locale)} />
+      <JsonLd data={siteJsonLd(locale, tr(locale, "Institutional research turned into comparable, traceable market signals.", "把机构研报转换为可比较、可追踪的市场信号。"))} />
       <LiveFeed
         initial={pulse}
         label={tr(locale, "New research", "有新研报")}

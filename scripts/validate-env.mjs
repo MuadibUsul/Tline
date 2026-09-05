@@ -43,7 +43,7 @@ if (production) {
   if (authProvider && !process.env.NEXTAUTH_URL) errors.push("NEXTAUTH_URL is required when production authentication is enabled.");
   // robots.txt, sitemap.xml and Open Graph URLs are wrong without a real origin.
   const siteUrl = process.env.SITE_URL || process.env.NEXTAUTH_URL || "";
-  if (!siteUrl) warnings.push("SITE_URL is unset; robots.txt, sitemap.xml and share previews will point at localhost.");
+  if (!siteUrl) errors.push("SITE_URL is required in production; canonical and machine-readable URLs must be explicit.");
   else if (!/^https:\/\//.test(siteUrl)) errors.push("Production SITE_URL must use https.");
   const alertWebhook = process.env.ALERT_WEBHOOK_URL || "";
   if (alertWebhook && !/^https:\/\//.test(alertWebhook)) errors.push("ALERT_WEBHOOK_URL must use https.");

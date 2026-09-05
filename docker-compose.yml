@@ -59,6 +59,7 @@ services:
     environment:
       DATABASE_URL: postgresql://tline:${POSTGRES_PASSWORD}@db:5432/tline
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
+      SITE_URL: ${SITE_URL:?Set SITE_URL}
       DOCUMENT_STORAGE_DRIVER: ${DOCUMENT_STORAGE_DRIVER:-local}
       DOCUMENT_STORAGE_ROOT: /app/storage
       S3_BUCKET: ${S3_BUCKET:-}
@@ -102,6 +103,7 @@ services:
     environment:
       DATABASE_URL: postgresql://tline:${POSTGRES_PASSWORD}@db:5432/tline
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
+      SITE_URL: ${SITE_URL:?Set SITE_URL}
       BLS_API_KEY: ${BLS_API_KEY:-}
       BEA_API_KEY: ${BEA_API_KEY:-}
       FRED_API_KEY: ${FRED_API_KEY:-}

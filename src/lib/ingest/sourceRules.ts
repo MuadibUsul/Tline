@@ -5,6 +5,8 @@ type SourceRule = {
   skipSitemap?: boolean;
   articleRejected?: RegExp;
   refreshKnownTitle?: RegExp;
+  minimumArticleLimit?: number;
+  embeddedPdfLimit?: number;
 };
 
 // Publisher-specific exceptions discovered during source acceptance. Scheduled
@@ -62,6 +64,12 @@ const RULES: Record<string, SourceRule> = {
       "https://www.scotiabank.com/ca/en/about/economics/economics-publications.housing.html",
       "https://www.scotiabank.com/ca/en/about/economics/economics-publications.fiscal-policy.html",
     ],
+    // The main economics listing often publishes 7-11 pieces in one day. A six-item
+    // batch stopped before the previous day's Daily Points, and each page's related-PDF
+    // links could consume the remaining slots. Read the full current listing, but take
+    // only the page's primary (first) download.
+    minimumArticleLimit: 12,
+    embeddedPdfLimit: 1,
   },
   barclays: {
     listingUrls: [
@@ -236,4 +244,12 @@ export function articleAllowed(slug: string, title: string, text: string): boole
 
 export function refreshKnownCandidate(slug: string, title: string): boolean {
   return RULES[slug]?.refreshKnownTitle?.test(title) ?? false;
+}
+
+export function minimumArticleLimit(slug: string): number {
+  return RULES[slug]?.minimumArticleLimit ?? 0;
+}
+
+export function embeddedPdfLimit(slug: string): number {
+  return RULES[slug]?.embeddedPdfLimit ?? Number.POSITIVE_INFINITY;
 }

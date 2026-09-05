@@ -24,6 +24,7 @@
     "slug": "scotiabank",
     "name": "Scotiabank Economics",
     "researchUrl": "https://www.scotiabank.com/ca/en/about/economics.html",
+    "crawlIntervalSec": 300,
     "rating": 4,
     "authorityScore": 0.85,
     "priority": 1,

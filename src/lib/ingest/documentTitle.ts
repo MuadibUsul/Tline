@@ -35,6 +35,9 @@ export function cleanLinkTitle(raw: string | null | undefined): string {
   const stripped = value.replace(CALL_TO_ACTION, "").replace(CHINESE_CALL_TO_ACTION, "").trim();
   // Nothing but the instruction: "Download PDF", "查看全文".
   if (!stripped || stripped.length < 3) return "";
+  // Download components commonly append the payload size to the CTA. After removing
+  // "Download PDF", "228.4 KB" is metadata, not the report title.
+  if (/^\d+(?:[.,]\d+)?\s*(?:bytes?|kib?|mib?|gib?|kb|mb|gb)$/i.test(stripped)) return "";
   if (GENERIC_LABEL.test(stripped)) return "";
   // Anchor text is as prone to slugs as a filename is — "jacksonhole", "AIcapex" — and a
   // slug must not outrank the heading the document sets for itself.

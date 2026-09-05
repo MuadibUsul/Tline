@@ -13,7 +13,7 @@ import { saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
-import { articleAllowed, candidateAllowed, listingUrls, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
@@ -57,6 +57,7 @@ async function ingestInstitution(
   sourceSeconds: number,
   renderLimit: number,
 ) {
+  perLimit = Math.max(perLimit, minimumArticleLimit(inst.slug));
   const intervalSeconds = crawlIntervalSeconds(inst);
   const startedAt = new Date();
   const claim = await prisma.institution.updateMany({
@@ -185,7 +186,7 @@ async function ingestInstitution(
   };
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
     let staged = false;
-    for (const pdfCandidate of extractPdfCandidates(html, pageUrl).slice(0, candidateLimit)) {
+    for (const pdfCandidate of extractPdfCandidates(html, pageUrl).slice(0, Math.min(candidateLimit, embeddedPdfLimit(inst.slug)))) {
       if (raws.length >= perLimit || !withinBudget()) break;
       const pdfUrl = pdfCandidate.url;
       if (!allowsUrl(pdfUrl) || await skipCandidate(pdfUrl)) continue;

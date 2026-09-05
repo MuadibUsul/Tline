@@ -12,6 +12,7 @@ test("a link that only instructs the reader yields no title", () => {
   assert.equal(cleanLinkTitle("View Transcript"), "");
   assert.equal(cleanLinkTitle("下载PDF"), "");
   assert.equal(cleanLinkTitle("查看全文"), "");
+  assert.equal(cleanLinkTitle("Download PDF 228.4 KB"), "");
   assert.equal(cleanLinkTitle("Insights"), "");
 });
 

@@ -233,11 +233,17 @@ export async function watchMacroReleases(now = new Date(), releaseId?: string) {
   });
   const results = [];
   for (const release of releases) results.push(await watchRelease(release, now));
+  // This is deliberately in the hot path: once every official value is committed,
+  // publish its bilingual read-out without waiting for another scheduler.
+  // Dynamic import avoids the releaseAnalysis -> releaseConsensus -> watch cycle.
+  const { generatePendingReleaseAnalyses } = await import("./releaseAnalysis");
+  const analyzed = await generatePendingReleaseAnalyses();
   return {
     considered: releases.length,
     attempted: results.filter((result) => result.attempted).length,
     released: results.filter((result) => result.status === "released").length,
     waiting: results.filter((result) => result.status === "waiting").length,
     expired: results.filter((result) => result.status === "expired").length,
+    analyzed,
   };
 }

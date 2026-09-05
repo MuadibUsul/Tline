@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { isFreshReleaseObservation, releaseTargetPeriod, watchSchedule } from "./watch";
 import type { MacroReleaseFamilyDefinition, NormalizedObservation } from "./types";
@@ -62,4 +63,11 @@ test("freshness requires the target period and rejects an unchanged pre-release 
   assert.equal(isFreshReleaseObservation(observation({ period: new Date("2026-07-01T00:00:00Z") }), target, release, null), false);
   assert.equal(isFreshReleaseObservation(observation({ sourcePublishedAt: new Date("2026-09-10T00:00:00Z") }), target, release, null), false);
   assert.equal(isFreshReleaseObservation(observation({ sourcePublishedAt: new Date("2026-09-11T00:00:00Z") }), target, release, old), true);
+});
+
+test("the release watcher immediately drains the bilingual analysis backlog", () => {
+  const watcher = readFileSync(new URL("./watch.ts", import.meta.url), "utf8");
+  const scheduler = readFileSync(new URL("../../../scripts/macro-scheduler.mjs", import.meta.url), "utf8");
+  assert.match(watcher, /await generatePendingReleaseAnalyses\(\)/);
+  assert.match(scheduler, /MACRO_RELEASE_WATCH_INTERVAL_MS", 10_000/);
 });

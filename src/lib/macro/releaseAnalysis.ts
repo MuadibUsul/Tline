@@ -35,10 +35,38 @@ export async function generateReleaseAnalysis(
     user: JSON.stringify(facts),
     maxTokens: 2000,
   });
-  if (!out.en?.trim() && !out.zh?.trim()) return false;
+  // Both locales are public. Treat a partial completion as retryable instead of
+  // leaving one locale stuck on "Analysis generating…" forever.
+  if (!out.en?.trim() || !out.zh?.trim()) return false;
   await prisma.macroRelease.update({
     where: { id: releaseId },
     data: { analysisEn: out.en?.trim() ?? null, analysisZh: out.zh?.trim() ?? null, analysisAt: new Date() },
   });
   return true;
+}
+
+/** Generate newest-first so a just-published release is visible before old repairs. */
+export async function generatePendingReleaseAnalyses(limit = 5): Promise<number> {
+  const provider = getLLMProvider(process.env.FORECAST_PROVIDER ?? process.env.TRANSLATION_PROVIDER);
+  if (!provider) return 0;
+  const pending = await prisma.macroRelease.findMany({
+    where: {
+      status: "RELEASED",
+      values: { some: {} },
+      OR: [{ analysisAt: null }, { analysisEn: null }, { analysisZh: null }],
+    },
+    orderBy: { releasedAt: "desc" },
+    take: limit,
+    select: { id: true },
+  });
+  let generated = 0;
+  for (const release of pending) {
+    try {
+      if (await generateReleaseAnalysis(release.id, provider)) generated++;
+    } catch (error) {
+      // Keep official-data polling alive; this item is selected again next pass.
+      console.error(JSON.stringify({ event: "macro.release.analysis.failed", releaseId: release.id, error: String(error).slice(0, 500) }));
+    }
+  }
+  return generated;
 }

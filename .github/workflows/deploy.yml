@@ -53,6 +53,29 @@ jobs:
       packages: read
     steps:
       - uses: actions/checkout@v4
+      - name: Configure www redirect
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -eu
+            cd ~/proxy
+            if ! grep -q '^www\.tlines\.tech {' Caddyfile; then
+              cp Caddyfile Caddyfile.bak
+              trap 'mv Caddyfile.bak Caddyfile' EXIT
+              cat >> Caddyfile <<'EOF'
+
+            www.tlines.tech {
+                redir https://tlines.tech{uri} permanent
+            }
+            EOF
+              docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
+              docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+              rm Caddyfile.bak
+              trap - EXIT
+            fi
       - name: Upload Compose configuration
         uses: appleboy/scp-action@v1
         with:

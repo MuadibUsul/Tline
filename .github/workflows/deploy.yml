@@ -61,19 +61,20 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -eu
-            cd ~/proxy
-            if ! grep -q '^www\.tlines\.tech {' Caddyfile; then
-              cp Caddyfile Caddyfile.bak
-              trap 'mv Caddyfile.bak Caddyfile' EXIT
-              cat >> Caddyfile <<'EOF'
+            CADDY_CONTAINER=$(docker ps --filter ancestor=caddy:2-alpine --format '{{.ID}}' | head -n 1)
+            CADDYFILE=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' "$CADDY_CONTAINER")
+            if ! grep -q '^www\.tlines\.tech {' "$CADDYFILE"; then
+              cp "$CADDYFILE" "$CADDYFILE.bak"
+              trap 'mv "$CADDYFILE.bak" "$CADDYFILE"' EXIT
+              cat >> "$CADDYFILE" <<'EOF'
 
             www.tlines.tech {
                 redir https://tlines.tech{uri} permanent
             }
             EOF
-              docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
-              docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
-              rm Caddyfile.bak
+              docker exec "$CADDY_CONTAINER" caddy validate --config /etc/caddy/Caddyfile
+              docker exec "$CADDY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile
+              rm "$CADDYFILE.bak"
               trap - EXIT
             fi
       - name: Upload Compose configuration

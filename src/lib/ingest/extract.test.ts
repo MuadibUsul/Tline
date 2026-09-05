@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
-import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { stripTrailingDisclaimerSegments } from "../articleText";
 
 test("captures inline figures in document order and anchors them to body segments", () => {
@@ -206,6 +206,8 @@ test("applies durable source discovery exceptions", () => {
   assert.equal(refreshKnownCandidate("schroders", "Monthly markets review - August 2026"), false);
   assert.equal(minimumArticleLimit("scotiabank"), 12);
   assert.equal(embeddedPdfLimit("scotiabank"), 1);
+  assert.equal(minimumLookbackHours("scotiabank"), 168);
+  assert.equal(refreshKnownCandidate("scotiabank", "Daily Points"), true);
   assert.equal(candidateAllowed("cr-dit-cib", "https://www.ca-cib.com/en/news/project-finance-transaction"), false);
   assert.equal(candidateAllowed("cr-dit-cib", "https://www.ca-cib.com/en/insights/global-markets-research"), true);
   assert.equal(candidateAllowed("saxo", "https://www.home.saxo/insights/saxostrats-experts"), false);

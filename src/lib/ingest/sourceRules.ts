@@ -7,6 +7,7 @@ type SourceRule = {
   refreshKnownTitle?: RegExp;
   minimumArticleLimit?: number;
   embeddedPdfLimit?: number;
+  minimumLookbackHours?: number;
 };
 
 // Publisher-specific exceptions discovered during source acceptance. Scheduled
@@ -70,6 +71,8 @@ const RULES: Record<string, SourceRule> = {
     // only the page's primary (first) download.
     minimumArticleLimit: 12,
     embeddedPdfLimit: 1,
+    minimumLookbackHours: 168,
+    refreshKnownTitle: /^Daily Points$/i,
   },
   barclays: {
     listingUrls: [
@@ -252,4 +255,8 @@ export function minimumArticleLimit(slug: string): number {
 
 export function embeddedPdfLimit(slug: string): number {
   return RULES[slug]?.embeddedPdfLimit ?? Number.POSITIVE_INFINITY;
+}
+
+export function minimumLookbackHours(slug: string): number {
+  return RULES[slug]?.minimumLookbackHours ?? 0;
 }

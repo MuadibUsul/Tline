@@ -13,7 +13,7 @@ import { saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
-import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
@@ -58,6 +58,8 @@ async function ingestInstitution(
   renderLimit: number,
 ) {
   perLimit = Math.max(perLimit, minimumArticleLimit(inst.slug));
+  const lookbackHours = minimumLookbackHours(inst.slug);
+  if (lookbackHours) since = new Date(Math.min(since.getTime(), Date.now() - lookbackHours * 3600_000));
   const intervalSeconds = crawlIntervalSeconds(inst);
   const startedAt = new Date();
   const claim = await prisma.institution.updateMany({
@@ -155,7 +157,7 @@ async function ingestInstitution(
 
   let created = 0, updated = 0, dup = 0, empty = 0, outOfWindow = 0, blocked = 0, nativeRejected = 0;
   const raws: RawArticle[] = [];
-  const nativePdfs = new Map<string, Buffer>();
+  const nativePdfs = new Map<string, { buffer: Buffer; sourceUrl: string }>();
   const seenCandidates = new Set<string>();
   const knownCandidates = new Map((await prisma.article.findMany({
     where: { institutionId: inst.id },
@@ -215,14 +217,17 @@ async function ingestInstitution(
         const accepted = stage({
           title: documentTitle,
           text: extracted.text,
-          sourceUrl: pdfUrl,
+          // Keep the canonical article page as the article identity. This upgrades an
+          // existing teaser/HTML row in place instead of creating a second report under
+          // the download URL; the actual PDF URL is retained on the native document.
+          sourceUrl: pageUrl,
           author: null,
           publishedAt: date,
           segments: [{ heading: null, text: extracted.text }],
           strict: true,
         });
         if (accepted) {
-          nativePdfs.set(pdfUrl, pdf);
+          nativePdfs.set(pageUrl, { buffer: pdf, sourceUrl: pdfUrl });
           staged = true;
         }
       } catch { /* try another PDF link */ }
@@ -253,7 +258,7 @@ async function ingestInstitution(
           publishedAt: candidate.publishedAt,
           segments: [{ heading: null, text: extracted.text }],
         });
-        if (accepted) nativePdfs.set(candidate.url, pdf);
+        if (accepted) nativePdfs.set(candidate.url, { buffer: pdf, sourceUrl: candidate.url });
       } catch {
         empty++;
       }
@@ -312,7 +317,7 @@ async function ingestInstitution(
             segments: [{ heading: null, text: extracted.text }],
             strict: true,
           });
-          nativePdfs.set(item.link, pdf);
+          nativePdfs.set(item.link, { buffer: pdf, sourceUrl: item.link });
           continue;
         }
         let html = await fetchText(item.link);
@@ -386,7 +391,7 @@ async function ingestInstitution(
             publishedAt,
             segments: [{ heading: null, text: extracted.text }],
           });
-          nativePdfs.set(candidate.url, pdf);
+          nativePdfs.set(candidate.url, { buffer: pdf, sourceUrl: candidate.url });
         } catch {
           empty++;
         }
@@ -509,7 +514,7 @@ async function ingestInstitution(
       const native = nativePdfs.get(r.sourceUrl);
       if (native) {
         try {
-          await saveNativePdf(article.id, r.sourceUrl, native);
+          await saveNativePdf(article.id, native.sourceUrl, native.buffer);
         } catch (error) {
           nativeRejected++;
           console.warn(`  native PDF rejected for ${r.sourceUrl}: ${String(error)}`);

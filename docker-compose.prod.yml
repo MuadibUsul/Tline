@@ -9,8 +9,9 @@ services:
     image: ghcr.io/muadibusul/tline:${TAG:-latest}
     build: !reset null
     container_name: tline-app
-    mem_limit: 768m
+    mem_limit: 1g
     environment:
+      NODE_OPTIONS: --max-old-space-size=768
       SITE_URL: ${SITE_URL:?Set SITE_URL}
       NEXTAUTH_URL: ${SITE_URL:?Set SITE_URL}
       AUTH_PROVIDER: email

@@ -79,3 +79,13 @@ test("one report cannot fill the list with its own views", () => {
 test("an asset still outranks the views that mention it", () => {
   assert.equal(rankSearchCandidates("黄金", withViews)[0]?.id, "gold");
 });
+
+test("normalized candidate data is reused across type-ahead queries", () => {
+  rankSearchCandidates("gold", candidates);
+  const normalized = candidates[0].normalizedPrimary;
+  const trigrams = candidates[0].combinedTrigrams;
+
+  rankSearchCandidates("gldman", candidates);
+  assert.strictEqual(candidates[0].normalizedPrimary, normalized);
+  assert.strictEqual(candidates[0].combinedTrigrams, trigrams);
+});

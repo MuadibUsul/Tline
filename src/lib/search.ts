@@ -4,6 +4,8 @@ import { publicationReadyWhere } from "./publication";
 import { assetName, domainTerm, institutionName, localizeChineseContent, type Locale } from "./i18n";
 import { hasChinese, looksLikePinyinQuery, pinyinForms, scorePinyin, type PinyinForms } from "./pinyin";
 
+const ASSET_BY_TICKER = new Map(ASSETS.map((asset) => [asset.ticker, asset]));
+
 export type SearchResultKind = "institution" | "asset" | "article" | "view";
 
 export interface SearchResult {
@@ -30,11 +32,24 @@ export interface SearchCandidate {
   normalizedContent?: string;
   contentWords?: string[];
   contentTrigrams?: Set<string>;
+  combinedTrigrams?: Set<string>;
+  normalizedPrimary?: string[];
+  normalizedAliases?: string[];
+  normalizedSecondary?: string[];
+  normalizedCombined?: string;
+  compactContent?: string;
   /** Display names as the reader sees them, kept apart from the composed result title
    * so a ticker appended for display cannot dilute the name's pronunciation. */
   displayNames?: string[];
   /** Pronunciations of the naming fields, so a Latin-keyboard query can reach them. */
   pinyin?: PinyinForms[];
+}
+
+interface PreparedQuery {
+  normalized: string;
+  compact: string;
+  words: string[];
+  trigrams?: string[];
 }
 
 export function normalizeSearchText(value: string) {
@@ -78,6 +93,16 @@ function trigrams(value: string) {
   return result;
 }
 
+function prepareQuery(value: string): PreparedQuery {
+  const normalized = normalizeSearchText(value);
+  return {
+    normalized,
+    compact: normalized.replace(/\s/g, ""),
+    words: normalized.split(" "),
+    trigrams: /^[a-z0-9]{4,}$/i.test(normalized) ? trigrams(normalized) : undefined,
+  };
+}
+
 function diceSimilarity(a: string, b: string) {
   const aa = bigrams(a);
   const bb = bigrams(b);
@@ -95,27 +120,25 @@ function diceSimilarity(a: string, b: string) {
   return (2 * overlap) / (aa.length + bb.length);
 }
 
-function scoreNormalizedText(q: string, text: string, cachedWords?: string[], cachedTrigrams?: Set<string>) {
+function scoreNormalizedText(query: PreparedQuery, text: string, cachedWords?: string[], cachedTrigrams?: Set<string>, cachedCompact?: string) {
+  const q = query.normalized;
   if (!q || !text) return 0;
   if (text === q) return 160;
   if (text.startsWith(q)) return 125;
   if (text.includes(q)) return 105;
 
-  const compactQ = q.replace(/\s/g, "");
-  const compactText = text.replace(/\s/g, "");
-  if (compactText.includes(compactQ)) return 95;
+  const compactText = cachedCompact ?? text.replace(/\s/g, "");
+  if (compactText.includes(query.compact)) return 95;
 
-  if (cachedTrigrams && /^[a-z0-9]{4,}$/i.test(q)) {
-    const queryTrigrams = trigrams(q);
-    const overlap = queryTrigrams.filter((part) => cachedTrigrams.has(part)).length;
-    if (overlap < Math.ceil(queryTrigrams.length / 2)) return 0;
+  if (cachedTrigrams && query.trigrams) {
+    const overlap = query.trigrams.filter((part) => cachedTrigrams.has(part)).length;
+    if (overlap < Math.ceil(query.trigrams.length / 2)) return 0;
   }
 
-  const queryWords = q.split(" ");
   const words = cachedWords ?? text.split(" ");
   let total = 0;
   let matched = 0;
-  for (const term of queryWords) {
+  for (const term of query.words) {
     let best = 0;
     for (const word of words) {
       if (word === term) best = Math.max(best, 48);
@@ -132,27 +155,42 @@ function scoreNormalizedText(q: string, text: string, cachedWords?: string[], ca
       total += best;
     }
   }
-  if (matched === queryWords.length) return total / queryWords.length;
+  if (matched === query.words.length) return total / query.words.length;
 
-  const dice = compactQ.length >= 4 && compactText.length <= 240 ? diceSimilarity(compactQ, compactText) : 0;
+  const dice = query.compact.length >= 4 && compactText.length <= 240 ? diceSimilarity(query.compact, compactText) : 0;
   return dice >= 0.45 ? dice * 36 : 0;
 }
 
-function candidateScore(query: string, candidate: SearchCandidate) {
+function prepareCandidate(candidate: SearchCandidate) {
+  if (candidate.normalizedPrimary) return;
+  candidate.normalizedPrimary = candidate.primary.map(normalizeSearchText);
+  candidate.normalizedAliases = (candidate.aliases ?? []).map(normalizeSearchText);
+  candidate.normalizedSecondary = (candidate.secondary ?? []).map(normalizeSearchText);
+  candidate.normalizedCombined = [...candidate.normalizedPrimary, ...candidate.normalizedAliases, ...candidate.normalizedSecondary].join(" ");
+  candidate.normalizedContent = normalizeSearchText((candidate.content ?? []).join(" "));
+  candidate.compactContent = candidate.normalizedContent.replace(/\s/g, "");
+  candidate.contentWords = [...new Set(candidate.normalizedContent.split(" "))];
+  candidate.contentTrigrams = new Set(candidate.contentWords.flatMap(trigrams));
+  candidate.combinedTrigrams = new Set(trigrams(candidate.normalizedCombined));
+}
+
+function candidateScore(query: PreparedQuery, candidate: SearchCandidate) {
+  prepareCandidate(candidate);
+  if (query.trigrams) {
+    let overlap = 0;
+    for (const part of query.trigrams) {
+      if (candidate.contentTrigrams!.has(part) || candidate.combinedTrigrams!.has(part)) overlap += 1;
+    }
+    if (overlap < Math.ceil(query.trigrams.length / 2)) return 0;
+  }
   const max = (values: string[] | undefined, weight: number) =>
-    Math.max(0, ...(values ?? []).map((value) => scoreNormalizedText(query, normalizeSearchText(value)) * weight));
-  const combined = [
-    ...candidate.primary,
-    ...(candidate.aliases ?? []),
-    ...(candidate.secondary ?? []),
-  ].join(" ");
-  const content = candidate.normalizedContent ?? normalizeSearchText((candidate.content ?? []).join(" "));
+    Math.max(0, ...(values ?? []).map((value) => scoreNormalizedText(query, value) * weight));
   const score = Math.max(
-    max(candidate.primary, 4),
-    max(candidate.aliases, 3.4),
-    max(candidate.secondary, 2),
-    scoreNormalizedText(query, content, candidate.contentWords, candidate.contentTrigrams) * 0.75,
-    scoreNormalizedText(query, normalizeSearchText(combined)) * 1.35,
+    max(candidate.normalizedPrimary, 4),
+    max(candidate.normalizedAliases, 3.4),
+    max(candidate.normalizedSecondary, 2),
+    scoreNormalizedText(query, candidate.normalizedContent!, candidate.contentWords, candidate.contentTrigrams, candidate.compactContent) * 0.75,
+    scoreNormalizedText(query, candidate.normalizedCombined!) * 1.35,
   );
   const isEntity = candidate.result.kind === "institution" || candidate.result.kind === "asset";
   return isEntity ? score * 1.2 : score;
@@ -185,12 +223,12 @@ function pinyinScore(query: string, candidate: SearchCandidate) {
 const MAX_VIEWS_PER_ARTICLE = 2;
 
 export function rankSearchCandidates(query: string, candidates: SearchCandidate[], limit = 12) {
-  const normalizedQuery = normalizeSearchText(query);
+  const preparedQuery = prepareQuery(query);
   const perArticle = new Map<string, number>();
   return candidates
     .map((candidate) => ({
       candidate,
-      score: Math.max(candidateScore(normalizedQuery, candidate), pinyinScore(normalizedQuery, candidate)),
+      score: Math.max(candidateScore(preparedQuery, candidate), pinyinScore(preparedQuery.normalized, candidate)),
     }))
     .filter(({ score }) => score >= 18)
     .sort((a, b) => b.score - a.score ||
@@ -228,10 +266,10 @@ export function matchingSnippet(values: Array<string | null | undefined> | undef
   let best = exact ? { ...exact, match: exact.text.slice(exact.index, exact.index + lowerQuery.length), score: 160 } : undefined;
 
   if (!best) {
-    const normalizedQuery = normalizeSearchText(query);
+    const preparedQuery = prepareQuery(query);
     for (const text of texts) {
       for (const word of text.matchAll(/[\p{L}\p{N}]+/gu)) {
-        const score = scoreNormalizedText(normalizedQuery, normalizeSearchText(word[0]));
+        const score = scoreNormalizedText(preparedQuery, normalizeSearchText(word[0]));
         if (score >= 24 && (!best || score > best.score)) best = { text, index: word.index ?? 0, match: word[0], score };
       }
     }
@@ -277,6 +315,7 @@ const loadSearchData = async () => Promise.all([
 
 // ponytail: an in-process index fits the current corpus; use database full-text search at tens of thousands of articles.
 const candidateCache = new Map<Locale, { version: string; candidates: SearchCandidate[] }>();
+const indexBuilds = new Map<string, Promise<SearchCandidate[]>>();
 
 // How long a computed version fingerprint is trusted before it is probed again. The
 // fingerprint itself is cheap; rebuilding the index is not — so the probe is throttled
@@ -326,9 +365,13 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
   const version = await dataVersion();
   const cached = candidateCache.get(locale);
   if (cached && cached.version === version) return rankSearchCandidates(q, cached.candidates, limit);
-  const [institutions, assets, articles] = await loadSearchData();
+  const buildKey = `${locale}:${version}`;
+  const existingBuild = indexBuilds.get(buildKey);
+  if (existingBuild) return rankSearchCandidates(q, await existingBuild, limit);
+  const build = (async () => {
+    const [institutions, assets, articles] = await loadSearchData();
 
-  const candidates: SearchCandidate[] = [
+    const candidates: SearchCandidate[] = [
     ...institutions.map((institution) => ({
       result: {
         id: institution.id,
@@ -341,7 +384,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
       displayNames: [institutionName(institution.name, locale)],
     })),
     ...assets.map((asset) => {
-      const canonicalAliases = ASSETS.find((definition) => definition.ticker === asset.ticker)?.aliases ?? [];
+      const canonicalAliases = ASSET_BY_TICKER.get(asset.ticker)?.aliases ?? [];
       return {
         result: {
           id: asset.id,
@@ -362,7 +405,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         asset.name,
         asset.ticker,
         ...parseAliases(asset.aliases),
-        ...(ASSETS.find((definition) => definition.ticker === asset.ticker)?.aliases ?? []),
+        ...(ASSET_BY_TICKER.get(asset.ticker)?.aliases ?? []),
       ]);
       const atomicText = article.atomicViews.flatMap((view) => [view.viewEn, view.viewZh, view.asset, view.assetTicker ?? "", view.topic, view.type, view.direction, view.timeHorizon, view.value ?? ""]);
       const institution = institutionName(article.institution.name, locale);
@@ -389,7 +432,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         // The view stores its asset in English, so a Chinese query only reaches it
         // through the dictionary aliases for that one ticker. Taking the parent report's
         // whole asset list instead would let an oil view answer a query about gold.
-        const definition = ASSETS.find((entry) => entry.ticker === view.assetTicker);
+        const definition = ASSET_BY_TICKER.get(view.assetTicker ?? "");
         return [{
           result: {
             id: view.id,
@@ -413,17 +456,29 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
     }),
   ];
 
-  for (const candidate of candidates) {
+    for (const candidate of candidates) {
     // Names only. Running the whole body through a dictionary would cost far more than it
     // could return: nobody searches an article's twentieth paragraph by its sound.
     const names = [...(candidate.displayNames ?? []), ...candidate.primary, ...(candidate.aliases ?? [])]
       .filter((value) => value && hasChinese(value));
     if (names.length) candidate.pinyin = [...new Set(names)].map(pinyinForms);
-    candidate.normalizedContent = normalizeSearchText((candidate.content ?? []).join(" "));
-    candidate.contentWords = [...new Set(candidate.normalizedContent.split(" "))];
-    candidate.contentTrigrams = new Set(candidate.contentWords.flatMap(trigrams));
-  }
-  candidateCache.set(locale, { version, candidates });
+    prepareCandidate(candidate);
+    }
+    return candidates;
+  })();
+  indexBuilds.set(buildKey, build);
 
-  return rankSearchCandidates(q, candidates, limit);
+  try {
+    const candidates = await build;
+    candidateCache.set(locale, { version, candidates });
+    return rankSearchCandidates(q, candidates, limit);
+  } finally {
+    indexBuilds.delete(buildKey);
+  }
+}
+
+/** Build both per-locale indexes before the first user query. */
+export async function warmSearchIndex() {
+  await searchSite("search", 1, "en");
+  await searchSite("搜索", 1, "zh-CN");
 }

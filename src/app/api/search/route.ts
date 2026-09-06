@@ -33,5 +33,9 @@ export async function GET(request: Request) {
     "x-ratelimit-remaining": String(remaining),
   };
   if (query.length < 2) return NextResponse.json({ results: [] }, { headers });
-  return NextResponse.json({ results: await searchSite(query, 12, locale) }, { headers });
+  const startedAt = performance.now();
+  const results = await searchSite(query, 12, locale);
+  return NextResponse.json({ results }, {
+    headers: { ...headers, "server-timing": `search;dur=${(performance.now() - startedAt).toFixed(1)}` },
+  });
 }

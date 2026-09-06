@@ -166,6 +166,7 @@ test("keeps research pages wrapped in a publisher ASP.NET form", () => {
 
 test("recognizes publisher consent copy and excludes author profile links", () => {
   assert.equal(isAccessGateText("Natixis S.A. and its CIB entities worldwide as the Data Controllers use cookies. You can give or not your consent."), true);
+  assert.equal(isAccessGateText("Some of the data collected by this provider is for the purposes of personalization and measuring advertising effectiveness. This website uses a combination of essential and non-essential cookies."), true);
   const links = extractLinks(`<a href="/author/171022">Read the complete author profile and publications</a><a href="/Site/en/publication/market-outlook-for-global-investors">Market outlook for global institutional investors</a>`, "https://research.example/Site/");
   assert.deepEqual(links.map((link) => link.url), ["https://research.example/Site/en/publication/market-outlook-for-global-investors"]);
 });
@@ -204,6 +205,8 @@ test("applies durable source discovery exceptions", () => {
   assert.deepEqual(sitemapUrls("schroders"), ["https://www.schroders.com/en/global/individual/sitemap.xml"]);
   assert.equal(refreshKnownCandidate("schroders", "Monthly markets review"), true);
   assert.equal(refreshKnownCandidate("schroders", "Monthly markets review - August 2026"), false);
+  assert.equal(minimumArticleLimit("mufg"), 20);
+  assert.equal(minimumLookbackHours("mufg"), 720);
   assert.equal(minimumArticleLimit("scotiabank"), 12);
   assert.equal(embeddedPdfLimit("scotiabank"), 1);
   assert.equal(minimumLookbackHours("scotiabank"), 168);

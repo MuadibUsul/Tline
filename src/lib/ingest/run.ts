@@ -171,6 +171,9 @@ async function ingestInstitution(
     // or an event date scraped as the publish date) so they never pin the newest-first feed.
     if (raw.publishedAt.getTime() > Date.now()) raw.publishedAt = new Date();
     if (raw.publishedAt < since) { outOfWindow++; return false; }
+    // A consent banner can be long enough to satisfy the generic article heuristic.
+    // Never persist it as research; another discovery path may still recover the PDF.
+    if (isAccessGateText(raw.text)) { empty++; return false; }
     if (!articleAllowed(inst.slug, raw.title, raw.text)) { empty++; return false; }
     // Webinars / podcasts / video / live-event invitations are not written research.
     if (isBroadcastOrEvent(raw.title, raw.text)) { empty++; return false; }
@@ -335,6 +338,10 @@ async function ingestInstitution(
         }
         const publishedAt = article.publishedAt || (item.isoDate ? new Date(item.isoDate) : null) || inferPublicationDate(item.link, item.title);
         if (!publishedAt || isNaN(publishedAt.getTime())) { empty++; continue; }
+        // RSS links often point at an HTML wrapper whose only useful payload is a
+        // data-download-url PDF (MUFG). Recover it here before the shared seen-set
+        // prevents the sitemap/listing passes from revisiting the same page.
+        if (await stageEmbeddedPdf(html, item.link, article.title || item.title || "", publishedAt)) continue;
         stage({
           title: article.title || item.title || "",
           text: article.text,

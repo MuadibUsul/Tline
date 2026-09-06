@@ -595,7 +595,7 @@ export function isJunk(text: string): boolean {
 
 /** Recognize consent/login copy so it is never mistaken for publisher research. */
 export function isAccessGateText(text: string): boolean {
-  return /these cookies are necessary for the website to function|view as guest|sign in to continue|log in to continue|subscription required|confirm.{0,120}professional investor|i am a professional investor|data controllers.{0,250}use cookies|give or not your consent|we are sorry an error has occurred/i.test(text);
+  return /these cookies are necessary for the website to function|this (?:web)?site uses a combination of essential and non-essential cookies|some of the data collected by this provider is for the purposes of personalization|view as guest|sign in to continue|log in to continue|subscription required|confirm.{0,120}professional investor|i am a professional investor|data controllers.{0,250}use cookies|give or not your consent|we are sorry an error has occurred/i.test(text);
 }
 
 /** Reject pages whose extracted "body" is really only the publisher's legal footer. */

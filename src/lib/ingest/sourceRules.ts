@@ -41,6 +41,10 @@ const RULES: Record<string, SourceRule> = {
     // The second alternative keeps the bk.mufg.jp PDF briefs reachable.
     candidatePath: /^\/(?:fx|rates|macro|credit|forecasts)\/[^/]+\/?$|^\/report\//i,
     preferNativePdf: true,
+    // Revisit the current research month so rows previously polluted by the
+    // consent banner are replaced from the institution's own PDF.
+    minimumArticleLimit: 20,
+    minimumLookbackHours: 720,
   },
   westpac: {
     // Sub-topic listing pages under Westpac IQ economics.

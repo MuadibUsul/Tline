@@ -202,7 +202,9 @@ async function ingestInstitution(
       if (!pdf) { accessReason ??= lastFetchReason(pdfUrl); continue; }
       try {
         const extracted = await extractPdf(pdf);
-        const date = pdfCandidate.publishedAt || inferPublicationDate(pdfUrl, extracted.text.slice(0, 1000)) || publishedAt || inferPublicationDate(pageUrl, title);
+        // The canonical article date outranks a vendor filename. MUFG has live
+        // September reports whose download filename still says August.
+        const date = publishedAt || inferPublicationDate(pageUrl, title) || inferPublicationDate(pdfUrl, extracted.text.slice(0, 1000)) || pdfCandidate.publishedAt;
         if (!date || !extracted.text.trim()) continue;
         const filename = decodeURIComponent(new URL(pdfUrl).pathname.split("/").pop() || "Research report")
           .replace(/\.pdf$/i, "")

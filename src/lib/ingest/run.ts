@@ -159,10 +159,12 @@ async function ingestInstitution(
   const raws: RawArticle[] = [];
   const nativePdfs = new Map<string, { buffer: Buffer; sourceUrl: string }>();
   const seenCandidates = new Set<string>();
-  const knownCandidates = new Map((await prisma.article.findMany({
+  const knownRows = await prisma.article.findMany({
     where: { institutionId: inst.id },
-    select: { urlHash: true, title: true, documents: { where: { kind: "source_native", status: "ready" }, select: { id: true }, take: 1 } },
-  })).map((article) => [article.urlHash, { title: article.title, hasNativePdf: article.documents.length > 0 }]));
+    select: { urlHash: true, title: true, sourceUrl: true, publishedAt: true, documents: { where: { kind: "source_native", status: "ready" }, select: { id: true }, take: 1 } },
+    orderBy: { publishedAt: "desc" },
+  });
+  const knownCandidates = new Map(knownRows.map((article) => [article.urlHash, { title: article.title, hasNativePdf: article.documents.length > 0 }]));
   let listingHtml: string | null = null;
   const candidateLimit = Math.min(500, Math.max(perLimit * 3, scanLimit));
   const stage = (raw: RawArticle) => {
@@ -238,6 +240,17 @@ async function ingestInstitution(
     }
     return staged;
   };
+
+  // Repair incomplete historical rows before ordinary discovery consumes the batch.
+  // This is deliberately bounded by the same per-source limit and lookback window.
+  if (prefersNativePdf(inst.slug)) {
+    for (const article of knownRows.filter((row) => row.documents.length === 0 && row.publishedAt >= since).slice(0, perLimit)) {
+      if (raws.length >= perLimit || !withinBudget()) break;
+      if (!allowsUrl(article.sourceUrl) || /\.pdf(?:$|\?)/i.test(article.sourceUrl)) continue;
+      const html = await fetchText(article.sourceUrl) || await renderPublic(article.sourceUrl);
+      if (html) await stageEmbeddedPdf(html, article.sourceUrl, article.title, article.publishedAt);
+    }
+  }
 
   // 0) Publisher JSON API (client-rendered sources whose HTML is only an app shell).
   if (apiDiscoveryEnabled(inst.slug)) {

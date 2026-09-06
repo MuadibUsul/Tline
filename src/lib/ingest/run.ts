@@ -8,12 +8,12 @@ import { resolveDocumentTitle } from "./documentTitle";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
-import { extractPdf } from "../documents/extractPdf";
+import { extractPdf, pdfSegments } from "../documents/extractPdf";
 import { saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
-import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
@@ -161,8 +161,8 @@ async function ingestInstitution(
   const seenCandidates = new Set<string>();
   const knownCandidates = new Map((await prisma.article.findMany({
     where: { institutionId: inst.id },
-    select: { urlHash: true, title: true },
-  })).map((article) => [article.urlHash, article.title]));
+    select: { urlHash: true, title: true, documents: { where: { kind: "source_native", status: "ready" }, select: { id: true }, take: 1 } },
+  })).map((article) => [article.urlHash, { title: article.title, hasNativePdf: article.documents.length > 0 }]));
   let listingHtml: string | null = null;
   const candidateLimit = Math.min(500, Math.max(perLimit * 3, scanLimit));
   const stage = (raw: RawArticle) => {
@@ -182,8 +182,8 @@ async function ingestInstitution(
     const clean = url.split("#")[0];
     if (seenCandidates.has(clean)) return true;
     seenCandidates.add(clean);
-    const knownTitle = knownCandidates.get(urlHash(clean));
-    if (knownTitle && !refreshKnownCandidate(inst.slug, knownTitle)) { dup++; return true; }
+    const known = knownCandidates.get(urlHash(clean));
+    if (known && !refreshKnownCandidate(inst.slug, known.title) && !(prefersNativePdf(inst.slug) && !known.hasNativePdf)) { dup++; return true; }
     return false;
   };
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
@@ -223,8 +223,9 @@ async function ingestInstitution(
           sourceUrl: pageUrl,
           author: null,
           publishedAt: date,
-          segments: [{ heading: null, text: extracted.text }],
+          segments: pdfSegments(extracted),
           strict: true,
+          preferReplacement: true,
         });
         if (accepted) {
           nativePdfs.set(pageUrl, { buffer: pdf, sourceUrl: pdfUrl });
@@ -256,7 +257,8 @@ async function ingestInstitution(
           sourceUrl: candidate.url,
           author: candidate.author,
           publishedAt: candidate.publishedAt,
-          segments: [{ heading: null, text: extracted.text }],
+          segments: pdfSegments(extracted),
+          preferReplacement: true,
         });
         if (accepted) nativePdfs.set(candidate.url, { buffer: pdf, sourceUrl: candidate.url });
       } catch {
@@ -314,7 +316,7 @@ async function ingestInstitution(
             sourceUrl: item.link,
             author: item.creator || null,
             publishedAt,
-            segments: [{ heading: null, text: extracted.text }],
+            segments: pdfSegments(extracted),
             strict: true,
           });
           nativePdfs.set(item.link, { buffer: pdf, sourceUrl: item.link });
@@ -389,7 +391,7 @@ async function ingestInstitution(
             sourceUrl: candidate.url,
             author: null,
             publishedAt,
-            segments: [{ heading: null, text: extracted.text }],
+            segments: pdfSegments(extracted),
           });
           nativePdfs.set(candidate.url, { buffer: pdf, sourceUrl: candidate.url });
         } catch {
@@ -510,15 +512,15 @@ async function ingestInstitution(
     else { empty++; continue; }
     const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
     if (!article) continue;
-    if (res === "created") {
-      const native = nativePdfs.get(r.sourceUrl);
-      if (native) {
-        try {
-          await saveNativePdf(article.id, native.sourceUrl, native.buffer);
-        } catch (error) {
-          nativeRejected++;
-          console.warn(`  native PDF rejected for ${r.sourceUrl}: ${String(error)}`);
-        }
+    const native = nativePdfs.get(r.sourceUrl);
+    if (native) {
+      try {
+        // An existing HTML/flattened row upgraded from the publisher PDF needs the
+        // native document just as much as a brand-new row does.
+        await saveNativePdf(article.id, native.sourceUrl, native.buffer);
+      } catch (error) {
+        nativeRejected++;
+        console.warn(`  native PDF rejected for ${r.sourceUrl}: ${String(error)}`);
       }
     }
   }

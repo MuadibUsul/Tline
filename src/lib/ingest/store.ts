@@ -14,6 +14,7 @@ export interface RawArticle {
   segments?: Segment[];
   disclaimerText?: string | null;
   strict?: boolean; // true for HTML-extracted pages → enforce the full article check
+  preferReplacement?: boolean; // publisher PDF supersedes an already stored HTML teaser
 }
 
 /** Idempotent seed of the asset dictionary. */
@@ -47,15 +48,16 @@ export async function persistArticle(
 
   const sameUrl = await prisma.article.findUnique({
     where: { urlHash: uHash },
-    select: { id: true, title: true, rawText: true, contentHash: true, disclaimerText: true },
+    select: { id: true, title: true, rawText: true, contentHash: true, disclaimerText: true, _count: { select: { segments: true } } },
   });
   if (sameUrl) {
     if (sameUrl.rawText === text) {
       const titleChanged = raw.title !== sameUrl.title;
       const disclaimerChanged = (raw.disclaimerText ?? partitioned.disclaimer) !== sameUrl.disclaimerText;
-      if (titleChanged || disclaimerChanged) {
+      const layoutImproved = partitioned.body.length > sameUrl._count.segments;
+      if (titleChanged || disclaimerChanged || layoutImproved) {
         await prisma.$transaction(async (tx) => {
-          if (titleChanged) {
+          if (titleChanged || layoutImproved) {
             await tx.articleTranslation.deleteMany({ where: { articleId: sameUrl.id } });
             await tx.articleDocument.deleteMany({ where: { articleId: sameUrl.id, kind: { not: "source_native" } } });
             // Title is part of every analysis/translation prompt. Keeping derived output
@@ -65,9 +67,11 @@ export async function persistArticle(
             await tx.articleAsset.deleteMany({ where: { articleId: sameUrl.id } });
             await tx.atomicView.deleteMany({ where: { articleId: sameUrl.id } });
           }
+          if (layoutImproved) await tx.articleSegment.deleteMany({ where: { articleId: sameUrl.id } });
           await tx.article.update({ where: { id: sameUrl.id }, data: {
             ...(titleChanged ? { title: raw.title, titleHash: tHash } : {}),
             disclaimerText: raw.disclaimerText ?? partitioned.disclaimer,
+            ...(layoutImproved ? { segments: { create: partitioned.body.map((segment, position) => ({ position, heading: segment.heading, text: segment.text })) } } : {}),
           } });
         });
         return "updated";
@@ -76,7 +80,7 @@ export async function persistArticle(
     }
     const oldLength = sameUrl.rawText?.length ?? 0;
     const materiallyMoreComplete = text.length - oldLength >= Math.max(500, Math.round(oldLength * 0.1));
-    if (!materiallyMoreComplete) return "duplicate";
+    if (!materiallyMoreComplete && !raw.preferReplacement) return "duplicate";
     await prisma.$transaction(async (tx) => {
       await tx.articleTranslation.deleteMany({ where: { articleId: sameUrl.id } });
       await tx.articleDocument.deleteMany({ where: { articleId: sameUrl.id, kind: { not: "source_native" } } });

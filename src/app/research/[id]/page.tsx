@@ -146,7 +146,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const summary = (locale === "zh-CN" ? an?.summaryZh : an?.summary) ?? institutionName(a.institution.name, locale);
 
   return (
-    <main className="wrap" style={{ maxWidth: 820 }}>
+    <main className="wrap" style={{ maxWidth: publisherPdf ? 1080 : 820 }}>
       <JsonLd data={reportJsonLd({
         id: a.id,
         title: heading,
@@ -180,9 +180,25 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           <div><dt>{tr(locale, "Published", "发布时间")}</dt><dd>{date}</dd></div>
           <div><dt>{tr(locale, "Time horizon", "时间范围")}</dt><dd>{[...new Set(a.atomicViews.map((view) => view.timeHorizon))].join(" · ") || tr(locale, "Not explicitly stated", "原文未明确说明")}</dd></div>
         </dl>
-        {keyNumbers.length > 0 && <div><b>{tr(locale, "Key numbers: ", "关键数字：")}</b>{keyNumbers.map((item) => `${item.label ?? ""} ${item.value ?? ""}`.trim()).join("; ")}</div>}
-        {risks.length > 0 && <div><b>{tr(locale, "Main risks: ", "主要风险：")}</b>{risks.join("; ")}</div>}
-        {a.atomicViews.some((view) => view.conditionEn || view.conditionZh) && <div><b>{tr(locale, "Conditions / invalidation: ", "条件 / 失效条件：")}</b>{a.atomicViews.map((view) => locale === "zh-CN" ? view.conditionZh : view.conditionEn).filter(Boolean).join("; ")}</div>}
+        {(keyNumbers.length > 0 || risks.length > 0) && <div className="citation-evidence">
+          {keyNumbers.length > 0 && <section aria-labelledby="key-numbers-heading">
+            <h3 id="key-numbers-heading">{tr(locale, "Key numbers", "关键数字")}</h3>
+            <dl className="key-number-grid">
+              {keyNumbers.map((item, index) => <div key={`${item.label}-${item.value}-${index}`}>
+                <dt>{item.label || tr(locale, "Value", "数值")}</dt>
+                <dd>{item.value}</dd>
+              </div>)}
+            </dl>
+          </section>}
+          {risks.length > 0 && <section aria-labelledby="main-risks-heading">
+            <h3 id="main-risks-heading">{tr(locale, "Main risks", "主要风险")}</h3>
+            <ul className="citation-list">{risks.map((risk, index) => <li key={`${risk}-${index}`}>{risk}</li>)}</ul>
+          </section>}
+        </div>}
+        {a.atomicViews.some((view) => view.conditionEn || view.conditionZh) && <section className="citation-conditions">
+          <h3>{tr(locale, "Conditions / invalidation", "条件 / 失效条件")}</h3>
+          <ul className="citation-list">{a.atomicViews.map((view) => locale === "zh-CN" ? view.conditionZh : view.conditionEn).filter(Boolean).map((condition, index) => <li key={`${condition}-${index}`}>{condition}</li>)}</ul>
+        </section>}
         <p className="citation-source">{tr(locale, "Context: this is Tlines' automated structure of a public institutional report, not the institution's wording. Scope and date above travel with the conclusion.", "上下文：这是 Tlines 对公开机构研报的自动结构化结果，并非机构原话；引用结论时须同时保留上述机构与日期范围。")}</p>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Verify at the original source ↗", "在原始来源核验 ↗")}</a>
       </section>

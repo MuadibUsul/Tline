@@ -190,20 +190,25 @@ export function extractPdfCandidates(html: string, baseUrl: string): CandidateLi
   const $ = cheerio.load(html);
   const base = new URL(baseUrl);
   const out = new Map<string, CandidateLink>();
-  $("a[href],iframe[src],embed[src],object[data]").each((_, element) => {
+  $("a[href],a[data-download-url],iframe[src],embed[src],object[data]").each((_, element) => {
     if ($(element).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]").length) return;
-    const raw = $(element).attr("href") || $(element).attr("src") || $(element).attr("data");
+    // MUFG and similar sites put the real file in data-download-url while href is only
+    // "#" for their click handler. Treat the public attribute as the download target.
+    const raw = $(element).attr("data-download-url") || $(element).attr("href") || $(element).attr("src") || $(element).attr("data");
     if (!raw) return;
     try {
       const url = new URL(raw, base);
-      if (url.origin !== base.origin || !/\.pdf(?:$|\?)/i.test(url.href) || DENY.test(url.pathname)) return;
+      // `/media/` is a common public document store (not a content category). Keep all
+      // other deny-list checks by neutralising only that leading storage directory.
+      const policyPath = url.pathname.replace(/^\/media\//i, "/files/");
+      if (url.origin !== base.origin || !/\.pdf(?:$|\?)/i.test(url.href) || DENY.test(policyPath)) return;
       const clean = url.href.split("#")[0];
       const card = $(element).closest("article,li,[class*=card],[class*=tile],[class*=teaser],[class*=item]").first();
       const cardText = card.text().replace(/\s+/g, " ").trim().slice(0, 1000);
       const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim();
       const linkText = $(element).text().replace(/\s+/g, " ").trim();
       const filename = decodeURIComponent(url.pathname.split("/").pop() || "").replace(/\.pdf$/i, "").replace(/[-_]+/g, " ");
-      const title = (heading || (/^(?:download|pdf|read more)$/i.test(linkText) ? "" : linkText) || filename).slice(0, 240);
+      const title = (heading || (/^(?:download(?: pdf)?|pdf|read more)$/i.test(linkText) ? "" : linkText) || filename).slice(0, 240);
       out.set(clean, { url: clean, title, publishedAt: inferPublicationDate(clean, title, cardText) });
     } catch { /* invalid link */ }
   });
@@ -580,7 +585,10 @@ export function isJunk(text: string): boolean {
   const tokens = text.split(/\s+/).filter((token) => token && !/^https?:\/\//i.test(token));
   if (tokens.length < 8) return false;
   const longest = tokens.reduce((m, t) => Math.max(m, t.length), 0);
-  if (longest > 45) return true;
+  // A single chart axis can legitimately arrive as one long token
+  // (`Jan-15Jul-15…`). Navigation dumps contain several jammed tokens, or one far
+  // larger run; do not reject a whole research PDF for one plotted label.
+  if (longest > 220) return true;
   const jammed = tokens.filter((t) => t.length > 22).length / tokens.length;
   return jammed > 0.06;
 }

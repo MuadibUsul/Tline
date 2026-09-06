@@ -8,6 +8,7 @@ type SourceRule = {
   minimumArticleLimit?: number;
   embeddedPdfLimit?: number;
   minimumLookbackHours?: number;
+  preferNativePdf?: boolean;
 };
 
 // Publisher-specific exceptions discovered during source acceptance. Scheduled
@@ -39,6 +40,7 @@ const RULES: Record<string, SourceRule> = {
     // Article pages sit one segment below each desk; the bare desk paths are listings.
     // The second alternative keeps the bk.mufg.jp PDF briefs reachable.
     candidatePath: /^\/(?:fx|rates|macro|credit|forecasts)\/[^/]+\/?$|^\/report\//i,
+    preferNativePdf: true,
   },
   westpac: {
     // Sub-topic listing pages under Westpac IQ economics.
@@ -73,6 +75,11 @@ const RULES: Record<string, SourceRule> = {
     embeddedPdfLimit: 1,
     minimumLookbackHours: 168,
     refreshKnownTitle: /^Daily Points$/i,
+  },
+  td: {
+    listingUrls: ["https://economics.td.com/ca-weekly-bottom-line"],
+    minimumLookbackHours: 168,
+    preferNativePdf: true,
   },
   barclays: {
     listingUrls: [
@@ -185,6 +192,7 @@ const RULES: Record<string, SourceRule> = {
     // Discovery runs through the site's own public API (see apiSources.ts).
     candidatePath: /^\/Site\/en\/publication\//i,
     skipSitemap: true,
+    preferNativePdf: true,
   },
   "cr-dit-cib": {
     // The global sitemap also contains corporate transaction announcements.
@@ -259,4 +267,8 @@ export function embeddedPdfLimit(slug: string): number {
 
 export function minimumLookbackHours(slug: string): number {
   return RULES[slug]?.minimumLookbackHours ?? 0;
+}
+
+export function prefersNativePdf(slug: string): boolean {
+  return RULES[slug]?.preferNativePdf ?? false;
 }

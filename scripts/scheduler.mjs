@@ -6,7 +6,9 @@ import { PrismaClient } from "@prisma/client";
 import { startWorkerHeartbeat } from "./worker-heartbeat.mjs";
 
 const intervalMs = Math.max(60_000, Number(process.env.INGEST_INTERVAL_MS || 60_000));
-const processingIntervalMs = Math.max(60_000, Number(process.env.PROCESS_INTERVAL_MS || 5 * 60 * 1000));
+// Keep analysis/translation close behind discovery. Source polling is publisher-bound,
+// but once a report lands there is no reason to leave it unparsed for another five minutes.
+const processingIntervalMs = Math.max(60_000, Number(process.env.PROCESS_INTERVAL_MS || 60_000));
 const limit = Math.max(1, Number(process.env.INGEST_ARTICLE_LIMIT || 6));
 const processLimit = Math.max(1, Number(process.env.PROCESS_ARTICLE_LIMIT || 50));
 const retryLimit = Math.max(1, Number(process.env.JOB_RETRY_LIMIT || 3));

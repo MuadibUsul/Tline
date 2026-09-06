@@ -4,7 +4,7 @@ import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider"
 import { validateTranslation, type TranslationQuality } from "./quality";
 import { protectTitleDates, restoreTitleDates } from "./titleDates";
 
-const PROMPT_VERSION = "finance-translation-v2";
+const PROMPT_VERSION = "finance-translation-v3";
 
 interface SourceSegment {
   id: string;
@@ -70,6 +70,7 @@ const TRANSLATION_SYSTEM = `You are a senior Chinese-language editor at a global
 Translate the complete English research article into professional Simplified Chinese.
 Be faithful, complete, restrained, and consistent. Never summarize, omit, add analysis, or strengthen uncertainty.
 Preserve every number, currency symbol, percentage, basis-point value, date, ticker, proper noun, and segment position.
+Preserve page and section boundaries, paragraph breaks, and bullet-list structure. Keep every source bullet on its own line and never merge separate paragraphs.
 Keep Arabic digit strings and scale units verbatim: never spell digits as Chinese numerals or convert 503bn into 5030亿.
 Preserve every __TL_NUM_n__ and __TLD_x__ placeholder exactly; they will be restored after translation.
 Apply the glossary below consistently. Keep official tickers and product names unchanged.
@@ -135,7 +136,7 @@ async function requestDraft(
   throw new Error(`Translation response did not preserve the source segment structure (${lastMeta.provider}/${lastMeta.model}).`);
 }
 
-function splitText(text: string, maxChars = 3_500): string[] {
+function splitText(text: string, maxChars = 1_800): string[] {
   if (text.length <= maxChars) return [text];
   const paragraphs = text.split(/\n\s*\n/).filter(Boolean);
   const parts: string[] = [];
@@ -168,10 +169,10 @@ function translationParts(segments: SourceSegment[]): TranslationPart[] {
 }
 
 // Merge consecutive parts into one request up to the same size splitText already deemed
-// reliable (3500), so many-small-segment articles collapse to far fewer calls while no
+// reliable, so many-small-segment articles collapse to fewer calls while no
 // single request grows larger than before (larger batches make the model drop content,
 // fail the per-batch integrity check and retry — which costs more, not less).
-function batches(parts: TranslationPart[], maxChars = 3_500): TranslationPart[][] {
+function batches(parts: TranslationPart[], maxChars = 1_800): TranslationPart[][] {
   const grouped: TranslationPart[][] = [];
   let current: TranslationPart[] = [];
   let size = 0;

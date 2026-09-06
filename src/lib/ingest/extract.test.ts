@@ -263,6 +263,11 @@ test("retains title and card date for direct research PDF links", () => {
   assert.equal(candidates[0].publishedAt?.toISOString().slice(0, 10), "2026-08-24");
 });
 
+test("discovers a PDF stored behind a publisher download data attribute", () => {
+  const candidates = extractPdfCandidates(`<main><h1>Middle East</h1><a href="#" data-download-url="/media/report.pdf">Download PDF</a></main>`, "https://bank.example/macro/report/");
+  assert.equal(candidates[0]?.url, "https://bank.example/media/report.pdf");
+});
+
 test("uses a card heading when the article link is a short CTA", () => {
   const links = extractLinks(`
     <main><article class="research-card"><h3>Quarterly Global Investment Outlook for institutional investors</h3>

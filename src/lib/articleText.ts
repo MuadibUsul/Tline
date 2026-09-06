@@ -94,7 +94,7 @@ export function stripTrailingDisclaimerSegments<T extends { text: string }>(segm
 export type ArticleBlock = { kind: "paragraph"; text: string } | { kind: "list"; items: string[] };
 
 // Publishers mark bullets with any of these, and the ingest layer writes its own.
-const BULLET = /^\s*[•·▪◦‣–—*+]\s+|^\s*[-]\s+/;
+const BULLET = /^\s*[•·▪◦‣►▶▸–—*+]\s+|^\s*[-]\s+/;
 
 /**
  * Groups a stored body into the blocks it was written as.

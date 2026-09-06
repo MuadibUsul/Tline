@@ -53,7 +53,7 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
   const holders = useRef(new Map<number, HTMLDivElement>());
   const drawn = useRef(new Map<number, number>());
   const [sizes, setSizes] = useState<{ width: number; height: number }[]>([]);
-  const [scale, setScale] = useState(1.1);
+  const [scale, setScale] = useState(1.25);
   const [current, setCurrent] = useState(1);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
 
@@ -109,7 +109,9 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
     drawn.current.set(index, scale);
 
     const page = await source.getPage(index);
-    const density = Math.min(2, window.devicePixelRatio || 1);
+    // A CSS-sized canvas at 1x is visibly soft on ordinary desktop displays. Render at
+    // least two physical pixels per CSS pixel, while bounding memory on high-DPI screens.
+    const density = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
     const viewport = page.getViewport({ scale: scale * density });
     const canvas = document.createElement("canvas");
     canvas.width = Math.floor(viewport.width);
@@ -182,7 +184,7 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
       </div>
       <div className="pdf-viewer-page-area" ref={scrollRef}>
         {state === "loading" && <p className="pdf-viewer-state">{labels.loading}</p>}
-        <div className="pdf-viewer-pages" style={{ width: `${Math.round(612 * scale)}px` }}>
+        <div className="pdf-viewer-pages" style={{ width: `${Math.round(Math.max(1, ...sizes.map((size) => size.width)) * scale)}px` }}>
           {sizes.map((size, position) => {
             const index = position + 1;
             return (

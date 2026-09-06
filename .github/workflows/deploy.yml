@@ -109,7 +109,10 @@ jobs:
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            # A schema migration can outlive Compose's dependency wait. Keep the app
+            # running and let the explicit gate below decide, instead of aborting before
+            # diagnostics and rollback can run.
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d || true
 
             for i in $(seq 1 18); do
               if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
@@ -137,6 +140,8 @@ jobs:
               fi
               sleep 5
             done
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 app || true
 
             if [ -n "$PREVIOUS_TAG" ]; then
               echo "Deployment unhealthy; rolling back to $PREVIOUS_TAG"

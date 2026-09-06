@@ -21,6 +21,7 @@ interface DraftSegment {
 
 interface TranslationPart extends SourceSegment {
   sourcePosition: number;
+  passthrough: boolean;
 }
 
 interface TranslationDraft {
@@ -165,7 +166,21 @@ function translationParts(segments: SourceSegment[]): TranslationPart[] {
     sourcePosition: segment.position,
     heading: part === 0 ? segment.heading : null,
     text,
+    passthrough: shouldPreserveVerbatim(text),
   })));
+}
+
+function shouldPreserveVerbatim(text: string): boolean {
+  const numbers = text.match(/(?:[$€£¥]\s*)?[+-]?\d[\d,]*(?:\.\d+)?(?:\s?%|\s?(?:bp|bps|basis points?))?/gi)?.length ?? 0;
+  const contactBlock = /(?:\b(?:tel|phone|fax|email)\b|@)/i.test(text);
+  const sentences = text.match(/[.!?](?:\s|$)/g)?.length ?? 0;
+  return (numbers >= 8 && sentences < Math.ceil(numbers / 3))
+    || (contactBlock && numbers > 0);
+}
+
+function preservedHeading(heading: string | null) {
+  const page = heading?.match(/^Page\s+(\d+)$/i);
+  return page ? `第 ${page[1]} 页` : heading;
 }
 
 // Merge consecutive parts into one request up to the same size splitText already deemed
@@ -207,6 +222,7 @@ async function reviewDraft(
     system: `You are an independent bilingual quality reviewer for institutional financial research.
 Compare the English source and Simplified Chinese translation. Check omissions, additions, mistranslation,
 modality, financial terminology, numbers, tickers, targets, dates, and direction changes.
+Publisher tables, chart axes, and contact details may intentionally remain verbatim to preserve their original layout and figures; do not reject solely for those blocks.
 Return ONLY JSON: {"pass":boolean,"score":number,"issues":string[]}.`,
     user: JSON.stringify({ source, translation: translated }),
     maxTokens: 1800,
@@ -230,11 +246,13 @@ export async function translateArticle(
   if (!provider) throw new Error("No LLM provider is configured for translation.");
   const source = articleText(title, segments);
   const parts = translationParts(segments);
-  const translatedParts: DraftSegment[] = [];
+  const translatedParts: DraftSegment[] = parts
+    .filter((part) => part.passthrough)
+    .map((part) => ({ position: part.position, heading: preservedHeading(part.heading), text: part.text }));
   let translatedTitle = "";
   let providerName = provider.name;
   let model = provider.model;
-  for (const batch of batches(parts)) {
+  for (const batch of batches(parts.filter((part) => !part.passthrough))) {
     const numbers: string[] = [];
     const dates: string[] = [];
     // Protect whole date expressions in the title first (alpha placeholder), then numbers.

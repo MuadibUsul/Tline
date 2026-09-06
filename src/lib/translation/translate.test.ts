@@ -126,3 +126,28 @@ test("retries when a draft is valid JSON but does not preserve segment positions
   assert.equal(result.status, "reviewed");
   assert.equal(result.segments.length, 1);
 });
+
+test("preserves numeric PDF tables verbatim instead of letting the model reshape them", async () => {
+  let translatedTable = false;
+  const provider: LLMProvider = {
+    name: "layout-test",
+    model: "layout-test-v1",
+    async complete(input) {
+      if (input.system.includes("independent bilingual quality reviewer")) {
+        return { provider: this.name, model: this.model, text: JSON.stringify({ pass: true, score: 1, issues: [] }) };
+      }
+      const payload = JSON.parse(input.user) as { title: string; segments: Array<{ position: number; heading: string | null; text: string }> };
+      translatedTable ||= payload.segments.some((segment) => segment.text.includes("2024 2025 2026"));
+      return { provider: this.name, model: this.model, text: JSON.stringify({ title: "市场展望", segments: payload.segments }) };
+    },
+  };
+  const table = "GDP 2024 2.1 2025 1.9 2026 2.2\nCPI 2024 2.8 2025 2.4 2026 2.1";
+  const result = await translateArticle("Test Bank", "Market outlook", [
+    { id: "prose", position: 0, heading: "Summary", text: "Growth remains resilient." },
+    { id: "table", position: 1, heading: "Page 2", text: table },
+  ], provider);
+  assert.equal(translatedTable, false);
+  assert.equal(result.segments[1].heading, "第 2 页");
+  assert.equal(result.segments[1].text, table);
+  assert.equal(result.quality.passed, true);
+});

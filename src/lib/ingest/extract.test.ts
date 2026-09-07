@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
-import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, printsToPdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { stripTrailingDisclaimerSegments } from "../articleText";
 
 test("captures inline figures in document order and anchors them to body segments", () => {
@@ -234,6 +234,7 @@ test("applies durable source discovery exceptions", () => {
   assert.equal(candidateAllowed("mizuho", "https://www.mizuhogroup.com/americas-news/2014-01-energy-corporate-access-day"), false);
   assert.equal(candidateAllowed("mizuho", "https://www.mizuhogroup.com/th/asia-pacific-insights/2021-04-22"), false);
   assert.deepEqual(documentOrigins("mizuho"), ["https://cdn.prod.website-files.com", "https://library.mizuhogroup.com"]);
+  assert.deepEqual(documentOrigins("westpac"), ["https://library.westpaciq.com.au"]);
   assert.deepEqual(documentOrigins("scotiabank"), []);
   assert.equal(embeddedPdfLimit("mizuho"), 12);
   // Newly registered sub-topic listing pages are crawled alongside the main research URL.
@@ -244,6 +245,19 @@ test("applies durable source discovery exceptions", () => {
   for (const section of ["economics", "emerging-markets", "annual-outlook", "rates", "sustainability"]) {
     assert.ok(nomura.includes(`https://www.nomuraconnects.com/${section}`), `${section} is crawled`);
   }
+});
+
+test("routes publisher download and print controls to native PDF storage", () => {
+  for (const slug of ["westpac", "daiwa", "td", "state-street", "goldman-sachs", "scotiabank", "franklin", "invesco", "pimco", "schroders", "wellington-management"]) {
+    assert.equal(prefersNativePdf(slug), true, `${slug} repairs missing native PDFs`);
+  }
+  for (const slug of ["wellington-management", "schroders", "franklin", "invesco", "pimco"]) {
+    assert.equal(printsToPdf(slug), true, `${slug} uses its public print view`);
+  }
+  assert.equal(printsToPdf("goldman-sachs"), false);
+  assert.equal(minimumLookbackHours("goldman-sachs"), 240);
+  assert.equal(articleAllowed("commonwealth", "We couldn't find that page", "The page has moved"), false);
+  assert.equal(articleAllowed("charles-schwab", "Page not found", "Sorry, we can't find the page you're looking for"), false);
 });
 
 test("discovers nested article pages and embedded same-origin PDFs", () => {

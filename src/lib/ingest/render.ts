@@ -24,6 +24,70 @@ export function lastRenderReason(url: string): string | undefined {
   return renderReasons.get(url);
 }
 
+/** Download a public PDF that requires the cookies/referrer of its public article page. */
+export async function fetchBrowserPdf(pageUrl: string, pdfUrl: string, timeoutMs = 25000): Promise<Buffer | null> {
+  await assertPublicHttpUrl(pageUrl);
+  await assertPublicHttpUrl(pdfUrl);
+  const executablePath = browserExecutable();
+  if (!executablePath) return null;
+  const browser = await chromium.launch({ headless: true, executablePath });
+  try {
+    const detector = await browser.newPage();
+    const browserUa = (await detector.evaluate(() => navigator.userAgent)).replace("HeadlessChrome", "Chrome");
+    await detector.close();
+    const context = await browser.newContext({ locale: "en-US", userAgent: browserUa });
+    const page = await context.newPage();
+    await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    const response = await context.request.get(pdfUrl, { headers: { referer: pageUrl }, timeout: timeoutMs });
+    await assertPublicHttpUrl(response.url());
+    const length = Number(response.headers()["content-length"] || 0);
+    if (!response.ok() || length > 50 * 1024 * 1024) return null;
+    const buffer = await response.body();
+    return buffer.length <= 50 * 1024 * 1024 && buffer.subarray(0, 1024).includes(Buffer.from("%PDF-")) ? buffer : null;
+  } catch {
+    return null;
+  } finally {
+    await browser.close();
+  }
+}
+
+/** Save the same public print view exposed by a publisher's Print control. */
+export async function renderPdf(url: string, timeoutMs = 25000): Promise<Buffer | null> {
+  renderReasons.delete(url);
+  await assertPublicHttpUrl(url);
+  const executablePath = browserExecutable();
+  if (!executablePath) return null;
+  const browser = await chromium.launch({ headless: true, executablePath });
+  try {
+    const detector = await browser.newPage();
+    const browserUa = (await detector.evaluate(() => navigator.userAgent)).replace("HeadlessChrome", "Chrome");
+    await detector.close();
+    const context = await browser.newContext({ locale: "en-US", userAgent: browserUa });
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    await assertPublicHttpUrl(page.url());
+    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
+    await page.waitForTimeout(800);
+    const necessary = page.getByRole("button", { name: /^(?:only necessary cookies|ok to necessary|necessary only|reject all)$/i }).first();
+    if (await necessary.isVisible().catch(() => false)) {
+      await necessary.click().catch(() => undefined);
+      await page.waitForTimeout(300);
+    }
+    const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 4000);
+    if (BLOCKED_PAGE.test(visible) || CONSENT_GATE.test(visible) || BLOCKED_PAGE.test(await page.title())) {
+      renderReasons.set(url, "access wall or human verification");
+      return null;
+    }
+    await page.emulateMedia({ media: "print" });
+    return await page.pdf({ format: "A4", printBackground: true, preferCSSPageSize: true });
+  } catch {
+    renderReasons.set(url, "public page PDF rendering failed");
+    return null;
+  } finally {
+    await browser.close();
+  }
+}
+
 /** Normal public-page rendering only: no stealth, proxy rotation, CAPTCHA solving, or login. */
 export async function renderHtml(url: string, timeoutMs = 25000): Promise<string | null> {
   renderReasons.delete(url);

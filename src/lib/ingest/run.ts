@@ -11,9 +11,9 @@ import { discoverFromSitemaps } from "./sitemap";
 import { extractPdf, pdfSegments } from "../documents/extractPdf";
 import { saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
-import { lastRenderReason, renderHtml } from "./render";
+import { fetchBrowserPdf, lastRenderReason, renderHtml, renderPdf } from "./render";
 import { runTrackedJob } from "../jobs";
-import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, printsToPdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
@@ -204,52 +204,83 @@ async function ingestInstitution(
    */
   const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null, identity: "page" | "document" = "page") => {
     let staged = false;
-    for (const pdfCandidate of extractPdfCandidates(html, pageUrl, publisherDocumentOrigins).slice(0, Math.min(candidateLimit, embeddedPdfLimit(inst.slug)))) {
-      if (raws.length >= perLimit || !withinBudget()) break;
-      const pdfUrl = pdfCandidate.url;
-      if (!allowsUrl(pdfUrl) || await skipCandidate(pdfUrl)) continue;
-      await sleep(delayMs);
-      const pdf = await fetchPdf(pdfUrl);
-      if (!pdf) { accessReason ??= lastFetchReason(pdfUrl); continue; }
-      try {
-        const extracted = await extractPdf(pdf);
-        // The canonical article date outranks a vendor filename. MUFG has live
-        // September reports whose download filename still says August.
-        const date = publishedAt || inferPublicationDate(pageUrl, title) || inferPublicationDate(pdfUrl, extracted.text.slice(0, 1000)) || pdfCandidate.publishedAt;
-        if (!date || !extracted.text.trim()) continue;
-        const filename = decodeURIComponent(new URL(pdfUrl).pathname.split("/").pop() || "Research report")
-          .replace(/\.pdf$/i, "")
-          .replace(/(?:[a-z]{0,2})?20\d{6}[a-z]?$/i, "")
-          .replace(/[-_]+/g, " ")
-          .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-          .replace(/([a-z])([A-Z])/g, "$1 $2")
-          .trim();
-        const pageLabel = title.split(/[;|]/).at(-1)?.trim() || title;
-        const documentTitle = resolveDocumentTitle({
-          linkTitle: pdfCandidate.title,
-          blocks: extracted.blocks,
-          pageTitle: pageLabel,
-          filename,
-        }) || filename;
-        if (!looksLikeResearchTopic(documentTitle, extracted.text)) continue;
-        const reportUrl = identity === "document" ? pdfUrl : pageUrl;
-        const accepted = stage({
-          title: documentTitle,
-          text: extracted.text,
-          // The canonical article page is the article identity where the page is the
-          // report; the actual PDF URL is retained on the native document either way.
-          sourceUrl: reportUrl,
-          author: null,
-          publishedAt: date,
-          segments: pdfSegments(extracted),
-          strict: true,
-          preferReplacement: true,
-        });
-        if (accepted) {
-          nativePdfs.set(reportUrl, { buffer: pdf, sourceUrl: pdfUrl });
-          staged = true;
-        }
-      } catch { /* try another PDF link */ }
+    const stageCandidates = async (candidateHtml: string) => {
+      for (const pdfCandidate of extractPdfCandidates(candidateHtml, pageUrl, publisherDocumentOrigins).slice(0, Math.min(candidateLimit, embeddedPdfLimit(inst.slug)))) {
+        if (raws.length >= perLimit || !withinBudget()) break;
+        const pdfUrl = pdfCandidate.url;
+        if (!allowsUrl(pdfUrl) || await skipCandidate(pdfUrl)) continue;
+        await sleep(delayMs);
+        const pdf = await fetchPdf(pdfUrl) || (inst.requiresRender ? await fetchBrowserPdf(pageUrl, pdfUrl) : null);
+        if (!pdf) { accessReason ??= lastFetchReason(pdfUrl); continue; }
+        try {
+          const extracted = await extractPdf(pdf);
+          // The canonical article date outranks a vendor filename. MUFG has live
+          // September reports whose download filename still says August.
+          const date = publishedAt || inferPublicationDate(pageUrl, title) || inferPublicationDate(pdfUrl, extracted.text.slice(0, 1000)) || pdfCandidate.publishedAt;
+          if (!date || !extracted.text.trim()) continue;
+          const filename = decodeURIComponent(new URL(pdfUrl).pathname.split("/").pop() || "Research report")
+            .replace(/\.pdf$/i, "")
+            .replace(/(?:[a-z]{0,2})?20\d{6}[a-z]?$/i, "")
+            .replace(/[-_]+/g, " ")
+            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .trim();
+          const pageLabel = title.split(/[;|]/).at(-1)?.trim() || title;
+          const documentTitle = resolveDocumentTitle({ linkTitle: pdfCandidate.title, blocks: extracted.blocks, pageTitle: pageLabel, filename }) || filename;
+          if (!looksLikeResearchTopic(documentTitle, extracted.text)) continue;
+          const reportUrl = identity === "document" ? pdfUrl : pageUrl;
+          const accepted = stage({
+            title: documentTitle,
+            text: extracted.text,
+            sourceUrl: reportUrl,
+            author: null,
+            publishedAt: date,
+            segments: pdfSegments(extracted),
+            strict: true,
+            preferReplacement: true,
+          });
+          if (accepted) {
+            nativePdfs.set(reportUrl, { buffer: pdf, sourceUrl: pdfUrl });
+            staged = true;
+          }
+        } catch { /* try another PDF link */ }
+      }
+    };
+    await stageCandidates(html);
+    // Some hydrated applications add their public PDF link only in the browser DOM.
+    if (!staged && identity === "page" && inst.requiresRender && prefersNativePdf(inst.slug) && !printsToPdf(inst.slug)) {
+      const rendered = await renderPublic(pageUrl);
+      if (rendered) await stageCandidates(rendered);
+    }
+    // Some publishers expose the article itself through a Print control rather than a
+    // file URL. Chromium's PDF output uses that same print stylesheet without operating
+    // a native print dialog. Listings are never printed: only dated article pages are.
+    if (!staged && identity === "page" && publishedAt && printsToPdf(inst.slug) && withinBudget()) {
+      const pdf = await renderPdf(pageUrl);
+      if (!pdf) {
+        accessReason ??= lastRenderReason(pageUrl);
+      } else {
+        try {
+          const extracted = await extractPdf(pdf);
+          const documentTitle = resolveDocumentTitle({ blocks: extracted.blocks, pageTitle: title }) || title;
+          if (extracted.text.trim() && looksLikeResearchTopic(documentTitle, extracted.text)) {
+            const accepted = stage({
+              title: documentTitle,
+              text: extracted.text,
+              sourceUrl: pageUrl,
+              author: null,
+              publishedAt,
+              segments: pdfSegments(extracted),
+              strict: true,
+              preferReplacement: true,
+            });
+            if (accepted) {
+              nativePdfs.set(pageUrl, { buffer: pdf, sourceUrl: pageUrl });
+              staged = true;
+            }
+          }
+        } catch { /* keep the HTML article fallback */ }
+      }
     }
     return staged;
   };

@@ -9,6 +9,7 @@ type SourceRule = {
   embeddedPdfLimit?: number;
   minimumLookbackHours?: number;
   preferNativePdf?: boolean;
+  printToPdf?: boolean;
   documentOrigins?: string[];
 };
 
@@ -24,7 +25,10 @@ const RULES: Record<string, SourceRule> = {
   commonwealth: {
     listingUrls: ["https://www.commbank.com.au/articles/newsroom.html"],
     candidatePath: /^\/articles\/newsroom\/20\d{2}\//i,
-    articleRejected: /(?:content presented in this section has been provided by Australian Associated Press|merchant fees?|card surcharg(?:e|ing)|scam prevention|customer support)/i,
+    articleRejected: /(?:we couldn't find that page|content presented in this section has been provided by Australian Associated Press|merchant fees?|card surcharg(?:e|ing)|scam prevention|customer support)/i,
+  },
+  "charles-schwab": {
+    articleRejected: /sorry, we can't find the page you're looking for/i,
   },
   saxo: {
     candidatePath: /^\/content\/articles\//i,
@@ -65,6 +69,9 @@ const RULES: Record<string, SourceRule> = {
       "https://www.westpaciq.com.au/topic.australia",
       "https://www.westpaciq.com.au/topic.newzealand",
     ],
+    documentOrigins: ["https://library.westpaciq.com.au"],
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
     articleRejected: /^Westpac IQ\s*$/i,
   },
   scotiabank: {
@@ -85,6 +92,7 @@ const RULES: Record<string, SourceRule> = {
     minimumArticleLimit: 12,
     embeddedPdfLimit: 1,
     minimumLookbackHours: 168,
+    preferNativePdf: true,
     refreshKnownTitle: /^Daily Points$/i,
   },
   td: {
@@ -169,6 +177,9 @@ const RULES: Record<string, SourceRule> = {
     // without browser rendering.
     sitemapUrls: ["https://www.schroders.com/en/global/individual/sitemap.xml"],
     candidatePath: /\/insights\//i,
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
+    printToPdf: true,
     // Revisit legacy rows whose dated suffix was lost by the old title cleaner. Once the
     // corrected title is stored they return to the normal URL-hash fast path.
     refreshKnownTitle: /^(?:Monthly|Quarterly) markets review$/i,
@@ -187,6 +198,9 @@ const RULES: Record<string, SourceRule> = {
       "https://www.franklintempleton.com/insights/franklin-templeton-institute/index",
       "https://www.franklintempleton.com/insights/research-findings/index",
     ],
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
+    printToPdf: true,
     articleRejected: /^Investment Themes\s*$/i,
   },
   invesco: {
@@ -194,7 +208,32 @@ const RULES: Record<string, SourceRule> = {
       "https://www.invesco.com/us/en/insights/topic/market-and-economic-insights.html",
       "https://www.invesco.com/us/en/insights/topic/investment-related-insights.html",
     ],
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
+    printToPdf: true,
     articleRejected: /^Market and economic insights\s*$/i,
+  },
+  pimco: {
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
+    printToPdf: true,
+  },
+  "goldman-sachs": {
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
+  },
+  "state-street": {
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
+  },
+  "wellington-management": {
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
+    printToPdf: true,
+  },
+  daiwa: {
+    minimumLookbackHours: 240,
+    preferNativePdf: true,
   },
   uob: {
     articleRejected: /^Quarterly Global Outlook\s*$/i,
@@ -314,4 +353,9 @@ export function documentOrigins(slug: string): string[] {
 
 export function prefersNativePdf(slug: string): boolean {
   return RULES[slug]?.preferNativePdf ?? false;
+}
+
+/** Article pages whose publisher-provided Print control is the document export. */
+export function printsToPdf(slug: string): boolean {
+  return RULES[slug]?.printToPdf ?? false;
 }

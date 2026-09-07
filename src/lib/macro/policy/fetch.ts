@@ -4,7 +4,8 @@ import { prisma } from "../../db";
 import { fetchText, sleep } from "../../ingest/fetch";
 import { inferPublicationDate } from "../../ingest/extract";
 import { fetchRobots, robotsAllows, robotsCrawlDelay } from "../../ingest/robots";
-import { getLLMProvider, type LLMProvider } from "../../llm/provider";
+import { resolveLLMProvider } from "../../llm/config";
+import type { LLMProvider } from "../../llm/provider";
 import { extractPolicyText } from "./extract";
 import { parsePolicyDocument, POLICY_PROMPT_VERSION } from "./parse";
 import type { DiscoveredPolicyDocument, PolicyDocumentType } from "./types";
@@ -118,7 +119,7 @@ export async function syncFomcPolicyDocuments(options: { since?: Date; now?: Dat
   if (!calendar) throw new Error("Federal Reserve FOMC calendar fetch failed.");
   const documents = discoverFomcPolicyDocuments(calendar).filter((item) => item.publishedAt >= since && item.publishedAt <= now);
   const delayMs = Math.max(1000, (robotsCrawlDelay(robots, UA) ?? 0) * 1000);
-  const provider = options.provider === undefined ? getLLMProvider() : options.provider;
+  const provider = options.provider === undefined ? await resolveLLMProvider("policy") : options.provider;
   const metrics = { discovered: documents.length, created: 0, unchanged: 0, reparsed: 0, deduplicated: 0, failed: 0 };
   for (const candidate of documents) {
     try {

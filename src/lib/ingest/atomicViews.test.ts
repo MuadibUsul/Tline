@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateAtomicViews } from "./atomicViews";
+import { validateAtomicViews, validateAtomicViewYield } from "./atomicViews";
 
 const valid = {
   view_en: "Test Bank expects gold to reach $5,000 by year-end.",
@@ -52,4 +52,30 @@ test("drops policy claims and Chinese additions unsupported by the quote", () =>
   const inventedChinese = { ...valid, view_en: "The bank expects gold to reach $5,000 by year-end.", view_zh: "测试银行预计失业率上升后黄金将在年底前达到5,000美元。" };
   assert.deepEqual(validateAtomicViews([unsupported], quote), []);
   assert.deepEqual(validateAtomicViews([inventedChinese], valid.source_quote), []);
+});
+
+test("a quote whose punctuation the model retyped still matches the article", () => {
+  // Publisher bodies carry typographic punctuation — thirty-five of forty sampled
+  // articles contained curly apostrophes. A model reproducing the sentence writes the
+  // straight form, which used to fail the containment check and discard a faithful
+  // quotation along with the whole view it supported.
+  const article = "Outlook. The bank’s view — gold to reach $5,000 – remains unchanged. Demand is firm.";
+  const view = {
+    ...valid,
+    view_en: "The bank expects gold to reach $5,000.",
+    view_zh: "该行预计黄金将达到5,000美元。",
+    value: "$5,000",
+    source_quote: "The bank's view - gold to reach $5,000 - remains unchanged.",
+  };
+  assert.equal(validateAtomicViews([view], article).length, 1);
+});
+
+test("the yield report names why each view was dropped", () => {
+  // The counts exist to answer whether the validator is discarding work already paid for:
+  // output tokens are billed on what the model wrote, not on what survived.
+  const invented = { ...valid, source_quote: "A sentence that is not in the article." };
+  const yielded = validateAtomicViewYield([valid, invented], valid.source_quote);
+  assert.equal(yielded.proposed, 2);
+  assert.equal(yielded.kept, 1);
+  assert.deepEqual(yielded.rejected, { quote_not_in_source: 1 });
 });

@@ -65,9 +65,21 @@ test("freshness requires the target period and rejects an unchanged pre-release 
   assert.equal(isFreshReleaseObservation(observation({ sourcePublishedAt: new Date("2026-09-11T00:00:00Z") }), target, release, old), true);
 });
 
-test("the release watcher immediately drains the bilingual analysis backlog", () => {
+test("the ten-second watcher makes no model call; analysis is its own slower task", () => {
   const watcher = readFileSync(new URL("./watch.ts", import.meta.url), "utf8");
   const scheduler = readFileSync(new URL("../../../scripts/macro-scheduler.mjs", import.meta.url), "utf8");
-  assert.match(watcher, /await generatePendingReleaseAnalyses\(\)/);
+  // Generating a read-out from the polling path bills once per poll for as long as a
+  // release stays unanalysed — a standing cost with no upper bound.
+  assert.doesNotMatch(watcher, /generatePendingReleaseAnalyses/);
   assert.match(scheduler, /MACRO_RELEASE_WATCH_INTERVAL_MS", 10_000/);
+  assert.match(scheduler, /MACRO_RELEASE_ANALYSIS_INTERVAL_MS/);
+});
+
+test("read-out generation backs off and gives up instead of retrying every pass", () => {
+  const analysis = readFileSync(new URL("./releaseAnalysis.ts", import.meta.url), "utf8");
+  assert.match(analysis, /MACRO_RELEASE_ANALYSIS_MAX_ATTEMPTS/);
+  assert.match(analysis, /MACRO_RELEASE_ANALYSIS_BACKOFF_MS/);
+  // The pending query matches on "analysis is missing", which is exactly the state a
+  // failing release stays in, so the attempt record is what stops the loop.
+  assert.match(analysis, /lastStatus === "exhausted"/);
 });

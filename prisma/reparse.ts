@@ -1,7 +1,10 @@
 import "dotenv/config";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../src/lib/db";
 import { parseArticle } from "../src/lib/ingest/parseLLM";
 import { syncForecastsForArticle } from "../src/lib/forecast";
+import { clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
+import { anyProviderConfigured } from "../src/lib/llm/config";
 import { queueRetry } from "../src/lib/contentRetry";
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
@@ -12,15 +15,31 @@ const concurrencyArg = process.argv.find((arg) => arg.startsWith("--concurrency=
 const concurrency = Math.min(8, Math.max(1, Number(concurrencyArg?.split("=")[1] || process.env.REPARSE_CONCURRENCY || 3)));
 
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.DEEPSEEK_API_KEY && !flag("heuristic")) {
-    console.log("No supported LLM key configured. Set ANTHROPIC_API_KEY / OPENAI_API_KEY / DEEPSEEK_API_KEY or pass --heuristic.");
+  if (!(await anyProviderConfigured()) && !flag("heuristic")) {
+    console.log("No model provider is configured. Add one in the console (Platform -> Model providers), set a provider API key in the environment, or pass --heuristic.");
     return;
   }
 
   const all = flag("all");
   const retryReview = flag("retry-review");
-  const rows = await prisma.article.findMany({
-    where: articleIds.length ? { id: { in: articleIds }, rawText: { not: null } } : { rawText: { not: null } },
+  // An operator who named ids, or asked for everything, gets what they asked for; backoff
+  // only governs the automatic pass the scheduler runs every minute.
+  const operatorSelected = articleIds.length > 0 || all;
+  const selection: Prisma.ArticleWhereInput[] = [];
+  if (!all) {
+    selection.push(retryReview
+      ? { OR: [{ analysis: { is: null } }, { analysis: { reviewStatus: "needs_review" } }] }
+      : { analysis: { is: null } });
+  }
+  if (!operatorSelected) selection.push(dueFilter("analysis"));
+  // Selected in the database rather than loaded and filtered here: the previous version
+  // pulled every article's full body into memory on every pass to keep fifty of them.
+  const candidates = await prisma.article.findMany({
+    where: {
+      rawText: { not: null },
+      ...(articleIds.length ? { id: { in: articleIds } } : {}),
+      ...(selection.length ? { AND: selection } : {}),
+    },
     select: {
       id: true,
       title: true,
@@ -32,9 +51,8 @@ async function main() {
       analysis: { select: { reviewStatus: true } },
     },
     orderBy: { publishedAt: "desc" },
+    take: limit,
   });
-  const pending = rows.filter((row) => all || !row.analysis || (retryReview && row.analysis.reviewStatus === "needs_review"));
-  const candidates = limit ? pending.slice(0, limit) : pending;
   const assets = await prisma.asset.findMany({ select: { id: true, ticker: true } });
   const assetIds = new Map(assets.map((asset) => [asset.ticker, asset.id]));
 
@@ -154,11 +172,15 @@ async function main() {
       // queue row is already "running", so queueRetry is a no-op and cannot loop forever.
       if (parsed.reviewStatus === "needs_review") await queueRetry(article.id, "analysis");
       await syncForecastsForArticle(article.id);
+      await clearFailures(article.id, "analysis");
         updated++;
         console.log(`  ${parsed.needsLLM ? "HOLD" : "OK  "} ${article.id} · ${article.title}`);
       } catch (error) {
         failed++;
-        console.error(`  FAIL ${article.id} · ${article.title}`, error);
+        // Counted so an article that can never be parsed leaves the candidate set instead
+        // of being re-billed on the next pass sixty seconds from now.
+        const failures = await recordFailure(article.id, "analysis");
+        console.error(`  FAIL (${failures}) ${article.id} · ${article.title}`, error);
       }
     }));
   }

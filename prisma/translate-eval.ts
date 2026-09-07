@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
-import { getLLMProvider } from "../src/lib/llm/provider";
+import { providerByName } from "../src/lib/llm/config";
+import { isProviderName } from "../src/lib/llm/types";
 import type { CompletionInput, CompletionResult, LLMProvider } from "../src/lib/llm/types";
 import { translateArticle } from "../src/lib/translation/translate";
 
@@ -28,10 +29,14 @@ async function main() {
   const limit = Math.max(1, Number(arg("limit") || 2));
   const enableReview = flag("review");
   const wanted = (arg("providers") || "deepseek,gemini,openai,anthropic").split(",").map((p) => p.trim());
-  const providers = wanted
-    .map((name) => ({ name, provider: getLLMProvider(name) }))
-    .filter((entry): entry is { name: string; provider: LLMProvider } => Boolean(entry.provider) && entry.provider!.name === entry.name);
-  if (!providers.length) { console.log("No configured providers. Set DEEPSEEK_API_KEY / GEMINI_API_KEY."); return; }
+  // Each named provider is resolved on its own rather than through task routing: the whole
+  // point here is to compare vendors, not to use whichever one the pipeline currently prefers.
+  const resolved = await Promise.all(wanted.map(async (name) => ({
+    name,
+    provider: isProviderName(name) ? await providerByName(name) : null,
+  })));
+  const providers = resolved.filter((entry): entry is { name: string; provider: LLMProvider } => entry.provider !== null);
+  if (!providers.length) { console.log("None of the requested providers has a key, in the console or the environment."); return; }
   console.log(`Providers: ${providers.map((p) => `${p.name}(${p.provider.model})`).join(", ")} · review=${enableReview}\n`);
 
   const articles = await prisma.article.findMany({
@@ -48,7 +53,9 @@ async function main() {
       const metered = new Metered(provider);
       const startedAt = Date.now();
       try {
-        const result = await translateArticle(article.institution.name, article.title, article.segments, metered, metered, enableReview);
+        // Sample rate 1: comparing providers means every candidate must be scored the
+        // same way. Production's sampling would review some providers and not others.
+        const result = await translateArticle(article.institution.name, article.title, article.segments, metered, metered, enableReview, 1);
         const ms = Date.now() - startedAt;
         console.log(`  [${name}] calls=${metered.calls} ${ms}ms · quality=${result.quality.score.toFixed(2)} status=${result.status} · in≈${(metered.inChars / 1000).toFixed(1)}k out≈${(metered.outChars / 1000).toFixed(1)}k chars`);
         console.log(`     标题: ${result.title}`);

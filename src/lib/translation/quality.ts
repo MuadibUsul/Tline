@@ -117,3 +117,49 @@ export function validateTranslation(
   const score = Math.max(0, 1 - issues.length * 0.12);
   return { passed: issues.length === 0, score: Number(score.toFixed(2)), issues };
 }
+
+
+/**
+ * Cheap structural signals for "did this translation go badly wrong", used to decide
+ * whether the paid independent review is worth running.
+ *
+ * validateTranslation checks figures, tickers and segment counts. It cannot see a chunk
+ * that came back untranslated, or one where the model summarised instead of translating —
+ * both of which change the SHAPE of the output, which is measurable for free.
+ *
+ * Thresholds are taken from the 340 translations already in the corpus rather than guessed.
+ * Among those the reviewer passed, Chinese characters per English source word sits between
+ * 1.31 (p1) and 1.89 (p99), and the Latin-script share of the output stays under 0.31 (p99).
+ * The bands below sit just outside that, so ordinary output is never flagged and only a
+ * genuinely misshapen result is.
+ */
+export interface TranslationRisk {
+  risky: boolean;
+  reasons: string[];
+  charsPerWord: number;
+  latinShare: number;
+}
+
+const CHARS_PER_WORD_MIN = 1.15;
+const CHARS_PER_WORD_MAX = 2.15;
+const LATIN_SHARE_MAX = 0.35;
+// Below this the ratios are dominated by a handful of tokens and say nothing useful.
+const MIN_SOURCE_WORDS = 50;
+
+export function assessTranslationRisk(source: string, translated: string): TranslationRisk {
+  const sourceWords = (source.match(/[A-Za-z][A-Za-z'-]*/g) ?? []).length;
+  const chineseChars = (translated.match(/[一-鿿]/g) ?? []).length;
+  // Runs of two or more letters: an isolated capital is a ticker or an initial, whereas
+  // untranslated prose shows up as words.
+  const latinChars = (translated.match(/[A-Za-z]{2,}/g) ?? []).join("").length;
+  const charsPerWord = sourceWords ? chineseChars / sourceWords : 0;
+  const latinShare = translated.length ? latinChars / translated.length : 0;
+
+  const reasons: string[] = [];
+  if (sourceWords >= MIN_SOURCE_WORDS) {
+    if (charsPerWord < CHARS_PER_WORD_MIN) reasons.push("Output is far shorter than the source implies; content may have been dropped.");
+    if (charsPerWord > CHARS_PER_WORD_MAX) reasons.push("Output is far longer than the source implies; content may have been added.");
+    if (latinShare > LATIN_SHARE_MAX) reasons.push("A large share of the output is still Latin script; part of it may be untranslated.");
+  }
+  return { risky: reasons.length > 0, reasons, charsPerWord: Number(charsPerWord.toFixed(3)), latinShare: Number(latinShare.toFixed(3)) };
+}

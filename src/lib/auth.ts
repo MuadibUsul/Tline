@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "./db";
 import { getServerSession } from "next-auth";
-import { authOptions, isFormalAuthConfigured } from "./auth-config";
+import { authOptions, isDemoAuthAllowed, isFormalAuthConfigured, isPasswordAuthConfigured } from "./auth-config";
 
 // Lightweight signed-cookie session. No passwords — email identifies the user.
 // MVP-grade: fine for a demo with no sensitive data; swap for Auth.js in production.
@@ -60,16 +60,26 @@ function touch(user: SessionUser) {
 
 /** Current user from the session cookie, or null. Safe to call in RSC + actions. */
 export async function getSessionUser() {
-  if (isFormalAuthConfigured()) {
+  // Gated on formal auth alone, this ignored a perfectly valid NextAuth session whenever
+  // AUTH_PROVIDER was unset — so signing in with a password succeeded, set its cookie, and
+  // every page still rendered as signed out. Password sign-in issues a NextAuth session
+  // too, so the question is whether any NextAuth provider is registered, not whether the
+  // mail provider happens to be one of them.
+  if (isFormalAuthConfigured() || isPasswordAuthConfigured()) {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) return null;
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!user) return null;
-    // A token minted before the password last changed belongs to a session the owner has
-    // since revoked by changing it.
-    const issuedAt = (session as { issuedAt?: number }).issuedAt;
-    if (user.passwordChangedAt && (!issuedAt || issuedAt < user.passwordChangedAt.getTime())) return null;
-    return activeUser(user);
+    if (session?.user?.email) {
+      const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+      if (!user) return null;
+      // A token minted before the password last changed belongs to a session the owner has
+      // since revoked by changing it.
+      const issuedAt = (session as { issuedAt?: number }).issuedAt;
+      if (user.passwordChangedAt && (!issuedAt || issuedAt < user.passwordChangedAt.getTime())) return null;
+      return activeUser(user);
+    }
+    // No NextAuth session. The preview cookie below is only consulted where the preview
+    // identity is still offered, so a deployment that has moved to real accounts cannot be
+    // entered with a cookie minted back when it had none.
+    if (!isDemoAuthAllowed()) return null;
   }
   const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;

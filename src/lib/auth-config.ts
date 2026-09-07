@@ -32,6 +32,36 @@ export function isEmailAuthConfigured() {
   return selectedProvider() === "email" && isFormalAuthConfigured();
 }
 
+/**
+ * Whether an account can sign in with a password.
+ *
+ * Password sign-in used to be registered only inside the `email` branch below, which tied
+ * it to SMTP being configured: with EMAIL_SERVER missing or AUTH_PROVIDER unset there was
+ * no `password` provider at all, every attempt failed, and the form reported it as
+ * "that email and password do not match" — a configuration fault described to the user as
+ * a wrong password, with no way to tell the two apart.
+ *
+ * A password is now independent of the mail provider. Only a deployment that has committed
+ * to an external identity provider gives it up, because there the directory owns the
+ * credential and a second one beside it is a second thing to attack.
+ */
+export function isPasswordAuthConfigured() {
+  const provider = selectedProvider();
+  const externalIdentity = (provider === "azure-ad" || provider === "google") && isFormalAuthConfigured();
+  return !externalIdentity;
+}
+
+/**
+ * Whether the passwordless preview identity is still accepted.
+ *
+ * Kept in one place because two things must agree about it: the sign-in page, which offers
+ * it, and getSessionUser, which honours the cookie it issues. A deployment that has moved
+ * to real accounts must not keep accepting a preview cookie minted before the move.
+ */
+export function isDemoAuthAllowed() {
+  return process.env.NODE_ENV !== "production" || process.env.ALLOW_INSECURE_DEMO_AUTH === "true";
+}
+
 function providers() {
   const provider = selectedProvider();
   if (provider === "azure-ad" && isFormalAuthConfigured()) {
@@ -41,24 +71,22 @@ function providers() {
       tenantId: process.env.AZURE_AD_TENANT_ID || "common",
     })];
   }
-  if (provider === "email" && isFormalAuthConfigured()) {
-    return [
-      // Enrolment and recovery only. Routine sign-in goes through the password provider
-      // below so the mail provider's quota is not spent on getting in every day.
-      EmailProvider({
-        server: process.env.EMAIL_SERVER!,
-        from: process.env.EMAIL_FROM!,
-      }),
-      passwordProvider(),
-    ];
-  }
   if (provider === "google" && isFormalAuthConfigured()) {
     return [GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     })];
   }
-  return [];
+  const list = [];
+  // Enrolment and recovery. Routine sign-in goes through the password provider, so the
+  // mail provider's quota is not spent on getting in every day.
+  if (isEmailAuthConfigured()) {
+    list.push(EmailProvider({ server: process.env.EMAIL_SERVER!, from: process.env.EMAIL_FROM! }));
+  }
+  // Unconditional: a broken or absent mail provider must not also remove the way in for
+  // everyone who already has a password.
+  list.push(passwordProvider());
+  return list;
 }
 
 /**

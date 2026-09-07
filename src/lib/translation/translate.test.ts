@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { CompletionInput, CompletionResult, LLMProvider } from "../llm/provider";
+import { assessTranslationRisk } from "./quality";
 import { translateArticle } from "./translate";
 
 class FakeProvider implements LLMProvider {
@@ -37,8 +38,12 @@ test("produces a reviewed structured translation through the provider boundary",
       text: "We raise the XAUUSD target from $4,700 to $4,900 and retain 2.5% upside.",
     }],
     new FakeProvider(),
+    undefined,
+    true,
+    1,
   );
   assert.equal(result.status, "reviewed");
+  assert.equal(result.reviewAttempted, true);
   assert.equal(result.provider, "fake");
   assert.equal(result.quality.passed, true);
   assert.equal(result.segments[0].position, 0);
@@ -58,7 +63,7 @@ test("keeps a rejected independent review in the retryable state", async () => {
     position: 0,
     heading: "Core view",
     text: "We raise the XAUUSD target from $4,700 to $4,900 and retain 2.5% upside.",
-  }], new RejectingReviewer());
+  }], new RejectingReviewer(), undefined, true, 1);
   assert.equal(result.status, "needs_review");
 });
 
@@ -150,4 +155,60 @@ test("preserves numeric PDF tables verbatim instead of letting the model reshape
   assert.equal(result.segments[1].heading, "第 2 页");
   assert.equal(result.segments[1].text, table);
   assert.equal(result.quality.passed, true);
+});
+
+test("an unsampled review is not a failed one: the article still reads as reviewed", async () => {
+  class CountingProvider extends FakeProvider {
+    reviews = 0;
+    async complete(input: CompletionInput): Promise<CompletionResult> {
+      if (input.system.includes("independent bilingual quality reviewer")) this.reviews++;
+      return super.complete(input);
+    }
+  }
+  const provider = new CountingProvider();
+  const result = await translateArticle("Test Bank", "Gold target raised to $4,900", [{
+    id: "segment-1",
+    position: 0,
+    heading: "Core view",
+    text: "We raise the XAUUSD target from $4,700 to $4,900 and retain 2.5% upside.",
+  }], provider, provider, true, 0);
+  assert.equal(provider.reviews, 0);
+  assert.equal(result.reviewAttempted, false);
+  // Marking this needs_review would re-queue the article and buy back the skipped call.
+  assert.equal(result.status, "reviewed");
+});
+
+test("a structurally misshapen translation is reviewed even at a zero sample rate", async () => {
+  // Long English source, near-empty Chinese output: charsPerWord collapses far below the
+  // band measured on the corpus, which is what "the model dropped content" looks like.
+  const source = Array.from({ length: 120 }, (_, index) => `sentence ${index} about the market outlook`).join(" ");
+  class DroppingProvider extends FakeProvider {
+    reviews = 0;
+    async complete(input: CompletionInput): Promise<CompletionResult> {
+      if (input.system.includes("independent bilingual quality reviewer")) {
+        this.reviews++;
+        return { provider: this.name, model: this.model, text: JSON.stringify({ pass: true, score: 0.9, issues: [] }) };
+      }
+      const payload = JSON.parse(input.user) as { title: string; segments: Array<{ position: number; heading: string | null }> };
+      return {
+        provider: this.name,
+        model: this.model,
+        text: JSON.stringify({ title: payload.title, segments: payload.segments.map((segment) => ({ ...segment, text: "简述。" })) }),
+      };
+    }
+  }
+  const provider = new DroppingProvider();
+  const result = await translateArticle("Test Bank", "Market outlook", [
+    { id: "segment-1", position: 0, heading: null, text: source },
+  ], provider, provider, true, 0);
+  assert.equal(result.risk.risky, true);
+  assert.equal(provider.reviews > 0, true);
+});
+
+test("ordinary output is never flagged risky by the cheap signals", () => {
+  const source = Array.from({ length: 120 }, (_, index) => `sentence ${index} about the market outlook`).join(" ");
+  // ~1.6 Chinese characters per English word, the corpus median.
+  const translated = "关于市场前景的第若干句话。".repeat(96);
+  const risk = assessTranslationRisk(source, translated);
+  assert.equal(risk.risky, false, risk.reasons.join(" "));
 });

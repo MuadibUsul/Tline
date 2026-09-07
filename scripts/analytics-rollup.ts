@@ -2,6 +2,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { runTrackedJob } from "../src/lib/jobs";
 import { retentionDays, rollupRecent } from "../src/lib/analytics/rollup";
+import { pruneLlmCalls } from "../src/lib/llm/report";
 
 /**
  * Summarise recent days into `TrafficDaily`, then delete raw rows past the retention
@@ -14,9 +15,14 @@ const days = Math.max(1, Number(process.argv.find((argument) => argument.startsW
 
 runTrackedJob("analytics-rollup", { days, retentionDays: retentionDays() }, async () => {
   const { rolled, pruned } = await rollupRecent(days);
+  // Model-call rows ride along on the same pass: they are raw per-event rows with a
+  // retention window, exactly like the traffic rows above, and giving them their own
+  // scheduled task would be a second thing to notice had stopped running.
+  const prunedLlmCalls = await pruneLlmCalls();
   return {
     result: undefined,
     metrics: {
+      prunedLlmCalls,
       days: rolled.length,
       views: rolled.reduce((total, day) => total + day.views, 0),
       rows: rolled.reduce((total, day) => total + day.rows, 0),

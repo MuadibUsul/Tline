@@ -12,6 +12,7 @@ export type PermissionAction =
   | "admin.analytics"
   | "admin.users"
   | "admin.api"
+  | "admin.models"
   | "admin.audit";
 
 export interface PermissionUser {
@@ -81,6 +82,9 @@ export function can(user: PermissionUser | null, action: PermissionAction): bool
     case "admin.sources":
     case "admin.users":
     case "admin.api":
+    // Model providers hold credentials and decide what every pipeline run spends. Admin
+    // only, for the same reason API keys are.
+    case "admin.models":
     case "admin.audit":
       return atLeast(user, "admin");
   }

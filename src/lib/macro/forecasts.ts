@@ -1,4 +1,5 @@
-import { completeJSON, getLLMProvider } from "../llm/provider";
+import { resolveLLMProvider } from "../llm/config";
+import { completeJSON, type LLMProvider } from "../llm/provider";
 
 // Generic expectations engine: turn any institution's research preview into normalized
 // numeric forecasts for tracked releases, and aggregate them into a consensus + distribution.
@@ -63,8 +64,9 @@ const PAST_ACTUAL = /\b(came in|printed at|rose to|fell to|grew|surprised|jumped
 export async function extractForecasts(
   title: string,
   text: string,
-  provider = getLLMProvider(process.env.FORECAST_PROVIDER ?? process.env.TRANSLATION_PROVIDER),
+  injected?: LLMProvider | null,
 ): Promise<ExtractedForecast[]> {
+  const provider = injected ?? await resolveLLMProvider("forecast");
   if (!provider) throw new Error("No LLM provider is configured for forecast extraction.");
   const { value } = await completeJSON<{ forecasts?: RawForecast[] }>(provider, {
     system: SYSTEM,

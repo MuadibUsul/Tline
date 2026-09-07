@@ -27,8 +27,13 @@ function cacheHeaders(response: NextResponse, request: NextRequest, pathname: st
   return response;
 }
 
-/** Paths that are not pages and must never be given a language prefix. */
-export const MACHINE_PATH = /^\/(?:api|_next|pdfjs|sitemap\.xml|robots\.txt|llms(?:-full)?\.txt|(?:rss|feed)\.xml|favicon\.ico|icon|opengraph-image|apple-icon)(?:\/|$|\.)/;
+/**
+ * Paths that are not pages and must never be given a language prefix.
+ *
+ * `sitemap` covers both the index at /sitemap.xml and the shards under /sitemap/1.xml: a
+ * language prefix on a shard would make the index point at addresses that redirect.
+ */
+export const MACHINE_PATH = /^\/(?:api|_next|pdfjs|sitemap(?:\.xml)?|robots\.txt|llms(?:-full)?\.txt|(?:rss|feed)\.xml|favicon\.ico|icon|opengraph-image|apple-icon)(?:\/|$|\.)/;
 
 function preferredSegment(request: NextRequest): string {
   const cookie = request.cookies.get(LOCALE_COOKIE)?.value;

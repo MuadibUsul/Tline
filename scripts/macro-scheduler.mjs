@@ -29,7 +29,6 @@ const active = new Map();
 const locks = new Set();
 let stopping = false;
 let wake;
-const stopHeartbeat = await startWorkerHeartbeat("macro", () => ({ activeTasks: [...active.keys()] }));
 
 const prisma = new PrismaClient();
 const recovered = await prisma.jobRun.updateMany({
@@ -38,6 +37,7 @@ const recovered = await prisma.jobRun.updateMany({
 });
 await prisma.$disconnect();
 if (recovered.count) console.log(JSON.stringify({ event: "macro.scheduler.recovered", jobs: recovered.count }));
+const stopHeartbeat = await startWorkerHeartbeat("macro", () => ({ activeTasks: [...active.keys()] }));
 
 function positive(name, fallback, minimum) {
   const value = Number(process.env[name] || fallback);

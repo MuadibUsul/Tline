@@ -8,3 +8,7 @@ storage
 data/cache
 storage/qa*
 npm-debug.log*
+backups
+docs
+*.xlsx
+*.md

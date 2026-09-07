@@ -119,13 +119,14 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const a = await getResearchView(params.id);
   if (!a) notFound();
   const an = a.analysis;
-  const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
-  const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
-  const keyNumbers = parseJson<Array<{ label?: string; value?: string }>>(locale === "zh-CN" ? an?.keyNumbersZh : an?.keyNumbers, []);
+  const analysisPoor = an?.reviewStatus === "needs_review";
+  const keyArgs = analysisPoor ? [] : parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
+  const risks = analysisPoor ? [] : parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
+  const keyNumbers = analysisPoor ? [] : parseJson<Array<{ label?: string; value?: string }>>(locale === "zh-CN" ? an?.keyNumbersZh : an?.keyNumbers, []);
   const date = formatDate(a.publishedAt, locale);
   const translation = a.translations[0];
-  const analysisPoor = an?.reviewStatus === "needs_review";
   const translationPoor = (translation?.qualityScore ?? 1) < 0.8;
+  const usableTranslation = translation && !translationPoor ? translation : null;
   const quality = contentQuality(a, locale);
   const qualityWarning = !quality.indexable;
 
@@ -142,8 +143,8 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
     ? await prisma.contentRetry.findMany({ where: { articleId: a.id }, orderBy: { requestedAt: "desc" } })
     : [];
 
-  const heading = locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title;
-  const summary = (locale === "zh-CN" ? an?.summaryZh : an?.summary) ?? institutionName(a.institution.name, locale);
+  const heading = locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title;
+  const summary = (!analysisPoor ? (locale === "zh-CN" ? an?.summaryZh : an?.summary) : null) ?? institutionName(a.institution.name, locale);
 
   return (
     <main className="wrap" style={{ maxWidth: publisherPdf ? 1080 : 820 }}>
@@ -167,7 +168,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           <Link href={localePath(locale, `/institution/${a.institution.slug}`)}>{institutionName(a.institution.name, locale)}</Link>
           {a.author ? ` · ${a.author}` : ""} · {date}
         </div>
-        <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title}</h1>
+        <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{heading}</h1>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p" style={{ alignSelf: "flex-start" }}>{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
       </div>
 
@@ -248,12 +249,12 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             }}
           />
         )}
-        {publisherPdf && locale === "zh-CN" && translation && (
+        {publisherPdf && locale === "zh-CN" && usableTranslation && (
           // Kept, but behind a disclosure: the document above is the report, and this is
           // a reading aid beside it.
           <details className="article-original" style={{ marginTop: 18 }}>
             <summary>完整中文译文</summary>
-            <ArticleBody segments={translation.segments} fallback={translation.text} locale={locale} translated figures={a.figures} />
+            <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} />
           </details>
         )}
         {!publisherPdf && locale === "en" && a.rawText && (
@@ -262,22 +263,22 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
           </div>
         )}
-        {!publisherPdf && locale === "zh-CN" && translation && (
+        {!publisherPdf && locale === "zh-CN" && usableTranslation && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
               完整中文译文
             </div>
-            <h2 style={{ fontSize: 20, marginBottom: 8 }}>{localizeChineseContent(translation.title)}</h2>
-            <ArticleBody segments={translation.segments} fallback={translation.text} locale={locale} translated figures={a.figures} />
+            <h2 style={{ fontSize: 20, marginBottom: 8 }}>{localizeChineseContent(usableTranslation.title)}</h2>
+            <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} />
           </div>
         )}
-        {!publisherPdf && locale === "zh-CN" && !translation && a.rawText && (
+        {!publisherPdf && locale === "zh-CN" && !usableTranslation && a.rawText && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
           </div>
         )}
-        {!publisherPdf && locale === "zh-CN" && translation && a.rawText && (
+        {!publisherPdf && locale === "zh-CN" && usableTranslation && a.rawText && (
           <details className="article-original">
             <summary>完整英文原文</summary>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />

@@ -21,7 +21,6 @@ const npmPrefix = process.platform === "win32" ? [process.env.npm_execpath] : []
 let stopping = false;
 const activeChildren = new Set();
 const waiters = new Set();
-const stopHeartbeat = await startWorkerHeartbeat("research", () => ({ activeChildren: activeChildren.size }));
 
 const runtimeDir = path.resolve(process.env.RUNTIME_DIR || path.join(process.cwd(), ".runtime"));
 const lockPath = path.join(runtimeDir, "research-scheduler.lock");
@@ -51,6 +50,7 @@ const recovered = await prisma.jobRun.updateMany({
 });
 await prisma.$disconnect();
 if (recovered.count) console.log(JSON.stringify({ event: "scheduler.recovered", jobs: recovered.count }));
+const stopHeartbeat = await startWorkerHeartbeat("research", () => ({ activeChildren: activeChildren.size }));
 
 function stop() {
   stopping = true;

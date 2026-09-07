@@ -8,6 +8,7 @@ const config = [
       "node_modules/**",
       ".next/**",
       ".next-tline/**",
+      ".next-*/**",
       ".runtime/**",
       "storage/**",
       // Vendored pdf.js assets: shipped as published, not ours to lint.

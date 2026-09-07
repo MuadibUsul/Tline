@@ -332,7 +332,7 @@ export async function translateArticle(
   };
 }
 
-export async function translateAndPersist(articleId: string, provider?: LLMProvider) {
+export async function translateAndPersist(articleId: string, provider?: LLMProvider, expectedContentHash?: string) {
   let article = await prisma.article.findUnique({
     where: { id: articleId },
     include: {
@@ -369,6 +369,13 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
     || (article.atomicViews[0]?.importance ?? 0) >= 4;
   const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider ?? undefined, reviewer, important);
   return prisma.$transaction(async (tx) => {
+    if (expectedContentHash) {
+      const claimed = await tx.article.updateMany({
+        where: { id: articleId, contentHash: expectedContentHash },
+        data: { contentHash: expectedContentHash },
+      });
+      if (claimed.count !== 1) throw new Error("Article changed while translation was running; stale result discarded.");
+    }
     const translation = await tx.articleTranslation.upsert({
       where: { articleId_locale: { articleId, locale: "zh-CN" } },
       create: {
@@ -409,5 +416,5 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
       });
     }
     return { translation, quality: result.quality, review: result.review };
-  });
+  }, { isolationLevel: "Serializable" });
 }

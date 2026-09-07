@@ -1,4 +1,5 @@
 import { lookup } from "node:dns/promises";
+import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 import { prisma } from "./db";
 
@@ -21,9 +22,11 @@ export function isPrivateAddress(address: string): boolean {
     const [a, b] = address.split(".").map(Number);
     if (a === 10 || a === 127 || a === 0) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
+    if (a === 192 && (b === 168 || (b === 0 && [0, 2].includes(Number(address.split(".")[2]))))) return true;
     if (a === 169 && b === 254) return true; // link-local, covers cloud metadata
     if (a === 100 && b >= 64 && b <= 127) return true; // carrier-grade NAT
+    if (a === 198 && (b === 18 || b === 19 || (b === 51 && Number(address.split(".")[2]) === 100))) return true;
+    if (a === 203 && b === 0 && Number(address.split(".")[2]) === 113) return true;
     if (a >= 224) return true; // multicast and reserved
     return false;
   }
@@ -31,7 +34,8 @@ export function isPrivateAddress(address: string): boolean {
     const normalized = address.toLowerCase();
     if (normalized === "::" || normalized === "::1") return true;
     if (/^f[cd]/.test(normalized)) return true; // unique local
-    if (normalized.startsWith("fe80")) return true; // link-local
+    if (/^fe[89ab]/.test(normalized)) return true; // link-local
+    if (normalized.startsWith("ff") || normalized.startsWith("2001:db8")) return true;
     // IPv4-mapped addresses inherit the IPv4 rules.
     const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
     if (mapped) return isPrivateAddress(mapped[1]);
@@ -57,21 +61,41 @@ export function checkWebhookUrl(raw: string): DeliveryVerdict {
   return { ok: true };
 }
 
-async function assertDeliverable(raw: string): Promise<DeliveryVerdict> {
+type ResolvedDeliveryVerdict = { ok: true; address: string; family: 4 | 6 } | { ok: false; reason: string };
+
+async function assertDeliverable(raw: string): Promise<ResolvedDeliveryVerdict> {
   const syntax = checkWebhookUrl(raw);
   if (!syntax.ok) return syntax;
   const hostname = new URL(raw).hostname;
-  if (isIP(hostname)) return { ok: true };
+  const literalFamily = isIP(hostname);
+  if (literalFamily) return { ok: true, address: hostname, family: literalFamily as 4 | 6 };
   try {
     const records = await lookup(hostname, { all: true });
     if (!records.length) return { ok: false, reason: "host does not resolve" };
     if (records.some((record) => isPrivateAddress(record.address))) {
       return { ok: false, reason: "resolves to a private address" };
     }
-    return { ok: true };
+    return { ok: true, address: records[0].address, family: records[0].family as 4 | 6 };
   } catch {
     return { ok: false, reason: "host does not resolve" };
   }
+}
+
+function postWebhook(destination: string, payload: AlertPayload, address: string, family: 4 | 6): Promise<number> {
+  const body = JSON.stringify(payload);
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(destination, {
+      method: "POST",
+      headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) },
+      lookup: (_hostname, _options, callback) => callback(null, address, family),
+    }, (response) => {
+      response.resume();
+      response.on("end", () => resolve(response.statusCode ?? 0));
+    });
+    request.setTimeout(10_000, () => request.destroy(new Error("delivery timed out")));
+    request.on("error", reject);
+    request.end(body);
+  });
 }
 
 export interface AlertPayload {
@@ -158,14 +182,8 @@ export async function deliverPendingAlerts(limit = 50): Promise<{ sent: number; 
 
     const attempts = event.deliveryAttempts + 1;
     try {
-      const response = await fetch(destination, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-        redirect: "manual",
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const status = await postWebhook(destination, payload, verdict.address, verdict.family);
+      if (status < 200 || status >= 300) throw new Error(`HTTP ${status}`);
       sent += 1;
       await prisma.alertEvent.update({
         where: { id: event.id },

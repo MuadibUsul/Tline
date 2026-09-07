@@ -174,13 +174,22 @@ export async function computeConsensusMany(
 export async function snapshotAll(): Promise<number> {
   const assets = await prisma.asset.findMany();
   const consensus = await computeConsensusMany(assets.map((a) => a.id));
+  const latest = await prisma.consensusHistory.findMany({
+    where: { assetId: { in: assets.map((a) => a.id) } },
+    orderBy: { timestamp: "desc" },
+    distinct: ["assetId"],
+  });
+  const previous = new Map(latest.map((row) => [row.assetId, row]));
   const data = assets.flatMap((a) => {
     const c = consensus.get(a.id);
-    return c && !c.isFallback
-      ? [{ assetId: a.id, consensusScore: c.score, institutionCount: c.institutionCount, bullishCount: c.bullishCount, neutralCount: c.neutralCount, bearishCount: c.bearishCount }]
-      : [];
+    if (!c || c.isFallback) return [];
+    const row = { assetId: a.id, consensusScore: c.score, institutionCount: c.institutionCount, bullishCount: c.bullishCount, neutralCount: c.neutralCount, bearishCount: c.bearishCount };
+    const old = previous.get(a.id);
+    return old && old.consensusScore === row.consensusScore && old.institutionCount === row.institutionCount
+      && old.bullishCount === row.bullishCount && old.neutralCount === row.neutralCount && old.bearishCount === row.bearishCount ? [] : [row];
   });
   if (data.length) await prisma.consensusHistory.createMany({ data });
+  await prisma.consensusHistory.deleteMany({ where: { timestamp: { lt: new Date(Date.now() - 180 * 864e5) } } });
   return data.length;
 }
 

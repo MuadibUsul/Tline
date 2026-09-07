@@ -14,6 +14,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   build:
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -98,6 +99,7 @@ jobs:
           script: |
             set -eu
             cd ~/tline
+            mkdir -p backups
             IMAGE='${{ needs.build.outputs.image }}'
             NEW_TAG='${{ needs.build.outputs.tag }}'
             PREVIOUS_TAG=$(cat .deploy-tag 2>/dev/null || true)
@@ -115,7 +117,9 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d || true
 
             for i in $(seq 1 18); do
-              if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
+              RESEARCH_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
+              MACRO_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q macro-scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
+              if [ "$RESEARCH_HEALTH" = healthy ] && [ "$MACRO_HEALTH" = healthy ] && docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
                 node -e "fetch('http://127.0.0.1:3000/api/health').then(async r=>{const b=await r.json();if(!r.ok||b.status!=='ok')process.exit(1)}).catch(()=>process.exit(1))"; then
                 echo "$NEW_TAG" > .deploy-tag
 

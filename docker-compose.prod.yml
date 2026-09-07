@@ -32,6 +32,23 @@ services:
     build: !reset null
     mem_limit: 384m
 
+  backup:
+    image: ghcr.io/muadibusul/tline:${TAG:-latest}
+    mem_limit: 384m
+    restart: unless-stopped
+    command: ["sh", "-c", "while true; do npm run backup; sleep 86400; done"]
+    environment:
+      DATABASE_URL: postgresql://tline:${POSTGRES_PASSWORD}@db:5432/tline
+      DOCUMENT_STORAGE_ROOT: /app/storage
+      BACKUP_DIR: /app/backups
+      BACKUP_KEEP: ${BACKUP_KEEP:-30}
+    volumes:
+      - document-storage:/app/storage:ro
+      - ${BACKUP_ROOT:-./backups}:/app/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
 networks:
   web:
     external: true

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { chromium } from "playwright-core";
+import { assertPublicHttpUrl } from "./fetch";
 
 function browserExecutable() {
   const candidates = [
@@ -26,6 +27,7 @@ export function lastRenderReason(url: string): string | undefined {
 /** Normal public-page rendering only: no stealth, proxy rotation, CAPTCHA solving, or login. */
 export async function renderHtml(url: string, timeoutMs = 25000): Promise<string | null> {
   renderReasons.delete(url);
+  await assertPublicHttpUrl(url);
   const executablePath = browserExecutable();
   if (!executablePath) return null;
   const browser = await chromium.launch({ headless: true, executablePath });
@@ -38,6 +40,7 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
     const context = await browser.newContext({ locale: "en-US", userAgent: browserUa });
     const page = await context.newPage();
     const origin = new URL(url).origin;
+    const checkedOrigins = new Set([origin]);
     const publicJson: string[] = [];
     const captures: Promise<void>[] = [];
     let capturedBytes = 0;
@@ -60,10 +63,20 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
     });
     await page.route("**/*", async (route) => {
       const type = route.request().resourceType();
-      if (["image", "media", "font"].includes(type)) await route.abort();
-      else await route.continue();
+      if (["image", "media", "font"].includes(type)) return route.abort();
+      try {
+        const target = new URL(route.request().url());
+        if (["http:", "https:"].includes(target.protocol) && !checkedOrigins.has(target.origin)) {
+          await assertPublicHttpUrl(target.toString());
+          checkedOrigins.add(target.origin);
+        }
+        await route.continue();
+      } catch {
+        await route.abort();
+      }
     });
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    await assertPublicHttpUrl(page.url());
     // Give public client-side content APIs time to settle, but cap the wait for pages
     // that keep analytics connections open indefinitely.
     await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);

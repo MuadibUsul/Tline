@@ -26,6 +26,7 @@ async function main() {
     select: {
       id: true,
       title: true,
+      contentHash: true,
       translations: { where: { locale: "zh-CN" }, select: { status: true, qualityScore: true } },
     },
     orderBy: { publishedAt: "desc" },
@@ -40,7 +41,7 @@ async function main() {
   for (let offset = 0; offset < candidates.length; offset += concurrency) {
     await Promise.all(candidates.slice(offset, offset + concurrency).map(async (article) => {
       try {
-        const result = await translateAndPersist(article.id, provider);
+        const result = await translateAndPersist(article.id, provider, article.contentHash);
         await generateArticleDocuments(article.id);
         if (result.translation.status === "needs_review") await queueRetry(article.id, "translation");
         if (result.translation.status === "reviewed") translated++;

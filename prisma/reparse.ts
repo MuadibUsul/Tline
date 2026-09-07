@@ -24,6 +24,7 @@ async function main() {
     select: {
       id: true,
       title: true,
+      contentHash: true,
       rawText: true,
       publishedAt: true,
       institution: { select: { name: true } },
@@ -61,8 +62,14 @@ async function main() {
           .map((signal) => [signal.ticker, signal]),
       ).values()];
 
-      await prisma.$transaction([
-        prisma.analysis.upsert({
+      await prisma.$transaction(async (tx) => {
+        const claimed = await tx.article.updateMany({
+          where: { id: article.id, contentHash: article.contentHash },
+          data: { contentHash: article.contentHash },
+        });
+        if (claimed.count !== 1) throw new Error("Article changed while analysis was running; stale result discarded.");
+        await Promise.all([
+        tx.analysis.upsert({
           where: { articleId: article.id },
           create: {
             articleId: article.id,
@@ -102,9 +109,9 @@ async function main() {
             reviewStatus: parsed.reviewStatus,
           },
         }),
-        prisma.articleAsset.deleteMany({ where: { articleId: article.id } }),
-        prisma.atomicView.deleteMany({ where: { articleId: article.id } }),
-        ...uniqueSignals.map((signal) => prisma.articleAsset.create({
+        tx.articleAsset.deleteMany({ where: { articleId: article.id } }),
+        tx.atomicView.deleteMany({ where: { articleId: article.id } }),
+        ...uniqueSignals.map((signal) => tx.articleAsset.create({
           data: {
             articleId: article.id,
             assetId: assetIds.get(signal.ticker)!,
@@ -115,7 +122,7 @@ async function main() {
             confidence: signal.confidence,
           },
         })),
-        ...parsed.atomicViews.map((view, position) => prisma.atomicView.create({
+        ...parsed.atomicViews.map((view, position) => tx.atomicView.create({
           data: {
             articleId: article.id,
             position,
@@ -141,7 +148,8 @@ async function main() {
             reviewStatus: parsed.reviewStatus,
           },
         })),
-      ]);
+        ]);
+      }, { isolationLevel: "Serializable" });
       // One automatic second pass for low-quality model output. During that retry the
       // queue row is already "running", so queueRetry is a no-op and cannot loop forever.
       if (parsed.reviewStatus === "needs_review") await queueRetry(article.id, "analysis");

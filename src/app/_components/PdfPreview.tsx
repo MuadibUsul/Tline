@@ -73,13 +73,10 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
         }) as unknown as PdfLoadingTask;
         loaded = (await task.promise) as PdfDocument;
         if (cancelled) return;
-        // Every page's natural size up front, so the column has its real height from the
-        // start and scrolling does not jump as pages are drawn into it.
-        const measured = [];
-        for (let index = 1; index <= loaded.numPages; index++) {
-          const viewport = (await loaded.getPage(index)).getViewport({ scale: 1 });
-          measured.push({ width: viewport.width, height: viewport.height });
-        }
+        // Most reports use one page size. Seed placeholders from page one and refine
+        // exceptional pages lazily instead of opening every page before showing the PDF.
+        const first = (await loaded.getPage(1)).getViewport({ scale: 1 });
+        const measured = Array.from({ length: loaded.numPages }, () => ({ width: first.width, height: first.height }));
         if (cancelled) return;
         documentRef.current = loaded;
         setSizes(measured);
@@ -109,6 +106,10 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
     drawn.current.set(index, scale);
 
     const page = await source.getPage(index);
+    const natural = page.getViewport({ scale: 1 });
+    setSizes((current) => current[index - 1]?.width === natural.width && current[index - 1]?.height === natural.height
+      ? current
+      : current.map((size, position) => position === index - 1 ? { width: natural.width, height: natural.height } : size));
     // A CSS-sized canvas at 1x is visibly soft on ordinary desktop displays. Render at
     // least two physical pixels per CSS pixel, while bounding memory on high-DPI screens.
     const density = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
@@ -138,7 +139,12 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
       (entries) => {
         for (const entry of entries) {
           const index = Number((entry.target as HTMLElement).dataset.page);
-          if (!entry.isIntersecting || !index) continue;
+          if (!index) continue;
+          if (!entry.isIntersecting) {
+            entry.target.replaceChildren();
+            drawn.current.delete(index);
+            continue;
+          }
           void drawPage(index).catch(() => {
             drawn.current.delete(index);
           });

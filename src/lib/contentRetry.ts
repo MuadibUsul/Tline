@@ -10,6 +10,10 @@ import { prisma } from "./db";
 export const RETRY_KINDS = ["analysis", "translation"] as const;
 export type RetryKind = (typeof RETRY_KINDS)[number];
 
+export function retryPassed(kind: RetryKind, score: number | null): boolean {
+  return kind === "analysis" ? score === 1 : score !== null && score >= 0.8;
+}
+
 export function isRetryKind(value: string): value is RetryKind {
   return (RETRY_KINDS as readonly string[]).includes(value);
 }
@@ -78,14 +82,15 @@ export async function claimQueuedRetries(kind: RetryKind, limit: number) {
 export async function completeRetry(id: string, articleId: string, kind: RetryKind, error?: string | null) {
   const scoreAfter = await currentScore(articleId, kind);
   const row = await prisma.contentRetry.findUnique({ where: { id }, select: { attempt: true } });
+  const outcomeError = error ?? (retryPassed(kind, scoreAfter) ? null : `quality threshold not met (${scoreAfter ?? "missing"})`);
   return prisma.contentRetry.update({
     where: { id },
     data: {
-      status: error ? "failed" : "succeeded",
+      status: outcomeError ? "failed" : "succeeded",
       finishedAt: new Date(),
       attempt: (row?.attempt ?? 0) + 1,
       scoreAfter,
-      error: error ? error.slice(0, 500) : null,
+      error: outcomeError ? outcomeError.slice(0, 500) : null,
     },
   });
 }

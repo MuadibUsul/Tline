@@ -22,3 +22,9 @@ test("quality gate catches broken words and low quality translations", () => {
   assert.ok(result.issues.includes("garbled_or_broken_words"));
   assert.ok(result.issues.includes("translation_below_threshold"));
 });
+
+test("quality gate withholds call-to-action titles from indexing", () => {
+  const result = contentQuality({ ...valid, title: "Go to Article" }, "en");
+  assert.equal(result.indexable, false);
+  assert.ok(result.issues.includes("abnormal_title"));
+});

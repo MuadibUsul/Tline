@@ -142,6 +142,21 @@ export function webPageJsonLd(locale: Locale, path: string, name: string, descri
   return { "@context": "https://schema.org", "@type": type, "@id": `${url}#webpage`, url, name, description, inLanguage: locale, isPartOf: { "@id": `${localizedUrl("/", locale)}#website` }, publisher: { "@id": organizationId() } };
 }
 
+export function institutionProfileJsonLd(locale: Locale, path: string, name: string, description: string, officialUrl: string) {
+  const page = webPageJsonLd(locale, path, name, description, "ProfilePage");
+  return {
+    ...page,
+    mainEntity: {
+      "@type": "Organization",
+      "@id": `${localizedUrl(path, locale)}#institution`,
+      name,
+      url: officialUrl,
+      sameAs: officialUrl,
+      mainEntityOfPage: { "@id": page["@id"] },
+    },
+  };
+}
+
 export function datasetJsonLd(locale: Locale, path: string, name: string, description: string, dateModified?: Date) {
   const url = localizedUrl(path, locale);
   return { "@context": "https://schema.org", "@type": "Dataset", "@id": `${url}#dataset`, name, description, url, inLanguage: locale, isAccessibleForFree: true, creator: { "@id": organizationId() }, ...(dateModified ? { dateModified: dateModified.toISOString() } : {}) };

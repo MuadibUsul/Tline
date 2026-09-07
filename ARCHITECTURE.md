@@ -564,3 +564,17 @@ MVP 先使用结构化任务日志，每个来源至少输出：
 
 - 各用户 tier 对中文全文、中英 PDF 下载、批量导出和 API 的具体权限矩阵。
 - 最终部署平台尚未确定，不阻塞当前采集和解析开发。
+
+## 16. 管理后台
+
+`/admin` 由统一 layout 完成登录与 `admin.access` 鉴权，并按角色权限生成侧栏。管理员可管理账户、来源、任务、审核、API 密钥和审计日志；reviewer 仅能进入审核及只读分析页面。`ADMIN_EMAILS` 始终提供 admin 保底权限，避免数据库角色误操作锁死后台。
+
+所有后台写操作使用 Server Action，在服务端再次校验对应的 `admin.*` 权限并调用 `writeAudit()`。账户封禁会删除数据库会话并让后续登录失败；强制下线通过推进 `passwordChangedAt` 和删除 Session 使现有登录失效。后台页面统一动态渲染、禁止索引，并由 middleware 加上 private/no-store 响应头。
+
+## 17. 访问与 API 分析管线
+
+页面客户端以 `sendBeacon` 向 `/api/analytics` 上报浏览、停留时间、业务事件和 Web Vitals。服务端先执行同源、DNT、机器人和限流检查，再异步写入原始表。访客 ID 使用 `AUTH_SECRET + UTC 日期 + IP + UA` 的 SHA-256 摘要；原始 IP 与分析 Cookie 均不保存，因此访客只能在单个 UTC 日内去重。
+
+`analytics-rollup` 将最近三天原始浏览汇总到 `TrafficDaily`，并按 `ANALYTICS_RAW_RETENTION_DAYS` 清理原始数据；重复运行是幂等的。后台查询历史区间时优先读取日聚合，当日和实时指标读取原始记录。
+
+公共 API 不保存逐请求日志。`withApiKey()` 在成功、鉴权失败、参数错误和服务端错误路径上记录端点、状态码与耗时，先合并进进程内缓冲，再批量 upsert 到 `ApiUsageDaily`。这让管理页能按日期、密钥、端点及状态码观察用量，而不会把数据库写入放进每次 API 请求的关键路径。

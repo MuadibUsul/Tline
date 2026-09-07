@@ -6,7 +6,7 @@ import { getInstitutionView } from "@/lib/queries";
 import { FeedCard, DirChip, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
-import { canonical, JsonLd, ogImage, webPageJsonLd } from "@/lib/seo";
+import { canonical, institutionProfileJsonLd, JsonLd, ogImage } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -40,7 +40,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
 
   return (
     <main className="wrap">
-      <JsonLd data={webPageJsonLd(locale, `/institution/${inst.slug}`, institutionName(inst.name, locale), tr(locale, `Structured public research, current views and source links for ${inst.name}.`, `${institutionName(inst.name, locale)}的结构化公开研报、当前观点与来源链接。`), "ProfilePage")} />
+      <JsonLd data={institutionProfileJsonLd(locale, `/institution/${inst.slug}`, institutionName(inst.name, locale), tr(locale, `Structured public research, current views and source links for ${inst.name}.`, `${institutionName(inst.name, locale)}的结构化公开研报、当前观点与来源链接。`), inst.researchUrl)} />
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Institution", "机构")}</div>
         <h1>{institutionName(inst.name, locale)}</h1>

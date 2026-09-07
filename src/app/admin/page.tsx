@@ -1,103 +1,155 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { noIndex } from "@/lib/seo";
-import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
-import { queueContentRetry, queueSourceRetry, setSourceMonitoring } from "./actions";
+import { age, compact, json, when } from "./_components/format";
+import { overview, realtime, windowFor } from "@/lib/analytics/query";
 import { pipelineHealth } from "@/../scripts/watchdog";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Dashboard" };
 
-// Behind a sign-in: robots.txt asks a crawler not to fetch this, which does not keep
-// it out of an index if something links to it. This does.
-export const metadata: Metadata = { title: "Operations", ...noIndex };
-
-
-function json(value: string) {
-  try { return JSON.parse(value) as Record<string, unknown>; } catch { return {}; }
-}
-
-function age(value: Date | null, locale: string) {
-  if (!value) return "—";
-  const minutes = Math.max(0, Math.round((Date.now() - value.getTime()) / 60_000));
-  if (minutes < 60) return locale === "zh-CN" ? `${minutes} 分钟前` : `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return locale === "zh-CN" ? `${hours} 小时前` : `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return locale === "zh-CN" ? `${days} 天前` : `${days}d ago`;
-}
-
-const tone = (status: string | null) => status === "succeeded" || status === "reviewed" ? "bull" : status === "failed" || status === "needs_review" ? "bear" : status === "running" || status === "queued" ? "acc" : "gray";
-
-export default async function AdminPage() {
-  const user = await getSessionUser();
-  if (!user || !can(user, "admin.review")) notFound();
+/**
+ * The console's front page.
+ *
+ * It used to be the crawler screen, which meant every visit — whatever the operator came
+ * for — opened on a table of sixty publishers. This answers "is anything wrong, and where"
+ * across all of the console's areas, and each card is a way into the section that owns it.
+ */
+export default async function AdminOverviewPage() {
+  const user = (await getSessionUser())!;
   const locale = await getLocale();
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const day = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [sources, jobs, articles24h, articles7d, analysisReview, translationReview, runningJobs, failedJobs, workers, staleJobs, health] = await Promise.all([
-    prisma.institution.findMany({ orderBy: [{ monitoringEnabled: "desc" }, { priority: "asc" }, { name: "asc" }] }),
-    prisma.jobRun.findMany({ orderBy: { startedAt: "desc" }, take: 30 }),
-    prisma.article.count({ where: { createdAt: { gte: since } } }),
-    prisma.article.count({ where: { createdAt: { gte: week } } }),
-    prisma.analysis.findMany({ where: { reviewStatus: "needs_review" }, orderBy: { createdAt: "desc" }, take: 10, include: { article: { include: { institution: true } } } }),
-    prisma.articleTranslation.findMany({ where: { status: "needs_review" }, orderBy: { updatedAt: "desc" }, take: 10, include: { article: { include: { institution: true } } } }),
-    prisma.jobRun.count({ where: { status: "running" } }),
-    prisma.jobRun.count({ where: { status: "failed", startedAt: { gte: since } } }),
-    prisma.workerHeartbeat.findMany({ orderBy: { name: "asc" } }),
-    prisma.jobRun.count({ where: { status: "running", startedAt: { lt: new Date(Date.now() - 20 * 60_000) } } }),
-    pipelineHealth(),
-  ]);
-  const enabled = sources.filter((source) => source.monitoringEnabled && ["allowed", "delayed"].includes(source.crawlPolicy)).length;
-  const unhealthy = sources.filter((source) => ["failed", "refused", "paused"].includes(source.lastCrawlStatus ?? "") || (!source.monitoringEnabled && source.consecutiveFailures > 0)).length;
-  const reviewCount = analysisReview.length + translationReview.length;
 
-  return <main className="wrap admin-page">
+  const [
+    users, newUsers, activeUsers, suspended,
+    analysisReview, translationReview,
+    sources, failedJobs, staleJobs,
+    keys, recentUsers, recentAudit, health,
+    traffic, live,
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { createdAt: { gte: week } } }),
+    prisma.user.count({ where: { lastSeenAt: { gte: week } } }),
+    prisma.user.count({ where: { suspendedAt: { not: null } } }),
+    prisma.analysis.count({ where: { reviewStatus: "needs_review" } }),
+    prisma.articleTranslation.count({ where: { status: "needs_review" } }),
+    prisma.institution.findMany({ select: { monitoringEnabled: true, crawlPolicy: true, lastCrawlStatus: true, consecutiveFailures: true } }),
+    prisma.jobRun.count({ where: { status: "failed", startedAt: { gte: day } } }),
+    prisma.jobRun.count({ where: { status: "running", startedAt: { lt: new Date(Date.now() - 20 * 60_000) } } }),
+    prisma.apiKey.findMany({ select: { revokedAt: true, requestCount: true, lastUsedAt: true } }),
+    prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 6, select: { id: true, email: true, role: true, tier: true, createdAt: true } }),
+    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { actor: { select: { email: true } } } }),
+    pipelineHealth(),
+    overview(windowFor("24h")),
+    realtime(),
+  ]);
+
+  const monitored = sources.filter((source) => source.monitoringEnabled && ["allowed", "delayed"].includes(source.crawlPolicy)).length;
+  const unhealthy = sources.filter((source) => ["failed", "refused", "paused"].includes(source.lastCrawlStatus ?? "") || (!source.monitoringEnabled && source.consecutiveFailures > 0)).length;
+  const review = analysisReview + translationReview;
+  const activeKeys = keys.filter((key) => !key.revokedAt).length;
+  const apiCalls = keys.reduce((total, key) => total + key.requestCount, 0);
+
+  // A card an operator cannot act on is decoration, so each one is a link into the
+  // section that can do something about the number it shows.
+  const cards: { show: boolean; href: string; label: string; value: string; note: string; alarm?: boolean }[] = [
+    {
+      show: can(user, "admin.analytics"), href: "/admin/analytics",
+      label: tr(locale, "Visitors · 24h", "24 小时访客"), value: compact(traffic.visitors),
+      note: tr(locale, `${compact(traffic.views)} views · ${live.visitors} online now`, `浏览 ${compact(traffic.views)} · 当前在线 ${live.visitors}`),
+    },
+    {
+      show: can(user, "admin.users"), href: "/admin/users",
+      label: tr(locale, "Accounts", "注册账户"), value: compact(users),
+      note: tr(locale, `${newUsers} new / 7d · ${activeUsers} active`, `7 日新增 ${newUsers} · 活跃 ${activeUsers}`),
+    },
+    {
+      show: can(user, "admin.users") && suspended > 0, href: "/admin/users?status=suspended",
+      label: tr(locale, "Suspended", "已封禁"), value: String(suspended),
+      note: tr(locale, "accounts refused at sign-in", "账户已被拒绝登录"), alarm: true,
+    },
+    {
+      show: can(user, "admin.review"), href: "/admin/review",
+      label: tr(locale, "Needs review", "待审核"), value: String(review),
+      note: tr(locale, `${analysisReview} analysis · ${translationReview} translation`, `分析 ${analysisReview} · 翻译 ${translationReview}`),
+      alarm: review > 20,
+    },
+    {
+      show: can(user, "admin.sources"), href: "/admin/sources",
+      label: tr(locale, "Monitored sources", "监控来源"), value: String(monitored),
+      note: tr(locale, `${sources.length} total · ${unhealthy} unhealthy`, `共 ${sources.length} 家 · 异常 ${unhealthy}`),
+      alarm: unhealthy > 0,
+    },
+    {
+      show: can(user, "admin.review"), href: "/admin/jobs",
+      label: tr(locale, "Newest research", "最近入库"),
+      value: health.articleAgeHours === null ? "—" : health.articleAgeHours < 1 ? tr(locale, "<1h", "1 小时内") : `${health.articleAgeHours.toFixed(0)}h`,
+      note: tr(locale, `${failedJobs} failed / 24h · ${staleJobs} stale`, `24 小时失败 ${failedJobs} · 卡死 ${staleJobs}`),
+      alarm: health.stalled.length > 0 || staleJobs > 0,
+    },
+    {
+      show: can(user, "admin.api"), href: "/admin/api",
+      label: tr(locale, "API keys", "API 密钥"), value: String(activeKeys),
+      note: tr(locale, `${compact(apiCalls)} requests all time`, `累计调用 ${compact(apiCalls)} 次`),
+    },
+  ];
+
+  return <>
     <header className="page-head admin-head">
-      <div><div className="eyebrow">Operations Console</div><h1>{tr(locale, "Operations", "运营后台")}</h1><p className="sub">{tr(locale, "Source health, pipeline runs and editorial review in one place.", "统一查看来源健康度、流水线任务和内容审核。")}</p></div>
-      <div className="tag-row"><span className="chip acc">{user.role}</span><Link className="minibtn" href={localePath(locale, "/admin/api-keys")}>{tr(locale, "API keys", "API 密钥")} →</Link><a className="minibtn" href={localePath(locale, "/api/health")} target="_blank" rel="noreferrer">Health JSON ↗</a></div>
+      <div>
+        <h1>{tr(locale, "Dashboard", "仪表盘")}</h1>
+        <p className="sub">{tr(locale, "What needs attention right now, across audience, accounts, the content pipeline and the API.", "跨访问、账户、内容管道与 API 四个方面，当前需要关注的事项。")}</p>
+      </div>
     </header>
 
-    <section className="admin-stats" aria-label={tr(locale, "Operations summary", "运营概览")}>
-      <div className="admin-stat"><span>{tr(locale, "Monitored sources", "监控来源")}</span><b>{enabled}</b><small>{sources.length} total</small></div>
-      <div className="admin-stat"><span>{tr(locale, "New research · 24h", "24 小时新增研报")}</span><b>{articles24h}</b><small>{articles7d} / 7d</small></div>
-      <div className="admin-stat"><span>{tr(locale, "Needs review", "待审核")}</span><b>{reviewCount}</b><small>{tr(locale, "analysis + translation", "分析与翻译")}</small></div>
-      <div className="admin-stat"><span>{tr(locale, "Pipeline health", "流水线状态")}</span><b>{staleJobs ? "!" : runningJobs}</b><small>{failedJobs} failed / 24h · {staleJobs} stale · {unhealthy} sources</small></div>
-      {/* A pipeline that succeeds while bringing nothing back reports as healthy
-          everywhere else; this is the one place it shows. */}
-      <div className={`admin-stat${health.stalled.length ? " admin-stat-alarm" : ""}`}>
-        <span>{tr(locale, "Newest research", "最近入库")}</span>
-        <b>{health.articleAgeHours === null ? "—" : health.articleAgeHours < 1 ? tr(locale, "<1h", "1 小时内") : `${health.articleAgeHours.toFixed(0)}h`}</b>
-        <small>{health.stalled.length ? health.stalled.join(" · ") : tr(locale, `${health.workingSources}/${health.crawlableSources} sources succeeded / 24h`, `24 小时内 ${health.workingSources}/${health.crawlableSources} 家来源成功`)}</small>
-      </div>
+    <section className="admin-stats admin-stats-6" aria-label={tr(locale, "Console summary", "后台概览")}>
+      {cards.filter((card) => card.show).map((card) => (
+        <Link className={`admin-stat admin-stat-link${card.alarm ? " admin-stat-alarm" : ""}`} key={card.label} href={localePath(locale, card.href)}>
+          <span>{card.label}</span><b>{card.value}</b><small>{card.note}</small>
+        </Link>
+      ))}
     </section>
 
     <div className="admin-columns">
-      <section className="blk"><div className="section-t"><span>{tr(locale, "Source monitoring", "来源监控")}</span><span className="chip gray">{sources.length}</span></div>
-        <div className="tbl-wrap"><table className="admin-table"><thead><tr><th>{tr(locale, "Institution", "机构")}</th><th>{tr(locale, "Status", "状态")}</th><th>{tr(locale, "Last success", "最近成功")}</th><th>{tr(locale, "Policy", "合规策略")}</th><th>{tr(locale, "Action", "操作")}</th></tr></thead><tbody>{sources.map((source) => {
-          const compliant = ["allowed", "delayed"].includes(source.crawlPolicy);
-          return <tr key={source.id}><td className="inst"><Link href={localePath(locale, `/institution/${source.slug}`)}>{source.name}</Link><small>{source.updateFreq ?? "—"}</small></td><td><span className={`chip ${tone(source.lastCrawlStatus)}`}>{source.monitoringEnabled ? source.lastCrawlStatus ?? "new" : source.consecutiveFailures > 0 ? "circuit_open" : "paused"}</span>{source.lastCrawlMessage && <small title={source.lastCrawlMessage}>{source.consecutiveFailures ? `${source.consecutiveFailures}× · ` : ""}{source.lastCrawlMessage}</small>}</td><td className="mono-cell">{age(source.lastSuccessAt, locale)}</td><td><span className={`chip ${compliant ? "gray" : "bear"}`}>{source.crawlPolicy}</span></td><td><div className="admin-actions">{user.role === "admin" && compliant && <><form action={setSourceMonitoring}><input type="hidden" name="id" value={source.id}/><input type="hidden" name="enabled" value={source.monitoringEnabled ? "false" : "true"}/><button className="minibtn" type="submit">{source.monitoringEnabled ? tr(locale, "Pause", "暂停") : tr(locale, "Resume", "恢复")}</button></form>{["failed", "paused"].includes(source.lastCrawlStatus ?? "") && <form action={queueSourceRetry}><input type="hidden" name="id" value={source.id}/><button className="minibtn p" type="submit">{tr(locale, "Next run", "加入下一轮")}</button></form>}</>}</div></td></tr>;
-        })}</tbody></table></div>
-      </section>
+      {can(user, "admin.audit") && <section className="blk">
+        <div className="section-t">
+          <span>{tr(locale, "Latest operator activity", "最近后台操作")}</span>
+          <Link className="minibtn" href={localePath(locale, "/admin/audit")}>{tr(locale, "Audit log", "审计日志")} →</Link>
+        </div>
+        <div className="admin-jobs">
+          {recentAudit.length === 0 && <div className="empty-state">{tr(locale, "No operator action has been recorded yet.", "尚未记录任何后台操作。")}</div>}
+          {recentAudit.map((entry) => {
+            const metadata = json(entry.metadata);
+            const name = typeof metadata.name === "string" ? metadata.name : typeof metadata.email === "string" ? metadata.email : entry.targetId;
+            return <div className="admin-job" key={entry.id}>
+              <div><b>{entry.action}</b><small>{entry.actor?.email ?? tr(locale, "system", "系统")} · {age(entry.createdAt, locale)}</small></div>
+              <div className="admin-job-state"><span className="mono admin-metric">{name ?? "—"}</span></div>
+            </div>;
+          })}
+        </div>
+      </section>}
 
-      <aside><section className="blk"><div className="section-t">{tr(locale, "Workers", "调度器心跳")}</div><div className="admin-workers">{["research", "macro"].map((name) => { const worker = workers.find((item) => item.name === name); const healthy = worker?.status === "running" && Date.now() - worker.lastSeenAt.getTime() < 120_000; return <div key={name}><b>{name}</b><span className={`chip ${healthy ? "bull" : "bear"}`}>{healthy ? "ok" : "stale"}</span><small>{age(worker?.lastSeenAt ?? null, locale)}</small></div>; })}</div></section>
-        <section className="blk"><div className="section-t">{tr(locale, "Needs review", "待审核")}</div><div className="admin-review-list">{reviewCount ? <>{[
-          ...analysisReview.map((item) => ({ key: `a-${item.id}`, article: item.article, kind: "analysis" as const })),
-          ...translationReview.map((item) => ({ key: `t-${item.id}`, article: item.article, kind: "translation" as const })),
-        ].map((item) => <div className="admin-review-row" key={item.key}>
-          <Link href={localePath(locale, `/research/${item.article.id}`)}><span><b>{item.article.title}</b><small>{item.article.institution.name} · {item.kind}</small></span><span className="chip bear">needs_review</span></Link>
-          {/* The rerun lives here rather than only on the report: this list is where an
-              operator decides, and a decision that costs a page visit is not taken. */}
-          {user.role === "admin" && <form action={queueContentRetry}>
-            <input type="hidden" name="articleId" value={item.article.id} />
-            <input type="hidden" name="kind" value={item.kind} />
-            <button className="minibtn" type="submit">{tr(locale, "Re-run", "重跑")}</button>
-          </form>}
-        </div>)}</> : <div className="empty-state">{tr(locale, "Nothing is waiting for review.", "当前没有待审核内容。")}</div>}</div></section>
-        <section className="blk"><div className="section-t">{tr(locale, "Recent jobs", "最近任务")}</div><div className="admin-jobs">{jobs.map((job) => { const metrics = json(job.metrics); return <div className="admin-job" key={job.id}><div><b>{job.name}</b><small>{age(job.startedAt, locale)} · attempt {job.attempt}</small></div><div className="admin-job-state"><span className={`chip ${tone(job.status)}`}>{job.status}</span>{Object.keys(metrics).length > 0 && <span className="mono admin-metric">{Object.entries(metrics).slice(0, 2).map(([key, value]) => `${key}:${String(value)}`).join(" · ")}</span>}</div>{job.error && <details><summary>{tr(locale, "Error", "错误")}</summary><p>{job.error}</p></details>}</div>; })}</div></section></aside>
+      <aside>
+        {can(user, "admin.users") && <section className="blk">
+          <div className="section-t">
+            <span>{tr(locale, "Newest accounts", "最新注册")}</span>
+            <Link className="minibtn" href={localePath(locale, "/admin/users")}>{tr(locale, "All", "全部")} →</Link>
+          </div>
+          <div className="admin-review-list">
+            {recentUsers.length === 0 && <div className="empty-state">{tr(locale, "No accounts yet.", "尚无账户。")}</div>}
+            {recentUsers.map((account) => <div className="admin-review-row" key={account.id}>
+              <Link href={localePath(locale, `/admin/users/${account.id}`)}>
+                <span><b>{account.email}</b><small>{when(account.createdAt, locale)}</small></span>
+                <span className="chip gray">{account.role}</span>
+              </Link>
+            </div>)}
+          </div>
+        </section>}
+      </aside>
     </div>
-  </main>;
+  </>;
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { breadcrumbJsonLd, canonical, reportJsonLd, siteJsonLd } from "./seo";
+import { breadcrumbJsonLd, canonical, institutionProfileJsonLd, reportJsonLd, siteJsonLd } from "./seo";
 
 process.env.SITE_URL = "https://tlines.tech";
 
@@ -12,6 +12,14 @@ test("canonical and hreflang use stable locale-prefixed URLs", () => {
     "zh-Hans": "https://tlines.tech/zh/research/abc",
     "x-default": "https://tlines.tech/en/research/abc",
   });
+});
+
+test("institution profiles name their main entity", () => {
+  const profile = institutionProfileJsonLd("zh-CN", "/institution/mufg", "三菱日联金融集团", "机构研报", "https://www.mufgresearch.com/");
+  assert.equal(profile["@type"], "ProfilePage");
+  assert.equal(profile.mainEntity["@type"], "Organization");
+  assert.equal(profile.mainEntity.name, "三菱日联金融集团");
+  assert.equal(profile.mainEntity.mainEntityOfPage["@id"], profile["@id"]);
 });
 
 test("article, breadcrumb and search schema preserve the page locale", () => {

@@ -10,6 +10,7 @@ import { isFormalAuthConfigured } from "@/lib/auth-config";
 import OAuthSignOutButton from "./_components/OAuthSignOutButton";
 import LanguageToggle from "./_components/LanguageToggle";
 import MobileNav, { type MobileNavItem } from "./_components/MobileNav";
+import Analytics from "./_components/Analytics";
 import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { siteUrl } from "@/lib/site";
@@ -59,7 +60,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     { href: "/research", label: tr(locale, "Research", "研报") },
     { href: "/consensus", label: tr(locale, "Consensus", "共识") },
     { href: "/watchlist", label: tr(locale, "Monitoring", "监控") },
-    ...(can(user, "admin.review") ? [{ href: "/admin", label: tr(locale, "Operations", "运营") }] : []),
+    ...(can(user, "admin.access") ? [{ href: "/admin", label: tr(locale, "Operations", "运营") }] : []),
   ] as MobileNavItem[]).map((item) => ({ ...item, href: localePath(locale, item.href) }));
 
   const account = user && formalAuth ? (
@@ -102,9 +103,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </div>
         {children}
+        {/* Mounted last and rendering nothing: the beacon must never be on the path to
+            first paint of the page it is measuring. */}
+        {process.env.ANALYTICS_ENABLED !== "false" && <Analytics />}
         <footer className="footer wrap">
           <span>{tr(locale, "Research → Data → Consensus → Signal", "研报 → 数据 → 共识 → 信号")}</span>
-          <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{["about", "methodology", "editorial-policy", "ai-usage", "sources", "corrections"].map((path) => <Link key={path} href={localePath(locale, `/${path}`)}>{path.replaceAll("-", " ")}</Link>)}</nav>
+          <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{["about", "methodology", "editorial-policy", "ai-usage", "sources", "privacy", "corrections"].map((path) => <Link key={path} href={localePath(locale, `/${path}`)}>{path.replaceAll("-", " ")}</Link>)}</nav>
         </footer>
       </body>
     </html>

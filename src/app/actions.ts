@@ -1,12 +1,13 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { COOKIE, makeToken, getSessionUser, SESSION_COOKIE_OPTS } from "@/lib/auth";
 import { describeRule, evaluateRules } from "@/lib/alerts";
 import { writeAudit } from "@/lib/audit";
+import { trackServerEvent } from "@/lib/analytics/serverEvent";
 import { can } from "@/lib/permissions";
 import { checkWebhookUrl } from "@/lib/alertDelivery";
 
@@ -28,10 +29,13 @@ export async function doSignIn(fd: FormData) {
   if (!email || !email.includes("@")) redirect("/signin?error=email");
   const user = await prisma.user.upsert({
     where: { email },
-    create: { email, name, tier: "pro" },
+    create: { email, name, tier: "free" },
     update: {},
   });
   await writeAudit({ actorId: user.id, action: "auth.sign_in" });
+  // Reported here rather than from the browser: this action ends in a redirect, which
+  // tears down the page a client-side beacon would have fired from.
+  trackServerEvent(user.createdAt.getTime() > Date.now() - 5_000 ? "account.created" : "account.signin", await headers(), { userId: user.id, path: "/signin" });
   (await cookies()).set(COOKIE, makeToken(user), SESSION_COOKIE_OPTS);
   redirect(localPath(str(fd, "next"), "/watchlist"));
 }
@@ -61,6 +65,7 @@ export async function addWatch(fd: FormData) {
     update: {},
   });
   await writeAudit({ actorId: user!.id, action: "watchlist.upsert", targetType: kind, targetId: refId, metadata: { itemId: item.id } });
+  trackServerEvent("watchlist.add", await headers(), { userId: user!.id, metadata: { kind } });
   revalidatePath("/watchlist");
   const back = str(fd, "back");
   if (back) revalidatePath(back);
@@ -119,6 +124,7 @@ export async function createRule(fd: FormData) {
     });
   }
   await writeAudit({ actorId: user!.id, action: "alert.create", targetType: "alert_rule", targetId: rule.id });
+  trackServerEvent("alert.create", await headers(), { userId: user!.id, metadata: { type, scopeKind } });
   await evaluateRules();
   revalidatePath("/watchlist");
 }

@@ -607,6 +607,13 @@ model User {
   // password signs out every other device.
   passwordChangedAt DateTime?
   alertWebhookUrl String? // https destination for fired alerts; validated before every POST
+  // An operator suspension. Kept as a timestamp rather than a flag so the record says
+  // when access was withdrawn, and restoring is a single field back to null.
+  suspendedAt   DateTime?
+  // Written at most once every ten minutes per user, so "who is still using this" is
+  // answerable without a write on every request.
+  lastSeenAt    DateTime?
+  note          String? // operator-only remark, never shown to the account holder
   createdAt     DateTime  @default(now())
 
   watchlist WatchlistItem[]
@@ -773,4 +780,110 @@ model ApiKey {
   createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([revokedAt])
+}
+
+// ---- Audience analytics (Phase 3). Cookie-less and IP-free by construction. ----
+
+// One page view.
+//
+// `visitorId` is a digest of (secret + UTC day + IP + user agent): the same reader is one
+// visitor for the length of a day and unlinkable to their own next day, and the address
+// they came from is never stored. That is deliberately weaker than a tracking cookie —
+// it is enough to count people, and not enough to follow one.
+model PageView {
+  id           String   @id @default(cuid())
+  ts           DateTime @default(now())
+  day          String // UTC YYYY-MM-DD, so rollup and pruning need no date arithmetic
+  path         String // language prefix and query string already removed
+  locale       String   @default("en")
+  visitorId    String
+  sessionId    String // minted in the tab, reset after 30 idle minutes
+  userId       String? // present only while signed in
+  isEntry      Boolean  @default(false)
+  referrerHost String? // host only; a full referrer can carry someone else's query
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  country      String?
+  device       String   @default("desktop") // desktop | mobile | tablet
+  os           String?
+  browser      String?
+  durationMs   Int? // filled by the unload beacon; null when the reader left abruptly
+
+  @@index([day, path])
+  @@index([ts])
+  @@index([visitorId, ts])
+  @@index([sessionId, ts])
+  @@index([userId, ts])
+}
+
+// A named thing someone did: a search, a download, an alert created. Same identity
+// model as PageView, so events and views can be counted against the same visitors.
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  ts        DateTime @default(now())
+  day       String
+  name      String
+  path      String?
+  visitorId String
+  sessionId String
+  userId    String?
+  value     Float?
+  metadata  String   @default("{}")
+
+  @@index([day, name])
+  @@index([ts])
+  @@index([userId, ts])
+}
+
+// Core Web Vitals as the reader's own browser measured them. Field data, not a lab score.
+model WebVital {
+  id     String   @id @default(cuid())
+  ts     DateTime @default(now())
+  day    String
+  metric String // LCP | CLS | INP | FCP | TTFB
+  value  Float
+  rating String // good | needs-improvement | poor
+  path   String
+  device String   @default("desktop")
+
+  @@index([day, metric])
+  @@index([ts])
+}
+
+// The daily aggregate. Raw rows above are pruned after the retention window; these are
+// kept, so a year-on-year comparison survives without keeping a year of page views.
+model TrafficDaily {
+  id          String @id @default(cuid())
+  day         String
+  dimension   String // total | path | referrer | country | device | browser | os | locale | utm_source | utm_medium | utm_campaign | event
+  value       String // empty string for dimension=total
+  views       Int    @default(0)
+  visitors    Int    @default(0)
+  sessions    Int    @default(0)
+  bounces     Int    @default(0)
+  durationSec Int    @default(0)
+
+  @@unique([day, dimension, value])
+  @@index([dimension, day])
+}
+
+// API traffic, aggregated as it arrives rather than logged row by row: a request log
+// would be the largest table here and answer nothing this does not.
+model ApiUsageDaily {
+  id String @id @default(cuid())
+
+  day String
+  // Empty string for a request that never authenticated, rather than null: both databases
+  // treat NULL as distinct from itself in a unique index, so a nullable column here would
+  // make the upsert below insert a fresh row for every anonymous call instead of counting.
+  keyId    String @default("")
+  endpoint String
+  status   Int
+  count    Int    @default(0)
+  totalMs  Int    @default(0)
+
+  @@unique([day, keyId, endpoint, status])
+  @@index([day])
+  @@index([keyId, day])
 }

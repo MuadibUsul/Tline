@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticate, type ApiScope, type AuthFailure, type AuthenticatedKey } from "./apiKeys";
+import { endpointOf, recordApiCall } from "./apiUsage";
 
 /**
  * One place where every public API response is shaped, so a caller sees the same error
@@ -28,10 +29,16 @@ export function withApiKey(
   handler: (request: Request, key: AuthenticatedKey) => Promise<unknown>,
 ) {
   return async (request: Request) => {
+    // Measured around everything, including the refusals: a key that is exhausting its
+    // rate limit or asking for a scope it lacks is precisely what an operator needs to
+    // see, and counting only the successes would hide it.
+    const startedAt = Date.now();
+    const endpoint = endpointOf(request.url);
     const result = await authenticate(request.headers.get("authorization"), scope);
 
     if ("failure" in result) {
       const failure = FAILURES[result.failure];
+      recordApiCall(result.keyId ?? null, endpoint, failure.status, Date.now() - startedAt);
       return apiError(
         failure.code,
         failure.message,
@@ -42,6 +49,7 @@ export function withApiKey(
 
     try {
       const body = await handler(request, result.key);
+      recordApiCall(result.key.id, endpoint, 200, Date.now() - startedAt);
       return NextResponse.json(body, {
         headers: {
           "cache-control": "no-store",
@@ -51,7 +59,11 @@ export function withApiKey(
         },
       });
     } catch (error) {
-      if (error instanceof ApiRequestError) return apiError(error.code, error.message, error.status);
+      if (error instanceof ApiRequestError) {
+        recordApiCall(result.key.id, endpoint, error.status, Date.now() - startedAt);
+        return apiError(error.code, error.message, error.status);
+      }
+      recordApiCall(result.key.id, endpoint, 500, Date.now() - startedAt);
       console.error(JSON.stringify({ event: "api.handler.failed", scope, error: String(error) }));
       return apiError("internal_error", "The request could not be completed.", 500);
     }

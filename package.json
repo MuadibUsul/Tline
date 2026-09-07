@@ -49,7 +49,8 @@
     "retries": "tsx scripts/content-retries.ts",
     "analysis:grounding": "tsx scripts/analysis-grounding.ts",
     "translate:rescore": "tsx scripts/translation-quality.ts",
-    "macro:market": "tsx scripts/market-sync.ts"
+    "macro:market": "tsx scripts/market-sync.ts",
+    "analytics:rollup": "tsx scripts/analytics-rollup.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

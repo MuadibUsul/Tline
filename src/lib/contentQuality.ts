@@ -14,7 +14,7 @@ export interface IndexableArticleInput {
 export interface ContentQualityResult { indexable: boolean; issues: string[] }
 
 const MOJIBAKE = /\uFFFD|(?:Ã.|Â.|â(?:€|€™|€œ|€œ))/;
-const BAD_TITLE = /^(?:untitled|title|document|report|research|无标题)$/i;
+const BAD_TITLE = /^(?:untitled|title|document|report|research|go to article|download(?: the)? (?:pdf|report|document)|无标题)$/i;
 const HAN = /\p{Script=Han}/u;
 const COMMON_COMPOUNDS = new Set(["viewpoint", "investment", "institution", "institutional", "research", "outlook", "forecast", "consensus", "economics", "strategy"]);
 

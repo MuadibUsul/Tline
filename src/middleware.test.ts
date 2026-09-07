@@ -4,8 +4,9 @@ import { NextRequest } from "next/server";
 import { MACHINE_PATH, middleware } from "./middleware";
 
 test("machine-readable endpoints bypass locale middleware", () => {
-  for (const path of ["/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt", "/rss.xml", "/feed.xml"]) assert.equal(MACHINE_PATH.test(path), true, path);
+  for (const path of ["/robots.txt", "/sitemap.xml", "/sitemap/0.xml", "/sitemap/12.xml", "/llms.txt", "/llms-full.txt", "/rss.xml", "/feed.xml"]) assert.equal(MACHINE_PATH.test(path), true, path);
   assert.equal(MACHINE_PATH.test("/research"), false);
+  assert.equal(MACHINE_PATH.test("/sitemaps-of-the-world"), false);
 });
 
 test("unprefixed public pages permanently redirect to a canonical locale", () => {

@@ -104,7 +104,7 @@ async function fetchSitemap(url: string) {
 export async function discoverFromSitemaps(
   seeds: string[],
   sourceUrl: string,
-  options: { since?: Date; limit?: number; maxSitemaps?: number; allows?: (url: string) => boolean } = {},
+  options: { since?: Date; limit?: number; maxSitemaps?: number; allows?: (url: string) => boolean; accepts?: (url: string) => boolean } = {},
 ) {
   const source = new URL(sourceUrl);
   const since = options.since ?? new Date(Date.now() - 180 * 864e5);
@@ -132,6 +132,11 @@ export async function discoverFromSitemaps(
       if (!visited.has(index) && (options.allows?.(index) ?? true) && queue.length + visited.size < maxSitemaps) queue.push(index);
     }
     for (const candidate of parsed.urls) {
+      // The source's own path filter is applied here rather than by the caller, because
+      // the limit below is what the caller actually receives. A publisher whose map holds
+      // thousands of press releases beside its research would otherwise spend the whole
+      // allowance on the press releases and hand back nothing the caller can use.
+      if (options.accepts && !options.accepts(candidate.url)) continue;
       const relevance = sitemapArticleRelevance(candidate.url, sourceUrl);
       if (relevance <= 0) continue;
       const dateHint = sitemapDateHint(candidate.url, candidate.lastModified);

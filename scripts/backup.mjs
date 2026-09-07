@@ -5,6 +5,9 @@
 // between the two steps is an orphan (harmless); the reverse order would produce
 // database rows pointing at documents the backup never captured.
 //
+// Unchanged documents are hardlinked against the previous snapshot rather than copied, so
+// keeping N snapshots costs one corpus plus the churn between them, not N corpora.
+//
 //   node scripts/backup.mjs [--out DIR] [--keep N]
 //   node scripts/backup.mjs --verify DIR/<snapshot>
 
@@ -83,8 +86,19 @@ async function walk(dir, base = dir) {
   return out;
 }
 
-/** Documents are content-addressed and never rewritten, so a plain file copy is safe. */
-async function backupDocuments(destination) {
+/**
+ * Documents are content-addressed and never rewritten, so a snapshot mostly repeats the
+ * one before it. Copying every file each night made N snapshots cost N times the corpus;
+ * hardlinking unchanged files against the previous snapshot makes them cost one.
+ *
+ * The link target is the PREVIOUS SNAPSHOT, not the live volume: in production
+ * `/app/storage` is a named volume and `/app/backups` a bind mount, so a link across them
+ * is EXDEV every time. Both snapshots share the backup filesystem, so this holds there.
+ *
+ * "Unchanged" is rsync's --link-dest test, same size and mtime. Exact for content-addressed
+ * documents; for the few mutable files in the volume it errs towards copying.
+ */
+async function backupDocuments(destination, previousDir) {
   const driver = process.env.DOCUMENT_STORAGE_DRIVER || "local";
   if (driver !== "local") {
     return { driver, skipped: `object storage (${driver}) is backed up by bucket versioning/replication, not by this script` };
@@ -96,14 +110,37 @@ async function backupDocuments(destination) {
   }
   const files = await walk(STORAGE_ROOT);
   let bytes = 0;
+  let linked = 0;
+  let copiedBytes = 0;
   for (const relative of files) {
     const from = path.join(STORAGE_ROOT, relative);
     const to = path.join(destination, relative);
+    const source = await fs.stat(from);
     await fs.mkdir(path.dirname(to), { recursive: true });
-    await fs.copyFile(from, to);
-    bytes += (await fs.stat(to)).size;
+    let reused = false;
+    if (previousDir) {
+      const previous = path.join(previousDir, relative);
+      const prior = await fs.stat(previous).catch(() => null);
+      if (prior?.isFile() && prior.size === source.size && Math.abs(prior.mtimeMs - source.mtimeMs) < 1000) {
+        // A failed link is never fatal: the copy below is always a correct answer.
+        try {
+          await fs.link(previous, to);
+          reused = true;
+        } catch { /* fall through to the copy */ }
+      }
+    }
+    if (!reused) {
+      await fs.copyFile(from, to);
+      // copyFile stamps the copy with the current time. Without restoring the source mtime
+      // every later snapshot would read a mismatch and copy the whole corpus again.
+      await fs.utimes(to, source.atime, source.mtime);
+      copiedBytes += source.size;
+    } else {
+      linked += 1;
+    }
+    bytes += source.size;
   }
-  return { driver, root: STORAGE_ROOT, files: files.length, bytes };
+  return { driver, root: STORAGE_ROOT, files: files.length, bytes, linked, copied: files.length - linked, copiedBytes };
 }
 
 async function verify(snapshotDir) {
@@ -128,10 +165,15 @@ async function verify(snapshotDir) {
   process.exitCode = failures ? 1 : 0;
 }
 
-async function prune() {
+/** Newest first. Snapshot names are UTC stamps, so lexical order is chronological. */
+async function listSnapshots() {
   const entries = await fs.readdir(OUT_ROOT, { withFileTypes: true }).catch(() => []);
-  const snapshots = entries.filter((entry) => entry.isDirectory() && /^\d{8}T\d{6}Z$/.test(entry.name))
+  return entries.filter((entry) => entry.isDirectory() && /^\d{8}T\d{6}Z$/.test(entry.name))
     .map((entry) => entry.name).sort().reverse();
+}
+
+async function prune() {
+  const snapshots = await listSnapshots();
   for (const stale of snapshots.slice(KEEP)) {
     await fs.rm(path.join(OUT_ROOT, stale), { recursive: true, force: true });
     console.log(`pruned ${stale}`);
@@ -145,12 +187,19 @@ async function main() {
   if (!DATABASE_URL) throw new Error("DATABASE_URL is not set.");
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
   const dir = path.join(OUT_ROOT, stamp);
+  // Read before the new snapshot exists, or it would nominate itself as its own base. Two
+  // runs inside one second share a stamp and so share a directory, which is the one case
+  // that slips past the ordering; naming it explicitly is cheaper than reasoning about it.
+  const previous = (await listSnapshots()).find((name) => name !== stamp) ?? null;
   await fs.mkdir(path.join(dir, "documents"), { recursive: true });
 
   const isPostgres = /^postgres(ql)?:/.test(DATABASE_URL);
   const dbFile = path.join(dir, isPostgres ? "database.dump" : "database.sqlite");
   const database = isPostgres ? await backupPostgres(dbFile) : await backupSqlite(dbFile);
-  const documents = await backupDocuments(path.join(dir, "documents"));
+  const documents = await backupDocuments(
+    path.join(dir, "documents"),
+    previous ? path.join(OUT_ROOT, previous, "documents") : null,
+  );
 
   const checksums = { [path.basename(dbFile)]: await sha256(dbFile) };
   const manifest = {

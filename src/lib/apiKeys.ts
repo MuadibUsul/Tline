@@ -80,10 +80,21 @@ export function bearerToken(header: string | null): string | null {
   return match ? match[1].trim() : null;
 }
 
+/**
+ * A refusal, and — where the caller was identified before being refused — which key it
+ * was. A key exhausting its own rate limit is the failure an operator most needs
+ * attributed; reporting it as "unauthenticated" points at nobody.
+ */
+export interface AuthRefusal {
+  failure: AuthFailure;
+  retryAfter?: number;
+  keyId?: string;
+}
+
 export async function authenticate(
   header: string | null,
   required: ApiScope,
-): Promise<{ key: AuthenticatedKey; remaining: number; resetAt: number } | { failure: AuthFailure; retryAfter?: number }> {
+): Promise<{ key: AuthenticatedKey; remaining: number; resetAt: number } | AuthRefusal> {
   const token = bearerToken(header);
   if (!token) return { failure: header ? "malformed" : "missing" };
   if (!token.startsWith(`${API_KEY_PREFIX}_`)) return { failure: "malformed" };
@@ -94,13 +105,13 @@ export async function authenticate(
   // The lookup already matched on the digest; this compares it again in constant time so
   // the code does not depend on the database's comparison for a secret-dependent branch.
   if (!timingSafeEqual(Buffer.from(record.tokenHash), Buffer.from(digest))) return { failure: "unknown" };
-  if (record.revokedAt) return { failure: "revoked" };
+  if (record.revokedAt) return { failure: "revoked", keyId: record.id };
 
   const scopes = parseScopes(record.scopes);
-  if (!scopes.includes(required)) return { failure: "forbidden" };
+  if (!scopes.includes(required)) return { failure: "forbidden", keyId: record.id };
 
   const rate = consumeRate(record.id, record.rateLimit);
-  if (!rate.allowed) return { failure: "rate_limited", retryAfter: Math.ceil((rate.resetAt - Date.now()) / 1000) };
+  if (!rate.allowed) return { failure: "rate_limited", retryAfter: Math.ceil((rate.resetAt - Date.now()) / 1000), keyId: record.id };
 
   // Usage is recorded without blocking the response; a lost counter increment costs
   // nothing, while a slow write on every request would be paid by the caller.

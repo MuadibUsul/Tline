@@ -10,9 +10,11 @@ import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata(props: { searchParams: Promise<{ page?: string }> }): Promise<Metadata> {
+  const searchParams = await props.searchParams;
   const locale = await getLocale();
-  return { ...canonical("/institutions", locale), title: tr(locale, "Views", "观点"), description: tr(locale, "Atomic institutional views ranked by heat, authority and freshness.", "按热度、机构权威与新鲜度排序的机构原子观点。") };
+  const page = Math.max(1, Number(searchParams.page) || 1);
+  return { ...canonical(page > 1 ? `/institutions?page=${page}` : "/institutions", locale), title: tr(locale, "Views", "观点"), description: tr(locale, "Atomic institutional views ranked by heat, authority and freshness.", "按热度、机构权威与新鲜度排序的机构原子观点。") };
 }
 
 const TYPE_ZH: Record<string, string> = {

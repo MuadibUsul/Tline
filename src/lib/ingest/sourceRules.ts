@@ -9,11 +9,18 @@ type SourceRule = {
   embeddedPdfLimit?: number;
   minimumLookbackHours?: number;
   preferNativePdf?: boolean;
+  documentOrigins?: string[];
 };
 
 // Publisher-specific exceptions discovered during source acceptance. Scheduled
 // crawling reads these rules directly; probes only verify that they still work.
 const RULES: Record<string, SourceRule> = {
+  ing: {
+    preferNativePdf: true,
+  },
+  danske: {
+    preferNativePdf: true,
+  },
   commonwealth: {
     listingUrls: ["https://www.commbank.com.au/articles/newsroom.html"],
     candidatePath: /^\/articles\/newsroom\/20\d{2}\//i,
@@ -121,19 +128,39 @@ const RULES: Record<string, SourceRule> = {
     ],
   },
   mizuho: {
-    // Insights are JS-loaded tabs; every tab is its own sub-category listing.
+    // Mizuho publishes research in two shapes, and the rule needs both.
+    //
+    // The `?tab=` addresses were ten listings on paper and one page in fact: the tabs are
+    // switched in the browser, so every one of them returned the same 1.2 MB document and
+    // the crawl spent ten fetches to read it ten times. One address is kept.
+    //
+    // That page carries the Japanese research desk's reports — Economic Outlook, the FX
+    // Medium-Term Outlook, the monthly bulletins — as ~870 direct PDF links in newest-
+    // first order, on two document hosts (below). A modest embedded limit takes the head
+    // of that list, which is the current month, and leaves the back catalogue alone.
+    //
+    // The Americas and Asia-Pacific desks publish written pieces instead, fully server-
+    // rendered at /americas-insights/ and /asia-pacific-insights/. Their download icon is
+    // `window.print()`, not a file, so those pages are the document.
     listingUrls: [
-      "https://www.mizuhogroup.com/bank/insights/information?tab=market-outlooks",
-      "https://www.mizuhogroup.com/bank/insights/information?tab=economic-information",
-      "https://www.mizuhogroup.com/bank/insights/information?tab=market-trends",
-      "https://www.mizuhogroup.com/bank/insights/information?tab=industry-reports",
-      "https://www.mizuhogroup.com/bank/insights/information?tab=country-reports",
-      "https://www.mizuhogroup.com/bank/insights/information?tab=research",
-      "https://www.mizuhogroup.com/bank/insights/information?tab=research-report",
-      "https://www.mizuhogroup.com/bank/insights/information?tab=information-and-reports-on-china",
-      "https://www.mizuhogroup.com/bank/insights/information?tab=mizuho-china-business-express",
       "https://www.mizuhogroup.com/americas/insights",
+      "https://www.mizuhogroup.com/asia-pacific/insights",
+      "https://www.mizuhogroup.com/bank/insights/information",
     ],
+    // Without this the site's 6,800-URL sitemap answers with corporate press releases:
+    // the five rows this source held were merger announcements from 2004 to 2018, filed
+    // as research. Only the insight collections are research; /americas-news/,
+    // /global-news/ and /news-release/ are not, and /th/ and /jp/ are translations of
+    // pages already read in English.
+    candidatePath: /^\/(?:americas-insights|asia-pacific-insights|beyond-the-obvious)\/[^/]+\/?$/i,
+    // Files live on the site platform's CDN and on Mizuho's own document library; the
+    // pages that link them do not.
+    documentOrigins: ["https://cdn.prod.website-files.com", "https://library.mizuhogroup.com"],
+    // The research listing also links each chapter of a bound report as its own file
+    // ("00 Front cover", "01", "02"…). Reading the head of the list keeps the crawl on
+    // this month's publications rather than a decade of section covers.
+    embeddedPdfLimit: 12,
+    articleRejected: /^(?:Insights|Research|Economic information|Market outlooks?)\s*$/i,
   },
   schroders: {
     // The listing is a client-rendered shell with no article links. Schroders publishes
@@ -271,6 +298,18 @@ export function embeddedPdfLimit(slug: string): number {
 
 export function minimumLookbackHours(slug: string): number {
   return RULES[slug]?.minimumLookbackHours ?? 0;
+}
+
+/**
+ * Hosts a publisher serves its own documents from.
+ *
+ * Pages and files need not share a host. A site built on a hosted platform keeps its
+ * pages on the corporate domain and its PDFs on the platform's asset CDN, and a same-
+ * origin-only reader sees a listing full of research and comes away with nothing. Only
+ * hosts named here are widened to, so a link to a third party's document is still refused.
+ */
+export function documentOrigins(slug: string): string[] {
+  return RULES[slug]?.documentOrigins ?? [];
 }
 
 export function prefersNativePdf(slug: string): boolean {

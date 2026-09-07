@@ -8,5 +8,16 @@ export function siteUrl(): string {
   return raw.replace(/\/+$/, "");
 }
 
-/** Routes that must never be indexed: authenticated surfaces and machine endpoints. */
-export const PRIVATE_ROUTES = ["/admin", "/alerts", "/watchlist", "/signin", "/api"];
+/**
+ * Paths a crawler is asked not to fetch.
+ *
+ * Authenticated surfaces are deliberately absent. They already carry `noindex`, and a
+ * page a crawler is forbidden to *fetch* is a page whose `noindex` is never *read* —
+ * which is exactly how a sign-in page ends up indexed from an external link. Letting the
+ * crawler in is what keeps it out of the index.
+ *
+ * Machine endpoints are listed, but not the whole `/api` tree: `/api/og` renders every
+ * social card and `/api/figures` serves the images inside a report, so blocking `/api`
+ * wholesale hid both from search along with the JSON.
+ */
+export const CRAWLER_DISALLOW = ["/api/auth", "/api/documents", "/api/feed", "/api/health", "/api/search", "/api/v1"];

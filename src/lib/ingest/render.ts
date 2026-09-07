@@ -90,11 +90,24 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
     }
     await Promise.allSettled(captures);
     const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 4000);
+    const publicDownloads = await page.locator("a[href]").evaluateAll((anchors) => anchors.flatMap((element) => {
+      const anchor = element as HTMLAnchorElement;
+      const marker = `${anchor.getAttribute("aria-label") || ""} ${anchor.getAttribute("data-share-type") || ""}`;
+      return anchor.hasAttribute("download") || /pdf/i.test(marker)
+        ? [{ href: anchor.href, label: anchor.textContent?.trim() || marker.trim() || "Download PDF" }]
+        : [];
+    }));
     if (BLOCKED_PAGE.test(visible) || BLOCKED_PAGE.test(await page.title())) {
       renderReasons.set(url, "access wall or human verification");
       return null;
     }
     if (CONSENT_GATE.test(visible)) {
+      // A publisher may expose a direct public document while placing an investor
+      // classification prompt over the HTML preview. Keep only that declared download;
+      // never answer the prompt or ingest the obscured page body.
+      if (publicDownloads.length) {
+        return `<html><body>${publicDownloads.map(({ href, label }) => `<a href="${escapeHtml(href)}" download>${escapeHtml(label)}</a>`).join("")}</body></html>`;
+      }
       renderReasons.set(url, "interactive consent or guest-access gate");
       return null;
     }

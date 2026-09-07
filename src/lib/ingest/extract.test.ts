@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
-import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { stripTrailingDisclaimerSegments } from "../articleText";
 
 test("captures inline figures in document order and anchors them to body segments", () => {
@@ -207,6 +207,8 @@ test("applies durable source discovery exceptions", () => {
   assert.equal(refreshKnownCandidate("schroders", "Monthly markets review - August 2026"), false);
   assert.equal(minimumArticleLimit("mufg"), 20);
   assert.equal(minimumLookbackHours("mufg"), 720);
+  assert.equal(prefersNativePdf("ing"), true);
+  assert.equal(prefersNativePdf("danske"), true);
   assert.equal(minimumArticleLimit("scotiabank"), 12);
   assert.equal(embeddedPdfLimit("scotiabank"), 1);
   assert.equal(minimumLookbackHours("scotiabank"), 168);
@@ -224,6 +226,16 @@ test("applies durable source discovery exceptions", () => {
   assert.equal(candidateAllowed("rabobank", "https://www.rabobank.com/knowledge/q011543889-seven-so-far-seven-more-to-come"), true);
   assert.equal(candidateAllowed("rabobank", "https://www.rabobank.com/knowledge/all-articles"), false);
   assert.equal(articleAllowed("bmo", "BMO Named Official Bank of the Los Angeles Lakers", "Sponsorship announcement"), false);
+  // Mizuho: the insight collections are research; the corporate news collections that
+  // dominate its 6,800-URL sitemap are not, and /th/ and /jp/ only repeat them.
+  assert.equal(candidateAllowed("mizuho", "https://www.mizuhogroup.com/americas-insights/japans-growth-revival-global-investors"), true);
+  assert.equal(candidateAllowed("mizuho", "https://www.mizuhogroup.com/asia-pacific-insights/2025-9"), true);
+  assert.equal(candidateAllowed("mizuho", "https://www.mizuhogroup.com/global-news-merger/2018-01-merger-of-mizuho-bank"), false);
+  assert.equal(candidateAllowed("mizuho", "https://www.mizuhogroup.com/americas-news/2014-01-energy-corporate-access-day"), false);
+  assert.equal(candidateAllowed("mizuho", "https://www.mizuhogroup.com/th/asia-pacific-insights/2021-04-22"), false);
+  assert.deepEqual(documentOrigins("mizuho"), ["https://cdn.prod.website-files.com", "https://library.mizuhogroup.com"]);
+  assert.deepEqual(documentOrigins("scotiabank"), []);
+  assert.equal(embeddedPdfLimit("mizuho"), 12);
   // Newly registered sub-topic listing pages are crawled alongside the main research URL.
   // Pinned to a day because the extras rotate; the sections themselves are asserted by
   // the rotation test rather than by their order here.
@@ -269,6 +281,87 @@ test("retains title and card date for direct research PDF links", () => {
 test("discovers a PDF stored behind a publisher download data attribute", () => {
   const candidates = extractPdfCandidates(`<main><h1>Middle East</h1><a href="#" data-download-url="/media/report.pdf">Download PDF</a></main>`, "https://bank.example/macro/report/");
   assert.equal(candidates[0]?.url, "https://bank.example/media/report.pdf");
+});
+
+test("discovers publisher-declared PDF downloads without a .pdf suffix", () => {
+  const [candidate] = extractPdfCandidates(`
+    <article><h1>The Commodities Feed</h1>
+      <a href="/downloads/pdf/article/the-commodities-feed" aria-label="Download PDF">Download</a>
+    </article>`, "https://think.ing.com/articles/the-commodities-feed");
+  assert.equal(candidate.url, "https://think.ing.com/downloads/pdf/article/the-commodities-feed");
+  assert.equal(candidate.title, "The Commodities Feed");
+});
+
+test("discovers a same-origin PDF declared by a download attribute", () => {
+  const [candidate] = extractPdfCandidates(`
+    <a href="https://research.danskebank.com/link/report/$file/report.pdf" download>Go to Article</a>
+  `, "https://research.danskebank.com/research/article/example/EN");
+  assert.equal(candidate.url, "https://research.danskebank.com/link/report/$file/report.pdf");
+});
+
+test("titles an article whose listing link is an empty overlay over the card", () => {
+  const links = extractLinks(`<main><div class="resources-preview_item">
+    <div class="resources-preview_item-content">
+      <h3 class="resources-preview_item-heading">Japan's growth revival: global investors take notice</h3>
+    </div>
+    <a href="/americas-insights/japans-growth-revival-global-investors" class="resources-preview_item-link"></a>
+  </div></main>`, "https://www.mizuhogroup.com/americas/insights");
+  assert.deepEqual(links.map((link) => [link.url, link.title]), [[
+    "https://www.mizuhogroup.com/americas-insights/japans-growth-revival-global-investors",
+    "Japan's growth revival: global investors take notice",
+  ]]);
+});
+
+test("does not date an article from the recommendation rail beside it", () => {
+  const body = "Japan's economy has moved from deflation to inflation and from stagnation to growth. ".repeat(10);
+  const article = extractArticle(`<html><head>
+      <script type="application/ld+json">{"@type":"Article","datePublished":"2026-08-17"}</script>
+    </head><body><main><h1>Japan's growth revival</h1><p>${body}</p></main>
+    <aside><div class="resources-preview_date-wrapper"><div>June 30, 2023</div></div></aside>
+  </body></html>`, "https://www.mizuhogroup.com/americas-insights/japans-growth-revival");
+  assert.equal(article.publishedAt?.toISOString().slice(0, 10), "2026-08-17");
+  assert.equal(article.publicationDateText, null);
+  assert.equal(inferPublicationDate(article.publicationDateText) ?? article.publishedAt, article.publishedAt);
+});
+
+test("keeps a download link's file annotation out of the report's title", () => {
+  const [candidate] = extractPdfCandidates(
+    `<main><a href="https://library.mizuhogroup.com/asset/abc/bk_e_monthly2608.pdf">‍Mizuho Dealer's Eye (Aug, 2026)(PDF/342KB)</a></main>`,
+    "https://www.mizuhogroup.com/bank/insights/information",
+    ["https://library.mizuhogroup.com"],
+  );
+  assert.equal(candidate.title, "Mizuho Dealer's Eye (Aug, 2026)");
+  assert.equal(candidate.publishedAt?.toISOString().slice(0, 10), "2026-08-01");
+});
+
+test("dates a monthly edition from the month it names", () => {
+  assert.equal(inferPublicationDate("Mizuho Dealer's Eye (Aug, 2026)(PDF/342KB)")?.toISOString().slice(0, 10), "2026-08-01");
+  assert.equal(inferPublicationDate("Forex Medium-Term Outlook(June 2026)")?.toISOString().slice(0, 10), "2026-06-01");
+  // Only the parenthesised edition marker counts; a month named in prose does not.
+  assert.equal(inferPublicationDate("Yields are at their lowest since March 2020"), null);
+});
+
+test("reads documents from a publisher's declared asset host but no further", () => {
+  const html = `<main>
+    <a href="https://library.mizuhogroup.com/asset/abc/bk_e_monthly2608.pdf">Mizuho Economic Outlook</a>
+    <a href="https://cdn.prod.website-files.com/site/report.pdf">Forex Medium-Term Outlook</a>
+    <a href="https://someone-else.example/their-report.pdf">Another firm's report</a>
+  </main>`;
+  const hosts = ["https://cdn.prod.website-files.com", "https://library.mizuhogroup.com"];
+  assert.deepEqual(extractPdfCandidates(html, "https://www.mizuhogroup.com/bank/insights/information", hosts).map((c) => c.url), [
+    "https://library.mizuhogroup.com/asset/abc/bk_e_monthly2608.pdf",
+    "https://cdn.prod.website-files.com/site/report.pdf",
+  ]);
+  assert.deepEqual(extractPdfCandidates(html, "https://www.mizuhogroup.com/bank/insights/information"), []);
+});
+
+test("recovers a document whose link was written with a stray leading hash", () => {
+  const [candidate] = extractPdfCandidates(
+    `<main><a href="#https://cdn.prod.website-files.com/site/economicoutlook.pdf">Economic Outlook</a></main>`,
+    "https://www.mizuhogroup.com/bank/insights/information",
+    ["https://cdn.prod.website-files.com"],
+  );
+  assert.equal(candidate?.url, "https://cdn.prod.website-files.com/site/economicoutlook.pdf");
 });
 
 test("uses a card heading when the article link is a short CTA", () => {

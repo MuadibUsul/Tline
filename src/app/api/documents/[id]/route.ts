@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { privateDownloadUrl, readPrivateFile } from "@/lib/documents/storage";
 import { can } from "@/lib/permissions";
 import { writeAudit } from "@/lib/audit";
+import { trackServerEvent } from "@/lib/analytics/serverEvent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,13 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
   try {
     const filename = safeFilename(document.article.title, document.locale);
+    // Counted for everyone, signed in or not: the audit log records who acted, this
+    // records that the document was wanted.
+    trackServerEvent(inline ? "document.preview" : "document.download", request.headers, {
+      userId: user?.id ?? null,
+      path: `/research/${document.articleId}`,
+      metadata: { kind: document.kind, locale: document.locale },
+    });
     if (user) {
       await writeAudit({
         actorId: user.id,

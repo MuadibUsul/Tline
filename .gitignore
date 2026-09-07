@@ -17,3 +17,4 @@ prisma/postgresql/schema.prisma
 backups/
 .deploy-tag
 backup.log
+tmp/

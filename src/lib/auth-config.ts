@@ -85,7 +85,7 @@ function passwordProvider() {
       if (!allowed) return null;
 
       const user = await prisma.user.findUnique({ where: { email } });
-      if (!user || !(await verifyPassword(password, user.passwordHash))) return null;
+      if (!user || user.suspendedAt || !(await verifyPassword(password, user.passwordHash))) return null;
       return { id: user.id, email: user.email, name: user.name };
     },
   });
@@ -109,7 +109,12 @@ export const authOptions: NextAuthOptions = {
         .split(",")
         .map((domain) => domain.trim().toLowerCase())
         .filter(Boolean);
-      return allowed.length === 0 || allowed.includes(user.email.split("@").at(-1)!.toLowerCase());
+      if (allowed.length > 0 && !allowed.includes(user.email.split("@").at(-1)!.toLowerCase())) return false;
+      // A suspended account is refused at the door, whichever provider it arrives by:
+      // otherwise an email link or OAuth round-trip would still mint a fresh token that
+      // getSessionUser would then have to reject on every request.
+      const record = await prisma.user.findUnique({ where: { email: user.email }, select: { suspendedAt: true } });
+      return !record?.suspendedAt;
     },
     async jwt({ token, user }) {
       if (user?.email) {
@@ -124,8 +129,9 @@ export const authOptions: NextAuthOptions = {
       if (!token.email) return token;
       const owner = await prisma.user.findUnique({
         where: { email: token.email },
-        select: { passwordChangedAt: true },
+        select: { passwordChangedAt: true, suspendedAt: true },
       });
+      if (owner?.suspendedAt) return {};
       if (owner?.passwordChangedAt && (!token.issuedAt || token.issuedAt < owner.passwordChangedAt.getTime())) {
         return {};
       }

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
+import { track } from "./Analytics";
 
 interface Result {
   id: string;
@@ -47,6 +48,9 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
         setResults(data.results ?? []);
         setActive(0);
         setOpen(true);
+        // A search that returns nothing is the most actionable thing this page produces:
+        // it names a gap in the corpus, or a word the index does not handle.
+        if ((data.results ?? []).length === 0) track("search.empty", 0, { query: query.slice(0, 80) });
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) setResults([]);
       } finally {
@@ -60,7 +64,11 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
   }, [q, locale]);
 
   const choose = (result?: Result) => {
-    if (result) router.push(result.href);
+    if (!result) return;
+    // Recorded on the choice rather than on every keystroke: a query that led somewhere
+    // is the one worth knowing about, and the debounced fetch fires for half-typed words.
+    track("search.select", results.length, { query: q.trim().slice(0, 80), kind: result.kind });
+    router.push(result.href);
   };
   const labels = locale === "zh-CN"
     ? { institution: "机构", asset: "资产", article: "研报", view: "观点", content: "正文命中", empty: "没有找到相关内容", hint: "输入至少两个字符", loading: "搜索中…" }

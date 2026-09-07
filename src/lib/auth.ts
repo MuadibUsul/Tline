@@ -34,6 +34,30 @@ function readToken(token: string): { uid: string; email: string } | null {
   }
 }
 
+/** How long a `lastSeenAt` reading stays good enough, so reads do not cause a write. */
+const SEEN_INTERVAL_MS = 10 * 60_000;
+
+type SessionUser = NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>;
+
+/**
+ * A suspended account is not a user.
+ *
+ * Returning null here rather than checking at each call site means suspension takes
+ * effect everywhere at once — pages, server actions and API routes alike — and an
+ * operator does not have to trust that every future feature remembered to ask.
+ */
+function activeUser(user: SessionUser | null): SessionUser | null {
+  if (!user || user.suspendedAt) return null;
+  touch(user);
+  return user;
+}
+
+/** Records activity in the background; a failed or skipped write costs nothing. */
+function touch(user: SessionUser) {
+  if (user.lastSeenAt && Date.now() - user.lastSeenAt.getTime() < SEEN_INTERVAL_MS) return;
+  void prisma.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
+}
+
 /** Current user from the session cookie, or null. Safe to call in RSC + actions. */
 export async function getSessionUser() {
   if (isFormalAuthConfigured()) {
@@ -45,13 +69,13 @@ export async function getSessionUser() {
     // since revoked by changing it.
     const issuedAt = (session as { issuedAt?: number }).issuedAt;
     if (user.passwordChangedAt && (!issuedAt || issuedAt < user.passwordChangedAt.getTime())) return null;
-    return user;
+    return activeUser(user);
   }
   const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;
   const claim = readToken(raw);
   if (!claim) return null;
-  return prisma.user.findUnique({ where: { id: claim.uid } });
+  return activeUser(await prisma.user.findUnique({ where: { id: claim.uid } }));
 }
 
 export const SESSION_COOKIE_OPTS = {

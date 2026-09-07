@@ -277,9 +277,9 @@
   },
   "mizuho": {
     "name": "Mizuho",
-    "policy": "manual",
+    "policy": "allowed",
     "crawlDelay": null,
-    "verdict": "无法确认 · 需人工复核"
+    "verdict": "已复核 · www.mizuhogroup.com/robots.txt 仅 Disallow 七条活动/帮助页，未覆盖 /americas/insights、/americas-insights/、/bank/insights，并声明 sitemap.xml；library.mizuhogroup.com/robots.txt 为 Disallow 空值（全站允许）"
   },
   "barclays": {
     "name": "Barclays",

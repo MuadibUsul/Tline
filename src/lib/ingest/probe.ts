@@ -4,12 +4,12 @@ import path from "node:path";
 import Parser from "rss-parser";
 import { prisma } from "../db";
 import { extractPdf } from "../documents/extractPdf";
-import { extractArticle, extractFeedLinks, extractLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic } from "./extract";
+import { extractArticle, extractFeedLinks, extractLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic } from "./extract";
 import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus } from "./fetch";
 import { lastRenderReason, renderHtml } from "./render";
 import { fetchRobots, robotsAllows, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
-import { candidateAllowed, listingUrls, sitemapEnabled } from "./sourceRules";
+import { candidateAllowed, documentOrigins, listingUrls, sitemapEnabled } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 
 const UA = "InstitutionalIntelligenceBot";
@@ -161,7 +161,7 @@ async function probeInstitution(inst: {
       ? await discoverFromSitemaps(
         declaredSitemaps.length || listingCandidates.length ? declaredSitemaps : [`${source.origin}/sitemap.xml`],
         inst.researchUrl,
-        { limit: 20, maxSitemaps: 6, allows },
+        { limit: 20, maxSitemaps: 6, allows, accepts: (url: string) => candidateAllowed(inst.slug, url) },
       )
       : [];
 
@@ -203,7 +203,7 @@ async function probeInstitution(inst: {
     for (const candidate of listingCandidates) {
       if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, lastModified: candidate.publishedAt });
     }
-    const directPdfCandidates = html ? extractPdfCandidates(html, inst.researchUrl) : [];
+    const directPdfCandidates = html ? extractPdfCandidates(html, inst.researchUrl, documentOrigins(inst.slug)) : [];
     for (const candidate of directPdfCandidates) {
       if (!candidates.has(candidate.url)) candidates.set(candidate.url, { ...candidate, lastModified: candidate.publishedAt });
     }
@@ -261,7 +261,7 @@ async function probeInstitution(inst: {
       }
 
       let embeddedReady = false;
-      for (const pdfUrl of extractPdfLinks(articleHtml || "", candidate.url).slice(0, 2)) {
+      for (const pdfUrl of extractPdfCandidates(articleHtml || "", candidate.url, documentOrigins(inst.slug)).map((c) => c.url).slice(0, 2)) {
         const pdf = await fetchPdf(pdfUrl);
         if (!pdf) { accessReason ??= lastFetchReason(pdfUrl); continue; }
         try {

@@ -87,11 +87,16 @@ export function extractLinks(html: string, baseUrl: string, limit = 60): Candida
     let text = $(el).text().replace(/\s+/g, " ").trim();
     if (text.length < 12) {
       const card = $(el).closest("article,[class*=card],[class*=tile],[class*=teaser]");
-      const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim()
-        || card.find("img[alt]").toArray()
+      const titleOf = (scope: cheerio.Cheerio<AnyNode>) => scope.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim()
+        || scope.find("img[alt]").toArray()
           .map((node) => ($(node).attr("alt") || "").trim())
           .find((value) => value.length >= 12 && !/^(?:right|left|up|down)?\s*(?:arrow|icon)|logo$/i.test(value))
-        || card.find("p").toArray().map((node) => $(node).text().replace(/\s+/g, " ").trim()).find((value) => value.length >= 20);
+        || scope.find("p").toArray().map((node) => $(node).text().replace(/\s+/g, " ").trim()).find((value) => value.length >= 20);
+      // A listing that makes the whole card clickable renders an empty anchor laid over
+      // it, so the heading is a sibling above the link rather than inside it. Read the
+      // anchor's own container in that case — Mizuho's insight listings are built this
+      // way, and nine articles a page were read as no articles at all.
+      const heading = titleOf(card) || titleOf($(el).parent());
       if (heading) text = heading;
     }
     if (text.length < 12 || text.length > 500) return;
@@ -185,28 +190,46 @@ export function extractPaginationLinks(html: string, pageUrl: string, sourceUrl:
   return [...out].slice(0, 5);
 }
 
-/** Find same-origin native PDFs and retain the surrounding card's title/date hints. */
-export function extractPdfCandidates(html: string, baseUrl: string): CandidateLink[] {
+/**
+ * Find the page's native PDFs and retain the surrounding card's title/date hints.
+ *
+ * Documents are read from the page's own origin, plus any document host the source rule
+ * names. A publisher on a hosted site platform keeps its pages on the corporate domain
+ * and its files on the platform's asset CDN, so same-origin alone finds nothing: Mizuho's
+ * research listing links 871 reports and every one of them lives on another host.
+ */
+export function extractPdfCandidates(html: string, baseUrl: string, documentOrigins: string[] = []): CandidateLink[] {
   const $ = cheerio.load(html);
   const base = new URL(baseUrl);
+  const allowedOrigins = new Set([base.origin, ...documentOrigins]);
   const out = new Map<string, CandidateLink>();
   $("a[href],a[data-download-url],iframe[src],embed[src],object[data]").each((_, element) => {
     if ($(element).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]").length) return;
     // MUFG and similar sites put the real file in data-download-url while href is only
     // "#" for their click handler. Treat the public attribute as the download target.
-    const raw = $(element).attr("data-download-url") || $(element).attr("href") || $(element).attr("src") || $(element).attr("data");
-    if (!raw) return;
+    const attribute = $(element).attr("data-download-url") || $(element).attr("href") || $(element).attr("src") || $(element).attr("data");
+    if (!attribute) return;
+    // A handful of hand-entered links read `href="#https://…/report.pdf"`. Resolved as
+    // written that is a fragment on the current page and the document is simply lost.
+    const raw = /^#https?:\/\//i.test(attribute) ? attribute.slice(1) : attribute;
     try {
       const url = new URL(raw, base);
       // `/media/` is a common public document store (not a content category). Keep all
       // other deny-list checks by neutralising only that leading storage directory.
       const policyPath = url.pathname.replace(/^\/media\//i, "/files/");
-      if (url.origin !== base.origin || !/\.pdf(?:$|\?)/i.test(url.href) || DENY.test(policyPath)) return;
+      const declaredPdf = /\.pdf(?:$|\?)/i.test(url.href)
+        || ($(element).is("a") && ($(element).is("[download]") || /pdf/i.test(`${$(element).attr("aria-label") || ""} ${$(element).attr("data-share-type") || ""}`)));
+      if (!allowedOrigins.has(url.origin) || !declaredPdf || DENY.test(policyPath)) return;
       const clean = url.href.split("#")[0];
       const card = $(element).closest("article,li,[class*=card],[class*=tile],[class*=teaser],[class*=item]").first();
       const cardText = card.text().replace(/\s+/g, " ").trim().slice(0, 1000);
       const heading = card.find("h1,h2,h3,h4").first().text().replace(/\s+/g, " ").trim();
-      const linkText = $(element).text().replace(/\s+/g, " ").trim();
+      // Publishers annotate a download link with the file's format and weight —
+      // "Mizuho Dealer's Eye (Aug, 2026)(PDF/342KB)". That describes the file, not the
+      // report, and reads as part of the headline once it is stored as a title. The
+      // zero-width joiners come from the same hand-edited links.
+      const linkText = $(element).text().replace(new RegExp("[\u200B-\u200D\uFEFF]", "g"), "").replace(/\s+/g, " ").trim()
+        .replace(/\s*[（(]\s*PDF\s*[/／]?\s*[\d,.]*\s*(?:[KMG]B)?\s*[）)]\s*$/i, "").trim();
       const filename = decodeURIComponent(url.pathname.split("/").pop() || "").replace(/\.pdf$/i, "").replace(/[-_]+/g, " ");
       const title = (heading || (/^(?:download(?: pdf)?|pdf|read more)$/i.test(linkText) ? "" : linkText) || filename).slice(0, 240);
       out.set(clean, { url: clean, title, publishedAt: inferPublicationDate(clean, title, cardText) });
@@ -384,6 +407,15 @@ export function inferPublicationDate(...values: Array<string | null | undefined>
       const dayNamed = input.match(new RegExp(`(?<!\\d)(0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?[-_\\s]+(${MONTH_PATTERN})(?![a-z])`, "i"));
       if (dayNamed) return new Date(Date.UTC(Number(years[0]), monthOf(dayNamed[2]), Number(dayNamed[1])));
     }
+  }
+
+  // A monthly edition names its month and no day: "Mizuho Dealer's Eye (Aug, 2026)".
+  // Only the parenthesised form is read, and only once every day-precision pattern above
+  // has failed, so a month mentioned in prose — "weakest since March 2020" — is not
+  // mistaken for a publication date. The edition is dated to the first of its month.
+  for (const input of decoded) {
+    const edition = input.match(new RegExp(`\\((?:\\s*)(${MONTH_PATTERN})[.,]?\\s*(?:,\\s*)?(20\\d{2})\\s*\\)`, "i"));
+    if (edition) return new Date(Date.UTC(Number(edition[2]), monthOf(edition[1]), 1));
   }
   return null;
 }
@@ -569,7 +601,13 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
     figures: cleanFigures,
     author: author?.slice(0, 120) || null,
     publishedAt,
-    publicationDateText: visibleDateBeforeStrip || null,
+    // A date read out of the visible page is a fallback for pages that declare none.
+    // Where the page states its own publication date in metadata, also reporting a
+    // scraped one hands callers a second, weaker answer — and on a page whose sidebar
+    // recommends three older pieces, the weaker answer is one of those pieces' dates.
+    // Every Mizuho insight was dated 30 June 2023 this way: the date of the first item
+    // in the "more from us" rail.
+    publicationDateText: (dateStr && dateStr !== visibleDateBeforeStrip && publishedAt ? null : visibleDateBeforeStrip) || null,
     disclaimerText: partitioned.disclaimer,
   };
 }

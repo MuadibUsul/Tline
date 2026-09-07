@@ -12,7 +12,7 @@ import type { PdfSourceBlock } from "../documents/extractPdf";
 
 // Anchor text that is an instruction rather than a name, in either language.
 const CALL_TO_ACTION =
-  /^\s*(?:download|read|view|open|get|access|see)\s*(?:the\s+)?(?:full\s+|complete\s+|latest\s+)?(?:pdf|report|transcript|document|article|paper|note|publication|version|here)?\s*[:：·|–—-]*\s*/i;
+  /^\s*(?:download|read|view|open|get|access|see|go\s+to)\s*(?:the\s+)?(?:full\s+|complete\s+|latest\s+)?(?:pdf|report|transcript|document|article|paper|note|publication|version|here)?\s*[:：·|–—-]*\s*/i;
 const CHINESE_CALL_TO_ACTION = /^\s*(?:下载|查看|阅读|点击(?:下载|查看)?|获取)\s*(?:全文|完整版?|报告|文件|原文)?\s*(?:pdf)?\s*[:：·|–—-]*\s*/i;
 
 // Section headings a publisher repeats across every page; true of the section, useless

@@ -13,7 +13,7 @@ import { saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { lastRenderReason, renderHtml } from "./render";
 import { runTrackedJob } from "../jobs";
-import { articleAllowed, candidateAllowed, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
@@ -101,7 +101,10 @@ async function ingestInstitution(
   // else widens it, so a stray off-site link is still refused.
   const originOf = (url: string) => { try { return new URL(url).origin; } catch { return null; } };
   const configuredListings = listingUrls(inst.slug, inst.researchUrl);
-  const allowedOrigins = new Set([origin, ...configuredListings.map(originOf).filter((o): o is string => o !== null)]);
+  // Document hosts join that set: a publisher whose files sit on an asset CDN is still
+  // the publisher, and each host is checked against its own robots.txt below.
+  const publisherDocumentOrigins = documentOrigins(inst.slug).map(originOf).filter((o): o is string => o !== null);
+  const allowedOrigins = new Set([origin, ...configuredListings.map(originOf).filter((o): o is string => o !== null), ...publisherDocumentOrigins]);
   const sourceListings = configuredListings.filter((url) => allowedOrigins.has(originOf(url) ?? ""));
   const deadline = Date.now() + sourceSeconds * 1000;
   const withinBudget = () => Date.now() < deadline;
@@ -191,9 +194,17 @@ async function ingestInstitution(
     if (known && !refreshKnownCandidate(inst.slug, known.title) && !(prefersNativePdf(inst.slug) && !known.hasNativePdf)) { dup++; return true; }
     return false;
   };
-  const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null) => {
+  /**
+   * Read the native documents a page links, and stage each as a report.
+   *
+   * `identity` says what the report IS. On an article page the page is the report and the
+   * PDF is its full text, so the page URL keeps the row's identity and an existing teaser
+   * is upgraded in place. A listing links many documents and is not any of them: keyed by
+   * the page, every month's edition would collide with the last one under a single row.
+   */
+  const stageEmbeddedPdf = async (html: string, pageUrl: string, title: string, publishedAt: Date | null, identity: "page" | "document" = "page") => {
     let staged = false;
-    for (const pdfCandidate of extractPdfCandidates(html, pageUrl).slice(0, Math.min(candidateLimit, embeddedPdfLimit(inst.slug)))) {
+    for (const pdfCandidate of extractPdfCandidates(html, pageUrl, publisherDocumentOrigins).slice(0, Math.min(candidateLimit, embeddedPdfLimit(inst.slug)))) {
       if (raws.length >= perLimit || !withinBudget()) break;
       const pdfUrl = pdfCandidate.url;
       if (!allowsUrl(pdfUrl) || await skipCandidate(pdfUrl)) continue;
@@ -221,13 +232,13 @@ async function ingestInstitution(
           filename,
         }) || filename;
         if (!looksLikeResearchTopic(documentTitle, extracted.text)) continue;
+        const reportUrl = identity === "document" ? pdfUrl : pageUrl;
         const accepted = stage({
           title: documentTitle,
           text: extracted.text,
-          // Keep the canonical article page as the article identity. This upgrades an
-          // existing teaser/HTML row in place instead of creating a second report under
-          // the download URL; the actual PDF URL is retained on the native document.
-          sourceUrl: pageUrl,
+          // The canonical article page is the article identity where the page is the
+          // report; the actual PDF URL is retained on the native document either way.
+          sourceUrl: reportUrl,
           author: null,
           publishedAt: date,
           segments: pdfSegments(extracted),
@@ -235,7 +246,7 @@ async function ingestInstitution(
           preferReplacement: true,
         });
         if (accepted) {
-          nativePdfs.set(pageUrl, { buffer: pdf, sourceUrl: pdfUrl });
+          nativePdfs.set(reportUrl, { buffer: pdf, sourceUrl: pdfUrl });
           staged = true;
         }
       } catch { /* try another PDF link */ }
@@ -388,6 +399,7 @@ async function ingestInstitution(
       limit: candidateLimit,
       since,
       allows: allowsUrl,
+      accepts: (url) => candidateAllowed(inst.slug, url),
     });
     for (const candidate of candidates.filter((item) => candidateAllowed(inst.slug, item.url))) {
       if (raws.length >= perLimit || !withinBudget()) break;
@@ -516,7 +528,12 @@ async function ingestInstitution(
       }
       if (raws.length < perLimit) {
         const listing = readArticle(listHtml);
-        await stageEmbeddedPdf(listHtml, pageUrl, listing.title, listing.publishedAt);
+        // A listing has no publication date of its own: any date visible on it belongs to
+        // one of the items it lists. Passing one down stamps it on every document found
+        // there — Mizuho's research index dated this month's FX outlook to August 2021,
+        // the date of an archived report further down the same page. Each document's own
+        // link carries its edition, so let that decide.
+        await stageEmbeddedPdf(listHtml, pageUrl, listing.title, null, "document");
       }
       for (const next of extractPaginationLinks(listHtml, pageUrl, pageUrl)) {
         if (!visitedPages.has(next) && allowsUrl(next)) pages.push(next);
@@ -530,7 +547,7 @@ async function ingestInstitution(
     const res = await persistArticle(inst.id, r);
     if (res === "created") created++;
     else if (res === "updated") updated++;
-    else if (res === "duplicate") { dup++; continue; }
+    else if (res === "duplicate") dup++;
     else { empty++; continue; }
     const article = await prisma.article.findUnique({ where: { urlHash: urlHash(r.sourceUrl) }, select: { id: true } });
     if (!article) continue;

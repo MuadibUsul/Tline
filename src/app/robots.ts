@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
-import { PRIVATE_ROUTES, siteUrl } from "@/lib/site";
+import { CRAWLER_DISALLOW, siteUrl } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
   const base = siteUrl();
-  const disallow = PRIVATE_ROUTES.flatMap((route) => [route, `${route}/`]);
+  const disallow = CRAWLER_DISALLOW.flatMap((route) => [route, `${route}/`]);
   return {
     rules: [
       { userAgent: "*", allow: "/", disallow },

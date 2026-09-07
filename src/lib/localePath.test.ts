@@ -31,6 +31,11 @@ test("an address that is not ours is left alone", () => {
   assert.equal(localePath("zh-CN", "#section"), "#section");
 });
 
+test("machine endpoints never gain duplicate locale addresses", () => {
+  assert.equal(localePath("zh-CN", "/api/documents/abc"), "/api/documents/abc");
+  assert.equal(localePath("en", "/_next/image"), "/_next/image");
+});
+
 test("a prefixed address still matches the route it would redirect to", () => {
   // The password gate compares the address against "/account/password". The header
   // carries the prefix, so without stripping it the gate redirects a reader onto the

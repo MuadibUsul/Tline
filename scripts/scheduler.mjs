@@ -16,6 +16,7 @@ const retryBatch = Math.max(1, Number(process.env.CONTENT_RETRY_BATCH || 5));
 const retryDelayMs = Math.max(10_000, Number(process.env.JOB_RETRY_DELAY_MS || 60_000));
 const sourceConcurrency = Math.min(16, Math.max(1, Number(process.env.INGEST_CONCURRENCY || 8)));
 const sourceSeconds = Math.min(600, Math.max(30, Number(process.env.INGEST_SOURCE_SECONDS || 90)));
+const analyticsIntervalMs = Math.max(300_000, Number(process.env.ANALYTICS_ROLLUP_INTERVAL_MS || 3_600_000));
 const npm = process.platform === "win32" ? process.execPath : "npm";
 const npmPrefix = process.platform === "win32" ? [process.env.npm_execpath] : [];
 let stopping = false;
@@ -159,5 +160,22 @@ async function processingLoop() {
   }
 }
 
-await Promise.all([ingestLoop(), processingLoop()]);
+/**
+ * Audience rollup and raw-row pruning.
+ *
+ * Its own loop on a much slower cadence: it is neither ingestion nor content processing,
+ * and putting it in either would tie how often the analytics tables are pruned to how
+ * fast publishers are polled. Recomputing recent days is idempotent, so an hourly pass
+ * costs nothing and keeps the console current well before the day is over.
+ */
+async function analyticsLoop() {
+  while (!stopping) {
+    await runCommand(["run", "analytics:rollup"]);
+    if (stopping) break;
+    console.log(JSON.stringify({ event: "scheduler.analytics.wait", intervalMs: analyticsIntervalMs }));
+    await wait(analyticsIntervalMs);
+  }
+}
+
+await Promise.all([ingestLoop(), processingLoop(), analyticsLoop()]);
 await stopHeartbeat();

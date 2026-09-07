@@ -79,7 +79,7 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
   const translation = a.translations?.[0];
   const title = locale === "zh-CN" && translation ? localizeChineseContent(translation.title) : a.title;
   const preview = shortPreview(locale === "zh-CN"
-    ? translation?.text ?? a.analysis?.summaryZh ?? a.rawText
+    ? a.analysis?.summaryZh ?? translation?.text ?? a.rawText
     : a.analysis?.summary ?? a.rawText);
   const localizedPreview = locale === "zh-CN" && preview ? localizeChineseContent(preview) : preview;
 

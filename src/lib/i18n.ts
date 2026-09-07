@@ -30,6 +30,7 @@ export function stripLocale(pathname: string): string {
 /** The same page under a given locale, with any prefix already there replaced. */
 export function localePath(locale: Locale, path: string): string {
   if (!path.startsWith("/")) return path;
+  if (/^\/(?:api|_next)(?:\/|$)/.test(path)) return path;
   const bare = localeFromPath(path) ? `/${path.split("/").slice(2).join("/")}` : path;
   const suffix = bare === "/" ? "" : bare.replace(/\/$/, "");
   return `/${LOCALE_SEGMENT[locale]}${suffix}`;

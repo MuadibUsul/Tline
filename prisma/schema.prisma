@@ -60,12 +60,22 @@ model Article {
   disclaimerText String? // publisher legal disclosure, excluded from analysis/translation
   createdAt      DateTime @default(now())
 
-  institution   Institution          @relation(fields: [institutionId], references: [id])
-  analysis      Analysis?
-  articleAssets ArticleAsset[]
-  segments      ArticleSegment[]
-  translations  ArticleTranslation[]
-  documents     ArticleDocument[]
+  // Model-call backoff, one pair per pipeline because the two fail independently: a body
+  // the translator chokes on is usually still analysable. Without these an article that
+  // can never be processed stays in the candidate set and is re-billed on every pass —
+  // the scheduler picks the newest 50 every minute, so a permanent failure is a permanent
+  // cost. Counters reset to zero on success; see src/lib/articleBackoff.ts.
+  analysisFailCount        Int       @default(0)
+  analysisNextAttemptAt    DateTime?
+  translationFailCount     Int       @default(0)
+  translationNextAttemptAt DateTime?
+
+  institution    Institution          @relation(fields: [institutionId], references: [id])
+  analysis       Analysis?
+  articleAssets  ArticleAsset[]
+  segments       ArticleSegment[]
+  translations   ArticleTranslation[]
+  documents      ArticleDocument[]
   atomicViews    AtomicView[]
   figures        ArticleFigure[]
   macroForecasts MacroForecast[]
@@ -76,6 +86,9 @@ model Article {
   @@index([publishedAt])
   @@index([titleHash])
   @@index([contentHash])
+  // The processing CLIs select "not yet done and due for another attempt", newest first.
+  @@index([analysisFailCount, analysisNextAttemptAt])
+  @@index([translationFailCount, translationNextAttemptAt])
 }
 
 model AtomicView {
@@ -593,28 +606,28 @@ model MacroSignalSnapshot {
 // ---- User side (Phase 2). Refs to assets/institutions are scalar (ticker/slug). ----
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified DateTime?
-  name          String?
-  image         String?
-  tier          String    @default("free") // matrix is configured later
-  role          String    @default("member") // member | reviewer | admin; independent of commercial tier
+  id                String    @id @default(cuid())
+  email             String    @unique
+  emailVerified     DateTime?
+  name              String?
+  image             String?
+  tier              String    @default("free") // matrix is configured later
+  role              String    @default("member") // member | reviewer | admin; independent of commercial tier
   // Email is for enrolling and for recovery only; day-to-day sign-in is by password, so
   // routine access never spends the mail provider's quota.
   passwordHash      String?
   // Doubles as revocation: sessions issued before this moment are refused, so changing a
   // password signs out every other device.
   passwordChangedAt DateTime?
-  alertWebhookUrl String? // https destination for fired alerts; validated before every POST
+  alertWebhookUrl   String? // https destination for fired alerts; validated before every POST
   // An operator suspension. Kept as a timestamp rather than a flag so the record says
   // when access was withdrawn, and restoring is a single field back to null.
-  suspendedAt   DateTime?
+  suspendedAt       DateTime?
   // Written at most once every ten minutes per user, so "who is still using this" is
   // answerable without a write on every request.
-  lastSeenAt    DateTime?
-  note          String? // operator-only remark, never shown to the account holder
-  createdAt     DateTime  @default(now())
+  lastSeenAt        DateTime?
+  note              String? // operator-only remark, never shown to the account holder
+  createdAt         DateTime  @default(now())
 
   watchlist WatchlistItem[]
   rules     AlertRule[]
@@ -873,7 +886,7 @@ model TrafficDaily {
 model ApiUsageDaily {
   id String @id @default(cuid())
 
-  day String
+  day      String
   // Empty string for a request that never authenticated, rather than null: both databases
   // treat NULL as distinct from itself in a unique index, so a nullable column here would
   // make the upsert below insert a fresh row for every anonymous call instead of counting.
@@ -886,4 +899,87 @@ model ApiUsageDaily {
   @@unique([day, keyId, endpoint, status])
   @@index([day])
   @@index([keyId, day])
+}
+
+/// Model-provider credentials and defaults, editable from the console.
+///
+/// The key is stored encrypted and is never sent back to the browser — the console shows
+/// only `apiKeyHint` (last four characters), which is enough to tell two keys apart and
+/// useless to anyone who reads it. Environment variables still work and act as the
+/// fallback, so an existing deployment keeps running until someone saves a key here.
+model LlmProvider {
+  provider       String    @id // anthropic | openai | deepseek | gemini
+  apiKeyCipher   String? // AES-256-GCM, see src/lib/secrets.ts
+  apiKeyHint     String?
+  baseUrl        String?
+  defaultModel   String?
+  enabled        Boolean   @default(true)
+  lastCheckedAt  DateTime?
+  lastCheckOk    Boolean?
+  lastCheckError String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+/// Which provider and model serve each model-backed task.
+///
+/// One row per task rather than one global setting, because the tasks are not equally
+/// valuable: bulk translation wants the cheapest model that is accurate, while the
+/// independent review that judges it should not be the same model marking its own work.
+model LlmTaskRoute {
+  task      String   @id // translation | translation_review | analysis | forecast | release_analysis | policy | retitle
+  provider  String? // null falls back to the default provider order
+  model     String? // null uses the provider's default model
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+/// Per-model prices, so recorded tokens can be shown as money.
+///
+/// Deliberately empty until an operator fills it in: published prices change and differ by
+/// account, and a number invented here would be reported as if it were fact.
+model LlmModelPrice {
+  id            String   @id @default(cuid())
+  provider      String
+  model         String
+  inputPerMTok  Float
+  outputPerMTok Float
+  currency      String   @default("USD")
+  updatedAt     DateTime @updatedAt
+
+  @@unique([provider, model])
+}
+
+/// One row per model call, with the token counts the provider itself reported.
+///
+/// Every provider returns usage on the response and the pipeline was throwing it away, so
+/// the only way to answer "what did that cost" was to estimate from character counts.
+/// These are measured, not inferred. Pruned by the analytics rollup.
+model LlmCall {
+  id   String @id @default(cuid())
+  /// UTC day, matching the convention the audience counters already use. Grouping by a
+  /// stored day string keeps the reports portable: date extraction differs between SQLite
+  /// and PostgreSQL, and a per-row date function cannot use an index in either.
+  day  String
+  task String
+
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  durationMs   Int      @default(0)
+  ok           Boolean  @default(true)
+  /// Why the model stopped, normalised across vendors: "stop" (finished on its own),
+  /// "length" (hit the output ceiling and was cut mid-answer), "filter", or whatever else
+  /// the vendor reported. Truncation is invisible in the token counts — a cut-off reply
+  /// bills for every token it generated — and it is the difference between "the ceiling is
+  /// fine" and "the ceiling is why this call is being retried".
+  finishReason String?
+  error        String?
+  createdAt    DateTime @default(now())
+
+  @@index([day])
+  @@index([day, task])
+  @@index([day, provider, model])
+  @@index([createdAt])
 }

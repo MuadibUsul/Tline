@@ -55,6 +55,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     {
       title: tr(locale, "Platform", "平台"),
       items: [
+        ...item("admin.models", "/admin/models", "Model providers", "模型接入"),
         ...item("admin.api", "/admin/api", "API & keys", "API 与密钥"),
         ...item("admin.audit", "/admin/audit", "Audit log", "审计日志"),
       ],

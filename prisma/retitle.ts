@@ -3,7 +3,8 @@ import { prisma } from "../src/lib/db";
 import { readPrivateFile } from "../src/lib/documents/storage";
 import { extractPdf } from "../src/lib/documents/extractPdf";
 import { isCallToActionOnly, resolveDocumentTitle } from "../src/lib/ingest/documentTitle";
-import { completeJSON, getLLMProvider } from "../src/lib/llm/provider";
+import { resolveLLMProvider } from "../src/lib/llm/config";
+import { completeJSON } from "../src/lib/llm/provider";
 import { protectTitleDates, restoreTitleDates } from "../src/lib/translation/titleDates";
 
 /**
@@ -45,7 +46,7 @@ function unusable(title: string) {
 }
 
 async function translateTitle(english: string): Promise<string | null> {
-  const provider = getLLMProvider(process.env.TRANSLATION_PROVIDER);
+  const provider = await resolveLLMProvider("retitle");
   if (!provider) return null;
   // Dates are placed before translation and restored after, so a model cannot reformat
   // "2 September 2026" into something that no longer reads as that day.

@@ -1,7 +1,8 @@
 import { ASSETS, DIRECTION, type DirectionKey } from "../assets";
-import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider";
+import { resolveLLMProvider } from "../llm/config";
+import { completeJSON, type LLMProvider } from "../llm/provider";
 import type { Segment } from "./extract";
-import { ATOMIC_VIEW_INSTRUCTIONS, ATOMIC_VIEW_JSON_SHAPE, ATOMIC_VIEW_PROMPT_VERSION, validateAtomicViews, type ParsedAtomicView } from "./atomicViews";
+import { ATOMIC_VIEW_INSTRUCTIONS, ATOMIC_VIEW_JSON_SHAPE, ATOMIC_VIEW_PROMPT_VERSION, validateAtomicViewYield, type ParsedAtomicView } from "./atomicViews";
 import { validateAnalysisGrounding } from "./analysisGrounding";
 
 export interface ParsedAsset {
@@ -241,7 +242,17 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
   // have returned only the institution name; rejecting these here lets realParse retry
   // instead of publishing a one-word conclusion beside a complete article.
   if (typeof summary !== "string" || summary.trim().length < 40 || !summaryZh || summaryZh.length < 12) return null;
-  const atomicViews = validateAtomicViews(json.atomic_views, sourceText);
+  const yielded = validateAtomicViewYield(json.atomic_views, sourceText);
+  const atomicViews = yielded.views;
+  // Every proposal was generated and billed, whether or not it survived. Logged rather
+  // than stored: it answers "is the validator throwing away work we paid for", and once
+  // that is answered the remedy is a prompt change, not a permanent column.
+  console.log(JSON.stringify({
+    event: "analysis.atomic_views",
+    proposed: yielded.proposed,
+    kept: yielded.kept,
+    rejected: yielded.rejected,
+  }));
   const fields = {
     summary,
     summaryZh,
@@ -285,7 +296,14 @@ async function realParse(input: ParseInput, provider: LLMProvider): Promise<Pars
       const result = await completeJSON<unknown>(provider, {
         system: SYSTEM,
         user,
-        maxTokens: 5000,
+        // Measured, not guessed: at 5000 the first attempt came back finish_reason
+        // "length" — cut off mid-answer, so its atomic views were incomplete, so
+        // reviewStatus was never "ok", so the loop below paid for a second full attempt.
+        // A complete answer measures around 4,200 tokens, which left no headroom at all.
+        // Output is billed on what is generated rather than on the ceiling, so raising it
+        // costs nothing when the model stops on its own and saves the entire retry when
+        // it would otherwise have been truncated.
+        maxTokens: 8000,
       });
       const parsed = coerceModelResponse(result.value, result.meta.provider, result.meta.model, sourceText);
       if (parsed?.reviewStatus === "ok") return parsed;
@@ -303,7 +321,7 @@ async function realParse(input: ParseInput, provider: LLMProvider): Promise<Pars
 /** Use the configured model for evidence-backed atomic views; fall back safely to heuristics. */
 export async function parseArticle(input: ParseInput, segments: Segment[] = []): Promise<ParsedArticle> {
   const heuristic = heuristicParse(input, segments);
-  const provider = getLLMProvider();
+  const provider = await resolveLLMProvider("analysis");
   if (provider) {
     const real = await realParse(input, provider);
     if (real) return real;

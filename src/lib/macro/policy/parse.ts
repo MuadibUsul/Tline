@@ -1,4 +1,5 @@
-import { completeJSON, getLLMProvider, type LLMProvider } from "../../llm/provider";
+import { resolveLLMProvider } from "../../llm/config";
+import { completeJSON, type LLMProvider } from "../../llm/provider";
 import type { ParsedPolicyDocument, PolicyDecision, PolicyParseResult, PolicySourceQuote, PolicyStance } from "./types";
 
 export const POLICY_PROMPT_VERSION = "fomc-policy-v1";
@@ -130,7 +131,9 @@ function mergeLlm(deterministic: ParsedPolicyDocument, value: unknown, text: str
   };
 }
 
-export async function parsePolicyDocument(text: string, provider: LLMProvider | null = getLLMProvider()): Promise<PolicyParseResult> {
+/** Undefined resolves from configuration; an explicit null forces the deterministic path. */
+export async function parsePolicyDocument(text: string, injected?: LLMProvider | null): Promise<PolicyParseResult> {
+  const provider = injected === undefined ? await resolveLLMProvider("policy") : injected;
   const deterministic = extractDeterministicPolicy(text);
   if (!provider) return { parsed: deterministic, provider: "deterministic", model: null, promptVersion: POLICY_PROMPT_VERSION, reviewStatus: "deterministic" };
   try {

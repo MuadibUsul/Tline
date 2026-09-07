@@ -233,17 +233,15 @@ export async function watchMacroReleases(now = new Date(), releaseId?: string) {
   });
   const results = [];
   for (const release of releases) results.push(await watchRelease(release, now));
-  // This is deliberately in the hot path: once every official value is committed,
-  // publish its bilingual read-out without waiting for another scheduler.
-  // Dynamic import avoids the releaseAnalysis -> releaseConsensus -> watch cycle.
-  const { generatePendingReleaseAnalyses } = await import("./releaseAnalysis");
-  const analyzed = await generatePendingReleaseAnalyses();
+  // The bilingual read-out is NOT generated here. This watcher polls official sources on a
+  // ten-second cadence; a model call on that path bills once per poll for as long as a
+  // release stays unanalysed, which is a standing cost with no upper bound. Generation runs
+  // as its own scheduler task (`macro:forecasts -- --analyze`) on a minutes-scale cadence.
   return {
     considered: releases.length,
     attempted: results.filter((result) => result.attempted).length,
     released: results.filter((result) => result.status === "released").length,
     waiting: results.filter((result) => result.status === "waiting").length,
     expired: results.filter((result) => result.status === "expired").length,
-    analyzed,
   };
 }

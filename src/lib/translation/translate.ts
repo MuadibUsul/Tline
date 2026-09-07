@@ -1,7 +1,8 @@
 import glossary from "../../../data/financial_glossary.zh-CN.json";
 import { prisma } from "../db";
-import { completeJSON, getLLMProvider, type LLMProvider } from "../llm/provider";
-import { validateTranslation, type TranslationQuality } from "./quality";
+import { resolveLLMProvider } from "../llm/config";
+import { completeJSON, type LLMProvider } from "../llm/provider";
+import { assessTranslationRisk, validateTranslation, type TranslationQuality, type TranslationRisk } from "./quality";
 import { protectTitleDates, restoreTitleDates } from "./titleDates";
 
 const PROMPT_VERSION = "finance-translation-v3";
@@ -47,6 +48,8 @@ export interface TranslationResult {
   qualityScore: number;
   quality: TranslationQuality;
   review: ReviewResult | null;
+  risk: TranslationRisk;
+  reviewAttempted: boolean;
 }
 
 function sourcePayload(
@@ -137,7 +140,17 @@ async function requestDraft(
   throw new Error(`Translation response did not preserve the source segment structure (${lastMeta.provider}/${lastMeta.model}).`);
 }
 
-function splitText(text: string, maxChars = 1_800): string[] {
+// One request per 1,800 characters put ~8 model calls behind an average article and 65
+// behind the longest one. `maxTokens: 9000` leaves ample room for a chunk several times
+// that size, so the ceiling was never the constraint — the cost was.
+//
+// Tunable rather than hard-coded because the trade-off is empirical: a larger chunk is
+// cheaper per article, but past some size the model starts dropping segments, which fails
+// the per-batch integrity check and re-requests the whole chunk. Watch the share of
+// translations landing in `needs_review` after a change; lower this if it climbs.
+const CHUNK_CHARS = Math.max(500, Number(process.env.TRANSLATION_CHUNK_CHARS || 6_000));
+
+function splitText(text: string, maxChars = CHUNK_CHARS): string[] {
   if (text.length <= maxChars) return [text];
   const paragraphs = text.split(/\n\s*\n/).filter(Boolean);
   const parts: string[] = [];
@@ -185,9 +198,10 @@ function preservedHeading(heading: string | null) {
 
 // Merge consecutive parts into one request up to the same size splitText already deemed
 // reliable, so many-small-segment articles collapse to fewer calls while no
-// single request grows larger than before (larger batches make the model drop content,
-// fail the per-batch integrity check and retry — which costs more, not less).
-function batches(parts: TranslationPart[], maxChars = 1_800): TranslationPart[][] {
+// single request grows larger than a single split part. Both sides read the same
+// CHUNK_CHARS: raising one without the other would let a batch exceed what splitText
+// judged safe, which is the case that makes the model drop content and forces a retry.
+function batches(parts: TranslationPart[], maxChars = CHUNK_CHARS): TranslationPart[][] {
   const grouped: TranslationPart[][] = [];
   let current: TranslationPart[] = [];
   let size = 0;
@@ -235,15 +249,43 @@ Return ONLY JSON: {"pass":boolean,"score":number,"issues":string[]}.`,
   };
 }
 
+/**
+ * Share of ordinary, structurally sound translations that still get the paid review.
+ *
+ * Reviewing every one of them was close to free QA in intent and expensive in practice:
+ * the review call carries the full English source AND the full Chinese output, so it is
+ * the single largest request in the pipeline — larger, after chunking was widened, than
+ * all the drafting calls for the same article combined. Measured on the existing corpus,
+ * 96% of articles cleared the "important" gate, so it reviewed essentially everything.
+ *
+ * Sampling keeps the check continuous — a systemic regression still shows up within a
+ * day at current volumes — without paying for it on every article. Anything the cheap
+ * signals flag is reviewed regardless of this rate; see reviewIsWorthwhile.
+ */
+export function defaultReviewSampleRate(): number {
+  const configured = Number(process.env.TRANSLATION_REVIEW_SAMPLE_RATE);
+  return Number.isFinite(configured) ? Math.max(0, Math.min(1, configured)) : 0.15;
+}
+
+function reviewIsWorthwhile(risk: TranslationRisk, sampleRate: number): boolean {
+  // Out-of-band output is always worth a second opinion, whatever the sample rate says.
+  return risk.risky || Math.random() < sampleRate;
+}
+
 export async function translateArticle(
   institution: string,
   title: string,
   segments: SourceSegment[],
-  provider = getLLMProvider(process.env.TRANSLATION_PROVIDER),
-  reviewer = provider,
+  // Undefined resolves from configuration; an explicit null means "no reviewer", which is
+  // how a caller switches the second opinion off without switching translation off too.
+  injected?: LLMProvider | null,
+  injectedReviewer?: LLMProvider | null,
   enableReview = true,
+  reviewSampleRate = defaultReviewSampleRate(),
 ): Promise<TranslationResult> {
+  const provider = injected ?? await resolveLLMProvider("translation");
   if (!provider) throw new Error("No LLM provider is configured for translation.");
+  const reviewer = injectedReviewer === undefined ? provider : injectedReviewer;
   const source = articleText(title, segments);
   const parts = translationParts(segments);
   const translatedParts: DraftSegment[] = parts
@@ -302,17 +344,24 @@ export async function translateArticle(
   const translated = articleText(translatedTitle, draftSegments);
   const quality = validateTranslation(source, translated, segments.length, draftSegments.length);
 
+  const risk = assessTranslationRisk(source, translated);
+
   // A successfully generated translation remains readable, but failed independent review
   // must stay in the retryable state instead of being mislabeled as reviewed.
   let review: ReviewResult | null = null;
-  if (enableReview && quality.passed && reviewer) {
+  let reviewAttempted = false;
+  if (enableReview && quality.passed && reviewer && reviewIsWorthwhile(risk, reviewSampleRate)) {
+    reviewAttempted = true;
     try {
       review = await reviewDraft(reviewer, source, translated);
     } catch {
       review = null;
     }
   }
-  const reviewed = quality.passed && (enableReview ? review?.pass === true : true);
+  // Keyed on whether a review actually ran, not on whether one was permitted. A review the
+  // sampler declined to buy must not read as a failed one — that would mark the article
+  // needs_review, which re-queues it, which buys back the very call that was skipped.
+  const reviewed = quality.passed && (reviewAttempted ? review?.pass === true : true);
   const qualityScore = reviewed
     ? Number(((quality.score + (review?.score ?? quality.score)) / 2).toFixed(2))
     : Number((quality.score * 0.7).toFixed(2));
@@ -329,6 +378,8 @@ export async function translateArticle(
     qualityScore,
     quality,
     review,
+    risk,
+    reviewAttempted,
   };
 }
 
@@ -361,13 +412,13 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
 
   // Production may review with a distinct provider; resolve it here (not inside the
   // pure translateArticle) so unit tests that inject a provider stay deterministic.
-  const translationProvider = provider ?? getLLMProvider(process.env.TRANSLATION_PROVIDER);
-  const reviewer = getLLMProvider(process.env.TRANSLATION_REVIEW_PROVIDER) ?? translationProvider ?? undefined;
+  const translationProvider = provider ?? await resolveLLMProvider("translation");
+  const reviewer = await resolveLLMProvider("translation_review") ?? translationProvider;
   // Spend the extra LLM review only on important articles; the deterministic gate covers the rest.
   const important = article.institution.rating >= 5
     || (article.analysis?.importanceScore ?? 0) >= 0.6
     || (article.atomicViews[0]?.importance ?? 0) >= 4;
-  const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider ?? undefined, reviewer, important);
+  const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider, reviewer, important);
   return prisma.$transaction(async (tx) => {
     if (expectedContentHash) {
       const claimed = await tx.article.updateMany({

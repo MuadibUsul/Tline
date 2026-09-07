@@ -38,6 +38,8 @@
     "scheduler": "node scripts/scheduler.mjs",
     "dataset:export": "tsx scripts/dataset.ts export",
     "dataset:import": "tsx scripts/dataset.ts import",
+    "user:password": "tsx scripts/set-password.ts",
+    "mail:test": "node scripts/mail-test.mjs",
     "env:check": "node scripts/validate-env.mjs",
     "env:check:production": "node scripts/validate-env.mjs --production",
     "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo-user.ts",

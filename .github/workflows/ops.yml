@@ -1,0 +1,84 @@
+# Operator commands that need a shell on the production host.
+#
+# Enrolment and password recovery both go through email. When the mail service fails,
+# the only way back into an account is a command on the server — which is exactly what
+# an operator who is locked out may have no way to run. This exposes the two commands
+# that resolve that, using the SSH credentials the deployment already holds, so they can
+# be triggered from a browser.
+#
+# Deliberately narrow: two fixed actions, no free-form command, manual trigger only.
+name: Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to run on the production host"
+        type: choice
+        required: true
+        default: diagnose-mail
+        options:
+          - diagnose-mail
+          - set-password
+      email:
+        description: "Account email address"
+        type: string
+        required: true
+
+concurrency:
+  group: ops-production
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    # Inherits whatever protection rules the production environment carries, so this is
+    # never a weaker door into the host than a deployment is.
+    environment: production
+    steps:
+      - name: Validate the address
+        env:
+          EMAIL: ${{ inputs.email }}
+        run: |
+          set -eu
+          # The address reaches a shell on the host. Constrain it to the characters an
+          # address can contain, so nothing else can ride along inside it.
+          case "$EMAIL" in
+            *[!A-Za-z0-9@._+-]*|*' '*|'') echo "Not a valid email address."; exit 1 ;;
+          esac
+          case "$EMAIL" in *@*.*) ;; *) echo "Not a valid email address."; exit 1 ;; esac
+          echo "Address accepted."
+
+      - name: Run on the production host
+        uses: appleboy/ssh-action@v1
+        env:
+          ACTION: ${{ inputs.action }}
+          EMAIL: ${{ inputs.email }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: ACTION,EMAIL
+          script: |
+            set -eu
+            cd ~/tline
+            COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+
+            case "$ACTION" in
+              diagnose-mail)
+                # Prints what the mail server itself says. The script redacts the password
+                # inside EMAIL_SERVER before printing it, so the transcript carries the
+                # diagnosis without the credential.
+                $COMPOSE exec -T app npm run mail:test -- --to="$EMAIL"
+                ;;
+              set-password)
+                echo "The generated password is printed below and appears in this log."
+                echo "Sign in with it, then change it immediately at /account/password."
+                echo ""
+                $COMPOSE exec -T app npm run user:password -- --email="$EMAIL"
+                ;;
+              *)
+                echo "Unknown action: $ACTION"
+                exit 1
+                ;;
+            esac

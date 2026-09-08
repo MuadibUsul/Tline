@@ -181,6 +181,10 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           <div><dt>{tr(locale, "Published", "发布时间")}</dt><dd>{date}</dd></div>
           <div><dt>{tr(locale, "Time horizon", "时间范围")}</dt><dd>{[...new Set(a.atomicViews.map((view) => view.timeHorizon))].join(" · ") || tr(locale, "Not explicitly stated", "原文未明确说明")}</dd></div>
         </dl>
+        {keyArgs.length > 0 && <section className="citation-arguments" aria-labelledby="key-arguments-heading">
+          <h3 id="key-arguments-heading">{tr(locale, "Key arguments", "关键论点")}</h3>
+          <ul className="citation-list">{keyArgs.map((item, index) => <li key={`${item}-${index}`}>{locale === "zh-CN" ? localizeChineseContent(item) : item}</li>)}</ul>
+        </section>}
         {(keyNumbers.length > 0 || risks.length > 0) && <div className="citation-evidence">
           {keyNumbers.length > 0 && <section aria-labelledby="key-numbers-heading">
             <h3 id="key-numbers-heading">{tr(locale, "Key numbers", "关键数字")}</h3>
@@ -328,8 +332,6 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             "由 AI 依据上文研报生成 · 非原文直译、非机构原话 · 重要判断请核对官网原文",
           )}
         </div>
-        {keyArgs.length > 0 && <details className="article-original"><summary>{tr(locale, "Key arguments", "关键论点")}</summary><ul className="prose">{keyArgs.map((item, index) => <li key={index}>{locale === "zh-CN" ? localizeChineseContent(item) : item}</li>)}</ul></details>}
-        {risks.length > 0 && <details className="article-original"><summary>{tr(locale, "Risks", "风险")}</summary><ul className="prose">{risks.map((item, index) => <li key={index}>{locale === "zh-CN" ? localizeChineseContent(item) : item}</li>)}</ul></details>}
       </section>}
     </main>
   );

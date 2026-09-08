@@ -259,7 +259,7 @@ test("routes publisher download and print controls to native PDF storage", () =>
   for (const slug of ["bnp", "westpac", "daiwa", "td", "state-street", "goldman-sachs", "scotiabank", "franklin", "pimco", "nomura"]) {
     assert.equal(prefersNativePdf(slug), true, `${slug} repairs missing native PDFs`);
   }
-  for (const slug of ["franklin", "pimco", "nomura"]) {
+  for (const slug of ["bnp", "franklin", "pimco", "nomura"]) {
     assert.equal(printsToPdf(slug), true, `${slug} uses its public print view`);
   }
   for (const slug of ["wellington-management", "schroders", "invesco"]) {

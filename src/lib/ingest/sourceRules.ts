@@ -18,8 +18,10 @@ type SourceRule = {
 const RULES: Record<string, SourceRule> = {
   bnp: {
     // Article pages expose a public `/pdf/<locale>/...` route without a `.pdf`
-    // suffix. The response is still a native application/pdf document.
+    // suffix. Some new editions temporarily return a one-line "coming soon" PDF;
+    // the complete public article print view is the fallback in that case.
     preferNativePdf: true,
+    printToPdf: true,
   },
   ing: {
     preferNativePdf: true,

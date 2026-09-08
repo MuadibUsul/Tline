@@ -78,6 +78,11 @@ export async function renderPdf(url: string, timeoutMs = 25000): Promise<Buffer 
       renderReasons.set(url, "access wall or human verification");
       return null;
     }
+    // Nomura's fixed navigation is repeated over the article at every page break.
+    // Its public print control has no dedicated stylesheet, so remove only that chrome.
+    if (new URL(page.url()).hostname.endsWith("nomuraconnects.com")) {
+      await page.locator("header").evaluateAll((headers) => headers.forEach((header) => header.remove()));
+    }
     await page.emulateMedia({ media: "print" });
     return await page.pdf({ format: "A4", printBackground: true, preferCSSPageSize: true });
   } catch {

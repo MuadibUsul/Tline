@@ -2,8 +2,9 @@ import { ASSETS, DIRECTION, type DirectionKey } from "../assets";
 import { resolveLLMProvider } from "../llm/config";
 import { completeJSON, type LLMProvider } from "../llm/provider";
 import type { Segment } from "./extract";
-import { ATOMIC_VIEW_INSTRUCTIONS, ATOMIC_VIEW_JSON_SHAPE, ATOMIC_VIEW_PROMPT_VERSION, validateAtomicViewYield, type ParsedAtomicView } from "./atomicViews";
+import { ATOMIC_VIEW_PROMPT_VERSION, type ParsedAtomicView } from "./atomicViews";
 import { validateAnalysisGrounding } from "./analysisGrounding";
+import { extractAtomicViewsByRule } from "./atomicViewsRules";
 
 export interface ParsedAsset {
   ticker: string;
@@ -196,13 +197,14 @@ export function heuristicParse(input: ParseInput, segments: Segment[] = []): Par
 export const mockParse = heuristicParse;
 
 // -------- Real LLM parser (configured provider) --------
+// Atomic views are no longer requested. They were the bulk of what this call produced —
+// up to fifteen objects of seven bilingual fields each, of which two thirds were then
+// discarded by validation — and they are now quoted from the article by rule instead.
 const SYSTEM = `You extract structured investment signals from a public institutional research article.
-${ATOMIC_VIEW_INSTRUCTIONS}
 Return ONLY valid JSON matching this shape:
 {"summary_en":string,"summary_zh":string,"key_arguments_en":string[],"key_arguments_zh":string[],"key_numbers_en":[{"label":string,"value":string}],"key_numbers_zh":[{"label":string,"value":string}],"risks_en":string[],"risks_zh":string[],
 "interpretation_en":string,"interpretation_zh":string,"importance_score":number(0..1),"confidence":number(0..1),
-"assets":[{"ticker":string,"direction":"strong_bull"|"bull"|"neutral"|"bear"|"strong_bear","target":number|null,"previous_target":number|null,"time_horizon":string|null,"confidence":number(0..1)}],
-${ATOMIC_VIEW_JSON_SHAPE}}
+"assets":[{"ticker":string,"direction":"strong_bull"|"bull"|"neutral"|"bear"|"strong_bear","target":number|null,"previous_target":number|null,"time_horizon":string|null,"confidence":number(0..1)}]}
 Use tickers only from this list where applicable: ${ASSETS.map((a) => a.ticker).join(", ")}.
 English analysis fields must contain professional English; _zh fields must contain institution-grade Simplified Chinese preserving every number, unit and modality. Summaries must be your own words, never a verbatim copy. If unsure about an asset, omit it.`;
 
@@ -242,17 +244,7 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
   // have returned only the institution name; rejecting these here lets realParse retry
   // instead of publishing a one-word conclusion beside a complete article.
   if (typeof summary !== "string" || summary.trim().length < 40 || !summaryZh || summaryZh.length < 12) return null;
-  const yielded = validateAtomicViewYield(json.atomic_views, sourceText);
-  const atomicViews = yielded.views;
-  // Every proposal was generated and billed, whether or not it survived. Logged rather
-  // than stored: it answers "is the validator throwing away work we paid for", and once
-  // that is answered the remedy is a prompt change, not a permanent column.
-  console.log(JSON.stringify({
-    event: "analysis.atomic_views",
-    proposed: yielded.proposed,
-    kept: yielded.kept,
-    rejected: yielded.rejected,
-  }));
+  const atomicViews: ParsedAtomicView[] = [];
   const fields = {
     summary,
     summaryZh,
@@ -283,7 +275,7 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
     provider,
     model,
     promptVersion: ATOMIC_VIEW_PROMPT_VERSION,
-    reviewStatus: atomicViews.length > 0 && grounding.passed ? "ok" : "needs_review",
+    reviewStatus: grounding.passed ? "ok" : "needs_review",
   };
 }
 
@@ -321,12 +313,20 @@ async function realParse(input: ParseInput, provider: LLMProvider): Promise<Pars
 /** Use the configured model for evidence-backed atomic views; fall back safely to heuristics. */
 export async function parseArticle(input: ParseInput, segments: Segment[] = []): Promise<ParsedArticle> {
   const heuristic = heuristicParse(input, segments);
+  // Views are quoted from the article by rule, not written by a model. Attached to
+  // whichever analysis is returned below, so they survive a model failure and cost
+  // nothing when the model is switched off entirely.
+  const ruleViews = extractAtomicViewsByRule(input.text);
   const provider = await resolveLLMProvider("analysis");
   if (provider) {
     const real = await realParse(input, provider);
-    if (real) return real;
+    if (real) return { ...real, atomicViews: ruleViews };
     heuristic.reviewStatus = "needs_review";
     heuristic.model = "heuristic-fallback";
   }
+  heuristic.atomicViews = ruleViews;
+  // Views no longer depend on the model, so their absence is no longer what makes an
+  // analysis incomplete: the grounding of the summary is.
+  if (ruleViews.length > 0 && heuristic.reviewStatus !== "needs_review") heuristic.reviewStatus = "ok";
   return heuristic;
 }

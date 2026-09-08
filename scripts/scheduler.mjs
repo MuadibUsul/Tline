@@ -103,7 +103,10 @@ async function processPending() {
     // AI output poor and asked for it again. Ahead of the routine backlog, not behind it.
     ["run", "retries", "--", `--batch=${retryBatch}`],
     ["run", "reparse", "--", `--limit=${processLimit}`],
-    ["run", "translate", "--", `--limit=${processLimit}`],
+    // Translation is not in this list. The site is English-only, so translating every
+    // article body produced output nothing renders — and it was the largest single
+    // consumer in the pipeline. The command still exists and still works if it is ever
+    // wanted again; nothing runs it on a schedule.
     ["run", "documents", "--", `--limit=${processLimit}`],
     // Last, so it judges the pass that has just finished. A non-zero exit here means the
     // pipeline is quiet rather than broken, which no other signal reports.

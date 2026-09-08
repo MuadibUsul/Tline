@@ -121,7 +121,22 @@ export async function resolveLLMProvider(task: LlmTask): Promise<LLMProvider | n
   return resolved ? withUsageRecording(resolved.provider, task) : null;
 }
 
+/**
+ * One switch that stops every model call, whatever the per-task routes say.
+ *
+ * The console can already disable each task individually, which is the right control when
+ * the question is "should this stage run". This answers a different one — "stop spending
+ * now" — and it is read from the environment rather than the database on purpose: the
+ * reason to reach for it is usually that something is wrong, and it should not depend on
+ * a database read or a cache expiry to take effect.
+ */
+export function isLlmDisabled(): boolean {
+  const value = process.env.LLM_DISABLED?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
 export async function resolveWithSource(task: LlmTask): Promise<ResolvedProvider | null> {
+  if (isLlmDisabled()) return null;
   const { providers, routes } = await snapshot();
   const route = routes.get(task);
   if (route && !route.enabled) return null;
@@ -151,6 +166,7 @@ export async function resolveWithSource(task: LlmTask): Promise<ResolvedProvider
  * Cheap and side-effect free: no provider is constructed and no call is made.
  */
 export async function anyProviderConfigured(): Promise<boolean> {
+  if (isLlmDisabled()) return false;
   const { providers } = await snapshot();
   if (PROVIDER_NAMES.some((name) => apiKeyFor(name, providers.get(name)))) return true;
   return getLLMProvider() !== null;
@@ -165,6 +181,9 @@ export async function anyProviderConfigured(): Promise<boolean> {
  * not pipeline work, and counting it would pollute the task figures.
  */
 export async function providerByName(name: ProviderName, overrides: ProviderConfig = {}): Promise<LLMProvider | null> {
+  // Not gated by isLlmDisabled: the console's connection test exists to answer whether a
+  // key works, which is a question an operator may well be asking precisely because
+  // everything is switched off.
   const { providers } = await snapshot();
   const row = providers.get(name);
   const apiKey = overrides.apiKey ?? apiKeyFor(name, row);

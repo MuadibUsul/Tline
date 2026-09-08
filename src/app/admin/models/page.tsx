@@ -4,7 +4,7 @@ import { BarList, StatCard, TimeSeries } from "@/app/_components/charts";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getLocale, tr, type Locale } from "@/lib/i18n";
-import { apiKeyFor, type ProviderRow } from "@/lib/llm/config";
+import { apiKeyFor, isLlmDisabled, type ProviderRow } from "@/lib/llm/config";
 import { llmUsageReport, recentLlmFailures } from "@/lib/llm/report";
 import { envApiKey } from "@/lib/llm/provider";
 import { LLM_TASKS, PROVIDER_NAMES, type LlmTask, type ProviderName } from "@/lib/llm/types";
@@ -93,6 +93,16 @@ export default async function ModelsPage() {
           <span className="chip acc">{tr(locale, `${usage.days}d`, `近 ${usage.days} 天`)}</span>
         </div>
       </header>
+
+      {isLlmDisabled() && (
+        <p className="notice bad" role="alert">
+          {tr(
+            locale,
+            "Every model call is switched off by LLM_DISABLED in the environment. Task routing below is ignored while it is set.",
+            "环境变量 LLM_DISABLED 已开启，所有模型调用已停用。开启期间下方的任务路由不生效。",
+          )}
+        </p>
+      )}
 
       {usage.totals.truncated > 0 && (
         <p className="notice bad" role="alert">

@@ -171,6 +171,14 @@ test("recognizes publisher consent copy and excludes author profile links", () =
   assert.deepEqual(links.map((link) => link.url), ["https://research.example/Site/en/publication/market-outlook-for-global-investors"]);
 });
 
+test("recognizes investor and jurisdiction gates captured over print views", () => {
+  assert.equal(isAccessGateText("Confirm your role to continue\nIndividual Investor\nFinancial Professional\nInstitutional"), true);
+  assert.equal(isAccessGateText("This website is intended for, and is relevant to, Australian and New Zealand residents only."), true);
+  assert.equal(isAccessGateText("Website terms of use\nI confirm that I have read and accept the Terms and Conditions of using this website."), true);
+  assert.equal(isAccessGateText("It looks like you're located in United States. Please select your role or change location."), true);
+  assert.equal(isAccessGateText("Cookie settings\nEssential cookies only\nAccept all cookies"), false);
+});
+
 test("rejects webinar / broadcast invitations but keeps written research", () => {
   // The exact page that slipped in: a Nordea webinar invite dated in the future.
   const webinar = "The global economy has shown remarkable resilience, but uncertainty remains high. Join Helge J. Pedersen as he explores the key forces shaping the economy in the years ahead. Date: 2 September 2026 Time: 11:00 CET Duration: 30 minutes plus Q&A Language: English";
@@ -248,11 +256,15 @@ test("applies durable source discovery exceptions", () => {
 });
 
 test("routes publisher download and print controls to native PDF storage", () => {
-  for (const slug of ["westpac", "daiwa", "td", "state-street", "goldman-sachs", "scotiabank", "franklin", "invesco", "pimco", "schroders", "wellington-management"]) {
+  for (const slug of ["bnp", "westpac", "daiwa", "td", "state-street", "goldman-sachs", "scotiabank", "franklin", "pimco", "nomura"]) {
     assert.equal(prefersNativePdf(slug), true, `${slug} repairs missing native PDFs`);
   }
-  for (const slug of ["wellington-management", "schroders", "franklin", "invesco", "pimco"]) {
+  for (const slug of ["franklin", "pimco", "nomura"]) {
     assert.equal(printsToPdf(slug), true, `${slug} uses its public print view`);
+  }
+  for (const slug of ["wellington-management", "schroders", "invesco"]) {
+    assert.equal(prefersNativePdf(slug), false, `${slug} does not retry an unavailable publisher PDF`);
+    assert.equal(printsToPdf(slug), false, `${slug} does not print an investor gate as a PDF`);
   }
   assert.equal(printsToPdf("goldman-sachs"), false);
   assert.equal(minimumLookbackHours("goldman-sachs"), 240);
@@ -304,6 +316,25 @@ test("discovers publisher-declared PDF downloads without a .pdf suffix", () => {
     </article>`, "https://think.ing.com/articles/the-commodities-feed");
   assert.equal(candidate.url, "https://think.ing.com/downloads/pdf/article/the-commodities-feed");
   assert.equal(candidate.title, "The Commodities Feed");
+});
+
+test("discovers BNP's public PDF route without a file extension", () => {
+  const page = "https://economic-research.bnpparibas.com/html/en-US/report/9/7/2026,53737";
+  const html = `<main><h1>India: Why is a middle class struggling to emerge?</h1>
+    <a class="button--pdf-gen" href="/pdf/en-US/report/9/7/2026,53737">PDF</a></main>`;
+  assert.deepEqual(extractPdfCandidates(html, page).map((candidate) => candidate.url), [
+    "https://economic-research.bnpparibas.com/pdf/en-US/report/9/7/2026,53737",
+  ]);
+});
+
+test("discovers State Street's icon-only native download and ignores its print control", () => {
+  const page = "https://www.ssga.com/sg/en/institutional/insights/mind-on-the-market-07-september-2026";
+  const html = `<main><h1>Global diversification is regaining value</h1>
+    <a aria-label="Download" href="/sg/en/institutional/library-content/assets/pdf/global/wmu/2026/mom-20260907.pdf"></a>
+    <a aria-label="Print" href="#"></a></main>`;
+  assert.deepEqual(extractPdfCandidates(html, page).map((candidate) => candidate.url), [
+    "https://www.ssga.com/sg/en/institutional/library-content/assets/pdf/global/wmu/2026/mom-20260907.pdf",
+  ]);
 });
 
 test("discovers a same-origin PDF declared by a download attribute", () => {

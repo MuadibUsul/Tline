@@ -217,7 +217,7 @@ export function extractPdfCandidates(html: string, baseUrl: string, documentOrig
       // `/media/` is a common public document store (not a content category). Keep all
       // other deny-list checks by neutralising only that leading storage directory.
       const policyPath = url.pathname.replace(/^\/media\//i, "/files/");
-      const declaredPdf = /\.pdf(?:$|\?)/i.test(url.href)
+      const declaredPdf = /\.pdf(?:$|\?)/i.test(url.href) || /\/pdf(?:\/|$)/i.test(url.pathname)
         || ($(element).is("a") && ($(element).is("[download]") || /pdf/i.test(`${$(element).attr("aria-label") || ""} ${$(element).attr("data-share-type") || ""}`)));
       if (!allowedOrigins.has(url.origin) || !declaredPdf || DENY.test(policyPath)) return;
       const clean = url.href.split("#")[0];
@@ -633,7 +633,7 @@ export function isJunk(text: string): boolean {
 
 /** Recognize consent/login copy so it is never mistaken for publisher research. */
 export function isAccessGateText(text: string): boolean {
-  return /these cookies are necessary for the website to function|this (?:web)?site uses a combination of essential and non-essential cookies|some of the data collected by this provider is for the purposes of personalization|view as guest|sign in to continue|log in to continue|subscription required|confirm.{0,120}professional investor|i am a professional investor|data controllers.{0,250}use cookies|give or not your consent|we are sorry an error has occurred/i.test(text);
+  return /these cookies are necessary for the website to function|this (?:web)?site uses a combination of essential and non-essential cookies|some of the data collected by this provider is for the purposes of personalization|view as guest|sign in to continue|log in to continue|subscription required|confirm your role to continue|located in.{0,120}select your role or change location|confirm.{0,120}professional investor|i am a professional investor|website is intended for.{0,180}residents only|website terms of use.{0,300}(?:read and accept|terms and conditions)|data controllers.{0,250}use cookies|give or not your consent|we are sorry an error has occurred/is.test(text);
 }
 
 /** Reject pages whose extracted "body" is really only the publisher's legal footer. */

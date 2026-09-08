@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { chromium } from "playwright-core";
 import { assertPublicHttpUrl } from "./fetch";
+import { isAccessGateText } from "./extract";
 
 function browserExecutable() {
   const candidates = [
@@ -13,7 +14,6 @@ function browserExecutable() {
 }
 
 const BLOCKED_PAGE = /captcha|verify you are human|access denied|unusual traffic|enable cookies to continue|sign in to continue|log in to continue|subscription required|we are sorry an error has occurred|unable to authorize your request/i;
-const CONSENT_GATE = /view as guest|these cookies are necessary for the website to function|confirm.{0,120}professional investor|i am a professional investor/i;
 const renderReasons = new Map<string, string>();
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({
@@ -73,8 +73,8 @@ export async function renderPdf(url: string, timeoutMs = 25000): Promise<Buffer 
       await necessary.click().catch(() => undefined);
       await page.waitForTimeout(300);
     }
-    const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 4000);
-    if (BLOCKED_PAGE.test(visible) || CONSENT_GATE.test(visible) || BLOCKED_PAGE.test(await page.title())) {
+    const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 100_000);
+    if (BLOCKED_PAGE.test(visible) || isAccessGateText(visible) || BLOCKED_PAGE.test(await page.title())) {
       renderReasons.set(url, "access wall or human verification");
       return null;
     }
@@ -153,7 +153,7 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
       await page.waitForTimeout(300);
     }
     await Promise.allSettled(captures);
-    const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 4000);
+    const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 100_000);
     const publicDownloads = await page.locator("a[href]").evaluateAll((anchors) => anchors.flatMap((element) => {
       const anchor = element as HTMLAnchorElement;
       const marker = `${anchor.getAttribute("aria-label") || ""} ${anchor.getAttribute("data-share-type") || ""}`;
@@ -165,7 +165,7 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
       renderReasons.set(url, "access wall or human verification");
       return null;
     }
-    if (CONSENT_GATE.test(visible)) {
+    if (isAccessGateText(visible)) {
       // A publisher may expose a direct public document while placing an investor
       // classification prompt over the HTML preview. Keep only that declared download;
       // never answer the prompt or ingest the obscured page body.

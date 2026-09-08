@@ -1,7 +1,15 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { generateArticleDocuments } from "../src/lib/documents/pdf";
+import { extractPdf } from "../src/lib/documents/extractPdf";
 import { getDocumentStorage } from "../src/lib/documents/storage";
+import { isAccessGateText } from "../src/lib/ingest/extract";
+
+const OBSCURED_ARTICLE_IDS = [
+  "cmtrisals0013t3h5yyy6rlh1",
+  "cmtrihzsy000x7h7xlmxoi9f8",
+  "cmtr781es000murz6175y314v",
+];
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -36,6 +44,32 @@ async function purgeTranslatedPdfs(limit: number) {
   return stale.length;
 }
 
+/** Remove the three reported gate screenshots once their readable English PDF exists. */
+async function purgeObscuredNativePdfs() {
+  const documents = await prisma.articleDocument.findMany({
+    where: {
+      articleId: { in: OBSCURED_ARTICLE_IDS },
+      kind: "source_native",
+      article: { documents: { some: { kind: "original_pdf", locale: "en", status: "ready" } } },
+    },
+    select: { id: true, storageKey: true },
+  });
+  const storage = getDocumentStorage();
+  let purged = 0;
+  for (const document of documents) {
+    try {
+      const extracted = await extractPdf(await storage.get(document.storageKey));
+      if (!isAccessGateText(extracted.text)) continue;
+      await prisma.articleDocument.delete({ where: { id: document.id } });
+      await storage.remove(document.storageKey);
+      purged++;
+    } catch (error) {
+      console.warn(`  obscured PDF audit failed for ${document.id}`, error);
+    }
+  }
+  return purged;
+}
+
 async function main() {
   const articleId = arg("id");
   const limit = Math.max(1, Number(arg("limit") || 20));
@@ -65,6 +99,8 @@ async function main() {
       console.error(`  FAIL ${article.id} · ${article.title}`, error);
     }
   }
+  const obscured = await purgeObscuredNativePdfs();
+  if (obscured) console.log(JSON.stringify({ event: "documents.obscured.purged", count: obscured }));
   console.log(`Documents complete: ${ready} ready · ${failed} failed.`);
 }
 

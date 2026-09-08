@@ -45,6 +45,11 @@ export function localePath(locale: Locale, path: string): string {
  * cookie is consulted only to choose where an address without a prefix should go.
  */
 export async function getLocale(): Promise<Locale> {
+  return "en";
+}
+
+/** Retained for the machine-readable routes that still reason about the address. */
+export async function getLocaleFromRequest(): Promise<Locale> {
   const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
   const fromPath = localeFromPath(headerStore.get("x-pathname") ?? "");
   if (fromPath) return fromPath;

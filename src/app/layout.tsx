@@ -8,7 +8,6 @@ import { getSessionUser } from "@/lib/auth";
 import { doSignOut } from "./actions";
 import { isFormalAuthConfigured } from "@/lib/auth-config";
 import OAuthSignOutButton from "./_components/OAuthSignOutButton";
-import LanguageToggle from "./_components/LanguageToggle";
 import MobileNav, { type MobileNavItem } from "./_components/MobileNav";
 import Analytics from "./_components/Analytics";
 import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
@@ -90,7 +89,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </nav>
             <div className="sp" />
             <div className="topbar-account">{account}</div>
-            <LanguageToggle locale={locale} />
             <ThemeToggle label={tr(locale, "Theme", "主题")} ariaLabel={tr(locale, "Toggle theme", "切换主题")} />
             <MobileNav
               items={navItems}

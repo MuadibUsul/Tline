@@ -48,6 +48,17 @@ export function middleware(request: NextRequest) {
   if (MACHINE_PATH.test(pathname)) return NextResponse.next();
 
   const [, first, ...rest] = pathname.split("/");
+
+  // /zh/... addresses were published and indexed while the site was bilingual. They are
+  // redirected rather than dropped, so an existing link or a search result lands on the
+  // English page instead of a 404.
+  if (first === "zh") {
+    const url = request.nextUrl.clone();
+    url.pathname = `/en${rest.length ? "/" + rest.join("/") : ""}`;
+    url.search = search;
+    return NextResponse.redirect(url, 308);
+  }
+
   if (SEGMENTS.has(first ?? "")) {
     // Serve the existing route, while the pages below still see the address as asked for.
     const url = request.nextUrl.clone();

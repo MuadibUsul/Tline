@@ -16,6 +16,11 @@ type SourceRule = {
 // Publisher-specific exceptions discovered during source acceptance. Scheduled
 // crawling reads these rules directly; probes only verify that they still work.
 const RULES: Record<string, SourceRule> = {
+  bnp: {
+    // Article pages expose a public `/pdf/<locale>/...` route without a `.pdf`
+    // suffix. The response is still a native application/pdf document.
+    preferNativePdf: true,
+  },
   ing: {
     preferNativePdf: true,
   },
@@ -128,6 +133,10 @@ const RULES: Record<string, SourceRule> = {
       "https://www.nomuraconnects.com/emea",
       "https://www.nomuraconnects.com/japan",
     ],
+    // "Read the full report" currently redirects anonymous readers to Nomura Now's
+    // login page. Preserve the complete public Connects article through its print view.
+    preferNativePdf: true,
+    printToPdf: true,
   },
   ocbc: {
     listingUrls: [
@@ -178,8 +187,6 @@ const RULES: Record<string, SourceRule> = {
     sitemapUrls: ["https://www.schroders.com/en/global/individual/sitemap.xml"],
     candidatePath: /\/insights\//i,
     minimumLookbackHours: 240,
-    preferNativePdf: true,
-    printToPdf: true,
     // Revisit legacy rows whose dated suffix was lost by the old title cleaner. Once the
     // corrected title is stored they return to the normal URL-hash fast path.
     refreshKnownTitle: /^(?:Monthly|Quarterly) markets review$/i,
@@ -209,8 +216,6 @@ const RULES: Record<string, SourceRule> = {
       "https://www.invesco.com/us/en/insights/topic/investment-related-insights.html",
     ],
     minimumLookbackHours: 240,
-    preferNativePdf: true,
-    printToPdf: true,
     articleRejected: /^Market and economic insights\s*$/i,
   },
   pimco: {
@@ -228,8 +233,6 @@ const RULES: Record<string, SourceRule> = {
   },
   "wellington-management": {
     minimumLookbackHours: 240,
-    preferNativePdf: true,
-    printToPdf: true,
   },
   daiwa: {
     minimumLookbackHours: 240,

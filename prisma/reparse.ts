@@ -92,6 +92,7 @@ async function main() {
           create: {
             articleId: article.id,
             summary: parsed.summary,
+            seoTitle: parsed.seoTitle,
             summaryZh: parsed.summaryZh,
             keyArguments: JSON.stringify(parsed.keyArguments),
             keyArgumentsZh: JSON.stringify(parsed.keyArgumentsZh),
@@ -110,6 +111,7 @@ async function main() {
           },
           update: {
             summary: parsed.summary,
+            seoTitle: parsed.seoTitle,
             summaryZh: parsed.summaryZh,
             keyArguments: JSON.stringify(parsed.keyArguments),
             keyArgumentsZh: JSON.stringify(parsed.keyArgumentsZh),

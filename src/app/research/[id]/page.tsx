@@ -25,24 +25,29 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
       language: true,
       publishedAt: true,
       institution: { select: { name: true } },
-      analysis: { select: { summary: true, summaryZh: true, reviewStatus: true } },
+      analysis: { select: { seoTitle: true, summary: true, summaryZh: true, reviewStatus: true } },
       translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true, qualityScore: true, status: true } },
     },
   });
   if (!article) return { title: tr(locale, "Report not found", "研报未找到") };
   const zh = locale === "zh-CN";
   const title = zh && article.translations[0] ? localizeChineseContent(article.translations[0].title) : article.title;
+  // What search sees. Publisher titles name the series — "The Commodities Feed", "EcoWeek 2"
+  // — which tells a search engine nothing about the subject, so a generated title leads
+  // instead when there is one. The page heading is unchanged: the institution's own wording
+  // is what the reader is shown and what the citation carries.
+  const searchTitle = article.analysis?.seoTitle?.trim() || title;
   const description = (zh ? article.analysis?.summaryZh : article.analysis?.summary)
     ?? institutionName(article.institution.name, locale);
   const quality = contentQuality(article, locale);
   return {
-    title,
+    title: searchTitle,
     description: description.slice(0, 160),
     robots: quality.indexable ? { index: true, follow: true } : { index: false, follow: true },
     ...canonical(`/research/${id}`, locale),
     openGraph: {
       type: "article",
-      title,
+      title: searchTitle,
       description: description.slice(0, 160),
       publishedTime: article.publishedAt.toISOString(),
       images: [{ url: ogImage("Research", article.title, article.institution.name), width: 1200, height: 630 }],

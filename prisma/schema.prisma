@@ -130,6 +130,14 @@ model Analysis {
   articleId        String   @unique
   summary          String
   summaryZh        String?
+  /// A title written for search, not for the page heading.
+  ///
+  /// Publisher titles are written for a reader who already has the PDF open: "The
+  /// Commodities Feed", "EcoWeek 2", "Fixed Income". They name the series rather than the
+  /// subject, so a search engine has nothing to match a query against. This one leads with
+  /// what the report is actually about. The publisher's own title still heads the page —
+  /// attribution does not change because search needs something else.
+  seoTitle         String?
   keyArguments     String   @default("[]") // JSON string
   keyArgumentsZh   String   @default("[]")
   keyNumbers       String   @default("[]") // JSON string [{label,value}]

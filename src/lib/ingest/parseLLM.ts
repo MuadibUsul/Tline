@@ -16,6 +16,8 @@ export interface ParsedAsset {
 }
 
 export interface ParsedArticle {
+  /** Written for search; null when the model produced nothing usable. */
+  seoTitle: string | null;
   summary: string;
   summaryZh: string | null;
   keyArguments: string[];
@@ -170,6 +172,7 @@ export function heuristicParse(input: ParseInput, segments: Segment[] = []): Par
   const importance = clamp(0.35 + Math.min(input.text.length, 4000) / 8000 + assets.length * 0.05, 0, 1);
   const needsLLM = unresolvedTickers.length > 0 || assets.length === 0;
   return {
+    seoTitle: null,
     summary,
     summaryZh: null,
     keyArguments: [],
@@ -201,8 +204,16 @@ export const mockParse = heuristicParse;
 // up to fifteen objects of seven bilingual fields each, of which two thirds were then
 // discarded by validation — and they are now quoted from the article by rule instead.
 const SYSTEM = `You extract structured investment signals from a public institutional research article.
+Also write seo_title_en: a title for search engines, not a headline.
+- 50-60 characters. Google truncates past that, and a cut title loses its ending.
+- Lead with the specific subject a person would type: the asset, indicator, country or policy.
+- Include the concrete call or figure when the report makes one.
+- No institution name, no series name, no date, no pipes or brackets, no clickbait.
+- Plain descriptive English. It must be true to the report; never overstate a hedged claim.
+Example of a bad publisher title: "The Commodities Feed". Good seo_title_en for the same
+report: "Brent Crude Holds Near $98 as Hormuz Tanker Attacks Persist".
 Return ONLY valid JSON matching this shape:
-{"summary_en":string,"summary_zh":string,"key_arguments_en":string[],"key_arguments_zh":string[],"key_numbers_en":[{"label":string,"value":string}],"key_numbers_zh":[{"label":string,"value":string}],"risks_en":string[],"risks_zh":string[],
+{"seo_title_en":string,"summary_en":string,"summary_zh":string,"key_arguments_en":string[],"key_arguments_zh":string[],"key_numbers_en":[{"label":string,"value":string}],"key_numbers_zh":[{"label":string,"value":string}],"risks_en":string[],"risks_zh":string[],
 "interpretation_en":string,"interpretation_zh":string,"importance_score":number(0..1),"confidence":number(0..1),
 "assets":[{"ticker":string,"direction":"strong_bull"|"bull"|"neutral"|"bear"|"strong_bear","target":number|null,"previous_target":number|null,"time_horizon":string|null,"confidence":number(0..1)}]}
 Use tickers only from this list where applicable: ${ASSETS.map((a) => a.ticker).join(", ")}.
@@ -245,7 +256,12 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
   // instead of publishing a one-word conclusion beside a complete article.
   if (typeof summary !== "string" || summary.trim().length < 40 || !summaryZh || summaryZh.length < 12) return null;
   const atomicViews: ParsedAtomicView[] = [];
+  // Trimmed to what a search result can show; a title cut mid-word by the engine reads
+  // worse than one that ends deliberately.
+  const seoTitleRaw = typeof json.seo_title_en === "string" ? json.seo_title_en.trim() : "";
+  const seoTitle = seoTitleRaw.length >= 15 && seoTitleRaw.length <= 90 ? seoTitleRaw : null;
   const fields = {
+    seoTitle,
     summary,
     summaryZh,
     keyArguments: Array.isArray(json.key_arguments_en) ? json.key_arguments_en.slice(0, 8) : Array.isArray(json.key_arguments) ? json.key_arguments.slice(0, 8) : [],

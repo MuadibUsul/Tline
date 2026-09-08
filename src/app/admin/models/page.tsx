@@ -124,7 +124,7 @@ export default async function ModelsPage() {
         </p>
       )}
 
-      <section className="admin-stats" aria-label={tr(locale, "Model usage", "模型消耗")}>
+      <section className="admin-stats admin-stats-6" aria-label={tr(locale, "Model usage", "模型消耗")}>
         <StatCard label={tr(locale, "Calls", "调用次数")} value={compact(usage.totals.calls)} note={tr(locale, "recorded from the provider response", "来自服务商响应")} />
         <StatCard label={tr(locale, "Input tokens", "输入 token")} value={tokens(usage.totals.inputTokens)} note={tr(locale, "measured, not estimated", "实测值，非估算")} />
         <StatCard label={tr(locale, "Output tokens", "输出 token")} value={tokens(usage.totals.outputTokens)} note={tr(locale, "billed even when truncated", "被截断也照样计费")} />

@@ -128,6 +128,19 @@ test("stops before related-content modules", () => {
   assert.doesNotMatch(article.text, /Another article title/);
 });
 
+test("removes UBS studio promotions while retaining the following daily research", () => {
+  const article = extractArticle(`<html><head><meta property="og:title" content="Daily: Look beyond rates to gold’s long-term support"></head><body>
+    <main><div class="container__content">
+      <div class="basecomponent textimage"><div class="highlighting__base"><h2><div class="textimage__title"><p>From the studio</p></div></h2>
+        <p>Video: Market Playbook | What do rate hikes mean for portfolios? (5 mins)</p>
+        <p>Video: Four reasons to take a closer look at Taiwanese equities (5 mins)</p>
+      </div></div>
+      <div class="basecomponent"><h2>Thought of the day</h2><p>${"Gold has long-term support even as higher Treasury yields create near-term pressure. ".repeat(12)}</p></div>
+    </div></main></body></html>`, "https://www.ubs.com/global/en/wealthmanagement/insights/daily.html");
+  assert.match(article.text, /Gold has long-term support/);
+  assert.doesNotMatch(article.text, /From the studio|Market Playbook|Taiwanese equities/);
+});
+
 test("distinguishes investment research PDFs from operational vendor notices", () => {
   assert.equal(looksLikeResearchTopic(
     "Global bond outlook",
@@ -176,7 +189,23 @@ test("recognizes investor and jurisdiction gates captured over print views", () 
   assert.equal(isAccessGateText("This website is intended for, and is relevant to, Australian and New Zealand residents only."), true);
   assert.equal(isAccessGateText("Website terms of use\nI confirm that I have read and accept the Terms and Conditions of using this website."), true);
   assert.equal(isAccessGateText("It looks like you're located in United States. Please select your role or change location."), true);
+  assert.equal(isAccessGateText("PIMCO United States\nChange Your Location\nTell us a little about you to help us personalize the site to your needs.\nFinancial Advisor"), true);
   assert.equal(isAccessGateText("Cookie settings\nEssential cookies only\nAccept all cookies"), false);
+});
+
+test("removes PIMCO's visitor modal without discarding the public article", () => {
+  const article = extractArticle(`
+    <html><head><meta property="og:title" content="Welcome Back, Balanced Portfolio"></head><body>
+      <main><article><h1>Welcome Back, Balanced Portfolio</h1>
+        <p>${"Higher bond yields restore fixed income as a source of income and diversification. ".repeat(12)}</p>
+      </article></main>
+      <div class="visitor-settings-modal-wrapper"><form class="visitor-settings-modal__inner">
+        <h2>PIMCO United States</h2><button>Change Your Location</button>
+        <p>Tell us a little about you to help us personalize the site to your needs.</p>
+      </form></div>
+    </body></html>`, "https://www.pimco.com/us/en/insights/welcome-back-balanced-portfolio");
+  assert.match(article.text, /Higher bond yields restore fixed income/);
+  assert.doesNotMatch(article.text, /Change Your Location|Tell us a little about you/);
 });
 
 test("rejects webinar / broadcast invitations but keeps written research", () => {
@@ -266,6 +295,9 @@ test("routes publisher download and print controls to native PDF storage", () =>
     assert.equal(prefersNativePdf(slug), false, `${slug} does not retry an unavailable publisher PDF`);
     assert.equal(printsToPdf(slug), false, `${slug} does not print an investor gate as a PDF`);
   }
+  assert.equal(refreshKnownCandidate("pimco", "Welcome Back, Balanced Portfolio PIMCO United States · Key takeaways"), true);
+  assert.equal(refreshKnownCandidate("pimco", "Welcome Back, Balanced Portfolio"), false);
+  assert.equal(refreshKnownCandidate("ubs", "Daily: Look beyond rates to gold’s long-term support"), true);
   assert.equal(printsToPdf("goldman-sachs"), false);
   assert.equal(minimumLookbackHours("goldman-sachs"), 240);
   assert.equal(articleAllowed("commonwealth", "We couldn't find that page", "The page has moved"), false);

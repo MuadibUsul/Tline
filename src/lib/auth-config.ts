@@ -32,6 +32,15 @@ export function isEmailAuthConfigured() {
   return selectedProvider() === "email" && isFormalAuthConfigured();
 }
 
+/** Nodemailer must receive one ordinary mailbox, never an address list or comment syntax. */
+export function normalizeEmailIdentifier(identifier: string) {
+  const value = identifier.trim().toLowerCase();
+  if (value.length > 254 || !/^[^\s<>()\[\],;:@]+@[^\s<>()\[\],;:@]+\.[^\s<>()\[\],;:@]+$/.test(value)) {
+    throw new Error("Invalid email address.");
+  }
+  return value;
+}
+
 /**
  * Whether an account can sign in with a password.
  *
@@ -81,7 +90,7 @@ function providers() {
   // Enrolment and recovery. Routine sign-in goes through the password provider, so the
   // mail provider's quota is not spent on getting in every day.
   if (isEmailAuthConfigured()) {
-    list.push(EmailProvider({ server: process.env.EMAIL_SERVER!, from: process.env.EMAIL_FROM! }));
+    list.push(EmailProvider({ server: process.env.EMAIL_SERVER!, from: process.env.EMAIL_FROM!, normalizeIdentifier: normalizeEmailIdentifier }));
   }
   // Unconditional: a broken or absent mail provider must not also remove the way in for
   // everyone who already has a password.

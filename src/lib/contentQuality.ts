@@ -1,7 +1,5 @@
 import type { Locale } from "./i18n";
 
-export const INDEX_QUALITY_THRESHOLD = 0.8;
-
 export interface IndexableArticleInput {
   title: string;
   rawText: string | null;
@@ -39,12 +37,10 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
   if (body.length < 300) issues.push("thin_content");
   if (!summary) issues.push("empty_summary");
   if (!article.sourceUrl || !/^https?:\/\//i.test(article.sourceUrl)) issues.push("missing_source");
-  if (!article.analysis || article.analysis.reviewStatus !== "ok") issues.push("analysis_below_threshold");
   if (article.language === "en" && HAN.test(title)) issues.push("source_language_mismatch");
 
   if (locale === "zh-CN") {
     if (!translation?.title.trim() || !translation.text?.trim()) issues.push("missing_translation");
-    if (translation?.status === "needs_review" || (translation?.qualityScore ?? 0) < INDEX_QUALITY_THRESHOLD) issues.push("translation_below_threshold");
     if (translation && !HAN.test(`${translation.title}\n${translation.text ?? ""}`)) issues.push("translation_language_mismatch");
     if (translation && (MOJIBAKE.test(`${translation.title}\n${translation.text ?? ""}`) || hasBrokenWord(`${translation.title}\n${translation.text ?? ""}`))) issues.push("translation_garbled");
   }

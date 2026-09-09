@@ -45,12 +45,18 @@ const lock = openSync(lockPath, "wx");
 writeFileSync(lock, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
 
 const prisma = new PrismaClient();
-const recovered = await prisma.jobRun.updateMany({
-  where: { name: "ingest", status: "running" },
-  data: { status: "failed", error: "Research scheduler restarted before this ingest completed.", finishedAt: new Date() },
-});
+const [recovered, recoveredSources] = await prisma.$transaction([
+  prisma.jobRun.updateMany({
+    where: { name: "ingest", status: "running" },
+    data: { status: "failed", error: "Research scheduler restarted before this ingest completed.", finishedAt: new Date() },
+  }),
+  prisma.institution.updateMany({
+    where: { lastCrawlStatus: "running" },
+    data: { lastCrawlStatus: "failed", lastCrawlMessage: "Research scheduler restarted before this crawl completed." },
+  }),
+]);
 await prisma.$disconnect();
-if (recovered.count) console.log(JSON.stringify({ event: "scheduler.recovered", jobs: recovered.count }));
+if (recovered.count || recoveredSources.count) console.log(JSON.stringify({ event: "scheduler.recovered", jobs: recovered.count, sources: recoveredSources.count }));
 const stopHeartbeat = await startWorkerHeartbeat("research", () => ({ activeChildren: activeChildren.size }));
 
 function stop() {

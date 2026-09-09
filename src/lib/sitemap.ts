@@ -2,7 +2,6 @@ import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
 import { siteUrl } from "@/lib/site";
 import { LOCALES, localePath } from "@/lib/i18n";
-import { contentQuality } from "@/lib/contentQuality";
 
 export interface SitemapEntry {
   url: string;
@@ -20,10 +19,7 @@ export const SHARD_SIZE = Math.max(100, Number(process.env.SITEMAP_SHARD_SIZE ||
 /**
  * Articles read from the database at a time while a shard is assembled.
  *
- * The indexability gate gets a vote on every article, and it reads the body to do it, so
- * the whole shard's text would otherwise be resident at once. Reading it in chunks and
- * keeping only the handful of fields that survive holds peak memory at roughly this many
- * articles' worth of text no matter how large the corpus grows.
+ * Reading in chunks keeps peak memory flat no matter how large the corpus grows.
  */
 const SCAN_CHUNK = 250;
 
@@ -37,16 +33,12 @@ const ARTICLE_ORDER = [{ publishedAt: "asc" as const }, { id: "asc" as const }];
  */
 const ARTICLE_SELECT = {
   id: true,
-  title: true,
-  rawText: true,
-  sourceUrl: true,
-  language: true,
   createdAt: true,
-  analysis: { select: { summary: true, summaryZh: true, reviewStatus: true } },
+  updatedAt: true,
   translations: {
     where: { locale: "zh-CN" },
     take: 1,
-    select: { title: true, text: true, qualityScore: true, status: true, updatedAt: true },
+    select: { updatedAt: true },
   },
 } as const;
 
@@ -162,10 +154,9 @@ export async function buildResearchShard(index: number): Promise<SitemapEntry[]>
     });
     for (const article of articles) {
       for (const locale of LOCALES) {
-        if (!contentQuality(article, locale).indexable) continue;
         entries.push({
           url: base + localePath(locale, `/research/${article.id}`),
-          lastModified: locale === "zh-CN" ? article.translations[0]?.updatedAt ?? article.createdAt : article.createdAt,
+          lastModified: locale === "zh-CN" ? article.translations[0]?.updatedAt ?? article.updatedAt : article.updatedAt,
           changeFrequency: "monthly",
           priority: 0.7,
         });
@@ -186,12 +177,12 @@ export async function researchShardLastModified(): Promise<Date[]> {
   const rows = await prisma.article.findMany({
     where: publicationReadyWhere(),
     orderBy: ARTICLE_ORDER,
-    select: { createdAt: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { updatedAt: true } } },
+    select: { updatedAt: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { updatedAt: true } } },
   });
   const shards: Date[] = [];
   rows.forEach((row, position) => {
     const shard = Math.floor(position / SHARD_SIZE);
-    const changed = row.translations[0]?.updatedAt ?? row.createdAt;
+    const changed = row.translations[0]?.updatedAt ?? row.updatedAt;
     if (!shards[shard] || changed > shards[shard]) shards[shard] = changed;
   });
   return shards;

@@ -267,6 +267,7 @@ const STRIP = "script,style,noscript,nav,header,footer,aside,svg,button,iframe,"
   "div[class*=nav],section[class*=nav],div[class*=menu],section[class*=menu]," +
   "div[class*=header],section[class*=header],div[class*=footer],section[class*=footer]," +
   "div[class*=cookie],section[class*=cookie],div[class*=consent],section[class*=consent]," +
+  "div[class*=visitor-settings-modal],form[class*=visitor-settings-modal]," +
   "div[class*=subscribe],section[class*=subscribe],div[class*=breadcrumb],section[class*=breadcrumb]," +
   "div[class*=social],section[class*=social],div[class*=share],section[class*=share]," +
   "div[class*=related],section[class*=related],div[class*=sidebar],section[class*=sidebar]," +
@@ -432,6 +433,7 @@ function parsePublicationDate(value: string): Date | null {
 /** Extract a clean title + body text (+ heading-delimited segments) from an article page. */
 export function extractArticle(html: string, baseUrl?: string): ExtractedArticle {
   const $ = cheerio.load(html);
+  const sourceHost = baseUrl && URL.canParse(baseUrl) ? new URL(baseUrl).hostname : "";
   let structuredTitle = "";
   let structuredBody = "";
   let structuredAuthor = "";
@@ -453,6 +455,12 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
     $("time,[class*=publish],[class*=date],[data-testid*=date],p").toArray()
       .map((element) => $(element).text().replace(/\s+/g, " ").trim())
       .find((value) => value.length <= 160 && (inferPublicationDate(value) || partialDate.test(value))) || "";
+  if (sourceHost === "ubs.com" || sourceHost.endsWith(".ubs.com")) {
+    $("h2,h3,h4").filter((_, heading) => $(heading).text().replace(/\s+/g, " ").trim() === "From the studio").each((_, heading) => {
+      const component = $(heading).closest(".basecomponent").first();
+      (component.length ? component : $(heading).closest(".highlighting__base").first()).remove();
+    });
+  }
   $(STRIP).each((_, element) => {
     if ($(element).find("main,article,[itemprop=articleBody]").length === 0) $(element).remove();
   });
@@ -633,7 +641,7 @@ export function isJunk(text: string): boolean {
 
 /** Recognize consent/login copy so it is never mistaken for publisher research. */
 export function isAccessGateText(text: string): boolean {
-  return /these cookies are necessary for the website to function|this (?:web)?site uses a combination of essential and non-essential cookies|some of the data collected by this provider is for the purposes of personalization|view as guest|sign in to continue|log in to continue|subscription required|confirm your role to continue|located in.{0,120}select your role or change location|confirm.{0,120}professional investor|i am a professional investor|website is intended for.{0,180}residents only|website terms of use.{0,300}(?:read and accept|terms and conditions)|data controllers.{0,250}use cookies|give or not your consent|we are sorry an error has occurred/is.test(text);
+  return /these cookies are necessary for the website to function|this (?:web)?site uses a combination of essential and non-essential cookies|some of the data collected by this provider is for the purposes of personalization|view as guest|sign in to continue|log in to continue|subscription required|confirm your role to continue|located in.{0,120}select your role or change location|change your location.{0,300}tell us a little about you|confirm.{0,120}professional investor|i am a professional investor|website is intended for.{0,180}residents only|website terms of use.{0,300}(?:read and accept|terms and conditions)|data controllers.{0,250}use cookies|give or not your consent|we are sorry an error has occurred/is.test(text);
 }
 
 /** Reject pages whose extracted "body" is really only the publisher's legal footer. */

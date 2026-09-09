@@ -66,6 +66,23 @@ export async function queueContentRetry(formData: FormData) {
   revalidatePath("/admin/review");
 }
 
+export async function resolveContentReview(formData: FormData) {
+  const user = await authorized("admin.review");
+  const articleId = formData.get("articleId")?.toString();
+  const kind = formData.get("kind")?.toString();
+  if (!user || !articleId || !kind || !isRetryKind(kind)) return;
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { title: true } });
+  if (!article) return;
+  if (kind === "analysis") {
+    await prisma.analysis.updateMany({ where: { articleId, reviewStatus: "needs_review" }, data: { reviewStatus: "ok" } });
+  } else {
+    await prisma.articleTranslation.updateMany({ where: { articleId, status: "needs_review" }, data: { status: "reviewed" } });
+  }
+  await writeAudit({ actorId: user.id, action: "content.review.resolve", targetType: "article", targetId: articleId, metadata: { kind, title: article.title } });
+  revalidatePath(`/research/${articleId}`);
+  revalidatePath("/admin/review");
+}
+
 export interface CreateKeyResult {
   error?: string;
   /** Present exactly once, immediately after creation; never retrievable again. */

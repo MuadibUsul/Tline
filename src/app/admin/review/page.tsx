@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
-import { queueContentRetry } from "../actions";
+import { queueContentRetry, resolveContentReview } from "../actions";
 import { age } from "../_components/format";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ export default async function ReviewPage() {
     <header className="page-head admin-head">
       <div>
         <h1>{tr(locale, "Editorial review", "内容审核")}</h1>
-        <p className="sub">{tr(locale, "Analysis and translations the pipeline was not confident enough to publish unattended.", "分析与翻译中，管道信心不足、需要人工确认后才发布的内容。")}</p>
+        <p className="sub">{tr(locale, "Analysis and translations flagged for an editor's attention.", "分析与翻译中，需要编辑人工确认的内容。")}</p>
       </div>
       <div className="tag-row"><span className={`chip ${analysisTotal + translationTotal ? "bear" : "bull"}`}>{analysisTotal + translationTotal} {tr(locale, "waiting", "待处理")}</span></div>
     </header>
@@ -63,6 +63,11 @@ export default async function ReviewPage() {
             <input type="hidden" name="articleId" value={item.article.id} />
             <input type="hidden" name="kind" value={item.kind} />
             <button className="minibtn" type="submit">{tr(locale, "Re-run", "重跑")}</button>
+          </form>
+          <form action={resolveContentReview}>
+            <input type="hidden" name="articleId" value={item.article.id} />
+            <input type="hidden" name="kind" value={item.kind} />
+            <button className="minibtn p" type="submit">{tr(locale, "Mark reviewed", "标记已审核")}</button>
           </form>
         </div>)}
       </div>

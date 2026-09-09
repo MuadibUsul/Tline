@@ -9,6 +9,7 @@ const OBSCURED_ARTICLE_IDS = [
   "cmtrisals0013t3h5yyy6rlh1",
   "cmtrihzsy000x7h7xlmxoi9f8",
   "cmtr781es000murz6175y314v",
+  "cmttbd7gm000m5wo2xdhi6sym",
 ];
 
 function arg(name: string): string | undefined {
@@ -44,7 +45,7 @@ async function purgeTranslatedPdfs(limit: number) {
   return stale.length;
 }
 
-/** Remove the three reported gate screenshots once their readable English PDF exists. */
+/** Remove reported gate screenshots once their readable English PDF exists. */
 async function purgeObscuredNativePdfs() {
   const documents = await prisma.articleDocument.findMany({
     where: {

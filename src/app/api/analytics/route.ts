@@ -64,11 +64,7 @@ export async function POST(request: Request) {
 
   const user = await getSessionUser().catch(() => null);
   const visitor = identify(request.headers, beacon.session, user?.id ?? null);
-  // Not awaited: the write is the caller's business only in the sense that they triggered
-  // it, and a database hiccup must not become latency in someone's page. It is logged
-  // though — a silent catch here is how a pipeline collects nothing for a week while
-  // every beacon still answers 204.
-  void record(beacon, visitor, request.headers).catch((error: unknown) => {
+  await record(beacon, visitor, request.headers).catch((error: unknown) => {
     console.warn(JSON.stringify({ event: "analytics.write_failed", error: String(error).slice(0, 300) }));
   });
   return accepted();

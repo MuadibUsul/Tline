@@ -4,29 +4,23 @@ import { notFound } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
 import { formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale, localePath } from "@/lib/i18n";
 import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
-import { getSessionUser } from "@/lib/auth";
-import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
-import { queueContentRetry } from "@/app/admin/actions";
 import PdfPreview from "@/app/_components/PdfPreview";
 import { JsonLd, breadcrumbJsonLd, canonical, ogImage, reportJsonLd } from "@/lib/seo";
-import { contentQuality } from "@/lib/contentQuality";
+import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await props.params;
   const locale = await getLocale();
-  const article = await prisma.article.findUnique({
-    where: { id },
+  const article = await prisma.article.findFirst({
+    where: publicationReadyWhere({ id }),
     select: {
       title: true,
-      rawText: true,
-      sourceUrl: true,
-      language: true,
       publishedAt: true,
       institution: { select: { name: true } },
-      analysis: { select: { seoTitle: true, summary: true, summaryZh: true, reviewStatus: true } },
-      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true, qualityScore: true, status: true } },
+      analysis: { select: { seoTitle: true, summary: true, summaryZh: true } },
+      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
     },
   });
   if (!article) return { title: tr(locale, "Report not found", "研报未找到") };
@@ -39,11 +33,9 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   const searchTitle = article.analysis?.seoTitle?.trim() || title;
   const description = (zh ? article.analysis?.summaryZh : article.analysis?.summary)
     ?? institutionName(article.institution.name, locale);
-  const quality = contentQuality(article, locale);
   return {
     title: searchTitle,
     description: description.slice(0, 160),
-    robots: quality.indexable ? { index: true, follow: true } : { index: false, follow: true },
     ...canonical(`/research/${id}`, locale),
     openGraph: {
       type: "article",
@@ -124,16 +116,12 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const a = await getResearchView(params.id);
   if (!a) notFound();
   const an = a.analysis;
-  const analysisPoor = an?.reviewStatus === "needs_review";
-  const keyArgs = analysisPoor ? [] : parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
-  const risks = analysisPoor ? [] : parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
-  const keyNumbers = analysisPoor ? [] : parseJson<Array<{ label?: string; value?: string }>>(locale === "zh-CN" ? an?.keyNumbersZh : an?.keyNumbers, []);
+  const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
+  const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
+  const keyNumbers = parseJson<Array<{ label?: string; value?: string }>>(locale === "zh-CN" ? an?.keyNumbersZh : an?.keyNumbers, []);
   const date = formatDate(a.publishedAt, locale);
   const translation = a.translations[0];
-  const translationPoor = (translation?.qualityScore ?? 1) < 0.8;
-  const usableTranslation = translation && !translationPoor ? translation : null;
-  const quality = contentQuality(a, locale);
-  const qualityWarning = !quality.indexable;
+  const usableTranslation = translation ?? null;
 
   // The publisher's own document. Where one exists it is the report — the page around it
   // was navigation and teaser copy — so it is shown open and in full, and the text
@@ -141,15 +129,8 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const publisherPdf = a.documents.find((document) => document.kind === "source_native");
   const previewDocument = publisherPdf ?? a.documents.find((document) => document.kind === "original_pdf");
 
-  const user = await getSessionUser();
-  const isOperator = can(user, "admin.review");
-  // The retry log is operator-facing: readers get the notice, operators get the audit trail.
-  const retries = qualityWarning && isOperator
-    ? await prisma.contentRetry.findMany({ where: { articleId: a.id }, orderBy: { requestedAt: "desc" } })
-    : [];
-
   const heading = locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title;
-  const summary = (!analysisPoor ? (locale === "zh-CN" ? an?.summaryZh : an?.summary) : null) ?? institutionName(a.institution.name, locale);
+  const summary = (locale === "zh-CN" ? an?.summaryZh : an?.summary) ?? institutionName(a.institution.name, locale);
 
   return (
     <main className="wrap" style={{ maxWidth: publisherPdf ? 1080 : 820 }}>
@@ -212,36 +193,6 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         <p className="citation-source">{tr(locale, "Context: this is Tlines' automated structure of a public institutional report, not the institution's wording. Scope and date above travel with the conclusion.", "上下文：这是 Tlines 对公开机构研报的自动结构化结果，并非机构原话；引用结论时须同时保留上述机构与日期范围。")}</p>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Verify at the original source ↗", "在原始来源核验 ↗")}</a>
       </section>
-
-      {qualityWarning && <div className="quality-notice" role="status">
-        <b>{tr(locale, "Automated quality notice", "自动质量提示")}</b>
-        <span>{tr(locale, "This report remains available, but its AI analysis or translation scored below the preferred quality threshold and is queued for improvement. Verify material decisions against the official source.", "本研报仍可阅读，但 AI 分析或译文低于优选质量阈值，已进入改进队列。重要判断请同时核对官网原文。")}</span>
-        {isOperator && <div className="retry-controls">
-          {(["analysis", "translation"] as const)
-            .filter((kind) => (kind === "analysis" ? analysisPoor : translationPoor))
-            .map((kind) => {
-              const retry = retries.find((row) => row.kind === kind);
-              const pending = retry?.status === "queued" || retry?.status === "running";
-              return (
-                <form action={queueContentRetry} key={kind}>
-                  <input type="hidden" name="articleId" value={a.id} />
-                  <input type="hidden" name="kind" value={kind} />
-                  <button type="submit" className="minibtn" disabled={pending}>
-                    {kind === "analysis" ? tr(locale, "Re-run analysis", "重跑分析") : tr(locale, "Re-run translation", "重跑译文")}
-                  </button>
-                </form>
-              );
-            })}
-          {retries.map((retry) => (
-            <span className="retry-log mono" key={retry.id}>
-              {retry.kind} · {retry.status}
-              {retry.scoreBefore !== null ? ` · ${retry.scoreBefore.toFixed(2)}` : ""}
-              {retry.scoreAfter !== null ? ` → ${retry.scoreAfter.toFixed(2)}` : ""}
-              {retry.error ? ` · ${retry.error.slice(0, 80)}` : ""}
-            </span>
-          ))}
-        </div>}
-      </div>}
 
       <section className="blk">
         <div className="section-t">{publisherPdf ? tr(locale, "The report", "研报原件") : tr(locale, "Complete Research", "完整研报正文")}</div>

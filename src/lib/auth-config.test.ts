@@ -79,6 +79,14 @@ test("email configured adds the link provider without displacing the password on
   });
 });
 
+test("email identifiers cannot smuggle an address list into the mailer", async () => {
+  await withEnv(NO_AUTH, 5, (mod) => {
+    assert.equal(mod.normalizeEmailIdentifier(" Person@Example.com "), "person@example.com");
+    assert.throws(() => mod.normalizeEmailIdentifier("person@example.com, attacker@example.com"));
+    assert.throws(() => mod.normalizeEmailIdentifier("Person (comment) <person@example.com>"));
+  });
+});
+
 test("half-configured email does not take password sign-in down with it", async () => {
   // The exact production failure: AUTH_PROVIDER set, SMTP details missing or removed.
   await withEnv({ ...NO_AUTH, AUTH_PROVIDER: "email", EMAIL_FROM: "Tline <no-reply@example.com>" }, 3, (mod) => {

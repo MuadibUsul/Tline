@@ -73,6 +73,12 @@ export async function renderPdf(url: string, timeoutMs = 25000): Promise<Buffer 
       await necessary.click().catch(() => undefined);
       await page.waitForTimeout(300);
     }
+    // PIMCO delivers the complete public article behind an optional personalization
+    // modal. Remove that chrome without selecting an investor role or accepting terms.
+    if (new URL(page.url()).hostname.endsWith("pimco.com")) {
+      await page.locator(".modaal-wrapper.visitor-settings-modal, .modaal-overlay, .visitor-settings-modal-wrapper").evaluateAll((modals) => modals.forEach((modal) => modal.remove()));
+      await page.locator("body").evaluate((body) => body.classList.remove("modaal-noscroll"));
+    }
     const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 100_000);
     if (BLOCKED_PAGE.test(visible) || isAccessGateText(visible) || BLOCKED_PAGE.test(await page.title())) {
       renderReasons.set(url, "access wall or human verification");
@@ -156,6 +162,10 @@ export async function renderHtml(url: string, timeoutMs = 25000): Promise<string
     if (await necessary.isVisible().catch(() => false)) {
       await necessary.click().catch(() => undefined);
       await page.waitForTimeout(300);
+    }
+    if (new URL(page.url()).hostname.endsWith("pimco.com")) {
+      await page.locator(".modaal-wrapper.visitor-settings-modal, .modaal-overlay, .visitor-settings-modal-wrapper").evaluateAll((modals) => modals.forEach((modal) => modal.remove()));
+      await page.locator("body").evaluate((body) => body.classList.remove("modaal-noscroll"));
     }
     await Promise.allSettled(captures);
     const visible = (await page.locator("body").innerText({ timeout: 3000 })).slice(0, 100_000);

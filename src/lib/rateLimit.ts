@@ -42,11 +42,11 @@ export function rateLimit(key: string, limit: number, windowMs: number, now = Da
 }
 
 /**
- * Best-effort client identity. `x-forwarded-for` is only trustworthy behind a proxy that
- * sets it; without one every caller collapses into a single bucket, which fails closed
- * (shared limit) rather than open.
+ * Proxy addresses are accepted only when the deployment explicitly says its edge replaces
+ * client-supplied forwarding headers. Otherwise callers share one fail-closed bucket.
  */
-export function clientKey(request: Request): string {
+export function clientKey(request: Request, trustProxy = process.env.TRUST_PROXY_HEADERS === "true"): string {
+  if (!trustProxy) return "unknown";
   const forwarded = request.headers.get("x-forwarded-for");
   const first = forwarded?.split(",")[0]?.trim();
   return first || request.headers.get("x-real-ip") || "unknown";

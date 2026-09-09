@@ -42,7 +42,12 @@ test("expired windows are swept so the map cannot grow without bound", () => {
 
 test("client key prefers the first forwarded address and falls back to a shared bucket", () => {
   const forwarded = new Request("http://x/", { headers: { "x-forwarded-for": "203.0.113.7, 70.41.3.18" } });
-  assert.equal(clientKey(forwarded), "203.0.113.7");
-  assert.equal(clientKey(new Request("http://x/", { headers: { "x-real-ip": "198.51.100.4" } })), "198.51.100.4");
+  assert.equal(clientKey(forwarded, true), "203.0.113.7");
+  assert.equal(clientKey(new Request("http://x/", { headers: { "x-real-ip": "198.51.100.4" } }), true), "198.51.100.4");
   assert.equal(clientKey(new Request("http://x/")), "unknown");
+});
+
+test("forwarded addresses are ignored unless the deployment trusts its proxy", () => {
+  const spoofed = new Request("http://x/", { headers: { "x-forwarded-for": "203.0.113.7" } });
+  assert.equal(clientKey(spoofed, false), "unknown");
 });

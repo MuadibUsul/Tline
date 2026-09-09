@@ -334,19 +334,18 @@ async function dataVersion(): Promise<string> {
   const [articles, views, newestArticle, newestTranslation, newestDocument, newestAnalysis] = await Promise.all([
     prisma.article.count(),
     prisma.atomicView.count(),
-    prisma.article.aggregate({ _max: { createdAt: true, publishedAt: true } }),
+    prisma.article.aggregate({ _max: { updatedAt: true } }),
     prisma.articleTranslation.aggregate({ _max: { updatedAt: true } }),
     prisma.articleDocument.aggregate({ _max: { updatedAt: true } }),
-    prisma.analysis.aggregate({ _max: { createdAt: true } }),
+    prisma.analysis.aggregate({ _max: { updatedAt: true } }),
   ]);
   const version = [
     articles,
     views,
-    newestArticle._max.createdAt?.getTime() ?? 0,
-    newestArticle._max.publishedAt?.getTime() ?? 0,
+    newestArticle._max.updatedAt?.getTime() ?? 0,
     newestTranslation._max.updatedAt?.getTime() ?? 0,
     newestDocument._max.updatedAt?.getTime() ?? 0,
-    newestAnalysis._max.createdAt?.getTime() ?? 0,
+    newestAnalysis._max.updatedAt?.getTime() ?? 0,
   ].join(":");
   versionProbe = { checkedAt: now, version };
   return version;

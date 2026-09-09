@@ -194,6 +194,10 @@ async function ingestInstitution(
     if (known && !refreshKnownCandidate(inst.slug, known.title) && !(prefersNativePdf(inst.slug) && !known.hasNativePdf)) { dup++; return true; }
     return false;
   };
+  const replacesKnownArticle = (url: string) => {
+    const known = knownCandidates.get(urlHash(url));
+    return Boolean(known && refreshKnownCandidate(inst.slug, known.title));
+  };
   /**
    * Read the native documents a page links, and stage each as a report.
    *
@@ -408,6 +412,7 @@ async function ingestInstitution(
           segments: article.segments,
           disclaimerText: article.disclaimerText,
           strict: true,
+          preferReplacement: replacesKnownArticle(item.link),
         });
       }
     } catch { /* fall through to HTML */ }
@@ -490,6 +495,7 @@ async function ingestInstitution(
           segments: article.segments,
           disclaimerText: article.disclaimerText,
           strict: true,
+          preferReplacement: replacesKnownArticle(candidate.url),
         });
       }
     }
@@ -555,6 +561,7 @@ async function ingestInstitution(
           segments: a.segments,
           disclaimerText: a.disclaimerText,
           strict: true, // HTML-extracted → enforce the full article check
+          preferReplacement: replacesKnownArticle(link.url),
         });
       }
       if (raws.length < perLimit) {

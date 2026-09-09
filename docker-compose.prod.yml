@@ -17,6 +17,8 @@ services:
       AUTH_PROVIDER: email
       EMAIL_SERVER: ${EMAIL_SERVER:?Set EMAIL_SERVER}
       EMAIL_FROM: ${EMAIL_FROM:?Set EMAIL_FROM}
+      # The app is reachable only through the Caddy service on the private web network.
+      TRUST_PROXY_HEADERS: "true"
       HEALTH_DETAIL_TOKEN: ${HEALTH_DETAIL_TOKEN:?Set HEALTH_DETAIL_TOKEN}
     networks:
       - default

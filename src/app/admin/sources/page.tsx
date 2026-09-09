@@ -7,7 +7,7 @@ import { getLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { queueSourceRetry, setSourceMonitoring } from "../actions";
 import { age, tone } from "../_components/format";
-import { pipelineHealth } from "@/../scripts/watchdog";
+import { pipelineHealth } from "@/lib/pipelineHealth";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Sources" };

@@ -45,6 +45,7 @@
     "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/demo-user.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "audit:prod": "npm audit --omit=dev --registry=https://registry.npmjs.org",
     "typecheck": "tsc --noEmit",
     "backup": "node scripts/backup.mjs",
     "backup:verify": "node scripts/backup.mjs --verify",
@@ -65,9 +66,9 @@
     "@prisma/client": "^5.22.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
-    "next": "^15.5.24",
+    "next": "^15.5.25",
     "next-auth": "^4.24.15",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^9.1.1",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.2.108",
     "pdfkit": "^0.20.1",
@@ -91,5 +92,11 @@
   },
   "optionalDependencies": {
     "@anthropic-ai/sdk": "^0.32.1"
+  },
+  "overrides": {
+    "postcss": "8.5.28",
+    "next-auth": {
+      "nodemailer": "$nodemailer"
+    }
   }
 }

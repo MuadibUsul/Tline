@@ -16,6 +16,10 @@ type SourceRule = {
 // Publisher-specific exceptions discovered during source acceptance. Scheduled
 // crawling reads these rules directly; probes only verify that they still work.
 const RULES: Record<string, SourceRule> = {
+  ubs: {
+    // Refresh the reported row while it remains in the normal recent-article window.
+    refreshKnownTitle: /^Daily: Look beyond rates to gold.s long-term support$/i,
+  },
   bnp: {
     // Article pages expose a public `/pdf/<locale>/...` route without a `.pdf`
     // suffix. Some new editions temporarily return a one-line "coming soon" PDF;
@@ -224,6 +228,9 @@ const RULES: Record<string, SourceRule> = {
     minimumLookbackHours: 240,
     preferNativePdf: true,
     printToPdf: true,
+    // Revisit the one legacy row whose title and body absorbed the visitor modal.
+    // The corrected publisher title no longer matches, so this repair is self-limiting.
+    refreshKnownTitle: /PIMCO United States\s*[·|]\s*Key takeaways$/i,
   },
   "goldman-sachs": {
     minimumLookbackHours: 240,

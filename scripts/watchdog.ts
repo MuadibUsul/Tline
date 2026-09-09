@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
+import { pipelineHealth, type PipelineHealth } from "../src/lib/pipelineHealth";
 
 /**
  * Reports a pipeline that has gone quiet while appearing healthy.
@@ -13,44 +14,6 @@ import { prisma } from "../src/lib/db";
  * a listing that moved, a date written in a form the parser did not know, a window that
  * excluded everything. The point is that a person hears about it the same day.
  */
-
-const STALL_HOURS = Math.max(1, Number(process.env.INGEST_STALL_HOURS || 6));
-const VIEW_STALL_HOURS = Math.max(1, Number(process.env.VIEW_STALL_HOURS || 12));
-
-export interface PipelineHealth {
-  articleAgeHours: number | null;
-  viewAgeHours: number | null;
-  crawlableSources: number;
-  workingSources: number;
-  stalled: string[];
-}
-
-const hoursSince = (value: Date | null) => (value ? (Date.now() - value.getTime()) / 3_600_000 : null);
-
-export async function pipelineHealth(): Promise<PipelineHealth> {
-  const [article, view, crawlable, working] = await Promise.all([
-    prisma.article.aggregate({ _max: { createdAt: true } }),
-    prisma.atomicView.aggregate({ _max: { createdAt: true } }),
-    prisma.institution.count({ where: { monitoringEnabled: true, crawlPolicy: { in: ["allowed", "delayed"] } } }),
-    prisma.institution.count({ where: { lastSuccessAt: { gte: new Date(Date.now() - 24 * 3_600_000) } } }),
-  ]);
-
-  const articleAgeHours = hoursSince(article._max.createdAt);
-  const viewAgeHours = hoursSince(view._max.createdAt);
-  const stalled: string[] = [];
-
-  if (articleAgeHours === null) stalled.push("no research has ever been stored");
-  else if (articleAgeHours > STALL_HOURS) stalled.push(`no research stored for ${articleAgeHours.toFixed(1)}h`);
-
-  // Views lag research, so they are given longer before silence counts as a stall.
-  if (articleAgeHours !== null && viewAgeHours !== null && viewAgeHours > VIEW_STALL_HOURS) {
-    stalled.push(`no views extracted for ${viewAgeHours.toFixed(1)}h`);
-  }
-  // Sources can each be "succeeding" while none of them returns anything.
-  if (crawlable > 0 && working === 0) stalled.push("no source has succeeded in 24h");
-
-  return { articleAgeHours, viewAgeHours, crawlableSources: crawlable, workingSources: working, stalled };
-}
 
 async function notify(health: PipelineHealth) {
   const url = process.env.JOB_FAILURE_WEBHOOK_URL;

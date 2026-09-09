@@ -16,11 +16,20 @@ test("quality gate opens only a complete, grounded locale version", () => {
   assert.equal(contentQuality(valid, "zh-CN").indexable, true);
 });
 
-test("quality gate catches broken words and low quality translations", () => {
+test("index validation catches broken words without filtering AI quality scores", () => {
   const result = contentQuality({ ...valid, title: "Vi e wp oint markets", translations: [{ ...valid.translations[0], qualityScore: 0.4 }] }, "zh-CN");
   assert.equal(result.indexable, false);
   assert.ok(result.issues.includes("garbled_or_broken_words"));
-  assert.ok(result.issues.includes("translation_below_threshold"));
+  assert.equal(result.issues.includes("translation_below_threshold"), false);
+});
+
+test("index validation leaves AI review status to human screening", () => {
+  const result = contentQuality({
+    ...valid,
+    analysis: { ...valid.analysis, reviewStatus: "needs_review" },
+    translations: [{ ...valid.translations[0], qualityScore: 0, status: "needs_review" }],
+  }, "zh-CN");
+  assert.equal(result.indexable, true);
 });
 
 test("quality gate withholds call-to-action titles from indexing", () => {

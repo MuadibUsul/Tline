@@ -35,9 +35,25 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
   // Only the last VIEW_WINDOW_DAYS are rankable, so bound the fetch to that window instead
   // of loading the whole corpus; ranking still happens in memory while the set is small.
   const windowStart = new Date(Date.now() - VIEW_WINDOW_DAYS * 864e5);
+  // Select only the columns ranking and this list actually read. `include: { article }`
+  // pulled the whole article row — `rawText` is the entire cleaned body, tens of KB each —
+  // once per view, so an article with N views loaded its body N times. Across a week of the
+  // full corpus that is hundreds of MB of text the page never renders, which overran the
+  // container's heap and took the process down (the page 502s while everything else briefly
+  // does too). None of those large columns are needed here.
   const allViews = await prisma.atomicView.findMany({
     where: { article: publicationReadyWhere({ publishedAt: { gte: windowStart } }) },
-    include: { article: { include: { institution: true } } },
+    select: {
+      id: true, articleId: true, viewEn: true, viewZh: true, type: true, asset: true,
+      assetTicker: true, topic: true, direction: true, timeHorizon: true, value: true,
+      importance: true, sourceQuote: true,
+      article: {
+        select: {
+          publishedAt: true, createdAt: true, institutionId: true,
+          institution: { select: { slug: true, name: true, rating: true, authorityScore: true } },
+        },
+      },
+    },
   });
   const ranked = clusterViewsNewestFirst(rankAtomicViews(allViews, new Date(), marketEvents as MarketEvent[]));
   const total = ranked.length;

@@ -1,9 +1,3 @@
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "3"
-
 services:
   db:
     image: postgres:16-alpine
@@ -14,7 +8,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tline -d tline"]
       interval: 5s
@@ -55,7 +48,6 @@ services:
       HEALTH_DETAIL_TOKEN: ${HEALTH_DETAIL_TOKEN:-}
     volumes:
       - document-storage:/app/storage
-    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy
@@ -94,7 +86,6 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
     volumes:
       - document-storage:/app/storage
-    logging: *default-logging
     depends_on:
       app:
         condition: service_healthy
@@ -134,7 +125,6 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    logging: *default-logging
     healthcheck:
       test: ["CMD", "node", "scripts/check-worker-health.mjs", "macro"]
       interval: 30s

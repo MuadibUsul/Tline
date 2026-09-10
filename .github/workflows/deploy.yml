@@ -105,6 +105,17 @@ jobs:
             PREVIOUS_TAG=$(cat .deploy-tag 2>/dev/null || true)
             export TAG="$NEW_TAG"
 
+            echo "Disk usage before cleanup"
+            df -h /
+            docker system df
+
+            # Pulling a multi-gigabyte image on every release previously left every
+            # unrelated old tag on this shared host. Prune only unused images old enough
+            # to be outside an active deployment; Docker never removes an in-use image,
+            # so the currently running release remains available for rollback.
+            docker image prune -af --filter until=12h || true
+            docker builder prune -af --filter until=24h || true
+
             # The image is private. This token dies with the workflow run, so the host
             # never holds a lasting registry credential.
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
@@ -138,6 +149,10 @@ jobs:
                   | tail -n +4 \
                   | awk '{print $1}' \
                   | xargs -r docker rmi || true
+
+                echo "Disk usage after deployment"
+                df -h /
+                docker system df
 
                 echo "Deployment is healthy"
                 exit 0

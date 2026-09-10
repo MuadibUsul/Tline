@@ -1,6 +1,16 @@
+# Cap container logs. The json-file driver keeps every line forever by default, so a
+# chatty or crash-looping container can quietly fill the disk — 30 MB per container here,
+# instead of unbounded. Takes effect when a container is recreated.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     mem_limit: 512m
+    logging: *default-logging
     command: >-
       postgres -c shared_buffers=128MB -c effective_cache_size=384MB
       -c max_connections=50 -c work_mem=4MB
@@ -10,6 +20,7 @@ services:
     build: !reset null
     container_name: tline-app
     mem_limit: 1g
+    logging: *default-logging
     environment:
       NODE_OPTIONS: --max-old-space-size=768
       SITE_URL: ${SITE_URL:?Set SITE_URL}
@@ -28,15 +39,18 @@ services:
     image: ghcr.io/muadibusul/tline:${TAG:-latest}
     build: !reset null
     mem_limit: 1g
+    logging: *default-logging
 
   macro-scheduler:
     image: ghcr.io/muadibusul/tline:${TAG:-latest}
     build: !reset null
     mem_limit: 384m
+    logging: *default-logging
 
   backup:
     image: ghcr.io/muadibusul/tline:${TAG:-latest}
     mem_limit: 384m
+    logging: *default-logging
     restart: unless-stopped
     command: ["sh", "-c", "while true; do npm run backup; sleep 86400; done"]
     environment:

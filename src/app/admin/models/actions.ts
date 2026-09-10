@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSessionUser } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { GLOBAL_SCOPE, invalidateBudgetCache } from "@/lib/llm/budget";
 import { invalidateLlmConfigCache, providerByName } from "@/lib/llm/config";
 import { isLlmTask, isProviderName, type ProviderName } from "@/lib/llm/types";
 import { can } from "@/lib/permissions";
@@ -98,6 +99,43 @@ export async function saveRoute(_state: ActionResult, form: FormData): Promise<A
   await prisma.llmTaskRoute.upsert({ where: { task }, create: { task, ...data }, update: data });
   await writeAudit({ actorId: user.id, action: "llm.route.update", targetType: "llmTaskRoute", targetId: task, metadata: data });
   refresh();
+  return { ok: "Saved." };
+}
+
+/** A positive number from the form, or null when the field is blank; error on garbage. */
+function optionalAmount(form: FormData, field: string): number | null | undefined {
+  const raw = form.get(field)?.toString().trim();
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+export async function saveBudget(_state: ActionResult, form: FormData): Promise<ActionResult> {
+  const user = await admin();
+  if (!user) return { error: "Not permitted." };
+  const scope = form.get("scope")?.toString() ?? "";
+  if (scope !== GLOBAL_SCOPE && !isLlmTask(scope)) return { error: "Unknown scope." };
+  const period = form.get("period")?.toString() === "day" ? "day" : "month";
+
+  const limitTokens = optionalAmount(form, "limitTokens");
+  const limitCost = optionalAmount(form, "limitCost");
+  if (limitTokens === undefined || limitCost === undefined) {
+    return { error: "Ceilings must be positive numbers, or left blank for no cap." };
+  }
+  // A row with neither ceiling set enforces nothing; clear it rather than store a no-op.
+  if (limitTokens === null && limitCost === null) {
+    await prisma.llmBudget.deleteMany({ where: { scope } });
+    await writeAudit({ actorId: user.id, action: "llm.budget.clear", targetType: "llmBudget", targetId: scope });
+    invalidateBudgetCache();
+    revalidatePath("/admin/models");
+    return { ok: "Cleared." };
+  }
+
+  const data = { period, limitTokens: limitTokens ?? null, limitCost: limitCost ?? null, enabled: form.get("enabled") === "on" };
+  await prisma.llmBudget.upsert({ where: { scope }, create: { scope, ...data }, update: data });
+  await writeAudit({ actorId: user.id, action: "llm.budget.update", targetType: "llmBudget", targetId: scope, metadata: data });
+  invalidateBudgetCache();
+  revalidatePath("/admin/models");
   return { ok: "Saved." };
 }
 

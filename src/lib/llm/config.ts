@@ -1,5 +1,6 @@
 import { prisma } from "../db";
 import { decryptSecret } from "../secrets";
+import { isTaskOverBudget } from "./budget";
 import { createProvider, envApiKey, getLLMProvider, withUsageRecording, type ProviderConfig } from "./provider";
 import { isProviderName, PROVIDER_NAMES, type LlmTask, type LLMProvider, type ProviderName } from "./types";
 
@@ -140,6 +141,13 @@ export async function resolveWithSource(task: LlmTask): Promise<ResolvedProvider
   const { providers, routes } = await snapshot();
   const route = routes.get(task);
   if (route && !route.enabled) return null;
+
+  // A reached budget stops the task exactly as a disabled route does, but for a reason worth
+  // logging: the operator set a ceiling and it worked, and the alternative is silent overspend.
+  if (await isTaskOverBudget(task)) {
+    console.warn(JSON.stringify({ event: "llm.budget.blocked", task }));
+    return null;
+  }
 
   const preferred = (route?.provider ?? envPreference(task))?.toLowerCase();
   const order = preferred && isProviderName(preferred)

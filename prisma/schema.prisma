@@ -993,3 +993,23 @@ model LlmCall {
   @@index([day, provider, model])
   @@index([createdAt])
 }
+
+/// A spending ceiling for one scope, enforced automatically before each model call.
+///
+/// The routing table decides whether a task runs at all; this decides how much it may
+/// spend before it stops on its own. `scope` is either the sentinel `*` (every task,
+/// summed) or one LlmTask. When a scope's spend in the current period reaches a ceiling,
+/// resolveLLMProvider returns null for that task exactly as if it had been switched off,
+/// and the console shows why. Enforcement fails open: an unreachable database must not halt
+/// the pipeline — LLM_DISABLED is the hard stop that does not depend on a database read.
+///
+/// A token ceiling is always enforceable; a cost ceiling only bites once the models in play
+/// are priced (an unpriced model contributes unknown cost, which cannot be compared).
+model LlmBudget {
+  scope       String   @id // "*" (global) | translation | analysis | forecast | …
+  period      String   @default("month") // "day" | "month", both UTC
+  limitTokens Int? // combined input+output ceiling for the period; null = no token cap
+  limitCost   Float? // cost ceiling for the period, in the price table's currency; null = no cost cap
+  enabled     Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+}

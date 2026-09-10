@@ -4,6 +4,7 @@ import { BarList, StatCard, TimeSeries } from "@/app/_components/charts";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getLocale, tr, type Locale } from "@/lib/i18n";
+import { budgetStatuses, GLOBAL_SCOPE } from "@/lib/llm/budget";
 import { apiKeyFor, isLlmDisabled, type ProviderRow } from "@/lib/llm/config";
 import { llmUsageReport, recentLlmFailures } from "@/lib/llm/report";
 import { envApiKey } from "@/lib/llm/provider";
@@ -12,6 +13,7 @@ import { can } from "@/lib/permissions";
 import { hasSecretKey } from "@/lib/secrets";
 import { compact, when } from "../_components/format";
 import { deletePrice } from "./actions";
+import BudgetRow from "./_components/BudgetRow";
 import PriceForm from "./_components/PriceForm";
 import ProviderCard from "./_components/ProviderCard";
 import RouteRow from "./_components/RouteRow";
@@ -55,18 +57,27 @@ function money(cost: number | null, currency: string, locale: Locale): string {
   return `${currency} ${cost < 1 ? cost.toFixed(4) : cost.toFixed(2)}`;
 }
 
+/** Display name for a budget scope: the global sentinel, else the task's own copy. */
+function scopeTitle(scope: string, locale: Locale): string {
+  if (scope === GLOBAL_SCOPE) return tr(locale, "All tasks", "全部任务");
+  const copy = TASK_COPY[scope as LlmTask];
+  return copy ? tr(locale, copy.en[0], copy.zh[0]) : scope;
+}
+
 export default async function ModelsPage() {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.models")) notFound();
   const locale = await getLocale();
 
-  const [providerRows, routeRows, prices, usage, failures] = await Promise.all([
+  const [providerRows, routeRows, prices, usage, failures, budgets] = await Promise.all([
     prisma.llmProvider.findMany(),
     prisma.llmTaskRoute.findMany(),
     prisma.llmModelPrice.findMany({ orderBy: [{ provider: "asc" }, { model: "asc" }] }),
     llmUsageReport(30),
     recentLlmFailures(8),
+    budgetStatuses(),
   ]);
+  const pausedByBudget = budgets.filter((row) => row.over);
 
   const byProvider = new Map(providerRows.map((row) => [row.provider, row]));
   const byTask = new Map(routeRows.map((row) => [row.task, row]));
@@ -110,6 +121,16 @@ export default async function ModelsPage() {
             locale,
             `${usage.totals.truncated} call(s) were cut off at the output ceiling. A truncated reply is billed in full and its caller usually retries, so raising the limit for that task can cost less than leaving it.`,
             `有 ${usage.totals.truncated} 次调用在输出上限处被截断。被截断的回复照样全额计费，且调用方通常会重跑一次——把该任务的上限调高，往往比维持现状更省。`,
+          )}
+        </p>
+      )}
+
+      {pausedByBudget.length > 0 && (
+        <p className="notice bad" role="alert">
+          {tr(
+            locale,
+            `Paused by budget: ${pausedByBudget.map((row) => scopeTitle(row.scope, locale)).join(", ")}. These calls are stopped until spend rolls into the next period or you raise the ceiling below.`,
+            `已触及预算而暂停：${pausedByBudget.map((row) => scopeTitle(row.scope, locale)).join("、")}。相关调用已停止，直到进入下一周期或你在下方调高上限。`,
           )}
         </p>
       )}
@@ -215,6 +236,50 @@ export default async function ModelsPage() {
               />
             );
           })}
+        </div>
+      </section>
+
+      <section className="blk">
+        <div className="section-t">{tr(locale, "Budgets", "预算额度")}</div>
+        <p className="sub">
+          {tr(
+            locale,
+            "A spending ceiling per task, plus one across all of them. When a scope reaches its cap for the period it stops on its own — the same effect as switching the task off, but automatic. Set a token cap, a cost cap (needs prices below), or both; leave both blank for no limit. Enforcement is checked within a few seconds and fails open, so LLM_DISABLED stays the instant hard stop.",
+            "为每个任务设定支出上限，并可对全部任务设一个总额。某个范围在本周期内触及上限后会自动停止——效果等同于关闭该任务，但无需人工干预。可设 token 上限、费用上限（需下方已定价），或两者皆设；两项都留空即不限制。判定有几秒缓存且失败时放行，因此环境变量 LLM_DISABLED 仍是即时的硬性开关。",
+          )}
+        </p>
+        <div className="llm-budgets">
+          {budgets.map((row) => (
+            <BudgetRow
+              key={row.scope}
+              scope={row.scope}
+              title={scopeTitle(row.scope, locale)}
+              hint={row.scope === GLOBAL_SCOPE
+                ? tr(locale, "Every task, summed. Reaching this pauses them all.", "所有任务合计。触及后全部暂停。")
+                : tr(locale, TASK_COPY[row.scope as LlmTask].en[1], TASK_COPY[row.scope as LlmTask].zh[1])}
+              period={row.period}
+              limitTokens={row.limitTokens}
+              limitCost={row.limitCost}
+              enabled={row.enabled}
+              spentTokens={row.spentTokens}
+              spentCost={row.spentCost}
+              currency={row.currency}
+              fraction={row.fraction}
+              over={row.over}
+              labels={{
+                day: tr(locale, "per day", "按天"),
+                month: tr(locale, "per month", "按月"),
+                tokenCap: tr(locale, "token cap", "token 上限"),
+                costCap: tr(locale, "cost cap", "费用上限"),
+                noCap: tr(locale, "no cap", "不限"),
+                enabled: tr(locale, "On", "启用"),
+                save: tr(locale, "Save", "保存"),
+                saving: tr(locale, "Saving…", "保存中…"),
+                spent: tr(locale, "Spent", "已用"),
+                paused: tr(locale, "paused", "已暂停"),
+              }}
+            />
+          ))}
         </div>
       </section>
 

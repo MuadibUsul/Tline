@@ -628,10 +628,12 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .llm-form{display:flex;flex-direction:column;gap:11px;padding:4px 2px}
 .llm-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
 .llm-form input[type=text],.llm-form input[type=password],.llm-form input:not([type]),
-.llm-route input,.llm-route select,.llm-price-form input,.llm-price-form select{
+.llm-route input,.llm-route select,.llm-price-form input,.llm-price-form select,
+.llm-budget input,.llm-budget select{
   padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit;font-size:13px}
 .llm-form input:focus-visible,.llm-route input:focus-visible,.llm-route select:focus-visible,
-.llm-price-form input:focus-visible,.llm-price-form select:focus-visible{
+.llm-price-form input:focus-visible,.llm-price-form select:focus-visible,
+.llm-budget input:focus-visible,.llm-budget select:focus-visible{
   outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
 .llm-form-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
 .llm-check{flex-direction:row !important;align-items:center;gap:7px !important;font-size:12px;color:var(--muted)}
@@ -650,6 +652,20 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .llm-price-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
 .llm-error{font-family:var(--mono);font-size:10.5px;color:var(--bear);max-width:340px;word-break:break-word}
 @media (max-width:760px){.llm-route{grid-template-columns:1fr;align-items:stretch}}
+.llm-budgets{display:flex;flex-direction:column;gap:9px;padding:2px}
+.llm-budget{display:grid;grid-template-columns:minmax(200px,2fr) minmax(96px,.7fr) minmax(96px,.8fr) minmax(96px,.8fr) auto auto;
+  align-items:center;gap:10px;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)}
+.llm-budget.over{border-color:var(--bear)}
+.llm-budget-name{display:flex;flex-direction:column;gap:3px;min-width:0}
+.llm-budget-name b{font-size:13px}
+.llm-budget-name small{color:var(--faint);font-size:11px;line-height:1.4}
+.llm-budget-spent{display:flex;align-items:center;gap:6px;color:var(--muted) !important}
+.llm-budget-spent .chip{font-size:10px}
+.llm-budget-bar{height:4px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:1px}
+.llm-budget-bar span{display:block;height:100%;background:var(--accent);border-radius:3px}
+.llm-budget-bar span.warn{background:var(--warn,#d98a00)}
+.llm-budget-bar span.over{background:var(--bear)}
+@media (max-width:760px){.llm-budget{grid-template-columns:1fr;align-items:stretch}}
 
 /* Console notices.
    The model-providers page was written against a `.notice` class that was never defined,

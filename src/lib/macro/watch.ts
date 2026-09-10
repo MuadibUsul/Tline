@@ -3,6 +3,7 @@ import { prisma } from "../db";
 import { createMacroProvider } from "./providers";
 import { MacroProviderError } from "./providers/types";
 import { getMacroReleaseFamily, getMacroSources } from "./registry";
+import { generateReleaseAnalysis } from "./releaseAnalysis";
 import { storeNormalizedObservation, syncMacroRegistry } from "./store";
 import type { MacroReleaseFamilyDefinition, NormalizedObservation } from "./types";
 
@@ -212,6 +213,17 @@ async function watchRelease(release: ReleaseRow, now: Date) {
   if (complete) {
     await prisma.macroRelease.update({ where: { id: release.id }, data: { status: "RELEASED", releasedAt: release.releasedAt ?? now } });
     await markAttempt(release, "released", now);
+    // The print has just landed and its value is final for this vintage, so generate the
+    // bilingual read-out right here — once. This is the release's known moment, and a
+    // RELEASED release drops out of the query in watchMacroReleases, so this fires exactly
+    // once per release, not once per poll. The model call is isolated so a failure can
+    // never take down official-data polling; an operator can regenerate a missed read-out
+    // with `macro:forecasts -- --analyze`.
+    try {
+      await generateReleaseAnalysis(release.id);
+    } catch (error) {
+      console.error(JSON.stringify({ event: "macro.release.analysis.inline.failed", releaseKey: release.releaseKey, error: String(error).slice(0, 500) }));
+    }
   } else {
     const errors = results.flatMap((result) => result.errors);
     await prisma.macroRelease.update({ where: { id: release.id }, data: { status: now >= release.scheduledAt ? "WAITING" : "SCHEDULED" } });
@@ -233,10 +245,11 @@ export async function watchMacroReleases(now = new Date(), releaseId?: string) {
   });
   const results = [];
   for (const release of releases) results.push(await watchRelease(release, now));
-  // The bilingual read-out is NOT generated here. This watcher polls official sources on a
-  // ten-second cadence; a model call on that path bills once per poll for as long as a
-  // release stays unanalysed, which is a standing cost with no upper bound. Generation runs
-  // as its own scheduler task (`macro:forecasts -- --analyze`) on a minutes-scale cadence.
+  // The bilingual read-out is generated inside watchRelease, once, at the instant a release
+  // is captured — see the RELEASED branch there. Because a RELEASED release leaves the query
+  // above, that is one model call per release (its known publish moment), not one per poll,
+  // so there is no standing per-poll cost. `macro:forecasts -- --analyze` stays available as
+  // a manual repair path for a read-out whose one-shot generation failed.
   return {
     considered: releases.length,
     attempted: results.filter((result) => result.attempted).length,

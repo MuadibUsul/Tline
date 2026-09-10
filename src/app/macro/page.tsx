@@ -64,7 +64,7 @@ export default async function MacroPage() {
       consensus: consensus?.median ?? toNum(value?.consensusAtRelease),
       consensusCount: consensus?.count ?? 0,
       unit: value?.indicator ? unitLabel(value.indicator.unit, locale) : consensus?.unit ?? "",
-      analysis: (locale === "zh-CN" ? release.analysisZh : release.analysisEn) ?? null,
+      analysis: (locale === "zh-CN" ? release.analysisZh ?? release.analysisEn : release.analysisEn) ?? null,
     };
   });
 

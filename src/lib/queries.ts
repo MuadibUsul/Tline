@@ -1,39 +1,8 @@
 import { prisma } from "./db";
-import { computeConsensus, computeConsensusMany, consensusDeltas, type ConsensusResult } from "./consensus";
-import { ASSETS, directionLabel } from "./assets";
+import { computeConsensus, consensusDeltas, type ConsensusResult } from "./consensus";
+import { directionLabel } from "./assets";
 import { publicationReadyWhere } from "./publication";
 import { articleTimestamp } from "./i18n";
-
-const FEATURED = ASSETS.filter((a) => a.featured).map((a) => a.ticker);
-
-export interface ConsensusCard {
-  ticker: string;
-  name: string;
-  score: number;
-  label: string;
-  tone: "bull" | "bear" | "neu";
-  d1: number | null;
-  d7: number | null;
-  d30: number | null;
-  isFallback: boolean;
-  windowEnd: Date;
-}
-
-export async function featuredConsensus(): Promise<ConsensusCard[]> {
-  const assets = await prisma.asset.findMany({ where: { ticker: { in: FEATURED } } });
-  const order = new Map(FEATURED.map((t, i) => [t, i]));
-  const ids = assets.map((a) => a.id);
-  // Whole featured block in three queries: batched consensus + batched 1/7/30-day deltas.
-  const [consensus, deltas] = await Promise.all([computeConsensusMany(ids), consensusDeltas(ids, [1, 7, 30])]);
-  const cards = assets.flatMap((a): ConsensusCard[] => {
-    const c = consensus.get(a.id);
-    if (!c) return [];
-    const d = deltas.get(a.id) ?? {};
-    return [{ ticker: a.ticker, name: a.name, score: c.score, label: c.label, tone: c.tone, d1: d[1] ?? null, d7: d[7] ?? null, d30: d[30] ?? null, isFallback: c.isFallback, windowEnd: c.windowEnd }];
-  });
-  cards.sort((x, y) => (order.get(x.ticker)! - order.get(y.ticker)!));
-  return cards;
-}
 
 export interface FeedPulse {
   latestId: string | null;
@@ -108,17 +77,6 @@ export async function mostActive(days = 7, limit = 6) {
   });
   const map = new Map(insts.map((i) => [i.id, i]));
   return rows.map((r) => ({ inst: map.get(r.institutionId)!, count: r._count._all }));
-}
-
-export async function viewChanges(limit = 6) {
-  const assets = await prisma.asset.findMany();
-  const deltas = await consensusDeltas(assets.map((a) => a.id), [1]);
-  const out = assets.flatMap((a) => {
-    const ch = deltas.get(a.id)?.[1] ?? null;
-    return ch !== null && ch !== 0 ? [{ ticker: a.ticker, name: a.name, change: ch }] : [];
-  });
-  out.sort((x, y) => Math.abs(y.change) - Math.abs(x.change));
-  return out.slice(0, limit);
 }
 
 export async function getAssetView(ticker: string) {

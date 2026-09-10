@@ -228,7 +228,6 @@ export default async function ApiPage() {
                 <li><code>GET /api/v1/research</code> — <span>{tr(locale, "newest first, cursor paged", "按时间倒序,游标翻页")}</span></li>
                 <li><code>GET /api/v1/research/&#123;id&#125;</code> — <span>{tr(locale, "one report", "单篇研报")}</span></li>
                 <li><code>GET /api/v1/institutions</code> — <span>{tr(locale, "source list", "机构列表")}</span></li>
-                <li><code>GET /api/v1/consensus</code> — <span>{tr(locale, "consensus per asset", "各资产共识")}</span></li>
               </ul>
               <p className="apikey-note">
                 {tr(

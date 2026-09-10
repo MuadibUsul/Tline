@@ -46,10 +46,8 @@ const STATIC_ROUTES: Array<[string, SitemapEntry["changeFrequency"], number]> = 
   ["/", "hourly", 1],
   ["/research", "hourly", 0.9],
   ["/institutions", "daily", 0.8],
-  ["/consensus", "hourly", 0.8],
   ["/macro", "hourly", 0.8],
   ["/macro/calendar", "daily", 0.6],
-  ["/markets", "hourly", 0.6],
   ["/about", "monthly", 0.5],
   ["/methodology", "monthly", 0.6],
   ["/editorial-policy", "monthly", 0.5],
@@ -104,14 +102,6 @@ export async function buildPagesShard(): Promise<SitemapEntry[]> {
       lastModified: consensusUpdatedAt.get(asset.id) ?? STATIC_UPDATED_AT,
       changeFrequency: "daily" as const,
       priority: 0.6,
-    })),
-    // The consensus view of each asset, and each institution's settled record: pages that
-    // exist nowhere else and were absent from the map entirely.
-    ...assets.map((asset) => ({
-      url: `${base}/consensus/${asset.ticker}`,
-      lastModified: consensusUpdatedAt.get(asset.id) ?? STATIC_UPDATED_AT,
-      changeFrequency: "daily" as const,
-      priority: 0.7,
     })),
     ...institutions.filter((institution) => hasSettledForecasts.has(institution.id)).map((institution) => ({
       url: `${base}/institution/${institution.slug}/accuracy`,

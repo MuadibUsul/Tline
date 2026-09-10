@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { featuredConsensus, feedPulse, importantReleasesThisWeek, latestFeed, mostActive, viewChanges } from "@/lib/queries";
-import { FeedCard, Delta } from "./_components/ui";
+import { feedPulse, importantReleasesThisWeek, latestFeed, mostActive } from "@/lib/queries";
+import { FeedCard } from "./_components/ui";
 import SearchBox from "./_components/SearchBox";
 import LiveFeed from "./_components/LiveFeed";
-import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
+import { domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
 import { JsonLd, canonical, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 
@@ -14,26 +14,22 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   const description = tr(
     locale,
-    "Institutional research from the world's banks and asset managers, turned into comparable, traceable signals: consensus by asset, each institution's stated view, and its record.",
-    "汇集全球银行与资产管理机构的研报，转换为可比较、可追溯的信号：分资产的市场共识、各机构的明确观点，以及它们的历史准确率。",
+    "Institutional research from the world's banks and asset managers, turned into searchable, source-linked signals and track records.",
+    "汇集全球银行与资产管理机构的研报，转换为可检索、有来源依据的信号与历史记录。",
   );
   return {
-    title: tr(locale, "Institutional Research Consensus & Market Signals", "全球机构研报共识与市场信号"),
+    title: tr(locale, "Institutional Research & Market Signals", "全球机构研报与市场信号"),
     description,
     ...canonical("/", locale),
-    openGraph: { type: "website", description, images: [{ url: ogImage("Institutional Intelligence", "Institutional Research Consensus & Market Signals", "Comparable, traceable, source-linked views"), width: 1200, height: 630 }] },
+    openGraph: { type: "website", description, images: [{ url: ogImage("Institutional Intelligence", "Institutional Research & Market Signals", "Traceable, source-linked views"), width: 1200, height: 630 }] },
   };
 }
 
-const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
-
 export default async function Home() {
   const locale = await getLocale();
-  const [cards, feed, active, changes, thisWeek, pulse] = await Promise.all([
-    featuredConsensus(),
+  const [feed, active, thisWeek, pulse] = await Promise.all([
     latestFeed(8),
     mostActive(30, 6),
-    viewChanges(6),
     importantReleasesThisWeek(5),
     feedPulse(),
   ]);
@@ -54,31 +50,6 @@ export default async function Home() {
         <SearchBox locale={locale} placeholder={tr(locale, "Search institutions, assets, research and views…", "搜索机构、资产、研报和观点……")} ariaLabel={tr(locale, "Search the site", "全站搜索")} />
       </section>
 
-      <section className="blk">
-        <div className="section-t">{tr(locale, "Market Consensus · current or latest available 24h", "市场共识 · 当前或最近可用24小时")}</div>
-        <div className="ctiles">
-          {cards.map((c) => (
-            <Link key={c.ticker} href={localePath(locale, `/asset/${c.ticker}`)} className="ctile">
-              <div className="a">{assetName(c.name, locale, c.ticker)}</div>
-              <div className="s tnum">
-                {c.score}
-                <span className={`dir ${c.tone === "bull" ? "up" : c.tone === "bear" ? "down" : "flat"}`}>
-                  {c.tone === "bull" ? "↑" : c.tone === "bear" ? "↓" : "→"} {c.tone === "bull" ? tr(locale, c.label, "看多") : c.tone === "bear" ? tr(locale, c.label, "看空") : tr(locale, c.label, "中性")}
-                </span>
-              </div>
-              <div className="bar"><i style={{ width: `${c.score}%`, background: TONE[c.tone] }} /></div>
-              <div className="meta">
-                <span>1D&nbsp;<Delta v={c.d1} /></span>
-                <span>7D&nbsp;<Delta v={c.d7} /></span>
-                <span>30D&nbsp;<Delta v={c.d30} /></span>
-                {c.isFallback && <span>{tr(locale, `as of ${formatDate(c.windowEnd, locale)}`, `截至 ${formatDate(c.windowEnd, locale)}`)}</span>}
-              </div>
-            </Link>
-          ))}
-          {cards.length === 0 && <p className="mono" style={{ color: "var(--muted)" }}>{tr(locale, "No market data yet.", "暂无市场数据。")}</p>}
-        </div>
-      </section>
-
       <div className="grid-main">
         <div>
           <div className="section-t">{tr(locale, "Latest Institutional Views", "最新机构观点")}</div>
@@ -97,18 +68,6 @@ export default async function Home() {
                 </Link>
               ))}
               {thisWeek.length === 0 && <div className="r"><span style={{ color: "var(--muted)" }}>{tr(locale, "No high-impact releases left this week.", "本周暂无重要数据发布。")}</span></div>}
-            </div>
-          </div>
-          <div className="side-block">
-            <div className="section-t">{tr(locale, "Largest View Changes · 24h", "最大观点变化 · 24小时")}</div>
-            <div className="rowlist">
-              {changes.map((c) => (
-                <Link key={c.ticker} href={localePath(locale, `/asset/${c.ticker}`)} className="r" style={{ textDecoration: "none" }}>
-                  <span className="inst">{assetName(c.name, locale, c.ticker)}</span>
-                  <span className={`n ${c.change > 0 ? "up" : "down"}`}>{c.change > 0 ? "+" : "−"}{Math.abs(c.change)}</span>
-                </Link>
-              ))}
-              {changes.length === 0 && <div className="r"><span style={{ color: "var(--muted)" }}>—</span></div>}
             </div>
           </div>
           <div className="side-block">

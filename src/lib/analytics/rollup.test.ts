@@ -41,8 +41,8 @@ test("a day rolls up to totals, and re-running it changes nothing", async (t) =>
     data: [
       // One visitor reading three pages in one session: not a bounce.
       view({ path: "/research" }),
-      view({ path: "/consensus", durationMs: 30_000 }),
-      view({ path: "/markets", durationMs: 90_000 }),
+      view({ path: "/macro", durationMs: 30_000 }),
+      view({ path: "/institutions", durationMs: 90_000 }),
       // A second visitor who arrives and leaves: a bounce.
       view({ visitorId: "v2", sessionId: "s2", path: "/research", browser: "Safari" }),
     ],

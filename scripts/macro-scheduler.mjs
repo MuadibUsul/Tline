@@ -11,13 +11,11 @@ const retryDelayMs = positive("MACRO_JOB_RETRY_DELAY_MS", 30_000, 1_000);
 const tasks = [
   task("calendar", "MACRO_CALENDAR_INTERVAL_MS", 6 * 60 * 60_000, ["run", "macro:calendar"]),
   task("provider-sync", "MACRO_PROVIDER_SYNC_INTERVAL_MS", 60 * 60_000, ["run", "macro:sync", "--", "--all"], "observations"),
+  // The watcher also generates the bilingual read-out inline, once, the moment a print is
+  // captured (see watchRelease) — so a fresh release is analysed within seconds of landing,
+  // not on a separate minutes-scale poll. No standalone release-analysis task: it fired once
+  // per release anyway, and doing it at the capture instant removes the extra latency.
   task("release-watch", "MACRO_RELEASE_WATCH_INTERVAL_MS", 10_000, ["run", "macro:watch"], "observations"),
-  // The bilingual read-out for a landed print, split out of the ten-second watcher above.
-  // Watching is a cheap HTTP poll; generating is a model call, and running one at the other's
-  // cadence bills a failing release ~8,600 times a day. Fifteen minutes is still well inside
-  // the window in which anyone reads a fresh print, and the generator's own backoff means a
-  // release that cannot be analysed stops being retried rather than repeating on every pass.
-  task("release-analysis", "MACRO_RELEASE_ANALYSIS_INTERVAL_MS", 15 * 60_000, ["run", "macro:forecasts", "--", "--analyze"]),
   task("revision-sync", "MACRO_REVISION_SYNC_INTERVAL_MS", 24 * 60 * 60_000, ["run", "macro:revision"], "observations"),
   task("policy-sync", "MACRO_POLICY_SYNC_INTERVAL_MS", 6 * 60 * 60_000, ["run", "macro:policy"]),
   // Skips itself cleanly when no market-data licence is configured.

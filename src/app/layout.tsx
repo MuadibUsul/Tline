@@ -28,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: title, template: `%s · ${title}` },
     description,
     applicationName: title,
-    openGraph: { type: "website", siteName: title, title, description, locale, images: [{ url: ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Consensus / Signal"), width: 1200, height: 630 }] },
-    twitter: { card: "summary_large_image", title, description, images: [ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Consensus / Signal")] },
+    openGraph: { type: "website", siteName: title, title, description, locale, images: [{ url: ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal"), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal")] },
     robots: { index: true, follow: true },
   };
 }
@@ -53,11 +53,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const navItems: MobileNavItem[] = ([
     { href: "/", label: tr(locale, "Home", "首页") },
-    { href: "/markets", label: tr(locale, "Markets", "市场") },
     { href: "/macro", label: tr(locale, "Economic Data", "经济数据") },
     { href: "/institutions", label: tr(locale, "Views", "观点") },
     { href: "/research", label: tr(locale, "Research", "研报") },
-    { href: "/consensus", label: tr(locale, "Consensus", "共识") },
     { href: "/watchlist", label: tr(locale, "Monitoring", "监控") },
     ...(can(user, "admin.access") ? [{ href: "/admin", label: tr(locale, "Operations", "运营") }] : []),
   ] as MobileNavItem[]).map((item) => ({ ...item, href: localePath(locale, item.href) }));
@@ -105,7 +103,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             first paint of the page it is measuring. */}
         {process.env.ANALYTICS_ENABLED !== "false" && <Analytics />}
         <footer className="footer wrap">
-          <span>{tr(locale, "Research → Data → Consensus → Signal", "研报 → 数据 → 共识 → 信号")}</span>
+          <span>{tr(locale, "Research → Data → Signal", "研报 → 数据 → 信号")}</span>
           <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{["about", "methodology", "editorial-policy", "ai-usage", "sources", "privacy", "corrections"].map((path) => <Link key={path} href={localePath(locale, `/${path}`)}>{path.replaceAll("-", " ")}</Link>)}</nav>
         </footer>
       </body>

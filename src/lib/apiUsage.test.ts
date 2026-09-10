@@ -12,8 +12,8 @@ test("identifiers are folded out of the endpoint, so the breakdown stays readabl
 });
 
 test("a short path segment is a route, not an identifier", () => {
-  // "consensus" is nine characters; the cut-off must not swallow real route names.
-  assert.equal(endpointOf("https://x.test/api/v1/consensus"), "/api/v1/consensus");
+  // "research" is eight characters; the cut-off must not swallow real route names.
+  assert.equal(endpointOf("https://x.test/api/v1/research"), "/api/v1/research");
 });
 
 test("an unparseable url is bucketed rather than thrown away", () => {

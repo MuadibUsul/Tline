@@ -8,7 +8,7 @@ export interface AssetDef {
   name: string;
   assetClass: AssetClass;
   aliases: string[];
-  featured?: boolean; // shown on the home Market Consensus grid
+  featured?: boolean; // included in market-wide monitoring rules
 }
 
 export const ASSETS: AssetDef[] = [

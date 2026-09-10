@@ -93,7 +93,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
                   <span title={tr(locale, "7-day cross-institution and event heat", "7天跨机构与事件热度")}>{tr(locale, "Heat", "热度")} {view.heatScore}{view.crossInstitutionCount > 1 ? ` · ${view.crossInstitutionCount}${tr(locale, " inst.", "家机构")}` : ""}</span>
                   <span title={tr(locale, "Institution authority and rating", "机构权威度与评级")}>{tr(locale, "Authority", "机构")} {view.authorityScore}</span>
                   <span title={tr(locale, "Exponential recency score", "指数衰减新鲜度")}>{tr(locale, "Fresh", "新鲜")} {view.freshnessScore}</span>
-                  <details><summary>{tr(locale, "English source evidence", "英文原文证据（非上文直译）")}</summary><blockquote>{view.sourceQuote}</blockquote></details>
+                  {view.sourceQuote && view.sourceQuote.trim() !== copy.trim() && <details><summary>{tr(locale, "English source evidence", "英文原文证据（非上文直译）")}</summary><blockquote>{view.sourceQuote}</blockquote></details>}
                 </div>
               </div>
             </article>

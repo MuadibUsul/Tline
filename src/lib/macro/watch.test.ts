@@ -65,14 +65,15 @@ test("freshness requires the target period and rejects an unchanged pre-release 
   assert.equal(isFreshReleaseObservation(observation({ sourcePublishedAt: new Date("2026-09-11T00:00:00Z") }), target, release, old), true);
 });
 
-test("the ten-second watcher makes no model call; analysis is its own slower task", () => {
+test("the watcher generates the read-out once at capture, not on a poll", () => {
   const watcher = readFileSync(new URL("./watch.ts", import.meta.url), "utf8");
   const scheduler = readFileSync(new URL("../../../scripts/macro-scheduler.mjs", import.meta.url), "utf8");
-  // Generating a read-out from the polling path bills once per poll for as long as a
-  // release stays unanalysed — a standing cost with no upper bound.
+  // The release time is known and the value is final once captured, so the read-out is
+  // generated inline exactly once — not by re-scanning for pending work on a schedule.
+  assert.match(watcher, /generateReleaseAnalysis\(/);
   assert.doesNotMatch(watcher, /generatePendingReleaseAnalyses/);
   assert.match(scheduler, /MACRO_RELEASE_WATCH_INTERVAL_MS", 10_000/);
-  assert.match(scheduler, /MACRO_RELEASE_ANALYSIS_INTERVAL_MS/);
+  assert.doesNotMatch(scheduler, /MACRO_RELEASE_ANALYSIS_INTERVAL_MS/);
 });
 
 test("read-out generation backs off and gives up instead of retrying every pass", () => {

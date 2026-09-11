@@ -562,6 +562,17 @@ model SocialAccount {
   @@unique([platform, externalAccountId])
 }
 
+// OAuth application credentials shared by every account on a platform. The client secret
+// is encrypted; only its last four characters are ever shown in the console.
+model SocialPlatformCredential {
+  platform           String   @id
+  clientId           String
+  clientSecretCipher String?
+  clientSecretHint   String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 model SocialRoute {
   id         String   @id @default(cuid())
   sourceKind String // research | macro

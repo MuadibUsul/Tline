@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { siteUrl } from "@/lib/site";
+import { xAppCredentials } from "@/lib/social/x";
 
 function sign(value: string) { return createHmac("sha256", process.env.AUTH_SECRET || "dev-insecure-secret-change-me").update(value).digest("base64url"); }
 
@@ -13,8 +14,9 @@ export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get("accountId");
   const account = accountId ? await prisma.socialAccount.findUnique({ where: { id: accountId } }) : null;
   if (!account || account.platform !== "x") return NextResponse.redirect(`${siteUrl()}/admin/social?error=account`);
-  const clientId = process.env.X_CLIENT_ID;
-  if (!clientId) return NextResponse.redirect(`${siteUrl()}/admin/social?error=x_config`);
+  let clientId: string;
+  try { ({ clientId } = await xAppCredentials()); }
+  catch { return NextResponse.redirect(`${siteUrl()}/admin/social?error=x_config`); }
   const state = randomBytes(24).toString("base64url");
   const verifier = randomBytes(48).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");

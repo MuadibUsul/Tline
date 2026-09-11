@@ -7,9 +7,33 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { validatePost } from "@/lib/social/content";
 import { decideDraft, refreshDraftCard, regenerateDraft } from "@/lib/social/pipeline";
+import { encryptSecret, hasSecretKey, secretHint } from "@/lib/secrets";
 
 async function admin() { const user = await getSessionUser(); return user && can(user, "admin.social") ? user : null; }
 function refresh(id?: string) { revalidatePath("/admin/social"); if (id) revalidatePath(`/admin/social/${id}`); }
+
+export interface SocialActionResult { error?: string; ok?: string; }
+
+export async function saveXAppSettings(_state: SocialActionResult, form: FormData): Promise<SocialActionResult> {
+  const user = await admin();
+  if (!user) return { error: "无权执行此操作。" };
+  const clientId = form.get("clientId")?.toString().trim() || "";
+  const clientSecret = form.get("clientSecret")?.toString().trim() || "";
+  const clearSecret = form.get("clearSecret") === "on";
+  if (!clientId) return { error: "请填写 X Client ID。" };
+  if (clientId.length > 500 || clientSecret.length > 1000) return { error: "X 应用凭据长度不正确。" };
+  if (clientSecret && !hasSecretKey()) return { error: "服务器尚未配置密钥加密能力。" };
+
+  const data = {
+    clientId,
+    ...(clientSecret ? { clientSecretCipher: encryptSecret(clientSecret), clientSecretHint: secretHint(clientSecret) }
+      : clearSecret ? { clientSecretCipher: null, clientSecretHint: null } : {}),
+  };
+  await prisma.socialPlatformCredential.upsert({ where: { platform: "x" }, create: { platform: "x", ...data }, update: data });
+  await writeAudit({ actorId: user.id, action: "social.x_app.update", targetType: "socialPlatformCredential", targetId: "x", metadata: { clientIdUpdated: true, clientSecretUpdated: Boolean(clientSecret), clientSecretCleared: clearSecret } });
+  refresh();
+  return { ok: "X 应用配置已保存，现在可以连接账号。" };
+}
 
 export async function createSocialAccount(form: FormData) {
   const user = await admin();
@@ -37,6 +61,17 @@ export async function saveSocialAccount(form: FormData) {
       : prisma.socialRoute.updateMany({ where: { sourceKind, accountId: id }, data: { enabled: false } })),
   ]);
   await writeAudit({ actorId: user.id, action: "social.account.update", targetType: "socialAccount", targetId: id, metadata: { label, language, enabled } });
+  refresh();
+}
+
+export async function disconnectSocialAccount(form: FormData) {
+  const user = await admin();
+  const id = form.get("id")?.toString();
+  if (!user || !id) return;
+  const account = await prisma.socialAccount.findUnique({ where: { id } });
+  if (!account) return;
+  await prisma.socialAccount.update({ where: { id }, data: { externalAccountId: null, externalUsername: null, accessTokenCipher: null, refreshTokenCipher: null, tokenExpiresAt: null, enabled: false, lastError: null } });
+  await writeAudit({ actorId: user.id, action: "social.account.disconnect", targetType: "socialAccount", targetId: id });
   refresh();
 }
 

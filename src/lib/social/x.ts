@@ -7,14 +7,15 @@ export class UncertainPublishError extends Error {
   constructor(message: string) { super(message); this.name = "UncertainPublishError"; }
 }
 
-function appCredentials() {
-  const clientId = process.env.X_CLIENT_ID;
+export async function xAppCredentials() {
+  const stored = await prisma.socialPlatformCredential.findUnique({ where: { platform: "x" } });
+  const clientId = stored?.clientId || process.env.X_CLIENT_ID;
   if (!clientId) throw new Error("X_CLIENT_ID is required.");
-  return { clientId, clientSecret: process.env.X_CLIENT_SECRET || null };
+  return { clientId, clientSecret: decryptSecret(stored?.clientSecretCipher) || process.env.X_CLIENT_SECRET || null };
 }
 
 async function tokenRequest(params: URLSearchParams) {
-  const { clientId, clientSecret } = appCredentials();
+  const { clientId, clientSecret } = await xAppCredentials();
   const headers: Record<string, string> = { "content-type": "application/x-www-form-urlencoded" };
   if (clientSecret) headers.authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
   else params.set("client_id", clientId);

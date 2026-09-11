@@ -31,6 +31,9 @@ services:
       # The app is reachable only through the Caddy service on the private web network.
       TRUST_PROXY_HEADERS: "true"
       HEALTH_DETAIL_TOKEN: ${HEALTH_DETAIL_TOKEN:?Set HEALTH_DETAIL_TOKEN}
+      # Full report bodies are held in both locale indexes. Keep the production
+      # working set bounded as the corpus grows, rather than exhausting V8 at boot.
+      SEARCH_INDEX_MAX_ARTICLES: ${SEARCH_INDEX_MAX_ARTICLES:-1000}
     networks:
       - default
       - web

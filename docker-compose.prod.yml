@@ -49,7 +49,7 @@ services:
 
   backup:
     image: ghcr.io/muadibusul/tline:${TAG:-latest}
-    mem_limit: 384m
+    mem_limit: 256m
     logging: *default-logging
     restart: unless-stopped
     command: ["sh", "-c", "while true; do npm run backup; sleep 86400; done"]

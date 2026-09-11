@@ -31,32 +31,29 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const groups: AdminNavGroup[] = [
     {
-      title: tr(locale, "Overview", "总览"),
+      title: tr(locale, "Overview", "工作台"),
       items: [{ href: localePath(locale, "/admin"), match: "/admin", label: tr(locale, "Dashboard", "仪表盘") }],
     },
     {
-      title: tr(locale, "Audience", "访问分析"),
+      title: tr(locale, "Content", "内容运营"),
       items: [
-        ...item("admin.analytics", "/admin/analytics", "Traffic", "流量"),
+        ...item("admin.sources", "/admin/sources", "Sources & crawler", "来源与采集"),
+        ...item("admin.review", "/admin/review", "Editorial review", "内容审核"),
+        ...item("admin.social", "/admin/social", "Publishing", "内容发布"),
+        ...item("admin.review", "/admin/jobs", "Jobs & workers", "任务状态"),
+      ],
+    },
+    {
+      title: tr(locale, "Operations", "用户与数据"),
+      items: [
+        ...item("admin.users", "/admin/users", "Accounts", "账户管理"),
+        ...item("admin.analytics", "/admin/analytics", "Traffic", "流量分析"),
         ...item("admin.analytics", "/admin/analytics/audience", "Visitors & users", "访客与用户"),
       ],
     },
     {
-      title: tr(locale, "People", "用户"),
-      items: item("admin.users", "/admin/users", "Accounts", "账户管理"),
-    },
-    {
-      title: tr(locale, "Pipeline", "内容管道"),
+      title: tr(locale, "Settings", "系统设置"),
       items: [
-        ...item("admin.sources", "/admin/sources", "Sources & crawler", "来源与爬虫"),
-        ...item("admin.review", "/admin/review", "Editorial review", "内容审核"),
-        ...item("admin.review", "/admin/jobs", "Jobs & workers", "任务与调度"),
-      ],
-    },
-    {
-      title: tr(locale, "Platform", "平台"),
-      items: [
-        ...item("admin.social", "/admin/social", "Publishing", "内容发布"),
         ...item("admin.models", "/admin/models", "Model providers", "模型接入"),
         ...item("admin.api", "/admin/api", "API & keys", "API 与密钥"),
         ...item("admin.audit", "/admin/audit", "Audit log", "审计日志"),

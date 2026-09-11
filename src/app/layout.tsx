@@ -37,14 +37,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   const formalAuth = isFormalAuthConfigured();
-  const locale = await getLocale();
+  const pathname = stripLocale((await headers()).get("x-pathname") ?? "");
+  const locale = pathname.startsWith("/admin") ? "zh-CN" : await getLocale();
 
   // An account enrolled by email link has no password yet. Sending it straight to the
   // page that sets one is what keeps email down to enrolment and recovery: without this
   // the next sign-in would need another message.
   // Compared without its language prefix: the header carries the address as asked for,
   // so "/zh/account/password" would otherwise never match the page it redirects to.
-  const pathname = stripLocale((await headers()).get("x-pathname") ?? "");
   // An empty path means the middleware did not run; redirecting on that guess would
   // loop the page onto itself, so the gate stays shut rather than trapping the browser.
   if (pathname && user && formalAuth && !user.passwordHash && !pathname.startsWith("/account/password")) {
@@ -73,6 +73,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   ) : (
     <Link href={localePath(locale, "/signin")} className="minibtn">{tr(locale, "Sign in", "登录")}</Link>
   );
+  const policyLinks = [
+    ["about", tr(locale, "About", "关于")], ["methodology", tr(locale, "Methodology", "方法论")],
+    ["editorial-policy", tr(locale, "Editorial policy", "编辑政策")], ["ai-usage", tr(locale, "AI usage", "AI 使用说明")],
+    ["sources", tr(locale, "Sources", "来源说明")], ["privacy", tr(locale, "Privacy", "隐私政策")],
+    ["corrections", tr(locale, "Corrections", "更正机制")],
+  ];
 
   return (
     <html lang={locale}>
@@ -104,7 +110,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {process.env.ANALYTICS_ENABLED !== "false" && <Analytics />}
         <footer className="footer wrap">
           <span>{tr(locale, "Research → Data → Signal", "研报 → 数据 → 信号")}</span>
-          <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{["about", "methodology", "editorial-policy", "ai-usage", "sources", "privacy", "corrections"].map((path) => <Link key={path} href={localePath(locale, `/${path}`)}>{path.replaceAll("-", " ")}</Link>)}</nav>
+          <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{policyLinks.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}</nav>
         </footer>
       </body>
     </html>

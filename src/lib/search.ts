@@ -285,7 +285,7 @@ export function matchingSnippet(values: Array<string | null | undefined> | undef
 
 // The index holds every article's full body in memory, so it is bounded explicitly.
 // Beyond this the oldest articles fall out of search rather than the process falling over.
-const INDEX_MAX_ARTICLES = Math.max(100, Number(process.env.SEARCH_INDEX_MAX_ARTICLES || 5000));
+const INDEX_MAX_ARTICLES = Math.max(100, Number(process.env.SEARCH_INDEX_MAX_ARTICLES || 1000));
 
 const loadSearchData = async () => Promise.all([
     prisma.institution.findMany({

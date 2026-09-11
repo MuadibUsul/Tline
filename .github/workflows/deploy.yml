@@ -161,7 +161,9 @@ jobs:
               sleep 5
             done
 
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true
             docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 app || true
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 social-scheduler || true
 
             if [ -n "$PREVIOUS_TAG" ]; then
               echo "Deployment unhealthy; rolling back to $PREVIOUS_TAG"

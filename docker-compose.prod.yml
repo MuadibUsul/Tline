@@ -74,7 +74,7 @@ services:
   social-scheduler:
     image: ghcr.io/muadibusul/tline:${TAG:-latest}
     build: !reset null
-    mem_limit: 256m
+    mem_limit: 384m
     logging: *default-logging
 
 networks:

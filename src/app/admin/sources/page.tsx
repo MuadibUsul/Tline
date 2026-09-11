@@ -3,19 +3,19 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, localePath } from "@/lib/i18n";
+import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { queueSourceRetry, setSourceMonitoring } from "../actions";
-import { age, tone } from "../_components/format";
+import { adminLabel, age, tone } from "../_components/format";
 import { pipelineHealth } from "@/lib/pipelineHealth";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Sources" };
+export const metadata: Metadata = { title: "来源与爬虫" };
 
 export default async function SourcesPage() {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.sources")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const [sources, articles24h, articles7d, health] = await Promise.all([
@@ -69,11 +69,11 @@ export default async function SourcesPage() {
               <small>{source.updateFreq ?? "—"}</small>
             </td>
             <td>
-              <span className={`chip ${tone(source.lastCrawlStatus)}`}>{source.monitoringEnabled ? source.lastCrawlStatus ?? "new" : source.consecutiveFailures > 0 ? "circuit_open" : "paused"}</span>
+              <span className={`chip ${tone(source.lastCrawlStatus)}`}>{adminLabel(source.monitoringEnabled ? source.lastCrawlStatus ?? "new" : source.consecutiveFailures > 0 ? "circuit_open" : "paused")}</span>
               {source.lastCrawlMessage && <small title={source.lastCrawlMessage}>{source.consecutiveFailures ? `${source.consecutiveFailures}× · ` : ""}{source.lastCrawlMessage}</small>}
             </td>
             <td className="mono-cell">{age(source.lastSuccessAt, locale)}</td>
-            <td><span className={`chip ${compliant ? "gray" : "bear"}`}>{source.crawlPolicy}</span></td>
+            <td><span className={`chip ${compliant ? "gray" : "bear"}`}>{adminLabel(source.crawlPolicy)}</span></td>
             <td><div className="admin-actions">{compliant && <>
               <form action={setSourceMonitoring}>
                 <input type="hidden" name="id" value={source.id} />

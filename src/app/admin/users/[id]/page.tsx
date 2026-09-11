@@ -3,20 +3,20 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, localePath } from "@/lib/i18n";
+import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can, isOperationsOwner, ROLES } from "@/lib/permissions";
 import { statusOf, tierOptions } from "@/lib/adminUsers";
-import { age, json, tone, when } from "../../_components/format";
+import { adminLabel, age, json, tone, when } from "../../_components/format";
 import ActionForm from "../_components/ActionForm";
 import { deleteUser, forceSignOut, setUserRole, setUserSuspension, setUserTier, updateUserNote } from "../actions";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Account" };
+export const metadata: Metadata = { title: "账户详情" };
 
 export default async function UserDetailPage(props: { params: Promise<{ id: string }> }) {
   const actor = await getSessionUser();
   if (!actor || !can(actor, "admin.users")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
   const { id } = await props.params;
 
   const account = await prisma.user.findUnique({
@@ -53,9 +53,9 @@ export default async function UserDetailPage(props: { params: Promise<{ id: stri
       </div>
       <div className="tag-row">
         <span className={`chip ${tone(status)}`}>{status}</span>
-        <span className={`chip ${account.role === "admin" ? "acc" : "gray"}`}>{account.role}</span>
-        <span className="chip gray">{account.tier}</span>
-        {owner && <span className="chip acc" title="ADMIN_EMAILS">owner</span>}
+        <span className={`chip ${account.role === "admin" ? "acc" : "gray"}`}>{adminLabel(account.role)}</span>
+        <span className="chip gray">{adminLabel(account.tier)}</span>
+        {owner && <span className="chip acc" title="ADMIN_EMAILS">所有者</span>}
       </div>
     </header>
 
@@ -107,7 +107,7 @@ export default async function UserDetailPage(props: { params: Promise<{ id: stri
             <ActionForm action={setUserRole} className="admin-inline-form">
               <input type="hidden" name="id" value={account.id} />
               <label><span>{tr(locale, "Role", "角色")}</span>
-                <select name="role" defaultValue={account.role}>{ROLES.map((role) => <option key={role} value={role}>{role}</option>)}</select>
+                <select name="role" defaultValue={account.role}>{ROLES.map((role) => <option key={role} value={role}>{adminLabel(role)}</option>)}</select>
               </label>
               <button className="minibtn p" type="submit">{tr(locale, "Save", "保存")}</button>
             </ActionForm>
@@ -118,7 +118,7 @@ export default async function UserDetailPage(props: { params: Promise<{ id: stri
               <input type="hidden" name="id" value={account.id} />
               <label><span>{tr(locale, "Tier", "套餐")}</span>
                 <select name="tier" defaultValue={account.tier}>{tierOptions(account.tier).map((option) => (
-                  <option key={option.value} value={option.value}>{option.value}{option.legacy ? tr(locale, " (legacy)", "（历史值）") : ""}</option>
+                  <option key={option.value} value={option.value}>{adminLabel(option.value)}{option.legacy ? "（历史值）" : ""}</option>
                 ))}</select>
               </label>
               <button className="minibtn p" type="submit">{tr(locale, "Save", "保存")}</button>

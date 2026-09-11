@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { getLocale, tr, localePath } from "@/lib/i18n";
+import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { breakdown, events, isRange, overview, RANGES, realtime, timeseries, vitals, windowFor, type Range } from "@/lib/analytics/query";
 import { BarList, Donut, StatCard, TimeSeries } from "@/app/_components/charts";
 import { compact, plural } from "../_components/format";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Traffic" };
+export const metadata: Metadata = { title: "流量分析" };
 
 const RANGE_LABEL: Record<Range, [string, string]> = {
   "24h": ["24 hours", "24 小时"],
@@ -26,7 +26,7 @@ function seconds(value: number | null, locale: string): string {
 export default async function TrafficPage(props: { searchParams: Promise<{ range?: string }> }) {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.analytics")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
   const params = await props.searchParams;
   const range: Range = isRange(params.range) ? params.range : "7d";
   const window = windowFor(range);

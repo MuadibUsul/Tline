@@ -2,14 +2,14 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, localePath } from "@/lib/i18n";
+import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
-import { age, compact, json, when } from "./_components/format";
+import { adminLabel, age, compact, json, when } from "./_components/format";
 import { overview, realtime, windowFor } from "@/lib/analytics/query";
 import { pipelineHealth } from "@/lib/pipelineHealth";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Dashboard" };
+export const metadata: Metadata = { title: "仪表盘" };
 
 /**
  * The console's front page.
@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Dashboard" };
  */
 export default async function AdminOverviewPage() {
   const user = (await getSessionUser())!;
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
   const day = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -144,7 +144,7 @@ export default async function AdminOverviewPage() {
             {recentUsers.map((account) => <div className="admin-review-row" key={account.id}>
               <Link href={localePath(locale, `/admin/users/${account.id}`)}>
                 <span><b>{account.email}</b><small>{when(account.createdAt, locale)}</small></span>
-                <span className="chip gray">{account.role}</span>
+                <span className="chip gray">{adminLabel(account.role)}</span>
               </Link>
             </div>)}
           </div>

@@ -39,6 +39,24 @@ export function tone(status: string | null | undefined): string {
   return "gray";
 }
 
+const ZH_LABELS: Record<string, string> = {
+  member: "普通用户", reviewer: "审核员", admin: "管理员",
+  free: "免费版", professional: "专业版", enterprise: "企业版",
+  running: "运行中", queued: "已排队", succeeded: "成功", failed: "失败", stopped: "已停止", stale: "心跳异常",
+  ok: "正常", active: "启用", paused: "已暂停", new: "未运行", circuit_open: "熔断中",
+  allowed: "允许抓取", delayed: "延迟抓取", blocked: "禁止抓取", refused: "已拒绝",
+  reviewed: "已审核", needs_review: "需要审核", invited: "待设密码", suspended: "已封禁",
+  PENDING_REVIEW: "待审核", APPROVED: "已批准", PUBLISHING: "发布中", PARTIAL: "部分成功",
+  SUCCEEDED: "全部成功", FAILED: "失败", REJECTED: "已拒绝", PENDING: "待发布", RETRY: "等待重试",
+  macro: "宏观数据", research: "研报", social: "内容发布", ingest: "研报采集",
+  en: "英文", "zh-CN": "中文",
+};
+
+/** Chinese names for internal enum values shown in the console. */
+export function adminLabel(value: string): string {
+  return ZH_LABELS[value] ?? value;
+}
+
 /** Compact counts: 1234 → 1.2k. Long numbers wreck a fixed-width stat card. */
 export function compact(value: number): string {
   if (Math.abs(value) < 1000) return String(value);

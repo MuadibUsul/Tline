@@ -3,20 +3,20 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, localePath } from "@/lib/i18n";
+import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { queueContentRetry, resolveContentReview } from "../actions";
 import { age } from "../_components/format";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Review" };
+export const metadata: Metadata = { title: "内容审核" };
 
 const PAGE_SIZE = 40;
 
 export default async function ReviewPage() {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.review")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
   const article = { include: { institution: true } } as const;
 
   const [analysisReview, translationReview, retries, analysisTotal, translationTotal] = await Promise.all([
@@ -55,7 +55,7 @@ export default async function ReviewPage() {
         {queue.map((item) => <div className="admin-review-row" key={item.key}>
           <Link href={localePath(locale, `/research/${item.article.id}`)}>
             <span><b>{item.article.title}</b><small>{item.article.institution.name} · {item.kind} · {age(item.at, locale)}</small></span>
-            <span className="chip bear">needs_review</span>
+            <span className="chip bear">需要审核</span>
           </Link>
           {/* The rerun lives here rather than only on the report: this list is where an
               operator decides, and a decision that costs a page visit is not taken. */}

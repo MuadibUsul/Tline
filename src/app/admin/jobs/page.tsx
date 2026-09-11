@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
+import { getAdminLocale, tr } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
-import { age, json, tone } from "../_components/format";
+import { adminLabel, age, json, tone } from "../_components/format";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Jobs" };
+export const metadata: Metadata = { title: "任务与调度" };
 
 /** A heartbeat older than this means the scheduler process is gone, not merely idle. */
 const HEARTBEAT_STALE_MS = 120_000;
@@ -17,7 +17,7 @@ const STALE_RUN_MS = 20 * 60_000;
 export default async function JobsPage(props: { searchParams: Promise<{ name?: string; status?: string }> }) {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.review")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
   const { name, status } = await props.searchParams;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
@@ -48,7 +48,7 @@ export default async function JobsPage(props: { searchParams: Promise<{ name?: s
       <div className="admin-stat"><span>{tr(locale, "Running", "运行中")}</span><b>{runningJobs}</b><small>{staleJobs} {tr(locale, "stale", "疑似卡死")}</small></div>
       <div className="admin-stat"><span>{tr(locale, "Succeeded · 24h", "24 小时成功")}</span><b>{succeeded24h}</b><small>&nbsp;</small></div>
       <div className={`admin-stat${failedJobs ? " admin-stat-alarm" : ""}`}><span>{tr(locale, "Failed · 24h", "24 小时失败")}</span><b>{failedJobs}</b><small>&nbsp;</small></div>
-      <div className="admin-stat"><span>{tr(locale, "Workers", "调度进程")}</span><b>{workers.filter((worker) => worker.status === "running" && Date.now() - worker.lastSeenAt.getTime() < HEARTBEAT_STALE_MS).length}/{workers.length || 2}</b><small>{tr(locale, "heartbeat within 2 min", "2 分钟内有心跳")}</small></div>
+      <div className="admin-stat"><span>{tr(locale, "Workers", "调度进程")}</span><b>{workers.filter((worker) => worker.status === "running" && Date.now() - worker.lastSeenAt.getTime() < HEARTBEAT_STALE_MS).length}/{workers.length || 3}</b><small>{tr(locale, "heartbeat within 2 min", "2 分钟内有心跳")}</small></div>
     </section>
 
     <div className="admin-columns">
@@ -63,7 +63,7 @@ export default async function JobsPage(props: { searchParams: Promise<{ name?: s
           <a className={`minibtn${!status && !name ? " p" : ""}`} href="?">{tr(locale, "All", "全部")}</a>
           <a className={`minibtn${status === "failed" ? " p" : ""}`} href="?status=failed">{tr(locale, "Failed", "失败")}</a>
           <a className={`minibtn${status === "running" ? " p" : ""}`} href="?status=running">{tr(locale, "Running", "运行中")}</a>
-          {names.map((row) => <a key={row.name} className={`minibtn${name === row.name ? " p" : ""}`} href={`?name=${encodeURIComponent(row.name)}`}>{row.name}</a>)}
+          {names.map((row) => <a key={row.name} className={`minibtn${name === row.name ? " p" : ""}`} href={`?name=${encodeURIComponent(row.name)}`}>{adminLabel(row.name)}</a>)}
         </div>
         <div className="admin-jobs">
           {jobs.length === 0 && <div className="empty-state">{tr(locale, "No runs match this filter.", "没有符合筛选条件的运行记录。")}</div>}
@@ -71,9 +71,9 @@ export default async function JobsPage(props: { searchParams: Promise<{ name?: s
             const metrics = json(job.metrics);
             const stale = job.status === "running" && Date.now() - job.startedAt.getTime() > STALE_RUN_MS;
             return <div className="admin-job" key={job.id}>
-              <div><b>{job.name}</b><small>{age(job.startedAt, locale)} · attempt {job.attempt}{job.finishedAt ? ` · ${Math.max(0, Math.round((job.finishedAt.getTime() - job.startedAt.getTime()) / 1000))}s` : ""}</small></div>
+              <div><b>{adminLabel(job.name)}</b><small>{age(job.startedAt, locale)} · 第 {job.attempt} 次尝试{job.finishedAt ? ` · ${Math.max(0, Math.round((job.finishedAt.getTime() - job.startedAt.getTime()) / 1000))} 秒` : ""}</small></div>
               <div className="admin-job-state">
-                <span className={`chip ${stale ? "bear" : tone(job.status)}`}>{stale ? "stale" : job.status}</span>
+                <span className={`chip ${stale ? "bear" : tone(job.status)}`}>{adminLabel(stale ? "stale" : job.status)}</span>
                 {Object.keys(metrics).length > 0 && <span className="mono admin-metric">{Object.entries(metrics).slice(0, 3).map(([key, value]) => `${key}:${String(value)}`).join(" · ")}</span>}
               </div>
               {job.error && <details><summary>{tr(locale, "Error", "错误")}</summary><p>{job.error}</p></details>}
@@ -85,10 +85,10 @@ export default async function JobsPage(props: { searchParams: Promise<{ name?: s
       <aside>
         <section className="blk">
           <div className="section-t">{tr(locale, "Workers", "调度器心跳")}</div>
-          <div className="admin-workers">{["research", "macro"].map((workerName) => {
+          <div className="admin-workers">{["research", "macro", "social"].map((workerName) => {
             const worker = workers.find((item) => item.name === workerName);
             const healthy = worker?.status === "running" && Date.now() - worker.lastSeenAt.getTime() < HEARTBEAT_STALE_MS;
-            return <div key={workerName}><b>{workerName}</b><span className={`chip ${healthy ? "bull" : "bear"}`}>{healthy ? "ok" : "stale"}</span><small>{age(worker?.lastSeenAt ?? null, locale)}</small></div>;
+            return <div key={workerName}><b>{adminLabel(workerName)}</b><span className={`chip ${healthy ? "bull" : "bear"}`}>{healthy ? "正常" : "心跳异常"}</span><small>{age(worker?.lastSeenAt ?? null, locale)}</small></div>;
           })}</div>
         </section>
       </aside>

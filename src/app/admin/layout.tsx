@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { getLocale, tr, localePath } from "@/lib/i18n";
+import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can, effectiveRole, isOperationsOwner, type PermissionAction } from "@/lib/permissions";
 import { noIndex } from "@/lib/seo";
 import AdminNav, { type AdminNavGroup } from "./_components/AdminNav";
+import { adminLabel } from "./_components/format";
 
 export const dynamic = "force-dynamic";
 
 // Behind a sign-in: robots.txt asks a crawler not to fetch this, which does not keep it
 // out of an index if something links to it. This does, for the whole console at once.
-export const metadata: Metadata = { title: { default: "Console", template: "%s · Console" }, ...noIndex };
+export const metadata: Metadata = { title: { default: "管理后台", template: "%s · 管理后台" }, ...noIndex };
 
 /**
  * The console's one door.
@@ -23,7 +24,7 @@ export const metadata: Metadata = { title: { default: "Console", template: "%s �
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.access")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
 
   const item = (action: PermissionAction, path: string, en: string, zh: string) =>
     can(user, action) ? [{ href: localePath(locale, path), match: path, label: tr(locale, en, zh) }] : [];
@@ -72,9 +73,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
         <AdminNav groups={groups} />
         <div className="admin-side-foot">
-          <span className="chip acc">{effectiveRole(user)}</span>
-          {isOperationsOwner(user) && <span className="chip gray" title={tr(locale, "Granted by ADMIN_EMAILS", "由 ADMIN_EMAILS 授予")}>owner</span>}
-          <a className="admin-side-link" href={localePath(locale, "/api/health")} target="_blank" rel="noreferrer">Health JSON ↗</a>
+          <span className="chip acc">{adminLabel(effectiveRole(user) ?? "member")}</span>
+          {isOperationsOwner(user) && <span className="chip gray" title="由 ADMIN_EMAILS 授予">所有者</span>}
+          <a className="admin-side-link" href={localePath(locale, "/api/health")} target="_blank" rel="noreferrer">健康状态 JSON ↗</a>
         </div>
       </aside>
       <div className="admin-body">{children}</div>

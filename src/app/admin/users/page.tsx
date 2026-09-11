@@ -3,13 +3,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, localePath, type Locale } from "@/lib/i18n";
+import { getAdminLocale, tr, localePath, type Locale } from "@/lib/i18n";
 import { can, ROLES } from "@/lib/permissions";
 import { listUsers, TIERS, USER_PAGE_SIZE, USER_STATUSES, type UserStatus } from "@/lib/adminUsers";
-import { age, tone, when } from "../_components/format";
+import { adminLabel, age, tone, when } from "../_components/format";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Accounts" };
+export const metadata: Metadata = { title: "账户管理" };
 
 const STATUS_LABEL: Record<UserStatus, [string, string]> = {
   active: ["Active", "正常"],
@@ -32,7 +32,7 @@ export default async function UsersPage(props: {
 }) {
   const actor = await getSessionUser();
   if (!actor || !can(actor, "admin.users")) notFound();
-  const locale: Locale = await getLocale();
+  const locale: Locale = await getAdminLocale();
   const params = await props.searchParams;
   const page = Math.max(1, Number(params.page) || 1);
   const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -72,11 +72,11 @@ export default async function UsersPage(props: {
         <input type="search" name="q" defaultValue={params.q ?? ""} placeholder={tr(locale, "Email or name", "邮箱或姓名")} aria-label={tr(locale, "Search accounts", "搜索账户")} />
         <select name="role" defaultValue={params.role ?? ""} aria-label={tr(locale, "Role", "角色")}>
           <option value="">{tr(locale, "Any role", "全部角色")}</option>
-          {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+          {ROLES.map((role) => <option key={role} value={role}>{adminLabel(role)}</option>)}
         </select>
         <select name="tier" defaultValue={params.tier ?? ""} aria-label={tr(locale, "Tier", "套餐")}>
           <option value="">{tr(locale, "Any tier", "全部套餐")}</option>
-          {TIERS.map((tier) => <option key={tier} value={tier}>{tier}</option>)}
+          {TIERS.map((tier) => <option key={tier} value={tier}>{adminLabel(tier)}</option>)}
         </select>
         <select name="status" defaultValue={params.status ?? ""} aria-label={tr(locale, "Status", "状态")}>
           <option value="">{tr(locale, "Any status", "全部状态")}</option>
@@ -109,8 +109,8 @@ export default async function UsersPage(props: {
               <Link href={localePath(locale, `/admin/users/${account.id}`)}>{account.email}</Link>
               <small>{account.name ?? "—"}</small>
             </td>
-            <td><span className={`chip ${account.role === "admin" ? "acc" : "gray"}`}>{account.role}</span></td>
-            <td><span className="chip gray">{account.tier}</span></td>
+            <td><span className={`chip ${account.role === "admin" ? "acc" : "gray"}`}>{adminLabel(account.role)}</span></td>
+            <td><span className="chip gray">{adminLabel(account.tier)}</span></td>
             <td><span className={`chip ${tone(account.status)}`}>{tr(locale, ...STATUS_LABEL[account.status])}</span></td>
             <td className="mono-cell">{when(account.createdAt, locale)}</td>
             <td className="mono-cell">{age(account.lastSeenAt, locale)}</td>

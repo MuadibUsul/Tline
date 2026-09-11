@@ -48,6 +48,11 @@ export async function getLocale(): Promise<Locale> {
   return "en";
 }
 
+/** The operations console is intentionally Chinese-only. */
+export async function getAdminLocale(): Promise<Locale> {
+  return "zh-CN";
+}
+
 /** Retained for the machine-readable routes that still reason about the address. */
 export async function getLocaleFromRequest(): Promise<Locale> {
   const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);

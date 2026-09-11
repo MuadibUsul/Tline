@@ -3,12 +3,12 @@ import type { Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
+import { getAdminLocale, tr } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { when } from "../_components/format";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Audit log" };
+export const metadata: Metadata = { title: "审计日志" };
 
 const PAGE_SIZE = 50;
 
@@ -29,7 +29,7 @@ export default async function AuditPage(props: {
 }) {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.audit")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
   const params = await props.searchParams;
   const page = Math.max(1, Number(params.page) || 1);
   const actor = params.actor?.trim().slice(0, 120);

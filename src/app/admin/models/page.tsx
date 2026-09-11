@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { BarList, StatCard, TimeSeries } from "@/app/_components/charts";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, type Locale } from "@/lib/i18n";
+import { getAdminLocale, tr, type Locale } from "@/lib/i18n";
 import { budgetStatuses, GLOBAL_SCOPE } from "@/lib/llm/budget";
 import { apiKeyFor, isLlmDisabled, type ProviderRow } from "@/lib/llm/config";
 import { llmUsageReport, recentLlmFailures } from "@/lib/llm/report";
@@ -19,7 +19,7 @@ import ProviderCard from "./_components/ProviderCard";
 import RouteRow from "./_components/RouteRow";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Model providers" };
+export const metadata: Metadata = { title: "模型接入" };
 
 const TASK_COPY: Record<LlmTask, { en: [string, string]; zh: [string, string] }> = {
   translation: {
@@ -67,7 +67,7 @@ function scopeTitle(scope: string, locale: Locale): string {
 export default async function ModelsPage() {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.models")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
 
   const [providerRows, routeRows, prices, usage, failures, budgets] = await Promise.all([
     prisma.llmProvider.findMany(),

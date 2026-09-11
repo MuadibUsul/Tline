@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr } from "@/lib/i18n";
+import { getAdminLocale, tr } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { API_SCOPES, parseScopes } from "@/lib/apiKeys";
 import { usagePerKey, usageReport } from "@/lib/apiUsage";
@@ -13,12 +13,12 @@ import CreateKeyForm from "./CreateKeyForm";
 import RotateKeyButton from "./RotateKeyButton";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "API" };
+export const metadata: Metadata = { title: "API 与密钥" };
 
 export default async function ApiPage() {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.api")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
 
   const [keys, usage, sparkline] = await Promise.all([
     prisma.apiKey.findMany({

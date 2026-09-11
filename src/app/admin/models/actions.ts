@@ -41,14 +41,14 @@ export interface ActionResult {
 
 export async function saveProvider(_state: ActionResult, form: FormData): Promise<ActionResult> {
   const user = await admin();
-  if (!user) return { error: "Not permitted." };
+  if (!user) return { error: "无权执行此操作。" };
   const name = form.get("provider")?.toString() ?? "";
-  if (!isProviderName(name)) return { error: "Unknown provider." };
+  if (!isProviderName(name)) return { error: "未知的模型服务商。" };
 
   const apiKey = text(form, "apiKey");
   const clearKey = form.get("clearKey") === "on";
   if (apiKey && !hasSecretKey()) {
-    return { error: "Set CONFIG_ENCRYPTION_KEY (or AUTH_SECRET) in the environment before storing a key here." };
+    return { error: "请先在环境变量中设置 CONFIG_ENCRYPTION_KEY（或 AUTH_SECRET），再保存密钥。" };
   }
 
   const data: Record<string, unknown> = {
@@ -84,22 +84,22 @@ export async function saveProvider(_state: ActionResult, form: FormData): Promis
     metadata: { baseUrl: data.baseUrl, defaultModel: data.defaultModel, enabled: data.enabled },
   });
   refresh();
-  return { ok: apiKey ? "Key stored." : "Saved." };
+  return { ok: apiKey ? "密钥已保存。" : "配置已保存。" };
 }
 
 export async function saveRoute(_state: ActionResult, form: FormData): Promise<ActionResult> {
   const user = await admin();
-  if (!user) return { error: "Not permitted." };
+  if (!user) return { error: "无权执行此操作。" };
   const task = form.get("task")?.toString() ?? "";
-  if (!isLlmTask(task)) return { error: "Unknown task." };
+  if (!isLlmTask(task)) return { error: "未知任务。" };
   const provider = text(form, "provider");
-  if (provider && !isProviderName(provider)) return { error: "Unknown provider." };
+  if (provider && !isProviderName(provider)) return { error: "未知的模型服务商。" };
 
   const data = { provider, model: text(form, "model"), enabled: form.get("enabled") === "on" };
   await prisma.llmTaskRoute.upsert({ where: { task }, create: { task, ...data }, update: data });
   await writeAudit({ actorId: user.id, action: "llm.route.update", targetType: "llmTaskRoute", targetId: task, metadata: data });
   refresh();
-  return { ok: "Saved." };
+  return { ok: "配置已保存。" };
 }
 
 /** A positive number from the form, or null when the field is blank; error on garbage. */
@@ -112,15 +112,15 @@ function optionalAmount(form: FormData, field: string): number | null | undefine
 
 export async function saveBudget(_state: ActionResult, form: FormData): Promise<ActionResult> {
   const user = await admin();
-  if (!user) return { error: "Not permitted." };
+  if (!user) return { error: "无权执行此操作。" };
   const scope = form.get("scope")?.toString() ?? "";
-  if (scope !== GLOBAL_SCOPE && !isLlmTask(scope)) return { error: "Unknown scope." };
+  if (scope !== GLOBAL_SCOPE && !isLlmTask(scope)) return { error: "未知范围。" };
   const period = form.get("period")?.toString() === "day" ? "day" : "month";
 
   const limitTokens = optionalAmount(form, "limitTokens");
   const limitCost = optionalAmount(form, "limitCost");
   if (limitTokens === undefined || limitCost === undefined) {
-    return { error: "Ceilings must be positive numbers, or left blank for no cap." };
+    return { error: "上限必须是正数；留空表示不设上限。" };
   }
   // A row with neither ceiling set enforces nothing; clear it rather than store a no-op.
   if (limitTokens === null && limitCost === null) {
@@ -128,7 +128,7 @@ export async function saveBudget(_state: ActionResult, form: FormData): Promise<
     await writeAudit({ actorId: user.id, action: "llm.budget.clear", targetType: "llmBudget", targetId: scope });
     invalidateBudgetCache();
     revalidatePath("/admin/models");
-    return { ok: "Cleared." };
+    return { ok: "已清除。" };
   }
 
   const data = { period, limitTokens: limitTokens ?? null, limitCost: limitCost ?? null, enabled: form.get("enabled") === "on" };
@@ -136,19 +136,19 @@ export async function saveBudget(_state: ActionResult, form: FormData): Promise<
   await writeAudit({ actorId: user.id, action: "llm.budget.update", targetType: "llmBudget", targetId: scope, metadata: data });
   invalidateBudgetCache();
   revalidatePath("/admin/models");
-  return { ok: "Saved." };
+  return { ok: "配置已保存。" };
 }
 
 export async function savePrice(_state: ActionResult, form: FormData): Promise<ActionResult> {
   const user = await admin();
-  if (!user) return { error: "Not permitted." };
+  if (!user) return { error: "无权执行此操作。" };
   const provider = text(form, "provider");
   const model = text(form, "model");
-  if (!provider || !isProviderName(provider) || !model) return { error: "Provider and model are both required." };
+  if (!provider || !isProviderName(provider) || !model) return { error: "服务商和模型名称均为必填项。" };
   const input = Number(form.get("inputPerMTok"));
   const output = Number(form.get("outputPerMTok"));
   if (!Number.isFinite(input) || !Number.isFinite(output) || input < 0 || output < 0) {
-    return { error: "Prices must be non-negative numbers." };
+    return { error: "价格必须是非负数。" };
   }
   const currency = (text(form, "currency") ?? "USD").toUpperCase().slice(0, 8);
   const data = { inputPerMTok: input, outputPerMTok: output, currency };
@@ -159,7 +159,7 @@ export async function savePrice(_state: ActionResult, form: FormData): Promise<A
   });
   await writeAudit({ actorId: user.id, action: "llm.price.update", targetType: "llmModelPrice", targetId: `${provider}/${model}`, metadata: data });
   revalidatePath("/admin/models");
-  return { ok: "Saved." };
+  return { ok: "价格已保存。" };
 }
 
 export async function deletePrice(form: FormData): Promise<void> {
@@ -182,9 +182,9 @@ export async function deletePrice(form: FormData): Promise<void> {
  */
 export async function testProvider(_state: ActionResult, form: FormData): Promise<ActionResult> {
   const user = await admin();
-  if (!user) return { error: "Not permitted." };
+  if (!user) return { error: "无权执行此操作。" };
   const name = form.get("provider")?.toString() ?? "";
-  if (!isProviderName(name)) return { error: "Unknown provider." };
+  if (!isProviderName(name)) return { error: "未知的模型服务商。" };
 
   const started = Date.now();
   const result = await probe(name);
@@ -196,20 +196,20 @@ export async function testProvider(_state: ActionResult, form: FormData): Promis
   await writeAudit({ actorId: user.id, action: "llm.provider.test", targetType: "llmProvider", targetId: name, metadata: { ok: result.ok } });
   revalidatePath("/admin/models");
   return result.ok
-    ? { ok: `Reachable in ${Date.now() - started}ms · ${result.model}` }
-    : { error: result.error ?? "Unknown error." };
+    ? { ok: `连接正常 · ${Date.now() - started} 毫秒 · ${result.model}` }
+    : { error: result.error ?? "未知错误。" };
 }
 
 async function probe(name: ProviderName): Promise<{ ok: boolean; model?: string; error?: string }> {
   try {
     const provider = await providerByName(name);
-    if (!provider) return { ok: false, error: "No key is configured for this provider, here or in the environment." };
+    if (!provider) return { ok: false, error: "该服务商尚未在后台或环境变量中配置密钥。" };
     const response = await provider.complete({
       system: 'Reply with exactly this JSON and nothing else: {"ok":true}',
       user: "ping",
       maxTokens: 32,
     });
-    if (!response.text.includes("ok")) return { ok: false, error: `Unexpected reply: ${response.text.slice(0, 120)}` };
+    if (!response.text.includes("ok")) return { ok: false, error: `返回内容不符合预期：${response.text.slice(0, 120)}` };
     return { ok: true, model: response.model };
   } catch (error) {
     return { ok: false, error: String(error).slice(0, 300) };

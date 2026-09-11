@@ -35,7 +35,7 @@ function isActive(current: string, match: string): boolean {
 export default function AdminNav({ groups }: { groups: AdminNavGroup[] }) {
   const current = bare(usePathname() || "/admin");
   return (
-    <nav className="admin-nav" aria-label="Console">
+    <nav className="admin-nav" aria-label="管理后台">
       {groups.map((group) => (
         <div className="admin-nav-group" key={group.title}>
           <span className="admin-nav-title">{group.title}</span>

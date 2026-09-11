@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getLocale, tr, localePath } from "@/lib/i18n";
+import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { audience, funnel, retention, topUsers } from "@/lib/analytics/query";
 import { BarList, StatCard } from "@/app/_components/charts";
 import { age, compact, plural } from "../../_components/format";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Visitors & users" };
+export const metadata: Metadata = { title: "访客与用户" };
 
 const FUNNEL_LABEL: Record<string, [string, string]> = {
   visitors: ["Visitors · 30d", "访客 · 30 天"],
@@ -45,7 +45,7 @@ function band(value: number | null): string {
 export default async function AudiencePage() {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.analytics")) notFound();
-  const locale = await getLocale();
+  const locale = await getAdminLocale();
 
   const [summary, steps, cohorts, active, totalUsers, newUsers] = await Promise.all([
     audience(),

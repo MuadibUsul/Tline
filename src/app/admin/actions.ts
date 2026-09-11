@@ -25,8 +25,8 @@ export async function setSourceMonitoring(formData: FormData) {
     where: { id },
     data: {
       monitoringEnabled: enabled,
-      ...(enabled ? { consecutiveFailures: 0, nextCrawlAt: null, lastCrawlStatus: "queued", lastCrawlMessage: "Resumed by operations." } : {}),
-      ...(!enabled ? { lastCrawlStatus: "paused", lastCrawlMessage: "Paused by operations." } : {}),
+      ...(enabled ? { consecutiveFailures: 0, nextCrawlAt: null, lastCrawlStatus: "queued", lastCrawlMessage: "已由后台恢复监控。" } : {}),
+      ...(!enabled ? { lastCrawlStatus: "paused", lastCrawlMessage: "已由后台暂停监控。" } : {}),
     },
   });
   await writeAudit({ actorId: user.id, action: enabled ? "source.monitoring.resume" : "source.monitoring.pause", targetType: "institution", targetId: id, metadata: { name: source.name, crawlPolicy: source.crawlPolicy } });
@@ -41,7 +41,7 @@ export async function queueSourceRetry(formData: FormData) {
   if (!source || !["allowed", "delayed"].includes(source.crawlPolicy)) return;
   await prisma.institution.update({
     where: { id },
-    data: { monitoringEnabled: true, consecutiveFailures: 0, nextCrawlAt: null, lastCrawlAt: null, lastCrawlStatus: "queued", lastCrawlMessage: "Queued for the next scheduler pass." },
+    data: { monitoringEnabled: true, consecutiveFailures: 0, nextCrawlAt: null, lastCrawlAt: null, lastCrawlStatus: "queued", lastCrawlMessage: "已加入下一轮调度。" },
   });
   await writeAudit({ actorId: user.id, action: "source.retry.queue", targetType: "institution", targetId: id, metadata: { name: source.name } });
   revalidatePath("/admin/sources");
@@ -92,18 +92,18 @@ export interface CreateKeyResult {
 
 export async function createApiKey(_previous: CreateKeyResult, formData: FormData): Promise<CreateKeyResult> {
   const user = await authorized("admin.api");
-  if (!user) return { error: "Not authorised." };
+  if (!user) return { error: "无权执行此操作。" };
 
   const name = formData.get("name")?.toString().trim() ?? "";
-  if (!name) return { error: "Give the key a name so it can be recognised later." };
+  if (!name) return { error: "请填写密钥名称，以便日后识别。" };
 
   const requested = formData.getAll("scopes").map(String);
   const scopes = API_SCOPES.filter((scope) => requested.includes(scope));
-  if (scopes.length === 0) return { error: "Select at least one scope." };
+  if (scopes.length === 0) return { error: "请至少选择一个权限范围。" };
 
   const rateLimit = Number(formData.get("rateLimit") ?? 60);
   if (!Number.isInteger(rateLimit) || rateLimit < 1 || rateLimit > 6000) {
-    return { error: "Rate limit must be between 1 and 6000 requests per minute." };
+    return { error: "每分钟请求上限必须在 1 到 6000 之间。" };
   }
 
   const token = generateToken();
@@ -145,13 +145,13 @@ export async function revokeApiKey(formData: FormData) {
  */
 export async function rotateApiKey(_previous: CreateKeyResult, formData: FormData): Promise<CreateKeyResult> {
   const user = await authorized("admin.api");
-  if (!user) return { error: "Not authorised." };
+  if (!user) return { error: "无权执行此操作。" };
   const id = formData.get("id")?.toString();
-  if (!id) return { error: "Missing key." };
+  if (!id) return { error: "缺少密钥。" };
 
   const existing = await prisma.apiKey.findUnique({ where: { id } });
-  if (!existing) return { error: "That key no longer exists." };
-  if (existing.revokedAt) return { error: "That key is already revoked; issue a new one instead." };
+  if (!existing) return { error: "该密钥已不存在。" };
+  if (existing.revokedAt) return { error: "该密钥已被吊销，请改为签发新密钥。" };
 
   const token = generateToken();
   const [, created] = await prisma.$transaction([

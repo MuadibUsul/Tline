@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { articleTimestamp, assetName, domainTerm, institutionName, localizeChineseContent, localizedDataValue, localeSafeText, relativeTime, resolveLocale, tr } from "./i18n";
+import { articleTimestamp, assetName, domainTerm, getAdminLocale, institutionName, localizeChineseContent, localizedDataValue, localeSafeText, relativeTime, resolveLocale, tr } from "./i18n";
 
 test("articleTimestamp keeps a publisher time but falls back to discovery time for date-only publications", () => {
   // Publisher gave a real time-of-day -> used verbatim.
@@ -30,6 +30,10 @@ test("resolves an explicit locale before browser language", () => {
   assert.equal(resolveLocale(undefined, "zh-CN,zh;q=0.9"), "zh-CN");
   assert.equal(resolveLocale(undefined, "en-US,en;q=0.9"), "en");
   assert.equal(tr("zh-CN", "Research", "研报"), "研报");
+});
+
+test("the operations console is always Chinese", async () => {
+  assert.equal(await getAdminLocale(), "zh-CN");
 });
 
 test("localizes canonical institution, asset and domain names without contaminating English", () => {

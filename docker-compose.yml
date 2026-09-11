@@ -147,6 +147,7 @@ services:
       DATABASE_URL: postgresql://tline:${POSTGRES_PASSWORD}@db:5432/tline
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
       SITE_URL: ${SITE_URL:?Set SITE_URL}
+      DOCUMENT_STORAGE_ROOT: /app/storage
       X_CLIENT_ID: ${X_CLIENT_ID:-}
       X_CLIENT_SECRET: ${X_CLIENT_SECRET:-}
       FEISHU_APP_ID: ${FEISHU_APP_ID:-}

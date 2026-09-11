@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { validatePost } from "@/lib/social/content";
+import { loadFeishuSettings, sendFeishuTestMessage } from "@/lib/social/feishu";
 import { decideDraft, refreshDraftCard, regenerateDraft } from "@/lib/social/pipeline";
 import { encryptSecret, hasSecretKey, secretHint } from "@/lib/secrets";
 
@@ -33,6 +34,47 @@ export async function saveXAppSettings(_state: SocialActionResult, form: FormDat
   await writeAudit({ actorId: user.id, action: "social.x_app.update", targetType: "socialPlatformCredential", targetId: "x", metadata: { clientIdUpdated: true, clientSecretUpdated: Boolean(clientSecret), clientSecretCleared: clearSecret } });
   refresh();
   return { ok: "X 应用配置已保存，现在可以连接账号。" };
+}
+
+export async function saveFeishuSettings(_state: SocialActionResult, form: FormData): Promise<SocialActionResult> {
+  const user = await admin();
+  if (!user) return { error: "无权执行此操作。" };
+  const current = await loadFeishuSettings();
+  const appId = form.get("appId")?.toString().trim() || "";
+  const appSecret = form.get("appSecret")?.toString().trim() || current.appSecret;
+  const encryptKey = form.get("encryptKey")?.toString().trim() || current.encryptKey;
+  const verificationToken = form.get("verificationToken")?.toString().trim() || current.verificationToken;
+  const receiveId = form.get("receiveId")?.toString().trim() || "";
+  const receiveIdType = ["open_id", "user_id", "union_id", "email", "chat_id"].includes(form.get("receiveIdType")?.toString() || "") ? form.get("receiveIdType")!.toString() : "open_id";
+  const approverOpenIds = [...new Set((form.get("approverOpenIds")?.toString() || "").split(",").map((id) => id.trim()).filter(Boolean))].join(",");
+  if (!appId || !appSecret || !receiveId || !approverOpenIds || !encryptKey) return { error: "请填写应用 ID、应用密钥、消息接收 ID、审核人 Open ID 和 Encrypt Key。" };
+  if ([appId, appSecret, encryptKey, verificationToken, receiveId, approverOpenIds].some((value) => value.length > 2000)) return { error: "飞书配置内容过长。" };
+  if (!hasSecretKey()) return { error: "服务器尚未配置密钥加密能力。" };
+
+  const settings = { appSecret, encryptKey, verificationToken, receiveId, receiveIdType, approverOpenIds };
+  await prisma.$transaction([
+    prisma.socialPlatformCredential.upsert({
+      where: { platform: "feishu" },
+      create: { platform: "feishu", clientId: appId, clientSecretCipher: encryptSecret(JSON.stringify(settings)), clientSecretHint: secretHint(appSecret) },
+      update: { clientId: appId, clientSecretCipher: encryptSecret(JSON.stringify(settings)), clientSecretHint: secretHint(appSecret) },
+    }),
+    prisma.socialDraft.updateMany({ where: { status: "PENDING_REVIEW", feishuMessageId: null }, data: { notifyAttempts: 0, notifyError: null } }),
+  ]);
+  await writeAudit({ actorId: user.id, action: "social.feishu.update", targetType: "socialPlatformCredential", targetId: "feishu", metadata: { receiveIdType, approverCount: approverOpenIds.split(",").length } });
+  refresh();
+  return { ok: "飞书机器人配置已保存，待审核内容将自动重新发送。" };
+}
+
+export async function testFeishuSettings(_state: SocialActionResult, _form: FormData): Promise<SocialActionResult> {
+  const user = await admin();
+  if (!user) return { error: "无权执行此操作。" };
+  try {
+    await sendFeishuTestMessage();
+    await writeAudit({ actorId: user.id, action: "social.feishu.test", targetType: "socialPlatformCredential", targetId: "feishu" });
+    return { ok: "测试消息已发送，请在飞书中查看。" };
+  } catch (error) {
+    return { error: error instanceof Error ? `测试失败：${error.message}` : "测试失败。" };
+  }
 }
 
 export async function createSocialAccount(form: FormData) {

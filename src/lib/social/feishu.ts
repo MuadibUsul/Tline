@@ -1,4 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { prisma } from "../db";
+import { decryptSecret } from "../secrets";
 import { siteUrl } from "../site";
 
 type DraftCard = {
@@ -12,12 +14,52 @@ type DraftCard = {
   deliveries?: Array<{ status: string; lastError: string | null; mainPostId: string | null; replyPostId: string | null; account: { label: string; externalUsername: string | null } }>;
 };
 
-let cachedToken: { value: string; expiresAt: number } | null = null;
+export type FeishuSettings = {
+  appId: string;
+  appSecret: string;
+  encryptKey: string;
+  verificationToken: string;
+  receiveId: string;
+  receiveIdType: string;
+  approverOpenIds: string;
+  source: "console" | "environment" | "none";
+};
 
-async function tenantToken(): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.value;
-  const appId = process.env.FEISHU_APP_ID;
-  const appSecret = process.env.FEISHU_APP_SECRET;
+let cachedToken: { value: string; expiresAt: number; credentialKey: string } | null = null;
+
+export async function loadFeishuSettings(): Promise<FeishuSettings> {
+  const stored = await prisma.socialPlatformCredential.findUnique({ where: { platform: "feishu" } });
+  if (stored) {
+    let saved: Partial<FeishuSettings> = {};
+    try { saved = JSON.parse(decryptSecret(stored.clientSecretCipher) || "{}"); } catch {}
+    return {
+      appId: stored.clientId,
+      appSecret: saved.appSecret || "",
+      encryptKey: saved.encryptKey || "",
+      verificationToken: saved.verificationToken || "",
+      receiveId: saved.receiveId || "",
+      receiveIdType: saved.receiveIdType || "open_id",
+      approverOpenIds: saved.approverOpenIds || "",
+      source: "console",
+    };
+  }
+  const appId = process.env.FEISHU_APP_ID || "";
+  return {
+    appId,
+    appSecret: process.env.FEISHU_APP_SECRET || "",
+    encryptKey: process.env.FEISHU_ENCRYPT_KEY || "",
+    verificationToken: process.env.FEISHU_VERIFICATION_TOKEN || "",
+    receiveId: process.env.FEISHU_REVIEW_RECEIVE_ID || "",
+    receiveIdType: process.env.FEISHU_REVIEW_RECEIVE_ID_TYPE || "open_id",
+    approverOpenIds: process.env.FEISHU_APPROVER_OPEN_IDS || "",
+    source: appId ? "environment" : "none",
+  };
+}
+
+async function tenantToken(settings: FeishuSettings): Promise<string> {
+  const { appId, appSecret } = settings;
+  const credentialKey = createHash("sha256").update(`${appId}\0${appSecret}`).digest("hex");
+  if (cachedToken && cachedToken.credentialKey === credentialKey && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.value;
   if (!appId || !appSecret) throw new Error("FEISHU_APP_ID and FEISHU_APP_SECRET are required.");
   const response = await fetch("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal", {
     method: "POST", headers: { "content-type": "application/json" },
@@ -25,7 +67,7 @@ async function tenantToken(): Promise<string> {
   });
   const body = await response.json() as { code?: number; msg?: string; tenant_access_token?: string; expire?: number };
   if (!response.ok || body.code || !body.tenant_access_token) throw new Error(`Feishu token failed: ${body.msg || response.status}`);
-  cachedToken = { value: body.tenant_access_token, expiresAt: Date.now() + (body.expire || 7200) * 1000 };
+  cachedToken = { value: body.tenant_access_token, expiresAt: Date.now() + (body.expire || 7200) * 1000, credentialKey };
   return cachedToken.value;
 }
 
@@ -54,9 +96,10 @@ export function draftCard(draft: DraftCard) {
   };
 }
 
-async function feishu(path: string, method: string, body: unknown) {
+async function feishu(path: string, method: string, body: unknown, settings?: FeishuSettings) {
+  const config = settings || await loadFeishuSettings();
   const response = await fetch(`https://open.feishu.cn/open-apis${path}`, {
-    method, headers: { authorization: `Bearer ${await tenantToken()}`, "content-type": "application/json" },
+    method, headers: { authorization: `Bearer ${await tenantToken(config)}`, "content-type": "application/json" },
     body: JSON.stringify(body), signal: AbortSignal.timeout(10_000),
   });
   const json = await response.json() as { code?: number; msg?: string; data?: { message_id?: string } };
@@ -65,12 +108,13 @@ async function feishu(path: string, method: string, body: unknown) {
 }
 
 export async function sendDraftCard(draft: DraftCard): Promise<string> {
-  const receiveId = process.env.FEISHU_REVIEW_RECEIVE_ID;
+  const settings = await loadFeishuSettings();
+  const { receiveId } = settings;
   if (!receiveId) throw new Error("FEISHU_REVIEW_RECEIVE_ID is required.");
-  const type = process.env.FEISHU_REVIEW_RECEIVE_ID_TYPE || "open_id";
+  const type = settings.receiveIdType || "open_id";
   const result = await feishu(`/im/v1/messages?receive_id_type=${encodeURIComponent(type)}`, "POST", {
     receive_id: receiveId, msg_type: "interactive", content: JSON.stringify(draftCard(draft)),
-  });
+  }, settings);
   if (!result.data?.message_id) throw new Error("Feishu did not return a message id.");
   return result.data.message_id;
 }
@@ -79,8 +123,18 @@ export async function updateDraftCard(messageId: string, draft: DraftCard) {
   await feishu(`/im/v1/messages/${encodeURIComponent(messageId)}`, "PATCH", { content: JSON.stringify(draftCard(draft)) });
 }
 
-export function verifyFeishuRequest(body: string, timestamp: string | null, nonce: string | null, signature: string | null): boolean {
-  const key = process.env.FEISHU_ENCRYPT_KEY;
+export async function sendFeishuTestMessage() {
+  const settings = await loadFeishuSettings();
+  if (!settings.receiveId) throw new Error("FEISHU_REVIEW_RECEIVE_ID is required.");
+  await feishu(`/im/v1/messages?receive_id_type=${encodeURIComponent(settings.receiveIdType)}`, "POST", {
+    receive_id: settings.receiveId,
+    msg_type: "text",
+    content: JSON.stringify({ text: "Tlines 飞书审核机器人连接成功。后续发布候选会发送到这里等待审核。" }),
+  }, settings);
+}
+
+export async function verifyFeishuRequest(body: string, timestamp: string | null, nonce: string | null, signature: string | null): Promise<boolean> {
+  const key = (await loadFeishuSettings()).encryptKey;
   if (!key) return process.env.NODE_ENV !== "production";
   if (!timestamp || !nonce || !signature || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
   const expected = createHash("sha256").update(`${timestamp}${nonce}${key}${body}`).digest("hex");
@@ -89,7 +143,7 @@ export function verifyFeishuRequest(body: string, timestamp: string | null, nonc
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-export function allowedFeishuApprover(openId: string | null): boolean {
-  const allowed = (process.env.FEISHU_APPROVER_OPEN_IDS || "").split(",").map((id) => id.trim()).filter(Boolean);
+export async function allowedFeishuApprover(openId: string | null): Promise<boolean> {
+  const allowed = (await loadFeishuSettings()).approverOpenIds.split(",").map((id) => id.trim()).filter(Boolean);
   return Boolean(openId && allowed.includes(openId));
 }

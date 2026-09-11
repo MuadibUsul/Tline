@@ -511,6 +511,93 @@ model MacroReleaseValue {
   @@index([indicatorId, observationPeriod])
 }
 
+// Human-approved outbound publishing. Source ids deliberately stay polymorphic: research
+// and macro records have different lifecycles, while a draft must survive either being removed.
+model SocialDraft {
+  id               String    @id @default(cuid())
+  sourceKind       String // research | macro
+  sourceId         String
+  title             String
+  textEn            String
+  textZh            String
+  routeSnapshot     String    @default("[]")
+  version           Int       @default(1)
+  status            String    @default("PENDING_REVIEW")
+  feishuMessageId   String?
+  notifyAttempts    Int       @default(0)
+  notifyError       String?
+  notifiedAt        DateTime?
+  approvedById      String?
+  approvedAt        DateTime?
+  rejectedById      String?
+  rejectedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  deliveries SocialDelivery[]
+
+  @@unique([sourceKind, sourceId])
+  @@index([status, createdAt])
+}
+
+model SocialAccount {
+  id                 String    @id @default(cuid())
+  platform           String    @default("x")
+  label              String
+  language           String // en | zh-CN
+  externalAccountId  String?
+  externalUsername   String?
+  accessTokenCipher  String?
+  refreshTokenCipher String?
+  tokenExpiresAt     DateTime?
+  enabled            Boolean   @default(false)
+  lastError          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  routes     SocialRoute[]
+  deliveries SocialDelivery[]
+
+  @@index([platform, enabled])
+  @@unique([platform, externalAccountId])
+}
+
+model SocialRoute {
+  id         String   @id @default(cuid())
+  sourceKind String // research | macro
+  accountId  String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceKind, accountId])
+  @@index([sourceKind, enabled])
+}
+
+model SocialDelivery {
+  id           String    @id @default(cuid())
+  draftId      String
+  accountId    String
+  language     String
+  status       String    @default("PENDING")
+  mainPostId   String?
+  replyPostId  String?
+  attempts     Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError    String?
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  draft   SocialDraft   @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([draftId, accountId])
+  @@index([status, nextAttemptAt])
+}
+
 model MacroPolicyDocument {
   id            String    @id @default(cuid())
   releaseId     String?

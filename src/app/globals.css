@@ -616,6 +616,7 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .admin-review-row{display:flex;align-items:center;gap:10px}
 .admin-review-row > a{flex:1;min-width:0}
 .admin-review-row form{flex:none}
+.admin-body textarea{width:100%;margin:6px 0 14px;padding:10px 12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--panel);color:var(--ink);font:12px/1.55 var(--mono);resize:vertical}
 
 /* A quiet pipeline reads as healthy everywhere else; here it does not. */
 .admin-stat-alarm{border-color:var(--bear);background:color-mix(in srgb,var(--bear) 8%,transparent)}

@@ -20,4 +20,4 @@ export function siteUrl(): string {
  * social card and `/api/figures` serves the images inside a report, so blocking `/api`
  * wholesale hid both from search along with the JSON.
  */
-export const CRAWLER_DISALLOW = ["/api/auth", "/api/documents", "/api/feed", "/api/health", "/api/search", "/api/v1"];
+export const CRAWLER_DISALLOW = ["/api/auth", "/api/documents", "/api/feed", "/api/health", "/api/search", "/api/social", "/api/v1"];

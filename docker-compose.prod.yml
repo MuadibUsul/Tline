@@ -71,6 +71,12 @@ services:
       start_period: 10m
       retries: 2
 
+  social-scheduler:
+    image: ghcr.io/muadibusul/tline:${TAG:-latest}
+    build: !reset null
+    mem_limit: 256m
+    logging: *default-logging
+
 networks:
   web:
     external: true

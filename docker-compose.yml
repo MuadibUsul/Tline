@@ -46,6 +46,13 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       HEALTH_DETAIL_TOKEN: ${HEALTH_DETAIL_TOKEN:-}
+      X_CLIENT_ID: ${X_CLIENT_ID:-}
+      X_CLIENT_SECRET: ${X_CLIENT_SECRET:-}
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
+      FEISHU_ENCRYPT_KEY: ${FEISHU_ENCRYPT_KEY:-}
+      FEISHU_VERIFICATION_TOKEN: ${FEISHU_VERIFICATION_TOKEN:-}
+      FEISHU_APPROVER_OPEN_IDS: ${FEISHU_APPROVER_OPEN_IDS:-}
     volumes:
       - document-storage:/app/storage
     depends_on:
@@ -127,6 +134,32 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "scripts/check-worker-health.mjs", "macro"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  social-scheduler:
+    build: .
+    restart: unless-stopped
+    command: ["sh", "-c", "npm run env:check:production && npm run social:scheduler"]
+    environment:
+      DATABASE_URL: postgresql://tline:${POSTGRES_PASSWORD}@db:5432/tline
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
+      SITE_URL: ${SITE_URL:?Set SITE_URL}
+      X_CLIENT_ID: ${X_CLIENT_ID:-}
+      X_CLIENT_SECRET: ${X_CLIENT_SECRET:-}
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
+      FEISHU_REVIEW_RECEIVE_ID: ${FEISHU_REVIEW_RECEIVE_ID:-}
+      FEISHU_REVIEW_RECEIVE_ID_TYPE: ${FEISHU_REVIEW_RECEIVE_ID_TYPE:-open_id}
+      SOCIAL_INTERVAL_MS: ${SOCIAL_INTERVAL_MS:-5000}
+      SOCIAL_PUBLISH_ATTEMPTS: ${SOCIAL_PUBLISH_ATTEMPTS:-6}
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "scripts/check-worker-health.mjs", "social"]
       interval: 30s
       timeout: 5s
       start_period: 30s

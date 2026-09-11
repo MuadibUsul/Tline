@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       prisma.jobRun.count({ where: { status: "running", startedAt: { lt: staleJobBefore } } }),
     ]);
 
-    const workerHealth = Object.fromEntries(["research", "macro"].map((name) => {
+    const workerHealth = Object.fromEntries(["research", "macro", "social"].map((name) => {
       const worker = workers.find((item) => item.name === name);
       const healthy = worker?.status === "running" && worker.lastSeenAt >= staleHeartbeatBefore;
       return [name, { status: healthy ? "ok" : "stale", lastSeenAt: worker?.lastSeenAt ?? null }];

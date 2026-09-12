@@ -47,6 +47,7 @@ model Institution {
 
 model Article {
   id             String   @id @default(cuid())
+  slug           String   @unique
   institutionId  String
   title          String
   author         String?

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
 import { formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale, localePath } from "@/lib/i18n";
 import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
@@ -8,14 +8,16 @@ import { prisma } from "@/lib/db";
 import PdfPreview from "@/app/_components/PdfPreview";
 import { JsonLd, breadcrumbJsonLd, canonical, ogImage, reportJsonLd } from "@/lib/seo";
 import { publicationReadyWhere } from "@/lib/publication";
+import { researchPath } from "@/lib/researchPath";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await props.params;
   const locale = await getLocale();
   const article = await prisma.article.findFirst({
-    where: publicationReadyWhere({ id }),
+    where: publicationReadyWhere({ OR: [{ id }, { slug: id }] }),
     select: {
+      slug: true,
       title: true,
       publishedAt: true,
       institution: { select: { name: true } },
@@ -36,7 +38,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   return {
     title: searchTitle,
     description: description.slice(0, 160),
-    ...canonical(`/research/${id}`, locale),
+    ...canonical(researchPath(article), locale),
     openGraph: {
       type: "article",
       title: searchTitle,
@@ -115,6 +117,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const locale = await getLocale();
   const a = await getResearchView(params.id);
   if (!a) notFound();
+  if (params.id !== a.slug) permanentRedirect(localePath(locale, researchPath(a)));
   const an = a.analysis;
   const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
   const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);
@@ -135,7 +138,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   return (
     <main className="wrap" style={{ maxWidth: publisherPdf ? 1080 : 820 }}>
       <JsonLd data={reportJsonLd({
-        id: a.id,
+        slug: a.slug,
         title: heading,
         description: summary,
         publishedAt: a.publishedAt,
@@ -147,7 +150,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
       <JsonLd data={breadcrumbJsonLd(locale, [
         { name: tr(locale, "Research", "研报"), path: "/research" },
         { name: institutionName(a.institution.name, locale), path: `/institution/${a.institution.slug}` },
-        { name: heading, path: `/research/${a.id}` },
+        { name: heading, path: researchPath(a) },
       ])} />
       <div className="page-head">
         <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>

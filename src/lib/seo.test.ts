@@ -23,10 +23,10 @@ test("institution profiles name their main entity", () => {
 });
 
 test("article, breadcrumb and search schema preserve the page locale", () => {
-  const article = reportJsonLd({ id: "abc", title: "A sourced market view", description: "Summary", publishedAt: new Date("2026-09-01T00:00:00Z"), institution: "Example Bank", sourceUrl: "https://example.com/report", locale: "zh-CN" });
-  assert.equal(article.url, "https://tlines.tech/zh/research/abc");
+  const article = reportJsonLd({ slug: "example-bank-market-view-abc1234567", title: "A sourced market view", description: "Summary", publishedAt: new Date("2026-09-01T00:00:00Z"), institution: "Example Bank", sourceUrl: "https://example.com/report", locale: "zh-CN" });
+  assert.equal(article.url, "https://tlines.tech/zh/research/example-bank-market-view-abc1234567");
   assert.equal(article.mainEntityOfPage["@id"], article.url);
-  assert.equal((article as { translationOfWork: { "@id": string } }).translationOfWork["@id"], "https://tlines.tech/en/research/abc");
+  assert.equal((article as { translationOfWork: { "@id": string } }).translationOfWork["@id"], "https://tlines.tech/en/research/example-bank-market-view-abc1234567");
   const crumbs = breadcrumbJsonLd("zh-CN", [{ name: "研报", path: "/research" }]);
   assert.equal(crumbs.itemListElement[0].item, "https://tlines.tech/zh/research");
   const site = siteJsonLd("zh-CN", "描述");

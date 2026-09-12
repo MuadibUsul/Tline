@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getAdminLocale, localePath } from "@/lib/i18n";
 import { adminLabel } from "../../_components/format";
 import { decideSocialDraft, regenerateSocialDraft, retryFeishuNotification, retrySocialDelivery, saveSocialDraft } from "../actions";
+import { researchPath } from "@/lib/researchPath";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,8 @@ export default async function SocialDraftPage({ params }: { params: Promise<{ id
   const draft = await prisma.socialDraft.findUnique({ where: { id }, include: { deliveries: { include: { account: true } } } });
   if (!draft) notFound();
   const locale = await getAdminLocale();
-  const sourceHref = draft.sourceKind === "macro" ? `/macro/release/${draft.sourceId}` : `/research/${draft.sourceId}`;
+  const article = draft.sourceKind === "research" ? await prisma.article.findUnique({ where: { id: draft.sourceId }, select: { slug: true } }) : null;
+  const sourceHref = draft.sourceKind === "macro" ? `/macro/release/${draft.sourceId}` : article ? researchPath(article) : `/research/${draft.sourceId}`;
   let targets: Target[] = [];
   try { const parsed = JSON.parse(draft.routeSnapshot); if (Array.isArray(parsed)) targets = parsed; } catch {}
   const languages = new Set(targets.map((target) => target.language));

@@ -10,6 +10,7 @@ import { describeRule } from "@/lib/alerts";
 import { prisma } from "@/lib/db";
 import { assetName, formatDate, getLocale, institutionName, localeSafeText, tr, type Locale, localePath } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
+import { researchPath } from "@/lib/researchPath";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function WatchlistPage() {
   ]);
   const eventArticles = events.some((event) => event.targetId) ? await prisma.article.findMany({
     where: publicationReadyWhere({ id: { in: events.flatMap((event) => event.targetId ? [event.targetId] : []) } }),
-    select: { id: true, title: true, institution: { select: { name: true } }, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } } },
+    select: { id: true, slug: true, title: true, institution: { select: { name: true } }, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } } },
   }) : [];
   const eventArticleById = new Map(eventArticles.map((article) => [article.id, article]));
   const releaseIds = events.flatMap((event) => event.targetId ? [event.targetId] : []);
@@ -155,7 +156,7 @@ export default async function WatchlistPage() {
           {rules.length === 0 && <div className="r monitor-empty">{tr(locale, "No monitoring rules yet.", "尚未创建监控规则。")}</div>}
         </div></div>
         <div><div className="section-t">{tr(locale, "Recent triggers", "近期触发")} · {events.length}</div><div className="feed">
-          {events.map((event) => { const readyTarget = event.targetId ? eventArticleById.has(event.targetId) : false; const macroTarget = event.targetId ? eventReleaseIds.has(event.targetId) : false; return <div key={event.id} className="fcard"><div className="top"><b>{localeSafeText(event.rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{alertMessage(event)}</div><span className={`chip ${event.deliveryStatus === "sent" ? "bull" : event.deliveryStatus === "failed" ? "bear" : "gray"}`} title={event.deliveryError ?? undefined}>{deliveryLabel(event.deliveryStatus)}</span>{(readyTarget || macroTarget || event.assetTicker) && <Link href={readyTarget ? `/research/${event.targetId}` : macroTarget ? `/macro/release/${event.targetId}` : `/asset/${event.assetTicker}`} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>; })}
+          {events.map((event) => { const article = event.targetId ? eventArticleById.get(event.targetId) : undefined; const readyTarget = Boolean(article); const macroTarget = event.targetId ? eventReleaseIds.has(event.targetId) : false; const target = article ? researchPath(article) : macroTarget ? `/macro/release/${event.targetId}` : `/asset/${event.assetTicker}`; return <div key={event.id} className="fcard"><div className="top"><b>{localeSafeText(event.rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{alertMessage(event)}</div><span className={`chip ${event.deliveryStatus === "sent" ? "bull" : event.deliveryStatus === "failed" ? "bear" : "gray"}`} title={event.deliveryError ?? undefined}>{deliveryLabel(event.deliveryStatus)}</span>{(readyTarget || macroTarget || event.assetTicker) && <Link href={localePath(locale, target)} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>; })}
           {events.length === 0 && <p className="mono monitor-empty">{tr(locale, "No triggers yet.", "尚未触发提醒。")}</p>}
         </div></div>
       </section>

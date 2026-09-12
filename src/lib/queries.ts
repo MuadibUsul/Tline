@@ -191,9 +191,9 @@ export async function getInstitutionView(slug: string) {
   };
 }
 
-export async function getResearchView(id: string) {
+export async function getResearchView(identifier: string) {
   return prisma.article.findFirst({
-    where: publicationReadyWhere({ id }),
+    where: publicationReadyWhere({ OR: [{ id: identifier }, { slug: identifier }] }),
     include: {
       institution: true,
       analysis: true,

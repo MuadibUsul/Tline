@@ -4,12 +4,17 @@ import { writeAudit } from "../audit";
 import { macroPosts, researchPosts, validatePost } from "./content";
 import { sendDraftCard, updateDraftCard } from "./feishu";
 import { createXPost } from "./x";
+import { localePath } from "../i18n";
+import { researchPath } from "../researchPath";
 
 const MAX_ATTEMPTS = Math.max(1, Number(process.env.SOCIAL_PUBLISH_ATTEMPTS || 6));
 
 function text(value: { toString(): string } | null | undefined) { return value?.toString() ?? null; }
-function linkFor(kind: string, id: string, language: string) {
-  return `${siteUrl()}/${language === "zh-CN" ? "zh-CN" : "en"}/${kind === "macro" ? "macro/release" : "research"}/${id}`;
+async function linkFor(kind: string, id: string, language: string) {
+  const path = kind === "macro"
+    ? `/macro/release/${id}`
+    : researchPath(await prisma.article.findUniqueOrThrow({ where: { id }, select: { slug: true } }));
+  return `${siteUrl()}${localePath(language === "zh-CN" ? "zh-CN" : "en", path)}`;
 }
 function shanghaiDayStart(now = new Date()) {
   const shifted = new Date(now.getTime() + 8 * 3600_000);
@@ -151,7 +156,7 @@ async function publishDelivery(id: string) {
     if (invalid) throw new Error(invalid);
     const mainPostId = delivery.mainPostId || await createXPost(delivery.accountId, post);
     if (!delivery.mainPostId) await prisma.socialDelivery.update({ where: { id }, data: { mainPostId } });
-    const replyPostId = delivery.replyPostId || await createXPost(delivery.accountId, linkFor(delivery.draft.sourceKind, delivery.draft.sourceId, delivery.language), mainPostId);
+    const replyPostId = delivery.replyPostId || await createXPost(delivery.accountId, await linkFor(delivery.draft.sourceKind, delivery.draft.sourceId, delivery.language), mainPostId);
     await prisma.socialDelivery.update({ where: { id }, data: { status: "SUCCEEDED", mainPostId, replyPostId, publishedAt: new Date(), lastError: null } });
     await writeAudit({ action: "social.delivery.succeeded", targetType: "socialDelivery", targetId: id, metadata: { accountId: delivery.accountId, mainPostId, replyPostId } });
   } catch (error) {

@@ -38,7 +38,7 @@ export const noIndex: Metadata = {
 };
 
 interface ReportSchema {
-  id: string;
+  slug: string;
   title: string;
   description: string;
   publishedAt: Date;
@@ -77,7 +77,8 @@ export function organizationJsonLd(locale: Locale) {
  * are ours. isAccessibleForFree is stated because the page genuinely is.
  */
 export function reportJsonLd(report: ReportSchema) {
-  const url = localizedUrl(`/research/${report.id}`, report.locale);
+  const path = `/research/${report.slug}`;
+  const url = localizedUrl(path, report.locale);
   const otherLocale: Locale = report.locale === "en" ? "zh-CN" : "en";
   return {
     "@context": "https://schema.org",
@@ -98,8 +99,8 @@ export function reportJsonLd(report: ReportSchema) {
     isBasedOn: report.sourceUrl,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
     ...(report.locale === "en"
-      ? { workTranslation: { "@id": localizedUrl(`/research/${report.id}`, otherLocale) } }
-      : { translationOfWork: { "@id": localizedUrl(`/research/${report.id}`, otherLocale) } }),
+      ? { workTranslation: { "@id": localizedUrl(path, otherLocale) } }
+      : { translationOfWork: { "@id": localizedUrl(path, otherLocale) } }),
   };
 }
 

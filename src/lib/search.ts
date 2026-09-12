@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { researchPath } from "./researchPath";
 import { ASSETS } from "./assets";
 import { publicationReadyWhere } from "./publication";
 import { assetName, domainTerm, institutionName, localizeChineseContent, type Locale } from "./i18n";
@@ -300,6 +301,7 @@ const loadSearchData = async () => Promise.all([
       take: INDEX_MAX_ARTICLES,
       select: {
         id: true,
+        slug: true,
         title: true,
         author: true,
         rawText: true,
@@ -414,7 +416,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
           kind: "article" as const,
           title,
           subtitle: institution,
-          href: `/research/${article.id}`,
+          href: researchPath(article),
           publishedAt: article.publishedAt.toISOString(),
         },
         primary: [article.title, translation?.title ?? ""],
@@ -441,7 +443,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
             subtitle: [institution, asset, domainTerm(view.direction, locale), view.timeHorizon].filter(Boolean).join(" · "),
             // Views have no page of their own; the site links them to their report, and
             // so does this.
-            href: `/research/${article.id}`,
+            href: researchPath(article),
             publishedAt: article.publishedAt.toISOString(),
           },
           primary: [view.viewEn, view.viewZh],

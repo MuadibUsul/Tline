@@ -7,6 +7,7 @@ import { articleTimestamp, assetName, domainTerm, formatDate, getLocale, institu
 import { clusterViewsNewestFirst, rankAtomicViews, VIEW_WINDOW_DAYS, type MarketEvent } from "@/lib/viewRanking";
 import marketEvents from "../../../data/market-events.json";
 import { publicationReadyWhere } from "@/lib/publication";
+import { researchPath } from "@/lib/researchPath";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
       importance: true, sourceQuote: true,
       article: {
         select: {
-          publishedAt: true, createdAt: true, institutionId: true,
+          slug: true, publishedAt: true, createdAt: true, institutionId: true,
           institution: { select: { slug: true, name: true, rating: true, authorityScore: true } },
         },
       },
@@ -86,7 +87,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
                   <span className="view-horizon">{domainTerm(view.timeHorizon, locale, "时间范围见观点")}</span>
                 </div>
                 <div className="ai-analysis-label">{tr(locale, "AI-generated analytical summary · not a direct translation", "AI 观点摘要 · 非原文直译")}</div>
-                <h2><Link href={localePath(locale, `/research/${view.articleId}`)}>{copy}</Link></h2>
+                <h2><Link href={localePath(locale, researchPath(view.article))}>{copy}</Link></h2>
                 <div className="view-flash-foot">
                   {displayValue && <b>{displayValue}</b>}
                   <span>{domainTerm(view.topic, locale, "相关主题")}</span><span>{"★".repeat(view.importance)}</span>

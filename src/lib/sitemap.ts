@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
 import { siteUrl } from "@/lib/site";
 import { LOCALES, localePath } from "@/lib/i18n";
+import { researchPath } from "@/lib/researchPath";
 
 export interface SitemapEntry {
   url: string;
@@ -33,6 +34,7 @@ const ARTICLE_ORDER = [{ publishedAt: "asc" as const }, { id: "asc" as const }];
  */
 const ARTICLE_SELECT = {
   id: true,
+  slug: true,
   createdAt: true,
   updatedAt: true,
   translations: {
@@ -145,7 +147,7 @@ export async function buildResearchShard(index: number): Promise<SitemapEntry[]>
     for (const article of articles) {
       for (const locale of LOCALES) {
         entries.push({
-          url: base + localePath(locale, `/research/${article.id}`),
+          url: base + localePath(locale, researchPath(article)),
           lastModified: locale === "zh-CN" ? article.translations[0]?.updatedAt ?? article.updatedAt : article.updatedAt,
           changeFrequency: "monthly",
           priority: 0.7,

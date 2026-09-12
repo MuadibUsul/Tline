@@ -3,6 +3,7 @@ import { urlHash, titleHash, contentHash } from "../hash";
 import { isJunk, looksLikeArticle, type Segment } from "./extract";
 import { ASSETS } from "../assets";
 import { partitionArticleSegments } from "../articleText";
+import { buildResearchSlug } from "../researchPath";
 
 export interface RawArticle {
   title: string;
@@ -124,8 +125,13 @@ export async function persistArticle(
   });
   if (duplicateContent) return "duplicate";
 
+  const institution = await prisma.institution.findUniqueOrThrow({
+    where: { id: institutionId },
+    select: { name: true },
+  });
   await prisma.article.create({
     data: {
+      slug: buildResearchSlug({ institution: institution.name, title: raw.title, fingerprint: uHash }),
       institutionId,
       title: raw.title,
       author: raw.author ?? null,

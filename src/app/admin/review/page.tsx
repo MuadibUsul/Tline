@@ -7,6 +7,7 @@ import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { queueContentRetry, resolveContentReview } from "../actions";
 import { age } from "../_components/format";
+import { researchPath } from "@/lib/researchPath";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "内容审核" };
@@ -53,7 +54,7 @@ export default async function ReviewPage() {
       <div className="admin-review-list">
         {queue.length === 0 && <div className="empty-state">{tr(locale, "Nothing is waiting for review.", "当前没有待审核内容。")}</div>}
         {queue.map((item) => <div className="admin-review-row" key={item.key}>
-          <Link href={localePath(locale, `/research/${item.article.id}`)}>
+          <Link href={localePath(locale, researchPath(item.article))}>
             <span><b>{item.article.title}</b><small>{item.article.institution.name} · {item.kind} · {age(item.at, locale)}</small></span>
             <span className="chip bear">需要审核</span>
           </Link>

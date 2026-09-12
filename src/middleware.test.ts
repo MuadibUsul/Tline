@@ -14,3 +14,11 @@ test("unprefixed public pages permanently redirect to a canonical locale", () =>
   assert.equal(response.status, 308);
   assert.equal(response.headers.get("location"), "https://tlines.tech/en/research");
 });
+
+test("both explicit language prefixes serve the requested locale", () => {
+  for (const segment of ["en", "zh"]) {
+    const response = middleware(new NextRequest(`https://tlines.tech/${segment}/research/example`));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("x-middleware-rewrite"), "https://tlines.tech/research/example");
+  }
+});

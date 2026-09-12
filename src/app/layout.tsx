@@ -79,6 +79,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     ["sources", tr(locale, "Sources", "来源说明")], ["privacy", tr(locale, "Privacy", "隐私政策")],
     ["corrections", tr(locale, "Corrections", "更正机制")],
   ];
+  const languageSwitch = pathname.startsWith("/admin") ? null : (
+    <Link
+      className="minibtn"
+      href={localePath(locale === "en" ? "zh-CN" : "en", pathname || "/")}
+      hrefLang={locale === "en" ? "zh-CN" : "en"}
+      aria-label={tr(locale, "Switch to Chinese", "切换到英文")}
+    >
+      {locale === "en" ? "中文" : "EN"}
+    </Link>
+  );
 
   return (
     <html lang={locale}>
@@ -93,6 +103,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </nav>
             <div className="sp" />
             <div className="topbar-account">{account}</div>
+            {languageSwitch}
             <ThemeToggle label={tr(locale, "Theme", "主题")} ariaLabel={tr(locale, "Toggle theme", "切换主题")} />
             <MobileNav
               items={navItems}

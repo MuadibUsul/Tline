@@ -2,9 +2,9 @@ import { ASSETS, DIRECTION, type DirectionKey } from "../assets";
 import { resolveLLMProvider } from "../llm/config";
 import { completeJSON, type LLMProvider } from "../llm/provider";
 import type { Segment } from "./extract";
-import { ATOMIC_VIEW_PROMPT_VERSION, type ParsedAtomicView } from "./atomicViews";
+import type { ParsedAtomicView } from "./atomicViews";
 import { validateAnalysisGrounding } from "./analysisGrounding";
-import { extractAtomicViewsByRule } from "./atomicViewsRules";
+import { extractAtomicViewsByRule, splitSentences } from "./atomicViewsRules";
 
 export interface ParsedAsset {
   ticker: string;
@@ -203,7 +203,8 @@ export const mockParse = heuristicParse;
 // Atomic views are no longer requested. They were the bulk of what this call produced —
 // up to fifteen objects of seven bilingual fields each, of which two thirds were then
 // discarded by validation — and they are now quoted from the article by rule instead.
-const SYSTEM = `You extract structured investment signals from a public institutional research article.
+const SYSTEM = `You finish a code-prepared evidence brief from a public institutional research article.
+Use only the supplied evidence. Preserve conditions, uncertainty and opposing scenarios. Never fill gaps from general knowledge.
 Also write seo_title_en: a title for search engines, not a headline.
 - 50-60 characters. Google truncates past that, and a cut title loses its ending.
 - Lead with the specific subject a person would type: the asset, indicator, country or policy.
@@ -217,7 +218,39 @@ Return ONLY valid JSON matching this shape:
 "interpretation_en":string,"interpretation_zh":string,"importance_score":number(0..1),"confidence":number(0..1),
 "assets":[{"ticker":string,"direction":"strong_bull"|"bull"|"neutral"|"bear"|"strong_bear","target":number|null,"previous_target":number|null,"time_horizon":string|null,"confidence":number(0..1)}]}
 Use tickers only from this list where applicable: ${ASSETS.map((a) => a.ticker).join(", ")}.
-English analysis fields must contain professional English; _zh fields must contain institution-grade Simplified Chinese preserving every number, unit and modality. Summaries must be your own words, never a verbatim copy. If unsure about an asset, omit it.`;
+English analysis fields must contain professional English; _zh fields must contain institution-grade Simplified Chinese preserving every number, unit and modality. Summaries must be your own words, never a verbatim copy. If unsure about an asset, omit it.
+Keep the output compact: summaries and interpretations at most 90 English words / 160 Chinese characters each; at most 4 key arguments, 5 key numbers and 3 risks per language. Do not repeat the same point across fields.`;
+
+const ANALYSIS_PROMPT_VERSION = "analysis-evidence-v1";
+const EVIDENCE_LIMIT = 8_000;
+const EVIDENCE_SIGNAL = /\b(?:expect|forecast|target|outlook|scenario|risk|unless|if|because|therefore|however|but|versus|vs\.?|increase|decrease|rise|fall|growth|inflation|rate|yield|price|demand|supply|earnings|revenue|margin|policy)\b/i;
+const EVIDENCE_NUMBER = /(?:[$€£¥]\s?)?\d[\d,]*(?:\.\d+)?\s?(?:%|bp|bps|bn|billion|million|trillion|tn|k)?/i;
+
+/** Shrink a long report to ordered source sentences that preserve facts, calls and caveats. */
+export function selectAnalysisEvidence(input: ParseInput, maxChars = EVIDENCE_LIMIT): string {
+  const source = input.text.replace(/\s+/g, " ").trim();
+  if (source.length <= maxChars) return source;
+  const sentences = splitSentences(source);
+  const titleTerms = input.title.toLowerCase().match(/[a-z][a-z0-9-]{3,}/g)?.filter((word) => !/^(with|from|this|that|market|research|report|weekly|monthly)$/.test(word)) ?? [];
+  const scored = sentences.map((sentence, index) => {
+    const lower = sentence.toLowerCase();
+    const titleHits = titleTerms.reduce((sum, term) => sum + (lower.includes(term) ? 1 : 0), 0);
+    const edge = index < 6 ? 8 - index : index >= sentences.length - 4 ? 4 : 0;
+    const score = edge + Math.min(6, titleHits * 2) + (EVIDENCE_SIGNAL.test(sentence) ? 4 : 0) + (EVIDENCE_NUMBER.test(sentence) ? 3 : 0);
+    return { index, sentence: sentence.slice(0, 1_500), score };
+  });
+  const chosen: typeof scored = [];
+  let length = 0;
+  for (const item of [...scored].sort((a, b) => b.score - a.score || a.index - b.index)) {
+    if (item.score === 0 || length + item.sentence.length + 16 > maxChars) continue;
+    chosen.push(item);
+    length += item.sentence.length + 16;
+  }
+  return chosen
+    .sort((a, b) => a.index - b.index)
+    .map((item) => `[E${String(item.index + 1).padStart(4, "0")}] ${item.sentence}`)
+    .join("\n");
+}
 
 /** Field-by-field shape of one model-proposed asset call, before validation. */
 interface RawAssetCall {
@@ -264,12 +297,12 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
     seoTitle,
     summary,
     summaryZh,
-    keyArguments: Array.isArray(json.key_arguments_en) ? json.key_arguments_en.slice(0, 8) : Array.isArray(json.key_arguments) ? json.key_arguments.slice(0, 8) : [],
-    keyArgumentsZh: Array.isArray(json.key_arguments_zh) ? json.key_arguments_zh.slice(0, 8) : [],
-    keyNumbers: Array.isArray(json.key_numbers_en) ? json.key_numbers_en.slice(0, 8) : Array.isArray(json.key_numbers) ? json.key_numbers.slice(0, 8) : [],
-    keyNumbersZh: Array.isArray(json.key_numbers_zh) ? json.key_numbers_zh.slice(0, 8) : [],
-    risks: Array.isArray(json.risks_en) ? json.risks_en.slice(0, 8) : Array.isArray(json.risks) ? json.risks.slice(0, 8) : [],
-    risksZh: Array.isArray(json.risks_zh) ? json.risks_zh.slice(0, 8) : [],
+    keyArguments: Array.isArray(json.key_arguments_en) ? json.key_arguments_en.slice(0, 4) : Array.isArray(json.key_arguments) ? json.key_arguments.slice(0, 4) : [],
+    keyArgumentsZh: Array.isArray(json.key_arguments_zh) ? json.key_arguments_zh.slice(0, 4) : [],
+    keyNumbers: Array.isArray(json.key_numbers_en) ? json.key_numbers_en.slice(0, 5) : Array.isArray(json.key_numbers) ? json.key_numbers.slice(0, 5) : [],
+    keyNumbersZh: Array.isArray(json.key_numbers_zh) ? json.key_numbers_zh.slice(0, 5) : [],
+    risks: Array.isArray(json.risks_en) ? json.risks_en.slice(0, 3) : Array.isArray(json.risks) ? json.risks.slice(0, 3) : [],
+    risksZh: Array.isArray(json.risks_zh) ? json.risks_zh.slice(0, 3) : [],
     interpretation: typeof json.interpretation_en === "string" ? json.interpretation_en : typeof json.interpretation === "string" ? json.interpretation : null,
     interpretationZh: typeof json.interpretation_zh === "string" ? json.interpretation_zh : null,
   };
@@ -290,43 +323,36 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
     needsLLM: false,
     provider,
     model,
-    promptVersion: ATOMIC_VIEW_PROMPT_VERSION,
+    promptVersion: ANALYSIS_PROMPT_VERSION,
     reviewStatus: grounding.passed ? "ok" : "needs_review",
   };
 }
 
 async function realParse(input: ParseInput, provider: LLMProvider): Promise<ParsedArticle | null> {
   const sourceText = input.text.slice(0, 50000);
-  const user = `INSTITUTION: ${input.institution}\nPUBLISHED: ${input.publishedAt}\nTITLE: ${input.title}\n\nARTICLE:\n${sourceText}`;
+  const evidence = selectAnalysisEvidence({ ...input, text: sourceText });
+  const contexts = evidence === sourceText ? [sourceText] : [evidence, sourceText];
   let best: ParsedArticle | null = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (const context of contexts) {
     try {
       const result = await completeJSON<unknown>(provider, {
         system: SYSTEM,
-        user,
-        // Measured, not guessed: at 5000 the first attempt came back finish_reason
-        // "length" — cut off mid-answer, so its atomic views were incomplete, so
-        // reviewStatus was never "ok", so the loop below paid for a second full attempt.
-        // A complete answer measures around 4,200 tokens, which left no headroom at all.
-        // Output is billed on what is generated rather than on the ceiling, so raising it
-        // costs nothing when the model stops on its own and saves the entire retry when
-        // it would otherwise have been truncated.
-        maxTokens: 8000,
-      });
+        user: `INSTITUTION: ${input.institution}\nPUBLISHED: ${input.publishedAt}\nTITLE: ${input.title}\n\n${context === evidence && evidence !== sourceText ? "CODE-SELECTED EVIDENCE" : "ARTICLE"}:\n${context}`,
+        maxTokens: 3_200,
+      }, 1);
       const parsed = coerceModelResponse(result.value, result.meta.provider, result.meta.model, sourceText);
       if (parsed?.reviewStatus === "ok") return parsed;
-      // A grounded summary without any validated atomic views is still incomplete. Retry
-      // it in the same run; if both attempts are partial, retain the richer candidate so
-      // the review queue has useful output rather than an empty page.
-      if (parsed && (!best || parsed.atomicViews.length > best.atomicViews.length)) best = parsed;
-    } catch {
-      // Fall through to retry, then preserve the safe heuristic result.
+      if (parsed) best = parsed;
+    } catch (error) {
+      // A larger context can repair incomplete JSON/content, but never an auth, balance,
+      // rate-limit or network failure. Let article backoff handle provider failures.
+      if (!String(error).includes("did not return a valid JSON object")) throw error;
     }
   }
   return best;
 }
 
-/** Use the configured model for evidence-backed atomic views; fall back safely to heuristics. */
+/** Use the configured model to finish the code-selected brief; fall back safely to heuristics. */
 export async function parseArticle(input: ParseInput, segments: Segment[] = []): Promise<ParsedArticle> {
   const heuristic = heuristicParse(input, segments);
   // Views are quoted from the article by rule, not written by a model. Attached to

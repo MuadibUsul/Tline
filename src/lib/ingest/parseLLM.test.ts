@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { coerceModelResponse, heuristicParse, type ParseInput } from "./parseLLM";
+import { coerceModelResponse, heuristicParse, selectAnalysisEvidence, type ParseInput } from "./parseLLM";
 import type { Segment } from "./extract";
 
 const input = (title: string, text: string): ParseInput => ({
@@ -72,4 +72,13 @@ test("does not assign another commodity's target to the detected asset", () => {
 test("rejects a one-word provider response instead of publishing it as analysis", () => {
   const parsed = coerceModelResponse({ summary_en: "Schroders", summary_zh: "施罗德", atomic_views: [] }, "test", "test", "Global equities gained in August.");
   assert.equal(parsed, null);
+});
+
+test("code-selected evidence keeps distant facts and risks within its budget", () => {
+  const filler = Array.from({ length: 180 }, (_, index) => `Background paragraph ${index} describes ordinary market history without a decision.`);
+  filler[90] = "Our forecast is 3.2% growth in 2027 because demand should recover, but it could fall to 2.1% if policy remains tight.";
+  const selected = selectAnalysisEvidence(input("Growth outlook and policy risks", filler.join(" ")), 2_000);
+  assert.ok(selected.length <= 2_000);
+  assert.match(selected, /3\.2% growth/);
+  assert.match(selected, /could fall to 2\.1% if policy remains tight/);
 });

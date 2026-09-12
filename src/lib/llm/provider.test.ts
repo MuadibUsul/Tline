@@ -17,3 +17,17 @@ test("completeJSON accepts the first balanced object without greedily joining la
   assert.equal(result.value.ok, true);
   assert.equal(calls, 1);
 });
+
+test("completeJSON can disable its format retry for a caller with its own fallback", async () => {
+  let calls = 0;
+  const provider: LLMProvider = {
+    name: "json-test",
+    model: "json-test-v1",
+    async complete() {
+      calls++;
+      return { provider: this.name, model: this.model, text: "not json" };
+    },
+  };
+  await assert.rejects(() => completeJSON(provider, { system: "json", user: "json" }, 1));
+  assert.equal(calls, 1);
+});

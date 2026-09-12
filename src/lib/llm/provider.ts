@@ -305,14 +305,18 @@ export function withUsageRecording(provider: LLMProvider, task: LlmTask): LLMPro
 export async function completeJSON<T>(
   provider: LLMProvider,
   input: CompletionInput,
+  maxAttempts = 2,
 ): Promise<{ value: T; meta: CompletionResult }> {
-  let meta = await provider.complete(input);
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let meta: CompletionResult | null = null;
+  for (let attempt = 0; attempt < Math.max(1, maxAttempts); attempt++) {
+    meta = await provider.complete(attempt === 0 ? input : {
+      ...input,
+      system: `${input.system}\nYour previous response was invalid JSON. Return one syntactically valid JSON object only.`,
+    });
     const value = firstJsonObject<T>(meta.text);
     if (value !== null) return { value, meta };
-    if (attempt === 0) meta = await provider.complete({ ...input, system: `${input.system}\nYour previous response was invalid JSON. Return one syntactically valid JSON object only.` });
   }
-  throw new Error(`${meta.provider} did not return a valid JSON object.`);
+  throw new Error(`${meta?.provider ?? provider.name} did not return a valid JSON object.`);
 }
 
 function firstJsonObject<T>(text: string): T | null {

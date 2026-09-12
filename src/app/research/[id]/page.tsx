@@ -32,7 +32,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   // — which tells a search engine nothing about the subject, so a generated title leads
   // instead when there is one. The page heading is unchanged: the institution's own wording
   // is what the reader is shown and what the citation carries.
-  const searchTitle = article.analysis?.seoTitle?.trim() || title;
+  const searchTitle = zh ? title : article.analysis?.seoTitle?.trim() || title;
   const description = (zh ? article.analysis?.summaryZh : article.analysis?.summary)
     ?? institutionName(article.institution.name, locale);
   return {

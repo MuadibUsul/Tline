@@ -20,3 +20,14 @@ test("merges synonymous topics and identifies cross-institution strengthening", 
   assert.equal(themes[0].status, "strengthening");
   assert.equal(themes[0].assets[0].marketConfirmed, true);
 });
+
+test("drops generic topics and generic assets instead of promoting data noise", () => {
+  const themes = buildTradingThemes([
+    view("general", "General", "neutral", 1, "bank-a"),
+    { ...view("rates", "Rates", "bearish", 1, "bank-b"), asset: "General", assetTicker: null },
+  ], now);
+  assert.equal(themes.length, 1);
+  assert.equal(themes[0].key, "rates");
+  assert.deepEqual(themes[0].assets, []);
+  assert.ok(themes[0].score < 100);
+});

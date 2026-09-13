@@ -44,6 +44,7 @@ const NAMED_THEMES = [
 ] as const;
 
 const clean = (value: string) => value.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const GENERIC_KEYS = new Set(["general", "market", "other", "unspecified"]);
 
 function identity(topic: string, text: string) {
   const sample = `${topic} ${text}`;
@@ -65,6 +66,7 @@ export function buildTradingThemes(views: ThemeView[], now = new Date(), marketM
     const published = view.article.publishedAt.getTime();
     if (published < previousSince || published > now.getTime()) continue;
     const theme = identity(view.topic, `${view.viewEn} ${view.viewZh}`);
+    if (GENERIC_KEYS.has(theme.key)) continue;
     const group = groups.get(theme.key) ?? { identity: theme, current: [], previous: [] };
     (published >= currentSince ? group.current : group.previous).push(view);
     groups.set(theme.key, group);
@@ -81,7 +83,7 @@ export function buildTradingThemes(views: ThemeView[], now = new Date(), marketM
     const assets = new Map<string, { ticker: string | null; name: string; bullish: number; bearish: number; views: number; movePct: number | null }>();
     for (const view of current) {
       const key = view.assetTicker?.toUpperCase() || clean(view.asset);
-      if (!key) continue;
+      if (!key || GENERIC_KEYS.has(clean(view.asset))) continue;
       const asset = assets.get(key) ?? { ticker: view.assetTicker?.toUpperCase() ?? null, name: view.asset, bullish: 0, bearish: 0, views: 0, movePct: view.assetTicker ? moves.get(view.assetTicker.toUpperCase()) ?? null : null };
       asset.views++;
       if (view.direction === "bullish") asset.bullish++;
@@ -98,7 +100,12 @@ export function buildTradingThemes(views: ThemeView[], now = new Date(), marketM
     const latestAt = current.reduce((latest, view) => view.article.publishedAt > latest ? view.article.publishedAt : latest, current[0].article.publishedAt);
     const freshness = Math.exp(-Math.max(0, now.getTime() - latestAt.getTime()) / (3 * 864e5));
     const averageImportance = current.reduce((sum, view) => sum + view.importance, 0) / current.length;
-    const score = Math.round(Math.min(100, institutions.size * 18 + Math.min(24, current.length * 6) + averageImportance * 7 + freshness * 15 + (confirmation ?? 0.5) * 8));
+    const breadthScore = Math.min(30, institutions.size * 6);
+    const densityScore = Math.min(20, Math.log2(current.length + 1) * 3);
+    const importanceScore = Math.min(25, averageImportance * 5);
+    const freshnessScore = freshness * 15;
+    const marketScore = (confirmation ?? 0.5) * 10;
+    const score = Math.round(breadthScore + densityScore + importanceScore + freshnessScore + marketScore);
     const status: ThemeStatus = bullish > 0 && bearish > 0 ? "diverging"
       : current.length > group.previous.length || institutions.size >= 2 ? "strengthening"
       : group.previous.length > current.length ? "cooling" : "active";

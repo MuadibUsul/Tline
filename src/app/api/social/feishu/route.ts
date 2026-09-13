@@ -27,31 +27,39 @@ export async function POST(request: NextRequest) {
     return response;
   }
 
+  // Feishu card callbacks must always answer HTTP 200: any other status makes the
+  // client show the generic "出错了请稍后重试" (200671) instead of our toast.
   try {
     if (!await verifyFeishuRequest(raw, request.headers.get("x-lark-request-timestamp"), request.headers.get("x-lark-request-nonce"), request.headers.get("x-lark-signature"))) {
-      return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
+      console.log("[Feishu] signature rejected");
+      return NextResponse.json({ toast: { type: "error", content: "回调签名校验失败，请检查 Encrypt Key 配置。" } });
     }
     const callbackToken = payload.token || (payload.header as { token?: string } | undefined)?.token;
     const { verificationToken } = await loadFeishuSettings();
     if (verificationToken && callbackToken !== verificationToken) {
-      return NextResponse.json({ error: "Invalid verification token." }, { status: 401 });
+      console.log("[Feishu] token mismatch");
+      return NextResponse.json({ toast: { type: "error", content: "回调 Verification Token 校验失败。" } });
     }
     const event = (payload.event || payload) as Record<string, unknown>;
     const action = event.action as { value?: Record<string, unknown> } | undefined;
     const operator = event.operator as { operator_id?: { open_id?: string }; open_id?: string } | undefined;
     const openId = operator?.operator_id?.open_id || operator?.open_id || null;
-    if (!await allowedFeishuApprover(openId)) return NextResponse.json({ toast: { type: "error", content: "你没有发布权限。" } }, { status: 403 });
+    if (!await allowedFeishuApprover(openId)) {
+      console.log("[Feishu] approver denied");
+      return NextResponse.json({ toast: { type: "error", content: "你没有发布权限。" } });
+    }
     const value = action?.value;
     const decision = value?.action;
     const draftId = value?.draftId;
     const version = Number(value?.version);
     if ((decision !== "approve" && decision !== "reject") || typeof draftId !== "string" || !Number.isInteger(version)) {
-      return NextResponse.json({ toast: { type: "error", content: "无效的审核操作。" } }, { status: 400 });
+      console.log("[Feishu] invalid action");
+      return NextResponse.json({ toast: { type: "error", content: "无效的审核操作。" } });
     }
     const result = await decideDraft(draftId, version, decision, `feishu:${openId}`);
     return NextResponse.json({ toast: { type: result.ok ? "success" : "warning", content: result.message } });
   } catch (error) {
     console.error("[Feishu] webhook failed:", error instanceof Error ? error.message : String(error));
-    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+    return NextResponse.json({ toast: { type: "error", content: "服务器处理失败，请稍后重试。" } });
   }
 }

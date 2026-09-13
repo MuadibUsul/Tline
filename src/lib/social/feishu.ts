@@ -132,13 +132,15 @@ export async function sendFeishuTestMessage() {
   }, settings);
 }
 
+export function feishuSignature(timestamp: string, nonce: string, encryptKey: string, body: string): string {
+  return createHash("sha256").update(`${timestamp}${nonce}${encryptKey}${body}`).digest("hex");
+}
+
 export async function verifyFeishuRequest(body: string, timestamp: string | null, nonce: string | null, signature: string | null): Promise<boolean> {
   const key = (await loadFeishuSettings()).encryptKey;
-  if (!key) return process.env.NODE_ENV !== "production";
   if (!timestamp || !nonce || !signature || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
-  const expected = createHash("sha256").update(`${timestamp}${nonce}${key}${body}`).digest("hex");
   const left = Buffer.from(signature);
-  const right = Buffer.from(expected);
+  const right = Buffer.from(feishuSignature(timestamp, nonce, key, body));
   return left.length === right.length && timingSafeEqual(left, right);
 }
 

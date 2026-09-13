@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can, effectiveRole, isOperationsOwner, type PermissionAction } from "@/lib/permissions";
@@ -23,7 +24,14 @@ export const metadata: Metadata = { title: { default: "管理后台", template: 
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
-  if (!user || !can(user, "admin.access")) notFound();
+  if (!user) {
+    // A signed-out visitor (e.g. the Feishu in-app browser opening a review card's
+    // web edit link) should land on the sign-in page and come back, not on the
+    // generic "this research no longer exists" not-found screen.
+    const pathname = (await headers()).get("x-pathname") || "/admin";
+    redirect(`/signin?next=${encodeURIComponent(pathname)}`);
+  }
+  if (!can(user, "admin.access")) notFound();
   const locale = await getAdminLocale();
 
   const item = (action: PermissionAction, path: string, en: string, zh: string) =>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import test from "node:test";
-import { approverAllowed, decryptFeishuPayload, draftCard, feishuConfigStatus, mergeFeishuSettings, requireMessageReceiver, type FeishuFormInput, type FeishuSettings } from "./feishu";
+import { approverAllowed, decryptFeishuPayload, draftCard, feishuConfigStatus, feishuSignature, mergeFeishuSettings, requireMessageReceiver, type FeishuFormInput, type FeishuSettings } from "./feishu";
 
 const empty: FeishuSettings = { appId: "", appSecret: "", encryptKey: "", verificationToken: "", receiveId: "", receiveIdType: "open_id", approverOpenIds: "", source: "none" };
 
@@ -83,4 +83,13 @@ test("review card uses schema 2.0 buttons instead of the legacy action container
   assert.equal((hint?.text as { text_size?: string }).text_size, "notation");
   const done = draftCard({ ...base, status: "SUCCEEDED" });
   assert.ok((done.body.elements as Array<Record<string, unknown>>).every((element) => element.tag !== "button"));
+});
+
+test("signature matches the official sha256(timestamp+nonce+encrypt_key+body), including an empty key", () => {
+  const timestamp = "1726223600";
+  const nonce = "nonce-1";
+  const body = '{"type":"card.action.trigger","event":{"action":{"value":{"action":"approve"}}}}';
+  const expected = createHash("sha256").update(timestamp + nonce + body).digest("hex");
+  assert.equal(feishuSignature(timestamp, nonce, "", body), expected);
+  assert.notEqual(feishuSignature(timestamp, nonce, "some-key", body), expected);
 });

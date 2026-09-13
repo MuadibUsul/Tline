@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 type Target = { label: string; language: string; username?: string | null };
 
 function feishuMessage(error: string) {
-  if (error.includes("FEISHU_REVIEW_RECEIVE_ID")) return "尚未设置飞书审核人。你仍可在本页完成审核；配置审核人后可重新发送通知。";
+  if (error.includes("尚未配置飞书消息接收 ID")) return "尚未设置飞书审核人。你仍可在本页完成审核；配置审核人后可重新发送通知。";
   return `飞书通知发送失败：${error}`;
 }
 

@@ -109,8 +109,7 @@ async function feishu(path: string, method: string, body: unknown, settings?: Fe
 
 export async function sendDraftCard(draft: DraftCard): Promise<string> {
   const settings = await loadFeishuSettings();
-  const { receiveId } = settings;
-  if (!receiveId) throw new Error("FEISHU_REVIEW_RECEIVE_ID is required.");
+  const receiveId = requireMessageReceiver(settings);
   const type = settings.receiveIdType || "open_id";
   const result = await feishu(`/im/v1/messages?receive_id_type=${encodeURIComponent(type)}`, "POST", {
     receive_id: receiveId, msg_type: "interactive", content: JSON.stringify(draftCard(draft)),
@@ -125,7 +124,7 @@ export async function updateDraftCard(messageId: string, draft: DraftCard) {
 
 export async function sendFeishuTestMessage() {
   const settings = await loadFeishuSettings();
-  if (!settings.receiveId) throw new Error("FEISHU_REVIEW_RECEIVE_ID is required.");
+  requireMessageReceiver(settings);
   await feishu(`/im/v1/messages?receive_id_type=${encodeURIComponent(settings.receiveIdType)}`, "POST", {
     receive_id: settings.receiveId,
     msg_type: "text",
@@ -143,7 +142,68 @@ export async function verifyFeishuRequest(body: string, timestamp: string | null
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-export async function allowedFeishuApprover(openId: string | null): Promise<boolean> {
-  const allowed = (await loadFeishuSettings()).approverOpenIds.split(",").map((id) => id.trim()).filter(Boolean);
+export function approverAllowed(openId: string | null, approverOpenIds: string): boolean {
+  const allowed = approverOpenIds.split(",").map((id) => id.trim()).filter(Boolean);
   return Boolean(openId && allowed.includes(openId));
+}
+
+export async function allowedFeishuApprover(openId: string | null): Promise<boolean> {
+  return approverAllowed(openId, (await loadFeishuSettings()).approverOpenIds);
+}
+
+export function requireMessageReceiver(settings: Pick<FeishuSettings, "receiveId">): string {
+  if (!settings.receiveId) throw new Error("尚未配置飞书消息接收 ID");
+  return settings.receiveId;
+}
+
+export type FeishuConfigStage = "none" | "basic" | "receiver_pending" | "complete";
+
+export function feishuConfigStatus(settings: Pick<FeishuSettings, "appId" | "appSecret" | "receiveId" | "approverOpenIds">): FeishuConfigStage {
+  if (!settings.appId || !settings.appSecret) return "none";
+  if (settings.receiveId && settings.approverOpenIds) return "complete";
+  if (!settings.receiveId && !settings.approverOpenIds) return "basic";
+  return "receiver_pending";
+}
+
+export type FeishuFormInput = {
+  appId: string;
+  appSecret: string;
+  encryptKey: string;
+  verificationToken: string;
+  receiveId: string;
+  receiveIdType: string;
+  approverOpenIds: string;
+};
+
+export type FeishuSaveSettings = {
+  appId: string;
+  appSecret: string;
+  encryptKey: string;
+  verificationToken: string;
+  receiveId: string;
+  receiveIdType: string;
+  approverOpenIds: string;
+};
+
+export type FeishuSaveResult = { settings: FeishuSaveSettings } | { error: string };
+
+export function mergeFeishuSettings(form: FeishuFormInput, current: FeishuSettings): FeishuSaveResult {
+  const appId = form.appId.trim();
+  const appSecret = form.appSecret.trim() || current.appSecret;
+  if (!appId || !appSecret) return { error: "请填写 App ID 和 App Secret。" };
+  if ([appId, form.appSecret, form.encryptKey, form.verificationToken, form.receiveId, form.approverOpenIds].some((value) => value.length > 2000)) return { error: "飞书配置内容过长。" };
+  return {
+    settings: {
+      appId,
+      appSecret,
+      // These two never show their stored value, so an empty field means "save
+      // empty", not "keep the old one": the callback must be able to switch between
+      // encrypted and plaintext verification, and a cleared key must reach the DB.
+      encryptKey: form.encryptKey.trim(),
+      verificationToken: form.verificationToken.trim(),
+      receiveId: form.receiveId.trim(),
+      receiveIdType: ["open_id", "user_id", "union_id", "email", "chat_id"].includes(form.receiveIdType) ? form.receiveIdType : "open_id",
+      approverOpenIds: [...new Set(form.approverOpenIds.split(",").map((id) => id.trim()).filter(Boolean))].join(","),
+    },
+  };
 }

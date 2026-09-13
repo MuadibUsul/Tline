@@ -6,7 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { validatePost } from "@/lib/social/content";
-import { loadFeishuSettings, sendFeishuTestMessage } from "@/lib/social/feishu";
+import { loadFeishuSettings, mergeFeishuSettings, sendFeishuTestMessage } from "@/lib/social/feishu";
 import { decideDraft, refreshDraftCard, regenerateDraft } from "@/lib/social/pipeline";
 import { encryptSecret, hasSecretKey, secretHint } from "@/lib/secrets";
 
@@ -40,27 +40,35 @@ export async function saveFeishuSettings(_state: SocialActionResult, form: FormD
   const user = await admin();
   if (!user) return { error: "无权执行此操作。" };
   const current = await loadFeishuSettings();
-  const appId = form.get("appId")?.toString().trim() || "";
-  const appSecret = form.get("appSecret")?.toString().trim() || current.appSecret;
-  const encryptKey = form.get("encryptKey")?.toString().trim() || current.encryptKey;
-  const verificationToken = form.get("verificationToken")?.toString().trim() || current.verificationToken;
-  const receiveId = form.get("receiveId")?.toString().trim() || "";
-  const receiveIdType = ["open_id", "user_id", "union_id", "email", "chat_id"].includes(form.get("receiveIdType")?.toString() || "") ? form.get("receiveIdType")!.toString() : "open_id";
-  const approverOpenIds = [...new Set((form.get("approverOpenIds")?.toString() || "").split(",").map((id) => id.trim()).filter(Boolean))].join(",");
-  if (!appId || !appSecret || !receiveId || !approverOpenIds || !encryptKey) return { error: "请填写应用 ID、应用密钥、消息接收 ID、审核人 Open ID 和 Encrypt Key。" };
-  if ([appId, appSecret, encryptKey, verificationToken, receiveId, approverOpenIds].some((value) => value.length > 2000)) return { error: "飞书配置内容过长。" };
+  const merged = mergeFeishuSettings({
+    appId: form.get("appId")?.toString() || "",
+    appSecret: form.get("appSecret")?.toString() || "",
+    encryptKey: form.get("encryptKey")?.toString() || "",
+    verificationToken: form.get("verificationToken")?.toString() || "",
+    receiveId: form.get("receiveId")?.toString() || "",
+    receiveIdType: form.get("receiveIdType")?.toString() || "",
+    approverOpenIds: form.get("approverOpenIds")?.toString() || "",
+  }, current);
+  if ("error" in merged) return { error: merged.error };
   if (!hasSecretKey()) return { error: "服务器尚未配置密钥加密能力。" };
 
-  const settings = { appSecret, encryptKey, verificationToken, receiveId, receiveIdType, approverOpenIds };
+  const settings = {
+    appSecret: merged.settings.appSecret,
+    encryptKey: merged.settings.encryptKey,
+    verificationToken: merged.settings.verificationToken,
+    receiveId: merged.settings.receiveId,
+    receiveIdType: merged.settings.receiveIdType,
+    approverOpenIds: merged.settings.approverOpenIds,
+  };
   await prisma.$transaction([
     prisma.socialPlatformCredential.upsert({
       where: { platform: "feishu" },
-      create: { platform: "feishu", clientId: appId, clientSecretCipher: encryptSecret(JSON.stringify(settings)), clientSecretHint: secretHint(appSecret) },
-      update: { clientId: appId, clientSecretCipher: encryptSecret(JSON.stringify(settings)), clientSecretHint: secretHint(appSecret) },
+      create: { platform: "feishu", clientId: merged.settings.appId, clientSecretCipher: encryptSecret(JSON.stringify(settings)), clientSecretHint: secretHint(merged.settings.appSecret) },
+      update: { clientId: merged.settings.appId, clientSecretCipher: encryptSecret(JSON.stringify(settings)), clientSecretHint: secretHint(merged.settings.appSecret) },
     }),
     prisma.socialDraft.updateMany({ where: { status: "PENDING_REVIEW", feishuMessageId: null }, data: { notifyAttempts: 0, notifyError: null } }),
   ]);
-  await writeAudit({ actorId: user.id, action: "social.feishu.update", targetType: "socialPlatformCredential", targetId: "feishu", metadata: { receiveIdType, approverCount: approverOpenIds.split(",").length } });
+  await writeAudit({ actorId: user.id, action: "social.feishu.update", targetType: "socialPlatformCredential", targetId: "feishu", metadata: { receiveIdType: merged.settings.receiveIdType, approverCount: merged.settings.approverOpenIds ? merged.settings.approverOpenIds.split(",").length : 0 } });
   refresh();
   return { ok: "飞书机器人配置已保存，待审核内容将自动重新发送。" };
 }

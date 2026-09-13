@@ -86,11 +86,11 @@ export function draftCard(draft: DraftCard) {
     header: { template: pending ? "blue" : draft.status === "SUCCEEDED" ? "green" : draft.status === "REJECTED" ? "grey" : "orange", title: { tag: "plain_text", content: `Tlines 发布审核 · ${draft.title}`.slice(0, 100) } },
     body: { elements: [
       { tag: "markdown", content: `**固定发布目标**\n${md(routeText)}\n\n**中文稿（v${draft.version}）**\n${md(draft.textZh)}\n\n**English**\n${md(draft.textEn)}${results}` },
-      ...(pending ? [{ tag: "action", actions: [
-        { tag: "button", type: "primary", text: { tag: "plain_text", content: "批准并发布" }, value: { action: "approve", draftId: draft.id, version: draft.version } },
-        { tag: "button", type: "danger", text: { tag: "plain_text", content: "拒绝" }, value: { action: "reject", draftId: draft.id, version: draft.version } },
-        { tag: "button", type: "default", text: { tag: "plain_text", content: "网页改稿" }, url: `${siteUrl()}/admin/social/${draft.id}` },
-      ] }] : []),
+      ...(pending ? [
+        { tag: "button", type: "primary", text: { tag: "plain_text", content: "批准并发布" }, behaviors: [{ type: "callback", value: { action: "approve", draftId: draft.id, version: draft.version } }] },
+        { tag: "button", type: "danger", text: { tag: "plain_text", content: "拒绝" }, behaviors: [{ type: "callback", value: { action: "reject", draftId: draft.id, version: draft.version } }] },
+        { tag: "button", type: "default", text: { tag: "plain_text", content: "网页改稿" }, behaviors: [{ type: "open_url", default_url: `${siteUrl()}/admin/social/${draft.id}` }] },
+      ] : []),
       { tag: "note", elements: [{ tag: "plain_text", content: pending ? "只有指定审核人可批准；旧版本按钮自动失效。" : `状态：${draft.status}` }] },
     ] },
   };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import test from "node:test";
-import { approverAllowed, decryptFeishuPayload, feishuConfigStatus, mergeFeishuSettings, requireMessageReceiver, type FeishuFormInput, type FeishuSettings } from "./feishu";
+import { approverAllowed, decryptFeishuPayload, draftCard, feishuConfigStatus, mergeFeishuSettings, requireMessageReceiver, type FeishuFormInput, type FeishuSettings } from "./feishu";
 
 const empty: FeishuSettings = { appId: "", appSecret: "", encryptKey: "", verificationToken: "", receiveId: "", receiveIdType: "open_id", approverOpenIds: "", source: "none" };
 
@@ -63,4 +63,22 @@ test("encrypted Feishu payloads use the official IV-prefixed AES format", () => 
   const cipher = createCipheriv("aes-256-cbc", createHash("sha256").update(encryptKey).digest(), iv);
   const encrypt = Buffer.concat([iv, cipher.update(plaintext), cipher.final()]).toString("base64");
   assert.equal(decryptFeishuPayload(encrypt, encryptKey), plaintext);
+});
+
+test("review card uses schema 2.0 buttons instead of the legacy action container", () => {
+  const base = { id: "draft_1", title: "标题", textEn: "English", textZh: "中文", version: 3, deliveries: [] };
+  const card = draftCard({ ...base, status: "PENDING_REVIEW" });
+  assert.equal(card.schema, "2.0");
+  const elements = card.body.elements as Array<Record<string, unknown>>;
+  assert.ok(elements.every((element) => element.tag !== "action" && !("actions" in element)), "no legacy action container");
+  const buttons = elements.filter((element) => element.tag === "button");
+  assert.equal(buttons.length, 3);
+  const behaviors = (element: Record<string, unknown>) => element.behaviors as Array<Record<string, unknown>>;
+  assert.equal(behaviors(buttons[0])[0].type, "callback");
+  assert.deepEqual(behaviors(buttons[0])[0].value, { action: "approve", draftId: "draft_1", version: 3 });
+  assert.deepEqual(behaviors(buttons[1])[0].value, { action: "reject", draftId: "draft_1", version: 3 });
+  assert.equal(behaviors(buttons[2])[0].type, "open_url");
+  assert.match(String(behaviors(buttons[2])[0].default_url), /admin\/social\/draft_1/);
+  const done = draftCard({ ...base, status: "SUCCEEDED" });
+  assert.ok((done.body.elements as Array<Record<string, unknown>>).every((element) => element.tag !== "button"));
 });

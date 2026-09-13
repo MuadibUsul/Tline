@@ -91,7 +91,7 @@ export function draftCard(draft: DraftCard) {
         { tag: "button", type: "danger", text: { tag: "plain_text", content: "拒绝" }, behaviors: [{ type: "callback", value: { action: "reject", draftId: draft.id, version: draft.version } }] },
         { tag: "button", type: "default", text: { tag: "plain_text", content: "网页改稿" }, behaviors: [{ type: "open_url", default_url: `${siteUrl()}/admin/social/${draft.id}` }] },
       ] : []),
-      { tag: "note", elements: [{ tag: "plain_text", content: pending ? "只有指定审核人可批准；旧版本按钮自动失效。" : `状态：${draft.status}` }] },
+      { tag: "div", text: { tag: "plain_text", content: pending ? "只有指定审核人可批准；旧版本按钮自动失效。" : `状态：${draft.status}`, text_size: "notation" } },
     ] },
   };
 }

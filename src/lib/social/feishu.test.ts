@@ -70,7 +70,7 @@ test("review card uses schema 2.0 buttons instead of the legacy action container
   const card = draftCard({ ...base, status: "PENDING_REVIEW" });
   assert.equal(card.schema, "2.0");
   const elements = card.body.elements as Array<Record<string, unknown>>;
-  assert.ok(elements.every((element) => element.tag !== "action" && !("actions" in element)), "no legacy action container");
+  assert.ok(elements.every((element) => element.tag !== "action" && !("actions" in element) && element.tag !== "note"), "no legacy action container or note element");
   const buttons = elements.filter((element) => element.tag === "button");
   assert.equal(buttons.length, 3);
   const behaviors = (element: Record<string, unknown>) => element.behaviors as Array<Record<string, unknown>>;
@@ -79,6 +79,8 @@ test("review card uses schema 2.0 buttons instead of the legacy action container
   assert.deepEqual(behaviors(buttons[1])[0].value, { action: "reject", draftId: "draft_1", version: 3 });
   assert.equal(behaviors(buttons[2])[0].type, "open_url");
   assert.match(String(behaviors(buttons[2])[0].default_url), /admin\/social\/draft_1/);
+  const hint = elements.find((element) => element.tag === "div") as { text: Record<string, unknown> } | undefined;
+  assert.equal((hint?.text as { text_size?: string }).text_size, "notation");
   const done = draftCard({ ...base, status: "SUCCEEDED" });
   assert.ok((done.body.elements as Array<Record<string, unknown>>).every((element) => element.tag !== "button"));
 });

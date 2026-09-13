@@ -805,3 +805,5 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .social-review-results .fcard{margin-top:10px}
 @media(max-width:900px){.admin-shell{gap:8px}.social-flow-section{grid-template-columns:1fr;gap:15px}.social-flow-guide{padding-top:0}.social-account-new{grid-template-columns:1fr}.social-summary{align-self:stretch}}
 @media(max-width:620px){.social-summary{width:100%;justify-content:space-between}.social-summary span{padding:0 9px}.social-flow-section{padding:26px 0}.social-panel-head{align-items:center}.social-account-fields,.social-disclosure .form-grid,.social-account-new .form-grid{grid-template-columns:1fr}.social-account-head>div{align-items:flex-start;flex-direction:column;gap:2px}.social-account-actions{flex-wrap:wrap}.social-review .page-head,.social-review-decision{align-items:flex-start;flex-direction:column}.social-review-route{grid-template-columns:1fr;gap:14px}.social-review-actions{justify-content:flex-start}.social-review-save{align-items:flex-start;flex-direction:column}}
+.breadcrumbs{display:flex;align-items:center;gap:8px;padding-top:24px;font:11px/1.4 var(--mono);color:var(--faint)}
+.breadcrumbs a{color:var(--muted)}

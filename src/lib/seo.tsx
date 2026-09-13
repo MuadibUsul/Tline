@@ -19,12 +19,12 @@ import { ORGANIZATION_ID_PATH, SITE_NAME, SITE_NAME_ZH, siteUrl } from "./site";
  * unrelated pages and picks one. x-default points at English, which is what an address
  * without a language resolves to for a reader with no stated preference.
  */
-export function canonical(path: string, locale?: Locale): Metadata {
+export function canonical(path: string, locale?: Locale, availableLocales: readonly Locale[] = LOCALES): Metadata {
   const base = siteUrl();
   if (!locale) return { alternates: { canonical: new URL(path, base).toString() } };
   const languages: Record<string, string> = {};
-  for (const other of LOCALES) {
-    languages[other === "zh-CN" ? "zh-Hans" : other] = new URL(localePath(other, path), base).toString();
+  for (const other of availableLocales) {
+    languages[other] = new URL(localePath(other, path), base).toString();
   }
   languages["x-default"] = new URL(localePath("en", path), base).toString();
   return {
@@ -47,9 +47,20 @@ interface ReportSchema {
   sourceUrl: string;
   locale: Locale;
   author?: string | null;
+  about?: string[];
+  hasTranslation?: boolean;
 }
 
 export const brandName = (locale: Locale) => locale === "zh-CN" ? SITE_NAME_ZH : SITE_NAME;
+export const homeSeoTitle = (locale: Locale) => locale === "zh-CN"
+  ? "Tlines 全球机构情报｜银行研报、市场共识与资产信号"
+  : "Tlines Institutional Intelligence | Bank Research & Market Consensus";
+export const assetSeoTitle = (name: string, locale: Locale) => locale === "zh-CN"
+  ? `${name}机构展望与银行预测｜Tlines`
+  : `${name} Institutional Outlook & Bank Forecasts | Tlines`;
+export const institutionSeoTitle = (name: string, locale: Locale) => locale === "zh-CN"
+  ? `${name}市场观点、预测与研报｜Tlines`
+  : `${name} Market Outlook, Forecasts & Research | Tlines`;
 export const localizedUrl = (path: string, locale: Locale) => new URL(localePath(locale, path), siteUrl()).toString();
 export const organizationId = () => `${siteUrl()}${ORGANIZATION_ID_PATH}`;
 export function ogImage(kind: string, title: string, subtitle?: string) {
@@ -72,9 +83,8 @@ export function organizationJsonLd(locale: Locale) {
 /**
  * A report described as an article, so a search engine can show it as one.
  *
- * The publisher is named as the author and this site as the publisher, which is what the
- * arrangement actually is: the research is theirs, the summary and the extracted views
- * are ours. isAccessibleForFree is stated because the page genuinely is.
+ * The institution remains the report publisher. Tlines is sdPublisher: it publishes this
+ * structured-data description and the surrounding analysis page, not the source report.
  */
 export function reportJsonLd(report: ReportSchema) {
   const path = `/research/${report.slug}`;
@@ -92,19 +102,20 @@ export function reportJsonLd(report: ReportSchema) {
     inLanguage: report.locale,
     isAccessibleForFree: true,
     author: report.author ? { "@type": "Person", name: report.author } : { "@type": "Organization", name: report.institution },
-    publisher: { "@id": organizationId() },
-    accountablePerson: { "@type": "Organization", name: report.institution },
+    publisher: { "@type": "Organization", name: report.institution },
+    sdPublisher: { "@id": organizationId() },
     abstract: report.description.slice(0, 300),
+    ...(report.about?.length ? { about: report.about.map((name) => ({ "@type": "Thing", name })) } : {}),
     // The publisher's own page is the authority for the research itself.
     isBasedOn: report.sourceUrl,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
     ...(report.locale === "en"
-      ? { workTranslation: { "@id": localizedUrl(path, otherLocale) } }
+      ? report.hasTranslation ? { workTranslation: { "@id": localizedUrl(path, otherLocale) } } : {}
       : { translationOfWork: { "@id": localizedUrl(path, otherLocale) } }),
   };
 }
 
-/** The site itself, with the search box a result page can offer. */
+/** The site itself. SearchAction is omitted until a crawlable search-results route exists. */
 export function siteJsonLd(locale: Locale, description: string) {
   const url = localizedUrl("/", locale);
   return {
@@ -116,11 +127,6 @@ export function siteJsonLd(locale: Locale, description: string) {
     description,
     inLanguage: locale,
     publisher: { "@id": organizationId() },
-    potentialAction: {
-      "@type": "SearchAction",
-      target: { "@type": "EntryPoint", urlTemplate: `${localizedUrl("/research", locale)}?q={search_term_string}` },
-      "query-input": "required name=search_term_string",
-    },
   };
 }
 

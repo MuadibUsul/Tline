@@ -8,7 +8,7 @@ const candidates: SearchCandidate[] = [
     primary: ["Goldman Sachs"],
   },
   {
-    result: { id: "gold", kind: "asset", title: "Gold · XAUUSD", subtitle: "commodity", href: "/asset/XAUUSD" },
+    result: { id: "gold", kind: "asset", title: "Gold · XAUUSD", subtitle: "commodity", href: "/markets/gold" },
     primary: ["Gold", "XAUUSD"],
     aliases: ["gold price", "黄金", "金价"],
   },

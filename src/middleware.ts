@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { assetPath } from "@/lib/assetPath";
 
 /**
  * Puts the language in the address.
@@ -46,6 +47,14 @@ export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (MACHINE_PATH.test(pathname)) return NextResponse.next();
+
+  const legacyAsset = /^\/(en|zh)?\/?asset\/([^/]+)\/?$/i.exec(pathname);
+  if (legacyAsset) {
+    const url = request.nextUrl.clone();
+    const segment = legacyAsset[1] || preferredSegment(request);
+    url.pathname = `/${segment}${assetPath(decodeURIComponent(legacyAsset[2]))}`;
+    return NextResponse.redirect(url, 308);
+  }
 
   const [, first, ...rest] = pathname.split("/");
 

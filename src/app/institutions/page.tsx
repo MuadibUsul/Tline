@@ -8,6 +8,7 @@ import { clusterViewsNewestFirst, rankAtomicViews, VIEW_WINDOW_DAYS, type Market
 import marketEvents from "../../../data/market-events.json";
 import { publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
+import { assetPath } from "@/lib/assetPath";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +83,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
                   <Link href={localePath(locale, `/institution/${view.article.institution.slug}`)}>{institutionName(view.article.institution.name, locale)}</Link>
                   <span className={`chip ${tone}`}>{directionLabel(view.direction, locale)}</span>
                   <span className="chip gray">{locale === "zh-CN" ? TYPE_ZH[view.type] ?? domainTerm(view.type, locale) : domainTerm(view.type, locale)}</span>
-                  {view.assetTicker ? <Link href={localePath(locale, `/asset/${view.assetTicker}`)} className="chip acc">{assetName(view.asset, locale, view.assetTicker, "相关资产")} · {view.assetTicker}</Link> : <span className="chip acc">{assetName(view.asset, locale, null, "相关资产")}</span>}
+                  {view.assetTicker ? <Link href={localePath(locale, assetPath(view.assetTicker))} className="chip acc">{assetName(view.asset, locale, view.assetTicker, "相关资产")} · {view.assetTicker}</Link> : <span className="chip acc">{assetName(view.asset, locale, null, "相关资产")}</span>}
                   {view.matchedEvent && <a href={view.matchedEvent.sourceUrl} target="_blank" rel="noopener noreferrer" className="chip bear">{locale === "zh-CN" ? view.matchedEvent.titleZh : view.matchedEvent.titleEn}</a>}
                   <span className="view-horizon">{domainTerm(view.timeHorizon, locale, "时间范围见观点")}</span>
                 </div>

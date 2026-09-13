@@ -2,13 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
-import { formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale, localePath } from "@/lib/i18n";
+import { assetName, formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale, localePath } from "@/lib/i18n";
 import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
 import { prisma } from "@/lib/db";
 import PdfPreview from "@/app/_components/PdfPreview";
-import { JsonLd, breadcrumbJsonLd, canonical, ogImage, reportJsonLd } from "@/lib/seo";
+import { JsonLd, breadcrumbJsonLd, canonical, localizedUrl, ogImage, reportJsonLd } from "@/lib/seo";
 import { preferredEnglishDocuments, publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
+import { contentQuality } from "@/lib/contentQuality";
+import { assetPath } from "@/lib/assetPath";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -19,10 +21,13 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
     select: {
       slug: true,
       title: true,
+      rawText: true,
+      sourceUrl: true,
+      language: true,
       publishedAt: true,
       institution: { select: { name: true } },
-      analysis: { select: { seoTitle: true, summary: true, summaryZh: true } },
-      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
+      analysis: { select: { seoTitle: true, summary: true, summaryZh: true, reviewStatus: true } },
+      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true, qualityScore: true, status: true } },
     },
   });
   if (!article) return { title: tr(locale, "Report not found", "研报未找到") };
@@ -35,12 +40,17 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   const searchTitle = zh ? title : article.analysis?.seoTitle?.trim() || title;
   const description = (zh ? article.analysis?.summaryZh : article.analysis?.summary)
     ?? institutionName(article.institution.name, locale);
+  const quality = contentQuality(article, locale);
+  const availableLocales = article.translations[0] ? (["en", "zh-CN"] as const) : (["en"] as const);
   return {
     title: searchTitle,
     description: description.slice(0, 160),
-    ...canonical(researchPath(article), locale),
+    ...canonical(researchPath(article), locale, availableLocales),
+    ...(quality.eligibility === "INDEX" ? {} : { robots: { index: false, follow: true } }),
     openGraph: {
       type: "article",
+      url: localizedUrl(researchPath(article), locale),
+      locale,
       title: searchTitle,
       description: description.slice(0, 160),
       publishedTime: article.publishedAt.toISOString(),
@@ -56,7 +66,7 @@ function parseJson<T>(s: string | undefined, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }
 }
 
-type Figure = { id: string; afterSegmentPosition: number; alt: string | null; caption: string | null };
+type Figure = { id: string; afterSegmentPosition: number; alt: string | null; caption: string | null; width: number | null; height: number | null };
 
 function Figures({ items }: { items: Figure[] }) {
   if (!items.length) return null;
@@ -65,7 +75,7 @@ function Figures({ items }: { items: Figure[] }) {
       {items.map((figure) => (
         <figure className="article-figure" key={figure.id}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/figures/${figure.id}`} alt={figure.alt ?? figure.caption ?? ""} loading="lazy" />
+          <img src={`/api/figures/${figure.id}`} alt={figure.alt ?? figure.caption ?? ""} width={figure.width ?? undefined} height={figure.height ?? undefined} loading="lazy" />
           {figure.caption && <figcaption>{figure.caption}</figcaption>}
         </figure>
       ))}
@@ -135,6 +145,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
 
   const heading = locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title;
   const summary = (locale === "zh-CN" ? an?.summaryZh : an?.summary) ?? institutionName(a.institution.name, locale);
+  const relatedAssets = [...new Map(a.atomicViews.filter((view) => view.assetTicker).map((view) => [view.assetTicker!, view.asset])).entries()];
 
   return (
     <main className="wrap" style={{ maxWidth: publisherPdf ? 1080 : 820 }}>
@@ -143,10 +154,13 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         title: heading,
         description: summary,
         publishedAt: a.publishedAt,
+        updatedAt: a.updatedAt,
         institution: a.institution.name,
         sourceUrl: a.sourceUrl,
         locale,
         author: a.author,
+        about: [...new Set(a.atomicViews.flatMap((view) => [view.topic, view.asset]).filter(Boolean))],
+        hasTranslation: Boolean(usableTranslation),
       })} />
       <JsonLd data={breadcrumbJsonLd(locale, [
         { name: tr(locale, "Research", "研报"), path: "/research" },
@@ -171,6 +185,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           <div><dt>{tr(locale, "Published", "发布时间")}</dt><dd>{date}</dd></div>
           <div><dt>{tr(locale, "Time horizon", "时间范围")}</dt><dd>{[...new Set(a.atomicViews.map((view) => view.timeHorizon))].join(" · ") || tr(locale, "Not explicitly stated", "原文未明确说明")}</dd></div>
         </dl>
+        {relatedAssets.length > 0 && <div className="tag-row" aria-label={tr(locale, "Related assets", "相关资产")}>{relatedAssets.map(([ticker, name]) => <Link className="chip acc" href={localePath(locale, assetPath(ticker))} key={ticker}>{assetName(name, locale, ticker)} · {ticker}</Link>)}</div>}
         {keyArgs.length > 0 && <section className="citation-arguments" aria-labelledby="key-arguments-heading">
           <h3 id="key-arguments-heading">{tr(locale, "Key arguments", "关键论点")}</h3>
           <ul className="citation-list">{keyArgs.map((item, index) => <li key={`${item}-${index}`}>{locale === "zh-CN" ? localizeChineseContent(item) : item}</li>)}</ul>

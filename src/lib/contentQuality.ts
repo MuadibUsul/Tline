@@ -9,7 +9,8 @@ export interface IndexableArticleInput {
   translations?: Array<{ title: string; text?: string; qualityScore: number | null; status: string }>;
 }
 
-export interface ContentQualityResult { indexable: boolean; issues: string[] }
+export type IndexEligibility = "INDEX" | "NOINDEX_FOLLOW" | "NOT_GENERATED";
+export interface ContentQualityResult { indexable: boolean; eligibility: IndexEligibility; issues: string[] }
 
 const MOJIBAKE = /\uFFFD|(?:Ã.|Â.|â(?:€|€™|€œ|€œ))/;
 const BAD_TITLE = /^(?:untitled|title|document|report|research|go to article|download(?: the)? (?:pdf|report|document)|无标题)$/i;
@@ -38,12 +39,17 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
   if (!summary) issues.push("empty_summary");
   if (!article.sourceUrl || !/^https?:\/\//i.test(article.sourceUrl)) issues.push("missing_source");
   if (article.language === "en" && HAN.test(title)) issues.push("source_language_mismatch");
+  if (article.analysis && article.analysis.reviewStatus !== "ok") issues.push("analysis_needs_review");
 
   if (locale === "zh-CN") {
     if (!translation?.title.trim() || !translation.text?.trim()) issues.push("missing_translation");
     if (translation && !HAN.test(`${translation.title}\n${translation.text ?? ""}`)) issues.push("translation_language_mismatch");
     if (translation && (MOJIBAKE.test(`${translation.title}\n${translation.text ?? ""}`) || hasBrokenWord(`${translation.title}\n${translation.text ?? ""}`))) issues.push("translation_garbled");
+    if (translation?.status === "needs_review") issues.push("translation_needs_review");
+    if (translation?.qualityScore != null && translation.qualityScore < 0.8) issues.push("translation_below_threshold");
   }
 
-  return { indexable: issues.length === 0, issues };
+  const essentialMissing = !title || !body || !article.sourceUrl;
+  const eligibility: IndexEligibility = essentialMissing ? "NOT_GENERATED" : issues.length ? "NOINDEX_FOLLOW" : "INDEX";
+  return { indexable: eligibility === "INDEX", eligibility, issues };
 }

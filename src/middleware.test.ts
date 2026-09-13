@@ -22,3 +22,9 @@ test("both explicit language prefixes serve the requested locale", () => {
     assert.equal(response.headers.get("x-middleware-rewrite"), "https://tlines.tech/research/example");
   }
 });
+
+test("legacy asset URLs permanently redirect to the readable market canonical", () => {
+  const response = middleware(new NextRequest("https://tlines.tech/zh/asset/XAUUSD"));
+  assert.equal(response.status, 308);
+  assert.equal(response.headers.get("location"), "https://tlines.tech/zh/markets/gold");
+});

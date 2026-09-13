@@ -13,22 +13,22 @@ import Analytics from "./_components/Analytics";
 import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { siteUrl } from "@/lib/site";
-import { ogImage } from "@/lib/seo";
+import { brandName, localizedUrl, ogImage } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  const title = tr(locale, "Institutional Intelligence", "全球机构情报");
+  const title = brandName(locale);
   const description = tr(
     locale,
-    "Turn institutional research into actionable signal.",
-    "将全球机构研究转化为可执行信号。",
+    "Institutional Research, Consensus & Market Signals",
+    "机构研报、市场共识与资产信号",
   );
   return {
     metadataBase: new URL(siteUrl()),
     title: { default: title, template: `%s · ${title}` },
     description,
     applicationName: title,
-    openGraph: { type: "website", siteName: title, title, description, locale, images: [{ url: ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal"), width: 1200, height: 630 }] },
+    openGraph: { type: "website", siteName: title, title, description, locale, url: localizedUrl("/", locale), images: [{ url: ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal"), width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal")] },
     robots: { index: true, follow: true },
   };
@@ -53,6 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const navItems: MobileNavItem[] = ([
     { href: "/", label: tr(locale, "Home", "首页") },
+    { href: "/markets", label: tr(locale, "Markets", "资产") },
     { href: "/macro", label: tr(locale, "Economic Data", "经济数据") },
     { href: "/institutions", label: tr(locale, "Views", "观点") },
     { href: "/research", label: tr(locale, "Research", "研报") },
@@ -77,7 +78,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     ["about", tr(locale, "About", "关于")], ["methodology", tr(locale, "Methodology", "方法论")],
     ["editorial-policy", tr(locale, "Editorial policy", "编辑政策")], ["ai-usage", tr(locale, "AI usage", "AI 使用说明")],
     ["sources", tr(locale, "Sources", "来源说明")], ["privacy", tr(locale, "Privacy", "隐私政策")],
-    ["corrections", tr(locale, "Corrections", "更正机制")],
+    ["corrections", tr(locale, "Corrections", "更正机制")], ["financial-disclaimer", tr(locale, "Financial disclaimer", "金融免责声明")],
   ];
   const languageSwitch = pathname.startsWith("/admin") ? null : (
     <Link
@@ -96,7 +97,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="topbar">
           <div className="wrap inner">
             <Link href={localePath(locale, "/")} className="brand">
-              <span className="glyph">II</span> <span className="brand-name">{tr(locale, "Institutional Intelligence", "全球机构情报")}</span>
+              <span className="glyph">II</span> <span className="brand-name">{brandName(locale)}</span>
             </Link>
             <nav className="nav" aria-label={tr(locale, "Primary", "主导航")}>
               {navItems.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
@@ -120,7 +121,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             first paint of the page it is measuring. */}
         {process.env.ANALYTICS_ENABLED !== "false" && <Analytics />}
         <footer className="footer wrap">
-          <span>{tr(locale, "Research → Data → Signal", "研报 → 数据 → 信号")}</span>
+          <span>{brandName(locale)} · {tr(locale, "Research → Data → Signal", "研报 → 数据 → 信号")}</span>
           <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{policyLinks.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}</nav>
         </footer>
       </body>

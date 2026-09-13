@@ -6,7 +6,9 @@ import { getInstitutionView } from "@/lib/queries";
 import { FeedCard, DirChip, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
-import { canonical, institutionProfileJsonLd, JsonLd, ogImage } from "@/lib/seo";
+import { breadcrumbJsonLd, canonical, institutionProfileJsonLd, institutionSeoTitle, JsonLd, localizedUrl, ogImage } from "@/lib/seo";
+import { assetPath } from "@/lib/assetPath";
+import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -14,19 +16,20 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const locale = await getLocale();
   const institution = await prisma.institution.findUnique({
     where: { slug },
-    select: { name: true, country: true },
+    select: { name: true, country: true, _count: { select: { articles: { where: publicationReadyWhere() } } } },
   });
   if (!institution) return { title: tr(locale, "Institution not found", "机构未找到") };
   const name = institutionName(institution.name, locale);
   return {
-    title: name,
+    title: { absolute: institutionSeoTitle(name, locale) },
     description: tr(
       locale,
       `Published research and extracted views from ${name}${institution.country ? ` (${institution.country})` : ""}.`,
       `${name}${institution.country ? `（${institution.country}）` : ""}的公开研报与提取观点。`,
     ),
     ...canonical(`/institution/${slug}`, locale),
-    openGraph: { images: [{ url: ogImage("Institution", institution.name, institution.country ?? undefined), width: 1200, height: 630 }] },
+    ...(institution._count.articles ? {} : { robots: { index: false, follow: true } }),
+    openGraph: { url: localizedUrl(`/institution/${slug}`, locale), locale, images: [{ url: ogImage("Institution", institution.name, institution.country ?? undefined), width: 1200, height: 630 }] },
   };
 }
 
@@ -41,6 +44,8 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
   return (
     <main className="wrap">
       <JsonLd data={institutionProfileJsonLd(locale, `/institution/${inst.slug}`, institutionName(inst.name, locale), tr(locale, `Structured public research, current views and source links for ${inst.name}.`, `${institutionName(inst.name, locale)}的结构化公开研报、当前观点与来源链接。`), inst.researchUrl)} />
+      <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Institutions", "机构"), path: "/institutions" }, { name: institutionName(inst.name, locale), path: `/institution/${inst.slug}` }])} />
+      <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")}><Link href={localePath(locale, "/institutions")}>{tr(locale, "Institutions", "机构")}</Link><span>›</span><span>{institutionName(inst.name, locale)}</span></nav>
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Institution", "机构")}</div>
         <h1>{institutionName(inst.name, locale)}</h1>
@@ -71,7 +76,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
               <tbody>
                 {views.map((v) => (
                   <tr key={v.ticker}>
-                    <td className="inst"><Link href={localePath(locale, `/asset/${v.ticker}`)}>{assetName(v.name, locale, v.ticker)}</Link></td>
+                    <td className="inst"><Link href={localePath(locale, assetPath(v.ticker))}>{assetName(v.name, locale, v.ticker)}</Link></td>
                     <td><DirChip direction={v.direction} locale={locale} /></td>
                     <td className="mono-cell">{v.target ? `$${v.target.toLocaleString()}` : "—"}</td>
                     <td className="mono-cell">{relTime(v.when, locale)}</td>

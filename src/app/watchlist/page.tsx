@@ -7,6 +7,7 @@ import { buildTradingThemes, type ThemeDirection } from "@/lib/tradingThemes";
 import { assetName, formatDate, getLocale, institutionName, localizeChineseContent, tr, localePath } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
 import { relTime } from "@/app/_components/ui";
+import { assetPath } from "@/lib/assetPath";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +108,7 @@ export default async function TradingThemesPage() {
               <div className="theme-body">
                 <div className="theme-row-head"><div><span className={`theme-state ${theme.status}`}>{zh ? STATUS[theme.status][1] : STATUS[theme.status][0]}</span><h3>{zh ? theme.titleZh : theme.titleEn}</h3></div><strong>{theme.score}</strong></div>
                 <p>{zh ? localizeChineseContent(rationale) : rationale}</p>
-                <div className="theme-assets">{theme.assets.map((asset) => <span key={asset.ticker || asset.name} className="theme-asset">{asset.ticker ? <Link href={localePath(locale, `/asset/${asset.ticker}`)}>{displayAsset(asset.name, asset.ticker, locale)}</Link> : displayAsset(asset.name, null, locale)}<em className={asset.direction}>{directionLabel(asset.direction, zh)}</em>{asset.movePct !== null && <small className={asset.marketConfirmed ? "confirmed" : "unconfirmed"}>{asset.movePct > 0 ? "+" : ""}{asset.movePct.toFixed(1)}% · {asset.marketConfirmed ? tr(locale, "confirmed", "行情确认") : tr(locale, "not confirmed", "尚未确认")}</small>}</span>)}</div>
+                <div className="theme-assets">{theme.assets.map((asset) => <span key={asset.ticker || asset.name} className="theme-asset">{asset.ticker ? <Link href={localePath(locale, assetPath(asset.ticker))}>{displayAsset(asset.name, asset.ticker, locale)}</Link> : displayAsset(asset.name, null, locale)}<em className={asset.direction}>{directionLabel(asset.direction, zh)}</em>{asset.movePct !== null && <small className={asset.marketConfirmed ? "confirmed" : "unconfirmed"}>{asset.movePct > 0 ? "+" : ""}{asset.movePct.toFixed(1)}% · {asset.marketConfirmed ? tr(locale, "confirmed", "行情确认") : tr(locale, "not confirmed", "尚未确认")}</small>}</span>)}</div>
                 <div className="theme-facts"><span>{theme.institutionCount}{tr(locale, " institutions", "家机构")}</span><span>{theme.viewCount}{tr(locale, " signals / 7d", "条观点 / 7天")}</span><span>{tr(locale, "Previous window", "此前7天")} {theme.previousViewCount}</span><span>{relTime(theme.latestAt, locale)}</span></div>
                 {condition && <div className="theme-condition"><b>{tr(locale, "Invalidation / condition", "失效条件 / 前提")}</b><span>{zh ? localizeChineseContent(condition) : condition}</span></div>}
                 <details className="theme-evidence"><summary>{tr(locale, "View source evidence", "查看来源依据")} · {theme.evidence.length}</summary><div>{theme.evidence.map((view) => <Link href={localePath(locale, researchPath(view.article))} key={view.id}><span>{institutionName(view.article.institution.name, locale)}</span><b>{zh ? localizeChineseContent(view.viewZh) : view.viewEn}</b></Link>)}</div></details>

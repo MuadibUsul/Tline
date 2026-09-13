@@ -3,6 +3,8 @@ import { publicationReadyWhere } from "@/lib/publication";
 import { siteUrl } from "@/lib/site";
 import { LOCALES, localePath } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
+import { assetPath } from "@/lib/assetPath";
+import { contentQuality } from "@/lib/contentQuality";
 
 export interface SitemapEntry {
   url: string;
@@ -35,18 +37,28 @@ const ARTICLE_ORDER = [{ publishedAt: "asc" as const }, { id: "asc" as const }];
 const ARTICLE_SELECT = {
   id: true,
   slug: true,
+  title: true,
+  rawText: true,
+  sourceUrl: true,
+  language: true,
   createdAt: true,
   updatedAt: true,
+  analysis: { select: { summary: true, summaryZh: true, reviewStatus: true } },
   translations: {
     where: { locale: "zh-CN" },
     take: 1,
-    select: { updatedAt: true },
+    select: { title: true, text: true, qualityScore: true, status: true, updatedAt: true },
   },
 } as const;
+
+export function indexableSitemapLocales(article: Parameters<typeof contentQuality>[0]) {
+  return LOCALES.filter((locale) => contentQuality(article, locale).eligibility === "INDEX");
+}
 
 const STATIC_ROUTES: Array<[string, SitemapEntry["changeFrequency"], number]> = [
   ["/", "hourly", 1],
   ["/research", "hourly", 0.9],
+  ["/markets", "daily", 0.8],
   ["/institutions", "daily", 0.8],
   ["/macro", "hourly", 0.8],
   ["/macro/calendar", "daily", 0.6],
@@ -58,9 +70,10 @@ const STATIC_ROUTES: Array<[string, SitemapEntry["changeFrequency"], number]> = 
   ["/sources", "weekly", 0.6],
   ["/privacy", "monthly", 0.5],
   ["/corrections", "monthly", 0.5],
+  ["/financial-disclaimer", "monthly", 0.4],
 ];
 
-const STATIC_UPDATED_AT = new Date("2026-09-05T00:00:00.000Z");
+const STATIC_UPDATED_AT = new Date("2026-09-13T00:00:00.000Z");
 
 export async function researchArticleCount(): Promise<number> {
   return prisma.article.count({ where: publicationReadyWhere() });
@@ -75,8 +88,11 @@ export async function researchShardCount(): Promise<number> {
 export async function buildPagesShard(): Promise<SitemapEntry[]> {
   const base = siteUrl();
   const [institutions, assets, indicators, consensusUpdates, settledInstitutions] = await Promise.all([
-    prisma.institution.findMany({ select: { id: true, slug: true, lastDiscoveredAt: true } }),
-    prisma.asset.findMany({ select: { id: true, ticker: true } }),
+    prisma.institution.findMany({ where: { articles: { some: publicationReadyWhere() } }, select: { id: true, slug: true, lastDiscoveredAt: true } }),
+    prisma.asset.findMany({
+      where: { articleAssets: { some: { article: publicationReadyWhere() } } },
+      select: { id: true, ticker: true, articleAssets: { where: { article: publicationReadyWhere() }, select: { article: { select: { institutionId: true } } } } },
+    }),
     prisma.macroIndicator.findMany({ where: { enabled: true }, select: { canonicalKey: true, updatedAt: true } }),
     prisma.consensusHistory.findMany({ orderBy: { timestamp: "desc" }, distinct: ["assetId"], select: { assetId: true, timestamp: true } }),
     prisma.forecast.findMany({ where: { status: "settled" }, distinct: ["institutionId"], select: { institutionId: true } }),
@@ -100,8 +116,8 @@ export async function buildPagesShard(): Promise<SitemapEntry[]> {
       changeFrequency: "daily" as const,
       priority: 0.6,
     })),
-    ...assets.map((asset) => ({
-      url: `${base}/asset/${asset.ticker}`,
+    ...assets.filter((asset) => new Set(asset.articleAssets.map((item) => item.article.institutionId)).size >= 2).map((asset) => ({
+      url: `${base}${assetPath(asset.ticker)}`,
       lastModified: consensusUpdatedAt.get(asset.id) ?? STATIC_UPDATED_AT,
       changeFrequency: "daily" as const,
       priority: 0.6,
@@ -146,7 +162,7 @@ export async function buildResearchShard(index: number): Promise<SitemapEntry[]>
       select: ARTICLE_SELECT,
     });
     for (const article of articles) {
-      for (const locale of LOCALES) {
+      for (const locale of indexableSitemapLocales(article)) {
         entries.push({
           url: base + localePath(locale, researchPath(article)),
           lastModified: locale === "zh-CN" ? article.translations[0]?.updatedAt ?? article.updatedAt : article.updatedAt,

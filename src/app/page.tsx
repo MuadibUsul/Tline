@@ -6,7 +6,7 @@ import SearchBox from "./_components/SearchBox";
 import LiveFeed from "./_components/LiveFeed";
 import { domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
-import { JsonLd, canonical, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
+import { JsonLd, canonical, homeSeoTitle, localizedUrl, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +14,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   const description = tr(
     locale,
-    "Institutional research from the world's banks and asset managers, turned into searchable, source-linked signals and track records.",
-    "汇集全球银行与资产管理机构的研报，转换为可检索、有来源依据的信号与历史记录。",
+    "Track market views from global banks and asset managers. Compare institutional forecasts, consensus signals and changes across equities, FX, commodities, rates and crypto.",
+    "追踪全球银行和资产管理机构的公开研究，比较股票、外汇、大宗商品、利率及加密资产的机构观点、共识变化与原始证据。",
   );
   return {
-    title: tr(locale, "Institutional Research & Market Signals", "全球机构研报与市场信号"),
+    title: { absolute: homeSeoTitle(locale) },
     description,
     ...canonical("/", locale),
-    openGraph: { type: "website", description, images: [{ url: ogImage("Institutional Intelligence", "Institutional Research & Market Signals", "Traceable, source-linked views"), width: 1200, height: 630 }] },
+    openGraph: { type: "website", title: tr(locale, "Tlines Institutional Intelligence", "Tlines 全球机构情报"), description, url: localizedUrl("/", locale), locale, images: [{ url: ogImage("Institutional Intelligence", "Institutional Research & Market Signals", "Traceable, source-linked views"), width: 1200, height: 630 }] },
   };
 }
 
@@ -44,8 +44,8 @@ export default async function Home() {
         ariaLabel={tr(locale, "Load newly published research", "载入新发布的研报")}
       />
       <section className="hero">
-        <div className="eyebrow">{tr(locale, "Global Institutional Intelligence", "全球机构情报")}</div>
-        <h1>{locale === "zh-CN" ? <>追踪全球顶尖<br />机构的<em>观点。</em></> : <>Track what the world&apos;s leading<br />institutions <em>think.</em></>}</h1>
+        <div className="eyebrow">{tr(locale, "Institutional Research, Consensus & Market Signals", "机构研报、市场共识与资产信号")}</div>
+        <h1>{tr(locale, "Tlines Institutional Intelligence", "Tlines 全球机构情报")}</h1>
         <p className="sub">{tr(locale, "Turn the research produced daily by global financial institutions into comparable, trackable and searchable signals.", "把全球金融机构每天产生的研报，转换成可比较、可追踪、可检索的信号。")}</p>
         <SearchBox locale={locale} placeholder={tr(locale, "Search institutions, assets, research and views…", "搜索机构、资产、研报和观点……")} ariaLabel={tr(locale, "Search the site", "全站搜索")} />
       </section>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { assetPath } from "@/lib/assetPath";
 import { directionLabel } from "@/lib/assets";
 import { articleTimestamp, assetName, institutionName, localizeChineseContent, relativeTime, tr, type Locale, localePath } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
@@ -49,7 +50,7 @@ export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale
         {a.articleAssets.slice(0, 4).map((aa) => {
           const direction = directionLabel(aa.direction);
           const arrow = direction.tone === "bull" ? "▲" : direction.tone === "bear" ? "▼" : "◆";
-          return <Link key={aa.asset.ticker} href={localePath(locale, `/asset/${aa.asset.ticker}`)} className={`chip ${direction.tone}`}>{aa.asset.ticker} {arrow}</Link>;
+          return <Link key={aa.asset.ticker} href={localePath(locale, assetPath(aa.asset.ticker))} className={`chip ${direction.tone}`}>{aa.asset.ticker} {arrow}</Link>;
         })}
       </div>
       {(primary?.target || primary?.previousTarget) && (
@@ -102,7 +103,7 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
           return (
             <Link
               key={articleAsset.asset.ticker}
-              href={localePath(locale, `/asset/${articleAsset.asset.ticker}`)}
+              href={localePath(locale, assetPath(articleAsset.asset.ticker))}
               className={`chip ${direction.tone}`}
               title={`${assetName(articleAsset.asset.name, locale, articleAsset.asset.ticker)} · ${label}`}
               aria-label={`${assetName(articleAsset.asset.name, locale, articleAsset.asset.ticker)} · ${label}`}

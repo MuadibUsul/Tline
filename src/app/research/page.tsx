@@ -11,16 +11,17 @@ import { paginationWindow } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
-type ResearchSearchParams = { institution?: string; country?: string; category?: string; ticker?: string; direction?: string; page?: string };
+type ResearchSearchParams = { institution?: string; country?: string; category?: string; ticker?: string; direction?: string; page?: string; q?: string };
 
 export async function generateMetadata(props: { searchParams: Promise<ResearchSearchParams> }): Promise<Metadata> {
   const searchParams = await props.searchParams;
   const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
-  const filtered = Boolean(searchParams.institution || searchParams.country || searchParams.category || searchParams.ticker || searchParams.direction);
+  const filtered = Object.entries(searchParams).some(([key, value]) => key !== "page" && Boolean(value));
+  const emptyPage = !filtered && page > 1 && (page - 1) * 20 >= await prisma.article.count({ where: publicationReadyWhere() });
   const title = tr(locale, "Verified Institutional Research & Structured Views", "已验证机构研报与结构化观点");
   const description = tr(locale, "Source-linked public research with comparable asset views, horizons, risks and institutional context.", "带原始来源的公开研报，包含可比较的资产观点、期限、风险与机构上下文。");
-  return { ...canonical(!filtered && page > 1 ? `/research?page=${page}` : "/research", locale), ...(filtered ? { robots: { index: false, follow: true } } : {}), title, description, openGraph: { images: [{ url: ogImage("Research", "Verified Institutional Research", "Sources, horizons, risks and comparable views"), width: 1200, height: 630 }] } };
+  return { ...canonical(!filtered && page > 1 ? `/research?page=${page}` : "/research", locale), ...(filtered || emptyPage ? { robots: { index: false, follow: true } } : {}), title, description, openGraph: { images: [{ url: ogImage("Research", "Verified Institutional Research", "Sources, horizons, risks and comparable views"), width: 1200, height: 630 }] } };
 }
 
 const ASSET_CLASSES: Array<[string, string]> = [["equity", "股票"], ["rate", "利率"], ["fx", "外汇"], ["commodity", "大宗商品"], ["crypto", "加密资产"], ["macro", "宏观"]];

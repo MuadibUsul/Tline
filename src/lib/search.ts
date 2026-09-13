@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { assetPath } from "./assetPath";
 import { researchPath } from "./researchPath";
 import { ASSETS } from "./assets";
 import { publicationReadyWhere } from "./publication";
@@ -392,7 +393,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
           kind: "asset" as const,
           title: `${assetName(asset.name, locale, asset.ticker)} · ${asset.ticker}`,
           subtitle: `${domainTerm(asset.assetClass, locale)} · ${asset._count.articleAssets} ${useChinese ? "篇相关研报" : "related reports"}`,
-          href: `/asset/${asset.ticker}`,
+          href: assetPath(asset.ticker),
         },
         primary: [asset.name, asset.ticker],
         displayNames: [assetName(asset.name, locale, asset.ticker)],

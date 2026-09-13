@@ -6,27 +6,34 @@ import { getAssetView, getAssetTimeline } from "@/lib/queries";
 import { FeedCard, DirChip, Delta, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
-import { canonical, datasetJsonLd, JsonLd, ogImage, webPageJsonLd } from "@/lib/seo";
+import { assetSeoTitle, breadcrumbJsonLd, canonical, datasetJsonLd, JsonLd, localizedUrl, ogImage, webPageJsonLd } from "@/lib/seo";
+import { assetPath, tickerFromAssetSlug } from "@/lib/assetPath";
+import { publicationReadyWhere } from "@/lib/publication";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
   const { ticker } = await props.params;
   const locale = await getLocale();
   const asset = await prisma.asset.findUnique({
-    where: { ticker: ticker.toUpperCase() },
-    select: { ticker: true, name: true },
+    where: { ticker: tickerFromAssetSlug(ticker) },
+    select: {
+      ticker: true, name: true,
+      articleAssets: { where: { article: publicationReadyWhere() }, select: { article: { select: { institutionId: true } } } },
+    },
   });
   if (!asset) return { title: tr(locale, "Asset not found", "资产未找到") };
   const name = assetName(asset.name, locale, asset.ticker);
+  const institutionCount = new Set(asset.articleAssets.map((item) => item.article.institutionId)).size;
   return {
-    title: `${name} · ${asset.ticker}`,
+    title: { absolute: assetSeoTitle(name, locale) },
     description: tr(
       locale,
-      `Cross-institution consensus and recent views on ${name} (${asset.ticker}).`,
-      `${name}（${asset.ticker}）的跨机构共识与近期观点。`,
+      institutionCount >= 2 ? `Cross-institution outlook and recent source-linked views on ${name} (${asset.ticker}).` : `Source-linked institutional research and recent views on ${name} (${asset.ticker}).`,
+      institutionCount >= 2 ? `${name}（${asset.ticker}）的跨机构展望与近期可溯源观点。` : `${name}（${asset.ticker}）的机构公开研报与近期观点。`,
     ),
-    ...canonical(`/asset/${asset.ticker}`, locale),
-    openGraph: { images: [{ url: ogImage("Asset Intelligence", `${asset.name} - ${asset.ticker}`), width: 1200, height: 630 }] },
+    ...canonical(assetPath(asset.ticker), locale),
+    ...(institutionCount < 2 ? { robots: { index: false, follow: true } } : {}),
+    openGraph: { url: localizedUrl(assetPath(asset.ticker), locale), locale, images: [{ url: ogImage("Asset Intelligence", `${asset.name} - ${asset.ticker}`), width: 1200, height: 630 }] },
   };
 }
 
@@ -34,7 +41,7 @@ export async function generateMetadata(props: { params: Promise<{ ticker: string
 export default async function AssetPage(props: { params: Promise<{ ticker: string }> }) {
   const params = await props.params;
   const locale = await getLocale();
-  const data = await getAssetView(params.ticker);
+  const data = await getAssetView(tickerFromAssetSlug(params.ticker));
   if (!data) notFound();
   const { asset, consensus, d1, d7, d30, dist, articles } = data;
   const timeline = (await getAssetTimeline(asset.id)).filter((t) => t.hasTargetMove || t.hasDirFlip);
@@ -42,12 +49,14 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
 
   return (
     <main className="wrap">
-      <JsonLd data={webPageJsonLd(locale, `/asset/${asset.ticker}`, assetName(asset.name, locale, asset.ticker), tr(locale, `Cross-institution views and consensus for ${asset.name}.`, `${assetName(asset.name, locale, asset.ticker)}的跨机构观点与共识。`))} />
-      <JsonLd data={datasetJsonLd(locale, `/asset/${asset.ticker}`, tr(locale, `${asset.name} institutional consensus`, `${assetName(asset.name, locale, asset.ticker)}机构共识`), tr(locale, "Authority-weighted, time-decayed public institutional views.", "按权威度加权并经时间衰减的公开机构观点。"), consensus?.windowEnd)} />
+      <JsonLd data={webPageJsonLd(locale, assetPath(asset.ticker), assetName(asset.name, locale, asset.ticker), tr(locale, `Cross-institution views and consensus for ${asset.name}.`, `${assetName(asset.name, locale, asset.ticker)}的跨机构观点与共识。`))} />
+      {consensus && consensus.institutionCount >= 2 && <JsonLd data={datasetJsonLd(locale, assetPath(asset.ticker), tr(locale, `${asset.name} institutional consensus`, `${assetName(asset.name, locale, asset.ticker)}机构共识`), tr(locale, "Authority-weighted, time-decayed public institutional views.", "按权威度加权并经时间衰减的公开机构观点。"), consensus.windowEnd)} />}
+      <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Markets", "资产市场"), path: "/markets" }, { name: assetName(asset.name, locale, asset.ticker), path: assetPath(asset.ticker) }])} />
+      <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")}><Link href={localePath(locale, "/markets")}>{tr(locale, "Markets", "资产市场")}</Link><span>›</span><span>{assetName(asset.name, locale, asset.ticker)}</span></nav>
       <div className="page-head">
         <div className="eyebrow">{consensus?.isFallback ? tr(locale, `Institutional Consensus · latest available 24h · as of ${formatDate(consensus.windowEnd, locale)}`, `机构共识 · 最近可用24小时 · 截至 ${formatDate(consensus.windowEnd, locale)}`) : tr(locale, "Institutional Consensus · last 24h", "机构共识 · 最近24小时")} · {domainTerm(asset.assetClass, locale)}</div>
         <h1>{assetName(asset.name, locale, asset.ticker)}</h1>
-        {consensus ? <>
+        {consensus && consensus.institutionCount >= 2 ? <>
           <div className="big-score">
             <span className="num" style={{ color: toneColor }}>{consensus.score}</span>
             <span className="mono" style={{ color: "var(--muted)" }}>/ 100</span>
@@ -59,11 +68,11 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
             <span>30D <Delta v={d30} /></span>
             <span style={{ color: "var(--faint)" }}>{tr(locale, `${consensus.institutionCount} institutions`, `${consensus.institutionCount} 家机构`)} · {consensus.bullishCount}↑ {consensus.neutralCount}→ {consensus.bearishCount}↓</span>
           </div>
-        </> : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No institutional view has been recorded for this asset yet.", "该资产尚未收录任何机构观点。")}</p>}
+        </> : consensus ? <div className="deltas"><span>{tr(locale, "Direction", "方向")} <b>{consensus.tone === "bull" ? tr(locale, "Bullish", "看多") : consensus.tone === "bear" ? tr(locale, "Bearish", "看空") : tr(locale, "Neutral", "中性")}</b></span><span>{tr(locale, "Coverage", "覆盖")} <b>{consensus.institutionCount} {tr(locale, "institution", "家机构")}</b></span><span>{tr(locale, "Confidence: insufficient coverage", "置信说明：覆盖不足")}</span><span>{tr(locale, "Freshness", "数据时间")} {formatDate(consensus.windowEnd, locale)}</span></div> : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No institutional view has been recorded for this asset yet.", "该资产尚未收录任何机构观点。")}</p>}
         <form action={addWatch} style={{ alignSelf: "flex-start" }}>
           <input type="hidden" name="kind" value="asset" />
           <input type="hidden" name="refId" value={asset.ticker} />
-          <input type="hidden" name="back" value={`/asset/${asset.ticker}`} />
+          <input type="hidden" name="back" value={assetPath(asset.ticker)} />
           <button type="submit" className="minibtn">＋ {tr(locale, "Watch", "关注")}</button>
         </form>
       </div>

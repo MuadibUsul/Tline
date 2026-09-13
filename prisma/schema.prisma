@@ -291,6 +291,7 @@ model Asset {
   forecasts         Forecast[]
   consensusHistory  ConsensusHistory[]
   priceObservations PriceObservation[]
+  marketInstruments MarketInstrument[]
 }
 
 model ArticleAsset {
@@ -313,23 +314,28 @@ model ArticleAsset {
 }
 
 model Forecast {
-  id               String    @id @default(cuid())
-  institutionId    String
-  assetId          String
-  articleAssetId   String?   @unique
-  forecastDate     DateTime
-  targetDate       DateTime?
-  targetValue      Float?
-  metric           String?
-  direction        Int?
-  status           String    @default("pending") // pending | settled
-  baseValue        Float?
-  actualValue      Float?
-  absoluteError    Float?
-  percentageError  Float?
-  directionCorrect Boolean?
-  settlementSource String?
-  settledAt        DateTime?
+  id                    String    @id @default(cuid())
+  institutionId         String
+  assetId               String
+  articleAssetId        String?   @unique
+  forecastDate          DateTime
+  targetDate            DateTime?
+  targetValue           Float?
+  metric                String?
+  direction             Int?
+  status                String    @default("pending") // pending | settled | excluded
+  baseValue             Float?
+  actualValue           Float?
+  absoluteError         Float?
+  percentageError       Float?
+  directionCorrect      Boolean?
+  settlementSource      String?
+  forecastType          String    @default("DIRECTION_OR_TARGET")
+  baseObservationId     String?
+  actualObservationId   String?
+  settlementRuleVersion String?
+  settlementReason      String?
+  settledAt             DateTime?
 
   institution  Institution   @relation(fields: [institutionId], references: [id])
   asset        Asset         @relation(fields: [assetId], references: [id])
@@ -341,13 +347,19 @@ model Forecast {
 }
 
 model PriceObservation {
-  id        String   @id @default(cuid())
-  assetId   String
-  timestamp DateTime
-  value     Float
-  source    String
-  sourceRef String?
-  createdAt DateTime @default(now())
+  id                  String   @id @default(cuid())
+  assetId             String
+  timestamp           DateTime
+  value               Float
+  source              String
+  sourceRef           String?
+  sourceObservationId String?
+  licenseKey          String?
+  domain              String   @default("MARKET")
+  unit                String?
+  priceType           String?
+  isProxy             Boolean  @default(false)
+  createdAt           DateTime @default(now())
 
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
@@ -390,6 +402,7 @@ model MacroIndicator {
 
   seriesSources MacroSeriesSource[]
   releaseValues MacroReleaseValue[]
+  expectations  MacroExpectation[]
 
   @@index([countryCode, category, enabled])
 }
@@ -463,6 +476,7 @@ model MacroRelease {
 
   values          MacroReleaseValue[]
   policyDocuments MacroPolicyDocument[]
+  expectations    MacroExpectation[]
 
   @@index([status, scheduledAt])
   @@index([releaseFamily, scheduledAt])
@@ -500,40 +514,82 @@ model MacroReleaseValue {
   consensusAtRelease       Decimal?
   consensusProvider        String?
   consensusAsOf            DateTime?
+  consensusExpectationId   String?
+  modelExpectationId       String?
   surpriseRaw              Decimal?
   surprisePct              Decimal?
   fetchedAt                DateTime
   createdAt                DateTime  @default(now())
 
-  release   MacroRelease   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  indicator MacroIndicator @relation(fields: [indicatorId], references: [id], onDelete: Restrict)
+  release              MacroRelease      @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  indicator            MacroIndicator    @relation(fields: [indicatorId], references: [id], onDelete: Restrict)
+  consensusExpectation MacroExpectation? @relation("ConsensusExpectation", fields: [consensusExpectationId], references: [id], onDelete: SetNull)
+  modelExpectation     MacroExpectation? @relation("ModelExpectation", fields: [modelExpectationId], references: [id], onDelete: SetNull)
 
   @@unique([releaseId, indicatorId])
   @@index([indicatorId, observationPeriod])
+  @@index([consensusExpectationId])
+}
+
+/// Append-only expectation evidence. Survey consensus, model forecasts and institution
+/// forecasts remain separate facts and are never inferred from one another.
+model MacroExpectation {
+  id                       String    @id @default(cuid())
+  releaseId                String
+  indicatorId              String
+  referencePeriod          DateTime
+  releaseStage             String    @default("INITIAL")
+  type                     String // SURVEY_CONSENSUS | MODEL_FORECAST | INSTITUTION_FORECAST
+  source                   String
+  sourceEventId            String?
+  rawField                 String?
+  sourceUrl                String?
+  licenseKey               String?
+  value                    Decimal
+  unit                     String
+  seasonalAdjustment       String?
+  annualization            String?
+  sourcePublishedAt        DateTime?
+  capturedAt               DateTime
+  sampleSize               Int?
+  surveyMethod             String?
+  entryMethod              String    @default("MANUAL")
+  operatorId               String?
+  historicalReconstruction Boolean   @default(false)
+  revisionNo               Int       @default(0)
+  createdAt                DateTime  @default(now())
+
+  release            MacroRelease        @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  indicator          MacroIndicator      @relation(fields: [indicatorId], references: [id], onDelete: Restrict)
+  consensusSnapshots MacroReleaseValue[] @relation("ConsensusExpectation")
+  modelSnapshots     MacroReleaseValue[] @relation("ModelExpectation")
+
+  @@unique([releaseId, indicatorId, type, source, revisionNo])
+  @@index([releaseId, indicatorId, type, capturedAt])
 }
 
 // Human-approved outbound publishing. Source ids deliberately stay polymorphic: research
 // and macro records have different lifecycles, while a draft must survive either being removed.
 model SocialDraft {
-  id               String    @id @default(cuid())
-  sourceKind       String // research | macro
-  sourceId         String
-  title             String
-  textEn            String
-  textZh            String
-  routeSnapshot     String    @default("[]")
-  version           Int       @default(1)
-  status            String    @default("PENDING_REVIEW")
-  feishuMessageId   String?
-  notifyAttempts    Int       @default(0)
-  notifyError       String?
-  notifiedAt        DateTime?
-  approvedById      String?
-  approvedAt        DateTime?
-  rejectedById      String?
-  rejectedAt        DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  sourceKind      String // research | macro
+  sourceId        String
+  title           String
+  textEn          String
+  textZh          String
+  routeSnapshot   String    @default("[]")
+  version         Int       @default(1)
+  status          String    @default("PENDING_REVIEW")
+  feishuMessageId String?
+  notifyAttempts  Int       @default(0)
+  notifyError     String?
+  notifiedAt      DateTime?
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedById    String?
+  rejectedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   deliveries SocialDelivery[]
 
@@ -559,8 +615,8 @@ model SocialAccount {
   routes     SocialRoute[]
   deliveries SocialDelivery[]
 
-  @@index([platform, enabled])
   @@unique([platform, externalAccountId])
+  @@index([platform, enabled])
 }
 
 // OAuth application credentials shared by every account on a platform. The client secret
@@ -589,19 +645,19 @@ model SocialRoute {
 }
 
 model SocialDelivery {
-  id           String    @id @default(cuid())
-  draftId      String
-  accountId    String
-  language     String
-  status       String    @default("PENDING")
-  mainPostId   String?
-  replyPostId  String?
-  attempts     Int       @default(0)
+  id            String    @id @default(cuid())
+  draftId       String
+  accountId     String
+  language      String
+  status        String    @default("PENDING")
+  mainPostId    String?
+  replyPostId   String?
+  attempts      Int       @default(0)
   nextAttemptAt DateTime  @default(now())
-  lastError    String?
-  publishedAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  lastError     String?
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   draft   SocialDraft   @relation(fields: [draftId], references: [id], onDelete: Cascade)
   account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
@@ -657,45 +713,112 @@ model MacroSyncState {
 }
 
 model MarketInstrument {
-  id            String   @id @default(cuid())
-  symbol        String   @unique
-  baseAsset     String
-  quoteCurrency String
-  assetClass    String
-  enabled       Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(cuid())
+  symbol         String   @unique
+  assetId        String?
+  baseAsset      String
+  quoteCurrency  String
+  assetClass     String
+  venue          String?
+  instrumentType String   @default("SPOT")
+  unit           String   @default("PRICE")
+  timezone       String   @default("UTC")
+  priceType      String   @default("LAST")
+  adjustment     String?
+  isProxy        Boolean  @default(false)
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
+  asset        Asset?                   @relation(fields: [assetId], references: [id], onDelete: SetNull)
   observations MarketObservation[]
+  sources      MarketInstrumentSource[]
 
   @@index([assetClass, enabled])
+  @@index([assetId])
 }
 
-model MarketObservation {
+model MarketInstrumentSource {
   id             String   @id @default(cuid())
   instrumentId   String
   provider       String
   externalSymbol String
-  observedAt     DateTime
-  fetchedAt      DateTime
-  interval       String
+  venue          String?
   quoteCurrency  String
-  quality        String
-  status         String
-  open           Decimal?
-  high           Decimal?
-  low            Decimal?
-  close          Decimal
-  sourceUrl      String?
-  rawHash        String?
-  metadata       String?
+  licenseKey     String?
+  priority       Int      @default(100)
+  enabled        Boolean  @default(true)
   createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  instrument MarketInstrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalSymbol])
+  @@index([instrumentId, enabled, priority])
+}
+
+model MarketObservation {
+  id                   String    @id @default(cuid())
+  instrumentId         String
+  provider             String
+  externalSymbol       String
+  observedAt           DateTime
+  fetchedAt            DateTime
+  interval             String
+  quoteCurrency        String
+  quality              String
+  status               String
+  providerUpdatedAt    DateTime?
+  providerDelaySeconds Int?
+  marketState          String    @default("UNKNOWN")
+  priceType            String    @default("LAST")
+  unit                 String    @default("PRICE")
+  licenseKey           String?
+  open                 Decimal?
+  high                 Decimal?
+  low                  Decimal?
+  close                Decimal
+  sourceUrl            String?
+  rawHash              String?
+  metadata             String?
+  createdAt            DateTime  @default(now())
 
   instrument MarketInstrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
 
   @@unique([provider, externalSymbol, observedAt, interval])
   @@index([instrumentId, observedAt])
   @@index([quality, fetchedAt])
+}
+
+/// Server-enforced evidence for each permitted data use. UNKNOWN is deliberately deny-by-default.
+model DataLicensePolicy {
+  id          String    @id @default(cuid())
+  datasetKey  String    @unique
+  provider    String
+  status      String    @default("UNKNOWN") // UNKNOWN | CONFIRMED | RESTRICTED | EXPIRED
+  allowedUses String    @default("[]")
+  evidenceUrl String?
+  confirmedBy String?
+  confirmedAt DateTime?
+  expiresAt   DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([provider, status])
+}
+
+/// Provider credits are reserved before a request, so restarts and failed requests cannot reset usage.
+model ProviderUsage {
+  id        String   @id @default(cuid())
+  provider  String
+  window    String
+  periodKey String
+  usedUnits Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, window, periodKey])
+  @@index([provider, updatedAt])
 }
 
 model MacroSignalSnapshot {
@@ -710,6 +833,20 @@ model MacroSignalSnapshot {
 
   @@index([scopeKey, generatedAt])
   @@index([methodologyVersion, generatedAt])
+}
+
+model TradingThemeSnapshot {
+  id                  String   @id @default(cuid())
+  scopeKey            String   @default("GLOBAL")
+  methodologyVersion  String
+  generatedAt         DateTime
+  themesJson          String
+  inputViewIds        String
+  inputObservationIds String
+  coverageJson        String
+  createdAt           DateTime @default(now())
+
+  @@index([scopeKey, generatedAt])
 }
 
 // ---- User side (Phase 2). Refs to assets/institutions are scalar (ticker/slug). ----

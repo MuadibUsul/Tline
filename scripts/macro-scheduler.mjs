@@ -25,6 +25,7 @@ const tasks = [
   // under the cap, but with no headroom for a backfill or a manual run. At 30 minutes it is
   // 336. Institutional research moves in days and weeks, so the faster poll bought nothing.
   task("market-sync", "MACRO_MARKET_SYNC_INTERVAL_MS", 30 * 60_000, ["run", "macro:market"], "observations"),
+  task("theme-snapshot", "THEME_SNAPSHOT_INTERVAL_MS", 30 * 60_000, ["run", "themes:snapshot"], "observations"),
   // Bridges macro/market observations into PriceObservation, then settles what is due.
   task("forecast-settle", "MACRO_FORECAST_SETTLE_INTERVAL_MS", 6 * 60 * 60_000, ["run", "forecasts"], "observations"),
   task("alerts", "MACRO_ALERT_INTERVAL_MS", 60_000, ["run", "macro:alerts"]),

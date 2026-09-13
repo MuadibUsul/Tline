@@ -19,6 +19,15 @@ test("merges synonymous topics and identifies cross-institution strengthening", 
   assert.equal(themes[0].institutionCount, 2);
   assert.equal(themes[0].status, "strengthening");
   assert.equal(themes[0].assets[0].marketConfirmed, true);
+  assert.equal(themes[0].marketStatus, "aligned");
+});
+
+test("mixed asset moves never become a selectively confirmed theme", () => {
+  const themes = buildTradingThemes([
+    view("a", "Inflation", "bullish", 1, "bank-a"),
+    { ...view("b", "Inflation", "bullish", 1, "bank-b"), asset: "Oil", assetTicker: "WTI" },
+  ], now, [{ symbol: "XAUUSD", changePct: 1 }, { symbol: "WTI", changePct: -1 }]);
+  assert.equal(themes[0].marketStatus, "mixed");
 });
 
 test("drops generic topics and generic assets instead of promoting data noise", () => {

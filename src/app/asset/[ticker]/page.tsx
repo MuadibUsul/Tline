@@ -9,6 +9,7 @@ import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, loca
 import { assetSeoTitle, breadcrumbJsonLd, canonical, datasetJsonLd, JsonLd, localizedUrl, ogImage, webPageJsonLd } from "@/lib/seo";
 import { assetPath, tickerFromAssetSlug } from "@/lib/assetPath";
 import { publicationReadyWhere } from "@/lib/publication";
+import { getAssetMarketSnapshot } from "@/lib/macro/market/read";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
@@ -44,8 +45,13 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
   const data = await getAssetView(tickerFromAssetSlug(params.ticker));
   if (!data) notFound();
   const { asset, consensus, d1, d7, d30, dist, articles } = data;
-  const timeline = (await getAssetTimeline(asset.id)).filter((t) => t.hasTargetMove || t.hasDirFlip);
+  const [timelineRows, market] = await Promise.all([getAssetTimeline(asset.id), getAssetMarketSnapshot(asset.ticker)]);
+  const timeline = timelineRows.filter((t) => t.hasTargetMove || t.hasDirFlip);
   const toneColor = consensus?.tone === "bull" ? "var(--bull)" : consensus?.tone === "bear" ? "var(--bear)" : "var(--neu)";
+  const marketSeries = market.available ? market.history.map((row) => Number(row.close)).filter(Number.isFinite) : [];
+  const marketMin = marketSeries.length ? Math.min(...marketSeries) : 0;
+  const marketRange = marketSeries.length ? Math.max(...marketSeries) - marketMin || 1 : 1;
+  const marketPoints = marketSeries.map((value, index) => `${marketSeries.length === 1 ? 0 : index / (marketSeries.length - 1) * 100},${40 - (value - marketMin) / marketRange * 36}`).join(" ");
 
   return (
     <main className="wrap">
@@ -76,6 +82,21 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
           <button type="submit" className="minibtn">＋ {tr(locale, "Watch", "关注")}</button>
         </form>
       </div>
+
+      <section className="blk">
+        <div className="section-t">{tr(locale, "Market observation", "行情观测")}</div>
+        {market.available ? <>
+          <div className="deltas">
+            <span>{tr(locale, "Latest", "最新")} <b className="mono">{Number(market.observation.close).toLocaleString()} {market.observation.quoteCurrency}</b></span>
+            <span>{market.observation.priceType.toLowerCase()} · {market.observation.interval}</span>
+            <span>{market.observation.provider} · {market.observation.quality.toLowerCase()}</span>
+            <span>{tr(locale, "As of", "截至")} {formatDate(market.observation.observedAt, locale)}</span>
+            <span>{tr(locale, "Provider delay", "供应商声明延迟")} {market.decision.providerDelaySeconds === null ? tr(locale, "not declared", "未声明") : `${market.decision.providerDelaySeconds}s`}</span>
+            <span>{tr(locale, "Site sampling", "本站采样")} {market.decision.samplingIntervalSeconds}s</span>
+          </div>
+          {marketPoints && <svg viewBox="0 0 100 42" role="img" aria-label={tr(locale, "Same-source 30-day price history", "同来源30日价格历史")} style={{ width: "100%", maxHeight: 180, marginTop: 18 }}><polyline points={marketPoints} fill="none" stroke="var(--accent)" strokeWidth="1.3" vectorEffect="non-scaling-stroke" /></svg>}
+        </> : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, `Price unavailable: ${market.reason.replaceAll("_", " ")}. Research content remains available.`, `行情不可用：${market.reason === "authorization_pending" ? "授权依据待确认" : market.reason === "stale" ? "数据已过期" : market.reason === "unsupported" ? "暂无匹配标的" : "暂无合格数据"}。研报内容不受影响。`)}</p>}
+      </section>
 
       {consensus && <section className="blk">
         <div className="section-t">{consensus.isFallback ? tr(locale, "Institutional Views · latest available 24h", "机构观点 · 最近可用24小时") : tr(locale, "Institutional Views · last 24h", "机构观点 · 最近24小时")}</div>

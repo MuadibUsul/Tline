@@ -8,6 +8,7 @@ import { assetName, formatDate, getLocale, institutionName, localizeChineseConte
 import { researchPath } from "@/lib/researchPath";
 import { relTime } from "@/app/_components/ui";
 import { assetPath } from "@/lib/assetPath";
+import { getMarketMovesForUse } from "@/lib/macro/market/read";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,10 @@ export async function generateMetadata(): Promise<Metadata> {
 const STATUS = {
   strengthening: ["Strengthening", "强化中"], active: ["Active", "运转中"],
   diverging: ["Diverging", "出现分歧"], cooling: ["Cooling", "降温中"],
+} as const;
+const MARKET_STATUS = {
+  aligned: ["Market aligned", "行情同向"], opposed: ["Market opposed", "行情反向"],
+  mixed: ["Market mixed", "行情混合"], insufficient: ["Market data unavailable", "行情数据不足"],
 } as const;
 
 function directionLabel(direction: ThemeDirection, zh: boolean) {
@@ -43,7 +48,7 @@ export default async function TradingThemesPage() {
   const marketSince = new Date(now.getTime() - 8 * 864e5);
   const catalystUntil = new Date(now.getTime() + 7 * 864e5);
 
-  const [views, observations, catalysts] = await Promise.all([
+  const [views, marketMoves, catalysts] = await Promise.all([
     prisma.atomicView.findMany({
       where: { reviewStatus: "ok", article: publicationReadyWhere({ publishedAt: { gte: fourteenDaysAgo } }) },
       select: {
@@ -53,11 +58,7 @@ export default async function TradingThemesPage() {
         article: { select: { slug: true, title: true, publishedAt: true, institutionId: true, institution: { select: { slug: true, name: true, rating: true, authorityScore: true } } } },
       },
     }),
-    prisma.marketObservation.findMany({
-      where: { observedAt: { gte: marketSince }, instrument: { enabled: true } },
-      orderBy: { observedAt: "asc" },
-      select: { close: true, instrument: { select: { symbol: true } } },
-    }),
+    getMarketMovesForUse(marketSince, now),
     prisma.macroRelease.findMany({
       where: { scheduledAt: { gte: now, lte: catalystUntil }, importance: { gte: 4 } },
       orderBy: { scheduledAt: "asc" }, take: 6,
@@ -65,16 +66,7 @@ export default async function TradingThemesPage() {
     }),
   ]);
 
-  const priceRanges = new Map<string, { first: number; last: number }>();
-  for (const observation of observations) {
-    const symbol = observation.instrument.symbol.toUpperCase();
-    const close = Number(observation.close);
-    const range = priceRanges.get(symbol);
-    if (range) range.last = close;
-    else priceRanges.set(symbol, { first: close, last: close });
-  }
-  const marketMoves = [...priceRanges].filter(([, range]) => range.first !== 0).map(([symbol, range]) => ({ symbol, changePct: (range.last / range.first - 1) * 100 }));
-  const themes = buildTradingThemes(views, now, marketMoves);
+  const themes = buildTradingThemes(views, now, marketMoves, Math.min(1, Math.max(0, Number(process.env.THEME_MARKET_MIN_COVERAGE || 0.6))));
   const lead = themes[0];
   const changed = themes.filter((theme) => theme.status !== "active").slice(0, 5);
 
@@ -109,7 +101,7 @@ export default async function TradingThemesPage() {
                 <div className="theme-row-head"><div><span className={`theme-state ${theme.status}`}>{zh ? STATUS[theme.status][1] : STATUS[theme.status][0]}</span><h3>{zh ? theme.titleZh : theme.titleEn}</h3></div><strong>{theme.score}</strong></div>
                 <p>{zh ? localizeChineseContent(rationale) : rationale}</p>
                 <div className="theme-assets">{theme.assets.map((asset) => <span key={asset.ticker || asset.name} className="theme-asset">{asset.ticker ? <Link href={localePath(locale, assetPath(asset.ticker))}>{displayAsset(asset.name, asset.ticker, locale)}</Link> : displayAsset(asset.name, null, locale)}<em className={asset.direction}>{directionLabel(asset.direction, zh)}</em>{asset.movePct !== null && <small className={asset.marketConfirmed ? "confirmed" : "unconfirmed"}>{asset.movePct > 0 ? "+" : ""}{asset.movePct.toFixed(1)}% · {asset.marketConfirmed ? tr(locale, "confirmed", "行情确认") : tr(locale, "not confirmed", "尚未确认")}</small>}</span>)}</div>
-                <div className="theme-facts"><span>{theme.institutionCount}{tr(locale, " institutions", "家机构")}</span><span>{theme.viewCount}{tr(locale, " signals / 7d", "条观点 / 7天")}</span><span>{tr(locale, "Previous window", "此前7天")} {theme.previousViewCount}</span><span>{relTime(theme.latestAt, locale)}</span></div>
+                <div className="theme-facts"><span>{theme.institutionCount}{tr(locale, " institutions", "家机构")}</span><span>{theme.viewCount}{tr(locale, " signals / 7d", "条观点 / 7天")}</span><span>{zh ? MARKET_STATUS[theme.marketStatus][1] : MARKET_STATUS[theme.marketStatus][0]} · {Math.round(theme.marketCoverage * 100)}%</span><span>{tr(locale, "Previous window", "此前7天")} {theme.previousViewCount}</span><span>{relTime(theme.latestAt, locale)}</span></div>
                 {condition && <div className="theme-condition"><b>{tr(locale, "Invalidation / condition", "失效条件 / 前提")}</b><span>{zh ? localizeChineseContent(condition) : condition}</span></div>}
                 <details className="theme-evidence"><summary>{tr(locale, "View source evidence", "查看来源依据")} · {theme.evidence.length}</summary><div>{theme.evidence.map((view) => <Link href={localePath(locale, researchPath(view.article))} key={view.id}><span>{institutionName(view.article.institution.name, locale)}</span><b>{zh ? localizeChineseContent(view.viewZh) : view.viewEn}</b></Link>)}</div></details>
               </div>

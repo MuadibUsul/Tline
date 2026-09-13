@@ -54,6 +54,8 @@
     "analysis:grounding": "tsx scripts/analysis-grounding.ts",
     "translate:rescore": "tsx scripts/translation-quality.ts",
     "macro:market": "tsx scripts/market-sync.ts",
+    "macro:expectation": "tsx scripts/macro-expectation.ts",
+    "themes:snapshot": "tsx scripts/trading-theme-snapshot.ts",
     "analytics:rollup": "tsx scripts/analytics-rollup.ts"
   },
   "prisma": {

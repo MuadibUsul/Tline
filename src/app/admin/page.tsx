@@ -85,6 +85,11 @@ export default async function AdminOverviewPage() {
       alarm: unhealthy > 0,
     },
     {
+      show: can(user, "admin.sources"), href: "/admin/data",
+      label: tr(locale, "Data loop", "数据闭环"), value: "→",
+      note: tr(locale, "market, expectations, licenses and settlement", "行情、预期、授权与结算"),
+    },
+    {
       show: can(user, "admin.review"), href: "/admin/jobs",
       label: tr(locale, "Newest research", "最近入库"),
       value: health.articleAgeHours === null ? "—" : health.articleAgeHours < 1 ? tr(locale, "<1h", "1 小时内") : `${health.articleAgeHours.toFixed(0)}h`,

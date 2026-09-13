@@ -45,3 +45,16 @@
 「审计日志」可按动作、操作人、对象及 UTC 日期区间检索，展开元数据可查看变更前后值。系统任务或已删除账户显示为「系统 / 已删除用户」。
 
 「任务与调度」显示采集和分析汇总任务状态；`analytics-rollup` 失败时应先检查数据库连接及 `ANALYTICS_RAW_RETENTION_DAYS`。健康检查 JSON 可从后台侧栏打开。
+# 数据闭环运维
+
+管理员从“内容运营 → 行情与宏观数据”查看统一状态：供应商同步、持久化额度、标的映射、用途授权、宏观预期快照和预测结算原因。页面只读，不会因访问页面触发供应商请求。
+
+授权记录必须有可核验依据 URL、确认人和确认时间。UNKNOWN/过期/未包含当前用途的数据会在服务端被拒绝；仅打开标的或来源开关不能替代许可证明。
+
+手动预期录入：
+
+`npm run macro:expectation -- --release=<release-id-or-key> --indicator=<canonical-key> --type=SURVEY_CONSENSUS --source=<source> --source-url=<evidence-url> --license-key=<policy-dataset-key> --value=<number> --period=<YYYY-MM-DD> --captured-at=<ISO-time> --dry-run=true`
+
+核对 dry-run 后去掉该参数保存。发布后补录必须显式 `--historical=true`，且永远不能成为实时 surprise 的发布前快照。样本量、调查方法、原始字段只有来源真实提供时才填写。
+
+行情回填先预演：`npm run macro:market -- --from=2026-01-01 --to=2026-03-31 --limit=2 --dry-run`。确认时间窗和批次后去掉 `--dry-run`；重复执行通过观测唯一键保持幂等，且与在线行情共享持久化预算。

@@ -3,10 +3,20 @@ import { resolveLLMProvider } from "../llm/config";
 import { completeJSON, type LLMProvider } from "../llm/provider";
 import { getReleaseConsensus } from "./releaseConsensus";
 
-const SYSTEM = `You are a macro strategist writing a concise professional read-out of an economic data release for institutional readers.
-Given the release facts (actual, previous, and the consensus mined from bank research with its distribution), write 300–400 words of analysis in BOTH English and Simplified Chinese.
-Cover: whether the print beat/missed/matched the institutional consensus and by how much; the change vs the previous period; what it implies for the trajectory; and how it sits against the range of bank forecasts. Be factual and restrained. Do not give investment advice or price targets.
+const SYSTEM = `You are a macro strategist writing a concise professional read-out for institutional readers.
+Write 300–400 words in BOTH English and Simplified Chinese. Keep these evidence classes separate:
+1. surveyConsensus is the only market consensus and the only basis for beat/miss/in-line language;
+2. modelForecast is a platform model output, never market consensus;
+3. institutionResearchForecasts are forecasts mined from research, never market consensus;
+4. previous is a historical comparison, not an expectation.
+If surveyConsensus is null, do not claim that the release beat, missed, exceeded, disappointed, or matched expectations/consensus. State plainly that no verified pre-release survey consensus is available. Discuss the change from previous and separately compare any model or institution forecasts. Be factual and restrained. Do not give investment advice or price targets.
 Return ONLY JSON: {"en":string,"zh":string}.`;
+
+const UNSUPPORTED_EXPECTATION_CLAIM = /\b(?:beat|miss(?:ed)?|above|below|exceed(?:ed)?|disappoint(?:ed)?|in[- ]line with|matched?)\s+(?:the\s+)?(?:market\s+)?(?:consensus|expectations?)\b|(?:超出|超过|高于|低于|不及|逊于|符合|持平于)(?:市场)?预期|超预期|不及预期/iu;
+
+export function analysisContainsUnsupportedExpectationClaim(text: string, hasSurveyConsensus: boolean) {
+  return !hasSurveyConsensus && UNSUPPORTED_EXPECTATION_CLAIM.test(text);
+}
 
 /** Generate and store the AI read-out for a released macro print. Idempotent-ish: overwrites. */
 export async function generateReleaseAnalysis(
@@ -17,7 +27,7 @@ export async function generateReleaseAnalysis(
   if (!provider) throw new Error("No LLM provider is configured for release analysis.");
   const release = await prisma.macroRelease.findUnique({
     where: { id: releaseId },
-    include: { values: { include: { indicator: true } } },
+    include: { values: { include: { indicator: true, modelExpectation: true } } },
   });
   if (!release) return false;
   const value = release.values[0];
@@ -28,9 +38,20 @@ export async function generateReleaseAnalysis(
     referencePeriod: value?.observationPeriod?.toISOString().slice(0, 10) ?? null,
     actual: value?.actualInitial != null ? Number(value.actualInitial.toString()) : null,
     previous: value ? Number((value.revisedPreviousAtRelease ?? value.previousAtRelease)?.toString() ?? "") || null : null,
-    institutionalConsensus: consensus?.median ?? null,
-    consensusRange: consensus ? { min: consensus.min, max: consensus.max, count: consensus.count } : null,
-    bankForecasts: consensus?.contributors.slice(0, 12) ?? [],
+    surveyConsensus: value?.consensusAtRelease != null ? Number(value.consensusAtRelease.toString()) : null,
+    surveyConsensusSource: value?.consensusProvider ?? null,
+    surveyConsensusAsOf: value?.consensusAsOf?.toISOString() ?? null,
+    modelForecast: value?.modelExpectation ? {
+      value: Number(value.modelExpectation.value.toString()),
+      source: value.modelExpectation.source,
+      capturedAt: value.modelExpectation.capturedAt.toISOString(),
+    } : null,
+    institutionResearchForecasts: consensus ? {
+      median: consensus.median,
+      range: { min: consensus.min, max: consensus.max },
+      count: consensus.count,
+      contributors: consensus.contributors.slice(0, 12),
+    } : null,
   };
   const { value: out } = await completeJSON<{ en?: string; zh?: string }>(provider, {
     system: SYSTEM,
@@ -44,6 +65,10 @@ export async function generateReleaseAnalysis(
   // Both locales are public. Treat a partial completion as retryable instead of
   // leaving one locale stuck on "Analysis generating…" forever.
   if (!out.en?.trim() || !out.zh?.trim()) return false;
+  const hasSurveyConsensus = value?.consensusAtRelease != null;
+  if (analysisContainsUnsupportedExpectationClaim(`${out.en}\n${out.zh}`, hasSurveyConsensus)) {
+    throw new Error("Model claimed an expectations surprise without a verified survey-consensus snapshot.");
+  }
   await prisma.macroRelease.update({
     where: { id: releaseId },
     data: { analysisEn: out.en?.trim() ?? null, analysisZh: out.zh?.trim() ?? null, analysisAt: new Date() },

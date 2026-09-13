@@ -10,6 +10,12 @@ export interface MarketQuote {
   quoteCurrency: string;
   quality: MarketQuality;
   status: string;
+  providerUpdatedAt: Date | null;
+  providerDelaySeconds: number | null;
+  marketState: "OPEN" | "CLOSED" | "UNKNOWN";
+  priceType: "LAST" | "CLOSE" | "SETTLEMENT" | "MID";
+  unit: string;
+  licenseKey: string;
   open: string | null;
   high: string | null;
   low: string | null;

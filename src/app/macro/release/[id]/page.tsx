@@ -8,6 +8,7 @@ import { actualText, consensusText, macroDateTime, macroNumber, unitLabel } from
 import { getReleaseConsensus } from "@/lib/macro/releaseConsensus";
 import type { ForecastConsensus } from "@/lib/macro/forecasts";
 import type { ParsedPolicyDocument } from "@/lib/macro/policy/types";
+import { authorizedExpectationIds } from "@/lib/macro/expectationUse";
 
 export const dynamic = "force-dynamic";
 
@@ -73,40 +74,50 @@ function ConsensusDistribution({ consensus, actual, locale }: { consensus: Forec
 export default async function MacroReleasePage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const locale = await getLocale();
-  const release = await prisma.macroRelease.findUnique({ where: { id: params.id }, include: { values: { include: { indicator: true } }, policyDocuments: { orderBy: { publishedAt: "desc" } } } });
+  const release = await prisma.macroRelease.findUnique({ where: { id: params.id }, include: { values: { include: { indicator: true, consensusExpectation: true, modelExpectation: true } }, policyDocuments: { orderBy: { publishedAt: "desc" } } } });
   if (!release) notFound();
   const policy = release.policyDocuments.map((document) => ({ document, value: parsed(document.parsedJson) }));
 
-  // P2: our own institutional consensus, mined from bank research, plus the AI read-out.
+  // Institution research is useful context, but is never relabelled as market consensus.
   const consensus = await getReleaseConsensus(release);
   const primary = release.values[0];
+  const publicExpectationIds = await authorizedExpectationIds(release.values.flatMap((value) => [value.consensusExpectation, value.modelExpectation].filter((item): item is NonNullable<typeof item> => Boolean(item))), "public_display");
   const released = release.status === "RELEASED";
   const actual = primary?.actualInitial != null ? Number(primary.actualInitial.toString()) : null;
   const unit = primary?.indicator?.unit ? unitLabel(primary.indicator.unit, locale) : consensus?.unit ?? "";
-  const surprise = released && actual !== null && consensus?.median != null ? actual - consensus.median : null;
+  const surveyConsensus = primary?.consensusExpectation && publicExpectationIds.has(primary.consensusExpectation.id) && primary.consensusAtRelease != null ? Number(primary.consensusAtRelease.toString()) : null;
+  const surprise = released && actual !== null && surveyConsensus !== null ? actual - surveyConsensus : null;
   const surpriseTone = surprise === null ? "gray" : surprise > 0 ? "bull" : surprise < 0 ? "bear" : "neu";
   const surpriseLabel = surprise === null ? "" : surprise > 0 ? tr(locale, "above consensus", "高于共识") : surprise < 0 ? tr(locale, "below consensus", "低于共识") : tr(locale, "in line", "符合共识");
-  const analysis = locale === "zh-CN" ? release.analysisZh ?? release.analysisEn : release.analysisEn;
+  const analysis = primary?.consensusExpectationId && !publicExpectationIds.has(primary.consensusExpectationId) ? null : locale === "zh-CN" ? release.analysisZh ?? release.analysisEn : release.analysisEn;
 
   return <main className="wrap"><div className="page-head"><div className="eyebrow">{release.countryCode} · {release.agency} · {release.status}</div><h1>{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}</h1><div className="deltas"><span>{tr(locale, "Scheduled", "计划")}: {macroDateTime(release.scheduledAt, locale, release.sourceTimezone)}</span><span>{tr(locale, "Released", "发布")}: {release.releasedAt ? macroDateTime(release.releasedAt, locale, release.sourceTimezone) : tr(locale, "Not released", "尚未发布")}</span></div><div className="tag-row"><Link className="minibtn" href={localePath(locale, "/macro/calendar")}>← {tr(locale, "Calendar", "日历")}</Link>{release.sourceUrl && <a className="minibtn p" href={release.sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Official source ↗", "官方来源 ↗")}</a>}</div></div>
 
-    <section className="blk"><div className="section-t">{tr(locale, "Release values", "发布值")}</div><div className="tbl-wrap"><table><thead><tr><th>{tr(locale, "Indicator", "指标")}</th><th>{tr(locale, "Period", "数据期")}</th><th>{tr(locale, "Previous", "前值")}</th><th>{tr(locale, "Revised previous", "修订前值")}</th><th>{tr(locale, "Consensus", "共识")}</th><th>{tr(locale, "Actual initial", "实际初值")}</th></tr></thead><tbody>{release.values.map((value) => <tr key={value.id}><td className="inst"><Link href={localePath(locale, `/macro/indicator/${value.indicator.canonicalKey}`)}>{locale === "zh-CN" ? value.indicator.nameZh ?? value.indicator.nameEn : value.indicator.nameEn}</Link></td><td className="mono-cell">{value.observationPeriod.toISOString().slice(0, 10)}</td><td className="mono-cell">{macroNumber(value.previousAtRelease, locale)}</td><td className="mono-cell">{macroNumber(value.revisedPreviousAtRelease, locale)}</td><td className="mono-cell">{consensusText(value.consensusAtRelease, locale)}</td><td className="mono-cell">{actualText(value.actualInitial, released, locale)}</td></tr>)}</tbody></table></div></section>
+    <section className="blk"><div className="section-t">{tr(locale, "Release values", "发布值")}</div><div className="tbl-wrap"><table><thead><tr><th>{tr(locale, "Indicator", "指标")}</th><th>{tr(locale, "Period", "数据期")}</th><th>{tr(locale, "Previous", "前值")}</th><th>{tr(locale, "Revised previous", "修订前值")}</th><th>{tr(locale, "Consensus", "共识")}</th><th>{tr(locale, "Actual initial", "实际初值")}</th></tr></thead><tbody>{release.values.map((value) => <tr key={value.id}><td className="inst"><Link href={localePath(locale, `/macro/indicator/${value.indicator.canonicalKey}`)}>{locale === "zh-CN" ? value.indicator.nameZh ?? value.indicator.nameEn : value.indicator.nameEn}</Link></td><td className="mono-cell">{value.observationPeriod.toISOString().slice(0, 10)}</td><td className="mono-cell">{macroNumber(value.previousAtRelease, locale)}</td><td className="mono-cell">{macroNumber(value.revisedPreviousAtRelease, locale)}</td><td className="mono-cell">{value.consensusExpectation && publicExpectationIds.has(value.consensusExpectation.id) ? consensusText(value.consensusAtRelease, locale) : "—"}</td><td className="mono-cell">{actualText(value.actualInitial, released, locale)}</td></tr>)}</tbody></table></div></section>
 
-    <section className="blk"><div className="section-t">{tr(locale, "Institutional consensus (mined from bank research)", "机构预期共识（自投行研报清洗）")}</div>
+    <section className="blk"><div className="section-t">{tr(locale, "Pre-release expectations", "发布前预期")}</div>
+      <div className="dist" style={{ marginTop: 14 }}>
+        <div className="stat"><span>{tr(locale, "Verified survey consensus", "经验证的市场调查共识")}</span><b>{surveyConsensus === null ? tr(locale, "Not available", "暂无") : `${num(surveyConsensus)}${unit ? ` ${unit}` : ""}`}</b>{surveyConsensus !== null && <small>{primary?.consensusExpectation?.source} · {macroDateTime(primary!.consensusExpectation!.capturedAt, locale, release.sourceTimezone)}</small>}</div>
+        <div className="stat"><span>{tr(locale, "Platform model forecast", "平台模型预期")}</span><b>{primary?.modelExpectation && publicExpectationIds.has(primary.modelExpectation.id) ? `${num(Number(primary.modelExpectation.value.toString()))}${unit ? ` ${unit}` : ""}` : tr(locale, "Not available", "暂无")}</b>{primary?.modelExpectation && publicExpectationIds.has(primary.modelExpectation.id) && <small>{primary.modelExpectation.source} · {macroDateTime(primary.modelExpectation.capturedAt, locale, release.sourceTimezone)}</small>}</div>
+        {surprise !== null && <div className="stat"><span>{tr(locale, "Actual vs survey consensus", "实际值 vs 市场调查共识")}</span><b><span className={`chip ${surpriseTone}`}>{surprise > 0 ? "+" : ""}{num(surprise)} · {surpriseLabel}</span></b></div>}
+      </div>
+      {surveyConsensus === null && <p style={{ color: "var(--muted)", marginTop: 12 }}>{tr(locale, "No verified pre-release survey snapshot is available, so this release is not labelled as a beat or miss.", "暂无经验证的发布前市场调查快照，因此不会将本次数据标记为超预期或不及预期。")}</p>}
+    </section>
+
+    <section className="blk"><div className="section-t">{tr(locale, "Institution research forecasts", "机构研报预期")}</div>
       {consensus ? <>
         <div className="dist" style={{ marginTop: 14 }}>
           <div className="stat"><span>{tr(locale, "Consensus (median)", "共识（中位数）")}</span><b>{consensus.median !== null ? num(consensus.median) : "N/A"}{unit ? ` ${unit}` : ""}</b></div>
           <div className="stat"><span>{tr(locale, "Mean", "均值")}</span><b>{consensus.mean !== null ? num(consensus.mean) : "N/A"}</b></div>
           <div className="stat"><span>{tr(locale, "Range", "区间")}</span><b>{consensus.min !== null ? num(consensus.min) : "N/A"}–{consensus.max !== null ? num(consensus.max) : "N/A"}</b></div>
           <div className="stat"><span>{tr(locale, "Contributing banks", "参与投行")}</span><b>{consensus.count}</b></div>
-          {released && actual !== null && <div className="stat"><span>{tr(locale, "Actual vs consensus", "实际 vs 共识")}</span><b><span className={`chip ${surpriseTone}`}>{surprise! > 0 ? "+" : ""}{surprise !== null ? num(surprise) : ""} · {surpriseLabel}</span></b></div>}
         </div>
         <ConsensusDistribution consensus={consensus} actual={actual} locale={locale} />
         <details style={{ marginTop: 10 }}><summary>{tr(locale, `Bank forecasts (${consensus.count})`, `投行预期（${consensus.count}）`)}</summary><div className="tbl-wrap" style={{ marginTop: 8 }}><table><thead><tr><th>{tr(locale, "Institution", "机构")}</th><th>{tr(locale, "Forecast", "预期值")}</th></tr></thead><tbody>{consensus.contributors.map((c, index) => <tr key={index}><td className="inst">{c.institution}</td><td className="mono-cell">{num(c.value)}{unit ? ` ${unit}` : ""}</td></tr>)}</tbody></table></div></details>
       </> : <p style={{ color: "var(--muted)", marginTop: 12 }}>{tr(locale, "No bank forecasts have been mined for this release yet. Forecasts are extracted automatically from institutional research as it is ingested.", "尚未从研报中清洗出该项发布的投行预期。系统会在研报入库时自动提取预期值。")}</p>}
     </section>
 
-    {analysis && <section className="blk"><div className="section-t">{tr(locale, "AI read-out", "AI 解读")}</div><div className="ai-analysis-label">{tr(locale, "AI-generated · actual vs consensus and previous · not investment advice", "AI 生成 · 实际值对比共识与前值 · 非投资建议")}{release.analysisAt ? ` · ${macroDateTime(release.analysisAt, locale, release.sourceTimezone)}` : ""}</div>{analysis.split(/\n{2,}/).filter(Boolean).map((para, index) => <p key={index} style={{ marginTop: 10, lineHeight: 1.7 }}>{para}</p>)}</section>}
+    {analysis && <section className="blk"><div className="section-t">{tr(locale, "AI read-out", "AI 解读")}</div><div className="ai-analysis-label">{tr(locale, "AI-generated · evidence classes kept separate · not investment advice", "AI 生成 · 区分市场共识、模型与机构研报预期 · 非投资建议")}{release.analysisAt ? ` · ${macroDateTime(release.analysisAt, locale, release.sourceTimezone)}` : ""}</div>{analysis.split(/\n{2,}/).filter(Boolean).map((para, index) => <p key={index} style={{ marginTop: 10, lineHeight: 1.7 }}>{para}</p>)}</section>}
 
     {policy.length > 0 && <section className="blk"><div className="section-t">{tr(locale, "Policy documents", "政策文件")}</div><div className="feed">{policy.map(({ document, value }) => <article className="card" key={document.id}><div className="tag-row"><span className="chip acc">{document.docType}</span><span className="chip gray">{document.provider ?? "deterministic"} · {document.reviewStatus}</span></div>{value && <><div className="dist" style={{ marginTop: 14 }}><div className="stat"><span>{tr(locale, "Decision", "决策")}</span><b>{value.decision}</b></div><div className="stat"><span>{tr(locale, "Target range", "目标区间")}</span><b>{value.targetRateLower ?? "N/A"}–{value.targetRateUpper ?? "N/A"}</b></div><div className="stat"><span>{tr(locale, "Change", "变动")}</span><b>{value.changeBps ?? "N/A"} bps</b></div><div className="stat"><span>{tr(locale, "Stance", "立场")}</span><b>{value.stance}</b></div></div>{[value.inflationAssessment, value.growthAssessment, value.laborAssessment, value.forwardGuidance, value.balanceSheetAction].filter(Boolean).map((text, index) => <p key={index}>{text}</p>)}<details><summary>{tr(locale, "Source quotes", "原文引句")}</summary>{value.sourceQuotes.map((item, index) => <blockquote key={index}>{item.field}: “{item.quote}”</blockquote>)}</details></>}<a href={document.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn" style={{ display: "inline-block", marginTop: 12 }}>{tr(locale, "Official document ↗", "官方文件 ↗")}</a></article>)}</div></section>}
   </main>;

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime, unitLabel } from "@/lib/macro/presentation";
 import ReleaseSpotlight, { type SpotlightRelease } from "./ReleaseSpotlight";
-import { getReleaseConsensusMap } from "@/lib/macro/releaseConsensus";
+import { authorizedExpectationIds } from "@/lib/macro/expectationUse";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,7 @@ export default async function MacroPage() {
       where: { scheduledAt: { gte: new Date(now.getTime() - 3 * 864e5), lte: new Date(now.getTime() + 14 * 864e5) }, importance: { gte: 3 } },
       orderBy: { scheduledAt: "asc" },
       take: 30,
-      include: { values: { take: 1, include: { indicator: true } } },
+      include: { values: { take: 1, include: { indicator: true, consensusExpectation: true } } },
     }),
     prisma.macroIndicator.findMany({
       where: { enabled: true },
@@ -45,10 +45,10 @@ export default async function MacroPage() {
   });
   const categories = [...new Set([...CATEGORY_ORDER, ...rows.map((row) => row.indicator.category)])].filter((category) => rows.some((row) => row.indicator.category === category));
 
-  const consensusMap = await getReleaseConsensusMap(calendar);
+  const publicExpectationIds = await authorizedExpectationIds(calendar.flatMap((release) => release.values.flatMap((value) => value.consensusExpectation ? [value.consensusExpectation] : [])), "public_display");
   const spotlight: SpotlightRelease[] = calendar.map((release) => {
     const value = release.values[0];
-    const consensus = consensusMap.get(release.id);
+    const publicConsensus = Boolean(value?.consensusExpectation && publicExpectationIds.has(value.consensusExpectation.id));
     return {
       id: release.id,
       titleEn: release.titleEn,
@@ -60,11 +60,12 @@ export default async function MacroPage() {
       status: release.status,
       actual: toNum(value?.actualInitial),
       previous: toNum(value?.revisedPreviousAtRelease ?? value?.previousAtRelease),
-      // Our own institutional consensus (mined from research) takes precedence; fall back to any captured value.
-      consensus: consensus?.median ?? toNum(value?.consensusAtRelease),
-      consensusCount: consensus?.count ?? 0,
-      unit: value?.indicator ? unitLabel(value.indicator.unit, locale) : consensus?.unit ?? "",
-      analysis: (locale === "zh-CN" ? release.analysisZh ?? release.analysisEn : release.analysisEn) ?? null,
+      // Only the frozen pre-release survey snapshot is market consensus. Research-mined
+      // institution forecasts remain a separate evidence class on the release page.
+      consensus: publicConsensus ? toNum(value?.consensusAtRelease) : null,
+      consensusCount: 0,
+      unit: value?.indicator ? unitLabel(value.indicator.unit, locale) : "",
+      analysis: value?.consensusExpectationId && !publicConsensus ? null : (locale === "zh-CN" ? release.analysisZh ?? release.analysisEn : release.analysisEn) ?? null,
     };
   });
 
@@ -98,7 +99,7 @@ export default async function MacroPage() {
                   <td className="ctr" title={`${release.importance}/5`}>{"●".repeat(release.importance)}</td>
                   <td className="mono-cell num"><b>{released ? dec(value?.actualInitial) : tr(locale, "—", "—")}</b></td>
                   <td className="mono-cell num">{dec(value?.revisedPreviousAtRelease ?? value?.previousAtRelease)}</td>
-                  <td className="mono-cell num">{dec(value?.consensusAtRelease)}</td>
+                  <td className="mono-cell num">{value?.consensusExpectation && publicExpectationIds.has(value.consensusExpectation.id) ? dec(value.consensusAtRelease) : "—"}</td>
                 </tr>
               );
             })}

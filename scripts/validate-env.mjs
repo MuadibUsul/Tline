@@ -9,6 +9,10 @@ const authSecret = process.env.AUTH_SECRET || "";
 const storageDriver = process.env.DOCUMENT_STORAGE_DRIVER || "local";
 const storageRoot = process.env.DOCUMENT_STORAGE_ROOT || "./storage";
 const authProvider = (process.env.AUTH_PROVIDER || "").toLowerCase();
+const positiveNumber = (name, fallback) => {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(value) || value < 0) errors.push(`${name} must be a non-negative number.`);
+};
 
 if (!databaseUrl) errors.push("DATABASE_URL is required.");
 if (!["local", "s3"].includes(storageDriver)) errors.push(`DOCUMENT_STORAGE_DRIVER=${storageDriver} has no registered adapter.`);
@@ -27,6 +31,11 @@ if (authProvider === "google" && (!process.env.GOOGLE_CLIENT_ID || !process.env.
 if (authProvider === "email" && (!process.env.EMAIL_SERVER || !process.env.EMAIL_FROM)) {
   errors.push("Email authentication requires EMAIL_SERVER and EMAIL_FROM.");
 }
+for (const [name, fallback] of [["MARKET_BUDGET_PER_MINUTE", 8], ["MARKET_BUDGET_PER_DAY", 800], ["MARKET_QUOTE_ENDPOINT_WEIGHT", 1], ["MARKET_TIME_SERIES_ENDPOINT_WEIGHT", 1], ["TWELVE_DATA_DECLARED_DELAY_SECONDS", 0]]) positiveNumber(name, fallback);
+const themeCoverage = Number(process.env.THEME_MARKET_MIN_COVERAGE ?? 0.6);
+if (!Number.isFinite(themeCoverage) || themeCoverage < 0 || themeCoverage > 1) errors.push("THEME_MARKET_MIN_COVERAGE must be between 0 and 1.");
+try { new Intl.DateTimeFormat("en", { timeZone: process.env.MARKET_BUDGET_RESET_TIMEZONE || "UTC" }).format(); }
+catch { errors.push("MARKET_BUDGET_RESET_TIMEZONE must be a valid IANA timezone."); }
 
 if (production) {
   if (!/^postgres(?:ql)?:\/\//.test(databaseUrl)) errors.push("Production DATABASE_URL must use PostgreSQL.");

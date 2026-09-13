@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { authorizedExpectationIds } from "./macro/expectationUse";
 import { computeConsensus, consensusChange, consensusSince } from "./consensus";
 import { ASSETS } from "./assets";
 import { assetName, domainTerm, institutionName } from "./i18n";
@@ -102,11 +103,12 @@ async function evalMacroRule(rule: RuleShape, scope: { kind: MonitorScopeKind; r
         ...(indicatorWhere ? { values: { some: { indicator: indicatorWhere } } } : {}),
       },
       orderBy: { releasedAt: "desc" },
-      include: { values: { where: indicatorWhere ? { indicator: indicatorWhere } : {}, include: { indicator: true } } },
+      include: { values: { where: indicatorWhere ? { indicator: indicatorWhere } : {}, include: { indicator: true, consensusExpectation: true } } },
     });
     if (!release) return null;
     if (rule.type === "MACRO_RELEASE") return { assetTicker: null, score: null, targetId: release.id, message: `${release.titleEn} released` };
-    const value = release.values.find((item) => item.consensusAtRelease !== null && surpriseThresholdMet(rule.type, item.surprisePct, rule.threshold));
+    const authorized = await authorizedExpectationIds(release.values.flatMap((item) => item.consensusExpectation ? [item.consensusExpectation] : []), "internal_analysis");
+    const value = release.values.find((item) => item.consensusExpectation && authorized.has(item.consensusExpectation.id) && item.consensusAtRelease !== null && surpriseThresholdMet(rule.type, item.surprisePct, rule.threshold));
     if (!value) return null;
     const percent = new Prisma.Decimal(value.surprisePct!).times(100).toDecimalPlaces(2).toString();
     return { assetTicker: null, score: null, targetId: release.id, message: `${value.indicator.nameEn} surprise ${percent}%` };

@@ -225,3 +225,16 @@ npm run env:check:production
 ```
 
 The final environment check intentionally fails when production still uses SQLite, a weak session secret, or an unregistered storage driver. CI (`.github/workflows/ci.yml`) runs the same checks on every push and pull request.
+# 行情与宏观预期增量上线
+
+1. 备份数据库并先发布兼容代码；不要对生产执行 `prisma db push`。
+2. 生成并核对双 schema：`npm run db:postgres:schema`。
+3. 在测试 PostgreSQL 执行 `npm run db:postgres:deploy`，再运行 typecheck/test/build 和只读页面检查。
+4. 生产维护窗口执行同一 migrate deploy。新增迁移是 `20260913180000_market_macro_data_loop`，仅新增表、索引、外键和带兼容默认值/可空字段。
+5. 在后台录入并核验 `DataLicensePolicy` 后才启用数字用途；旧数据默认 UNKNOWN，不做授权回填。
+6. 配置 `TWELVE_DATA_API_KEY` 后启动既有 macro-scheduler。无 key 时行情任务安全跳过，研报与官方宏观功能继续运行。
+7. `FRED_DATA_USE_CONFIRMED` 默认 false；只有完成当前 FRED API 条款及具体第三方序列授权复核后才设为 true。BEA/BLS/EIA/ECB/Eurostat 的直接官方管线不依赖此开关。
+
+预算示例：10 个标的，每轮 quote 权重 1、30 分钟一次，理论基础用量约 `10 × 48 = 480 credits/day`，还必须为失败重试和回填留余量。实际计费以供应商账户和端点规则为准。`MARKET_BUDGET_PER_MINUTE` 默认 8，`MARKET_BUDGET_PER_DAY` 默认 800，`MARKET_BUDGET_RESET_TIMEZONE` 默认 UTC；端点权重由 `MARKET_QUOTE_ENDPOINT_WEIGHT` 与 `MARKET_TIME_SERIES_ENDPOINT_WEIGHT` 配置。
+
+停用/回滚：停止 macro-scheduler 或移除 `TWELVE_DATA_API_KEY`；将映射 `enabled=false`；将授权状态改为 RESTRICTED。无需删除观测。应用可回滚到旧版本，但数据库新增结构保留，避免破坏已采集证据。

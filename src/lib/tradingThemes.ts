@@ -27,7 +27,10 @@ export interface ThemeView {
 export interface ThemeMarketMove {
   symbol: string;
   changePct: number;
+  observationIds?: string[];
 }
+
+export const THEME_METHODOLOGY_VERSION = "research-market-v2";
 
 const NAMED_THEMES = [
   ["ai-capex", /\b(?:ai|artificial intelligence|data cent(?:er|re)|semiconductor|compute)\b/i, "AI Capex", "AI 资本开支"],
@@ -57,7 +60,7 @@ function identity(topic: string, text: string) {
 const tone = (direction: string): ThemeDirection =>
   direction === "bullish" || direction === "bearish" || direction === "conditional" ? direction : "neutral";
 
-export function buildTradingThemes(views: ThemeView[], now = new Date(), marketMoves: ThemeMarketMove[] = []) {
+export function buildTradingThemes(views: ThemeView[], now = new Date(), marketMoves: ThemeMarketMove[] = [], minimumMarketCoverage = 0.6) {
   const currentSince = now.getTime() - 7 * 864e5;
   const previousSince = now.getTime() - 14 * 864e5;
   const groups = new Map<string, { identity: ReturnType<typeof identity>; current: ThemeView[]; previous: ThemeView[] }>();
@@ -96,7 +99,10 @@ export function buildTradingThemes(views: ThemeView[], now = new Date(), marketM
       marketConfirmed: asset.movePct === null || asset.bullish === asset.bearish ? null : (asset.movePct > 0) === (asset.bullish > asset.bearish),
     }));
     const confirmations = assetList.filter((asset) => asset.marketConfirmed !== null);
+    const comparableAssets = assetList.filter((asset) => asset.ticker !== null).length;
+    const marketCoverage = comparableAssets ? confirmations.length / comparableAssets : 0;
     const confirmation = confirmations.length ? confirmations.filter((asset) => asset.marketConfirmed).length / confirmations.length : null;
+    const marketStatus = confirmation === null || marketCoverage < minimumMarketCoverage ? "insufficient" as const : confirmation === 1 ? "aligned" as const : confirmation === 0 ? "opposed" as const : "mixed" as const;
     const latestAt = current.reduce((latest, view) => view.article.publishedAt > latest ? view.article.publishedAt : latest, current[0].article.publishedAt);
     const freshness = Math.exp(-Math.max(0, now.getTime() - latestAt.getTime()) / (3 * 864e5));
     const averageImportance = current.reduce((sum, view) => sum + view.importance, 0) / current.length;
@@ -122,6 +128,8 @@ export function buildTradingThemes(views: ThemeView[], now = new Date(), marketM
       institutionCount: institutions.size,
       assets: assetList,
       marketConfirmation: confirmation,
+      marketCoverage,
+      marketStatus,
       lead: current[0],
       evidence: current.filter((view, index, list) => list.findIndex((candidate) => candidate.articleId === view.articleId) === index).slice(0, 3),
     };

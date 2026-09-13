@@ -2,6 +2,7 @@ export type SocialLanguage = "en" | "zh-CN";
 export type SocialSourceKind = "research" | "macro";
 
 const FORBIDDEN = /(?:guaranteed returns?|risk[- ]free profit|稳赚|保证收益|必涨|必跌)/i;
+const EXPECTATION_CLAIM = /\b(?:beat|miss(?:ed)?|above|below|exceed(?:ed)?|disappoint(?:ed)?|in[- ]line with|matched?)\s+(?:the\s+)?(?:market\s+)?(?:consensus|expectations?)\b|(?:超出|超过|高于|低于|不及|逊于|符合|持平于)(?:市场)?预期|超预期|不及预期/iu;
 
 export function xWeightedLength(text: string): number {
   return [...text].reduce((sum, char) => sum + (/^[\u0000-\u10ff\u2000-\u200d\u2010-\u201f\u2032-\u2037]$/u.test(char) ? 1 : 2), 0);
@@ -55,6 +56,9 @@ function valueLine(value: MacroValue, zh: boolean) {
 }
 
 export function macroPosts(input: MacroInput) {
+  if (!input.values.some((value) => value.consensus != null) && EXPECTATION_CLAIM.test(`${input.analysisEn}\n${input.analysisZh}`)) {
+    throw new Error("Macro post claims an expectations surprise without a verified survey-consensus snapshot.");
+  }
   const enValues = input.values.slice(0, 2).map((value) => valueLine(value, false)).join("\n");
   const zhValues = input.values.slice(0, 2).map((value) => valueLine(value, true)).join("\n");
   return {

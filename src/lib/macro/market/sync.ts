@@ -2,6 +2,10 @@ import { prisma } from "../../db";
 import { marketInstruments, storeMarketQuote, syncMarketInstruments } from "./provider";
 import { createTwelveDataProvider } from "./twelveData";
 import type { MarketDataProvider } from "./types";
+import { reserveProviderBudget } from "./budget";
+import { providerFailureReason } from "./quality";
+
+type BudgetReserve = (provider: string, cost: number) => Promise<{ allowed: boolean; reason: string | null }>;
 
 /**
  * Pull one quote per enabled instrument.
@@ -16,6 +20,7 @@ export interface MarketSyncResult {
   instruments: number;
   stored: number;
   failed: number;
+  deferred: number;
   errors: string[];
   reason?: string;
 }
@@ -29,6 +34,7 @@ export function resolveMarketProvider(): MarketDataProvider | null {
 
 export async function syncMarketQuotes(
   provider: MarketDataProvider | null = resolveMarketProvider(),
+  reserve: BudgetReserve = reserveProviderBudget,
 ): Promise<MarketSyncResult> {
   if (!provider) {
     return {
@@ -36,6 +42,7 @@ export async function syncMarketQuotes(
       instruments: 0,
       stored: 0,
       failed: 0,
+      deferred: 0,
       errors: [],
       reason: "no market-data provider configured (set TWELVE_DATA_API_KEY)",
     };
@@ -53,21 +60,24 @@ export async function syncMarketQuotes(
 
   let stored = 0;
   let failed = 0;
+  let deferred = 0;
   const errors: string[] = [];
 
   for (const { symbol } of enabled) {
     try {
+      const budget = await reserve(provider.id, Math.max(1, Number(process.env.MARKET_QUOTE_ENDPOINT_WEIGHT || 1)));
+      if (!budget.allowed) { deferred += 1; continue; }
       const quote = await provider.getQuote(symbol);
       await storeMarketQuote(quote);
       stored += 1;
     } catch (error) {
       // One rejected symbol must not abandon the rest of the sheet.
       failed += 1;
-      if (errors.length < 5) errors.push(`${symbol}: ${String(error).slice(0, 160)}`);
+      if (errors.length < 5) errors.push(`${symbol} [${providerFailureReason(error)}]: ${String(error).slice(0, 160)}`);
     }
   }
 
-  return { configured: true, instruments: enabled.length, stored, failed, errors };
+  return { configured: true, instruments: enabled.length, stored, failed, deferred, errors };
 }
 
 /**
@@ -81,6 +91,8 @@ export async function backfillMarketHistory(
   start: Date,
   end: Date = new Date(),
   provider: MarketDataProvider | null = resolveMarketProvider(),
+  reserve: BudgetReserve = reserveProviderBudget,
+  options: { instrumentLimit?: number; dryRun?: boolean } = {},
 ): Promise<MarketSyncResult> {
   if (!provider) {
     return {
@@ -88,6 +100,7 @@ export async function backfillMarketHistory(
       instruments: 0,
       stored: 0,
       failed: 0,
+      deferred: 0,
       errors: [],
       reason: "no market-data provider configured (set TWELVE_DATA_API_KEY)",
     };
@@ -99,13 +112,18 @@ export async function backfillMarketHistory(
     select: { symbol: true },
     orderBy: { symbol: "asc" },
   });
+  const selected = enabled.slice(0, Math.max(0, options.instrumentLimit ?? enabled.length));
+  if (options.dryRun) return { configured: true, instruments: selected.length, stored: 0, failed: 0, deferred: 0, errors: [], reason: `dry-run: ${selected.length} instrument(s), ${start.toISOString()}..${end.toISOString()}` };
 
   let stored = 0;
   let failed = 0;
+  let deferred = 0;
   const errors: string[] = [];
 
-  for (const { symbol } of enabled) {
+  for (const { symbol } of selected) {
     try {
+      const budget = await reserve(provider.id, Math.max(1, Number(process.env.MARKET_TIME_SERIES_ENDPOINT_WEIGHT || 1)));
+      if (!budget.allowed) { deferred += 1; continue; }
       const quotes = await provider.getTimeSeries(symbol, "1day", start, end);
       for (const quote of quotes) {
         await storeMarketQuote(quote);
@@ -113,9 +131,9 @@ export async function backfillMarketHistory(
       }
     } catch (error) {
       failed += 1;
-      if (errors.length < 5) errors.push(`${symbol}: ${String(error).slice(0, 160)}`);
+      if (errors.length < 5) errors.push(`${symbol} [${providerFailureReason(error)}]: ${String(error).slice(0, 160)}`);
     }
   }
 
-  return { configured: true, instruments: enabled.length, stored, failed, errors };
+  return { configured: true, instruments: selected.length, stored, failed, deferred, errors };
 }

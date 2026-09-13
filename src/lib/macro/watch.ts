@@ -4,6 +4,8 @@ import { createMacroProvider } from "./providers";
 import { MacroProviderError } from "./providers/types";
 import { getMacroReleaseFamily, getMacroSources } from "./registry";
 import { generateReleaseAnalysis } from "./releaseAnalysis";
+import { freezeReleaseExpectations } from "./expectations";
+import { recomputeReleaseSurprises } from "./surprise";
 import { storeNormalizedObservation, syncMacroRegistry } from "./store";
 import type { MacroReleaseFamilyDefinition, NormalizedObservation } from "./types";
 
@@ -213,6 +215,10 @@ async function watchRelease(release: ReleaseRow, now: Date) {
   if (complete) {
     await prisma.macroRelease.update({ where: { id: release.id }, data: { status: "RELEASED", releasedAt: release.releasedAt ?? now } });
     await markAttempt(release, "released", now);
+    // Freeze only evidence captured before the scheduled release, then calculate the
+    // surprise from that immutable snapshot. Neither AI nor post-release data may fill it.
+    await freezeReleaseExpectations(release.id);
+    await recomputeReleaseSurprises(release.id);
     // The print has just landed and its value is final for this vintage, so generate the
     // bilingual read-out right here — once. This is the release's known moment, and a
     // RELEASED release drops out of the query in watchMacroReleases, so this fires exactly

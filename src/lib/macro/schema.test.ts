@@ -24,6 +24,11 @@ test("defines the independent Macro Intelligence schema", () => {
     "MarketInstrument",
     "MarketObservation",
     "MacroSignalSnapshot",
+    "MacroExpectation",
+    "MarketInstrumentSource",
+    "DataLicensePolicy",
+    "ProviderUsage",
+    "TradingThemeSnapshot",
   ]) model(name);
 
   assert.match(model("PriceObservation"), /value\s+Float/);
@@ -59,4 +64,8 @@ test("generated PostgreSQL schema and migration match the canonical schema", () 
   assert.doesNotMatch(migration, /"(?:value|actualInitial|consensusAtRelease)" DOUBLE PRECISION/);
   assert.match(migration, /ON DELETE RESTRICT/);
   assert.match(migration, /ON DELETE SET NULL/);
+  const dataLoop = read("prisma/postgresql/migrations/20260913180000_market_macro_data_loop/migration.sql");
+  for (const table of ["MacroExpectation", "MarketInstrumentSource", "DataLicensePolicy", "ProviderUsage", "TradingThemeSnapshot"]) assert.match(dataLoop, new RegExp(`CREATE TABLE "${table}"`));
+  assert.match(dataLoop, /"licenseKey" TEXT/);
+  assert.match(dataLoop, /"value" DECIMAL\(65,30\) NOT NULL/);
 });

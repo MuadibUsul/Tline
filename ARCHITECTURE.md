@@ -578,3 +578,12 @@ MVP 先使用结构化任务日志，每个来源至少输出：
 `analytics-rollup` 将最近三天原始浏览汇总到 `TrafficDaily`，并按 `ANALYTICS_RAW_RETENTION_DAYS` 清理原始数据；重复运行是幂等的。后台查询历史区间时优先读取日聚合，当日和实时指标读取原始记录。
 
 公共 API 不保存逐请求日志。`withApiKey()` 在成功、鉴权失败、参数错误和服务端错误路径上记录端点、状态码与耗时，先合并进进程内缓冲，再批量 upsert 到 `ApiUsageDaily`。这让管理页能按日期、密钥、端点及状态码观察用量，而不会把数据库写入放进每次 API 请求的关键路径。
+# 行情与宏观预期数据闭环（2026-09）
+
+行情链路为 `macro-scheduler → Twelve Data adapter → MarketObservation → 用途/质量检查 → PriceObservation 兼容桥 → 资产页、主题、预测结算与告警`。`MarketInstrument` 是稳定内部身份，`MarketInstrumentSource` 保存经核验的供应商代码、场所和报价币种；消费者不得按相似名称自行匹配。宏观代理观测写入旧价格表时带 `domain=MACRO_REFERENCE` 与 `isProxy=true`，不能进入目标价结算。
+
+数据授权采用默认拒绝。`DataLicensePolicy` 必须包含数据集、依据、确认人、时间、有效期及允许用途；`evaluateMarketUse` 同时检查授权、质量、新鲜度、市场状态、供应商延迟和本站采样。公开页面只接收服务端已经裁剪过的数值。
+
+宏观预期采用只追加的 `MacroExpectation`，明确区分调查共识、模型预测和机构研报预测。正式值落地后，watcher 只冻结发布时间前、事件/指标/参考期/阶段/单位/季调完全匹配且获内部用途授权的版本。`MacroReleaseValue` 保存冻结引用；surprise、解读、告警与社交不得回退到前值或研报中位数。
+
+供应商预算由 `ProviderUsage` 按分钟和日窗口持久化，并在请求前按端点权重预留。额度不足只延后，不升级套餐。预测结算记录起终观测、规则版本、原因与口径，已经结算的记录不会在文章重算时被重置。

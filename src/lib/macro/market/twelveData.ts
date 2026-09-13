@@ -18,6 +18,7 @@ interface TwelveDataResponse {
   high?: string;
   low?: string;
   interval?: string;
+  is_market_open?: boolean;
   meta?: { symbol?: string; interval?: string; currency?: string; type?: string };
   values?: Array<{ datetime?: string; open?: string; high?: string; low?: string; close?: string }>;
 }
@@ -35,6 +36,7 @@ export function createTwelveDataProvider(options: ProviderOptions & { quality?: 
   const apiKey = () => requireApiKey("twelve_data", options.apiKey ?? process.env.TWELVE_DATA_API_KEY);
   const now = options.now ?? (() => new Date());
   const quality = options.quality ?? (process.env.TWELVE_DATA_QUALITY as MarketQuality | undefined) ?? "DELAYED";
+  const providerDelaySeconds = Math.max(0, Number(process.env.TWELVE_DATA_DECLARED_DELAY_SECONDS || 0)) || null;
   if (!(["DELAYED", "REALTIME", "EOD"] as MarketQuality[]).includes(quality)) throw new Error("Twelve Data quality must be DELAYED, REALTIME, or EOD.");
   const external = (symbol: string) => {
     const value = SYMBOLS[symbol.toUpperCase()];
@@ -44,14 +46,17 @@ export function createTwelveDataProvider(options: ProviderOptions & { quality?: 
   const mapped = (symbol: string, row: TwelveValue, meta: TwelveDataResponse["meta"], interval: string, fetchedAt: Date): MarketQuote => {
     const close = normalizeDecimal(row.close);
     if (!close) throw new Error("Twelve Data response has no close price.");
-    return { symbol: symbol.toUpperCase(), provider: "twelve-data", externalSymbol: external(symbol), observedAt: instant(row), fetchedAt, interval, quoteCurrency: meta?.currency ?? symbol.toUpperCase().slice(3), quality, status: "PUBLISHED", open: normalizeDecimal(row.open), high: normalizeDecimal(row.high), low: normalizeDecimal(row.low), close, sourceUrl: "https://twelvedata.com/", metadata: { type: meta?.type ?? null } };
+    const observedAt = instant(row);
+    return { symbol: symbol.toUpperCase(), provider: "twelve-data", externalSymbol: external(symbol), observedAt, fetchedAt, interval, quoteCurrency: meta?.currency ?? symbol.toUpperCase().slice(3), quality, status: "PUBLISHED", providerUpdatedAt: observedAt, providerDelaySeconds, marketState: "UNKNOWN", priceType: interval === "1day" ? "CLOSE" : "LAST", unit: "PRICE", licenseKey: "twelve-data:market", open: normalizeDecimal(row.open), high: normalizeDecimal(row.high), low: normalizeDecimal(row.low), close, sourceUrl: "https://twelvedata.com/", metadata: { type: meta?.type ?? null } };
   };
   const getQuote = async (symbol: string) => {
       const fetchedAt = now();
       const url = new URL(`${ENDPOINT}/quote`); url.searchParams.set("symbol", external(symbol)); url.searchParams.set("timezone", "UTC"); url.searchParams.set("apikey", apiKey());
       const body = await requestJson<TwelveDataResponse>(url.href);
       if (body.status === "error") throw new Error(`Twelve Data rejected quote request (${body.code ?? "unknown"}).`);
-      return mapped(symbol, body, { currency: body.currency, interval: body.interval }, body.interval ?? "quote", fetchedAt);
+      const quote = mapped(symbol, body, { currency: body.currency, interval: body.interval }, body.interval ?? "quote", fetchedAt);
+      quote.marketState = body.is_market_open === true ? "OPEN" : body.is_market_open === false ? "CLOSED" : "UNKNOWN";
+      return quote;
   };
   const getTimeSeries = async (symbol: string, interval: string, start: Date, end: Date) => {
       if (start > end) throw new Error("Market time-series start must not exceed end.");

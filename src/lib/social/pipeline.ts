@@ -6,6 +6,7 @@ import { sendDraftCard, updateDraftCard } from "./feishu";
 import { createXPost } from "./x";
 import { localePath } from "../i18n";
 import { researchPath } from "../researchPath";
+import { authorizedExpectationIds } from "../macro/expectationUse";
 
 const MAX_ATTEMPTS = Math.max(1, Number(process.env.SOCIAL_PUBLISH_ATTEMPTS || 6));
 
@@ -32,15 +33,18 @@ async function createMacroCandidates() {
   const releases = await prisma.macroRelease.findMany({
     where: { status: "RELEASED", importance: 5, analysisAt: { gte: new Date(Date.now() - 24 * 3600_000) }, analysisEn: { not: null }, analysisZh: { not: null }, values: { some: { actualInitial: { not: null } } } },
     orderBy: { releasedAt: "desc" }, take: 20,
-    include: { values: { where: { actualInitial: { not: null } }, include: { indicator: true }, orderBy: { createdAt: "asc" } } },
+    include: { values: { where: { actualInitial: { not: null } }, include: { indicator: true, consensusExpectation: true }, orderBy: { createdAt: "asc" } } },
   });
   let created = 0;
   for (const release of releases) {
-    const posts = macroPosts({
-      titleEn: release.titleEn, titleZh: release.titleZh,
-      analysisEn: release.analysisEn!, analysisZh: release.analysisZh!,
-      values: release.values.map((value) => ({ nameEn: value.indicator.nameEn, nameZh: value.indicator.nameZh, actual: text(value.actualInitial)!, consensus: text(value.consensusAtRelease), previous: text(value.previousAtRelease) })),
-    });
+    const authorized = await authorizedExpectationIds(release.values.flatMap((value) => value.consensusExpectation ? [value.consensusExpectation] : []), "social");
+    let posts;
+    try { posts = macroPosts({
+        titleEn: release.titleEn, titleZh: release.titleZh,
+        analysisEn: release.analysisEn!, analysisZh: release.analysisZh!,
+        values: release.values.map((value) => ({ nameEn: value.indicator.nameEn, nameZh: value.indicator.nameZh, actual: text(value.actualInitial)!, consensus: value.consensusExpectation && authorized.has(value.consensusExpectation.id) ? text(value.consensusAtRelease) : null, previous: text(value.previousAtRelease) })),
+      });
+    } catch (error) { console.warn(JSON.stringify({ event: "social.macro.skipped", releaseId: release.id, reason: String(error) })); continue; }
     try {
       await prisma.socialDraft.create({ data: { sourceKind: "macro", sourceId: release.id, title: release.titleEn, textEn: posts.en, textZh: posts.zh, routeSnapshot: JSON.stringify(targets) } });
       created++;
@@ -136,8 +140,11 @@ export async function regenerateDraft(id: string) {
     const analysis = await prisma.analysis.findUnique({ where: { articleId: draft.sourceId }, include: { article: { include: { institution: true, translations: { where: { locale: "zh-CN" }, take: 1 } } } } });
     if (analysis?.summaryZh) posts = researchPosts({ title: analysis.article.translations[0]?.title || analysis.article.title, institution: analysis.article.institution.name, summaryEn: analysis.summary, summaryZh: analysis.summaryZh, interpretationEn: analysis.interpretation, interpretationZh: analysis.interpretationZh });
   } else if (draft.sourceKind === "macro") {
-    const release = await prisma.macroRelease.findUnique({ where: { id: draft.sourceId }, include: { values: { where: { actualInitial: { not: null } }, include: { indicator: true }, orderBy: { createdAt: "asc" } } } });
-    if (release?.analysisEn && release.analysisZh) posts = macroPosts({ titleEn: release.titleEn, titleZh: release.titleZh, analysisEn: release.analysisEn, analysisZh: release.analysisZh, values: release.values.map((value) => ({ nameEn: value.indicator.nameEn, nameZh: value.indicator.nameZh, actual: text(value.actualInitial)!, consensus: text(value.consensusAtRelease), previous: text(value.previousAtRelease) })) });
+    const release = await prisma.macroRelease.findUnique({ where: { id: draft.sourceId }, include: { values: { where: { actualInitial: { not: null } }, include: { indicator: true, consensusExpectation: true }, orderBy: { createdAt: "asc" } } } });
+    if (release?.analysisEn && release.analysisZh) {
+      const authorized = await authorizedExpectationIds(release.values.flatMap((value) => value.consensusExpectation ? [value.consensusExpectation] : []), "social");
+      try { posts = macroPosts({ titleEn: release.titleEn, titleZh: release.titleZh, analysisEn: release.analysisEn, analysisZh: release.analysisZh, values: release.values.map((value) => ({ nameEn: value.indicator.nameEn, nameZh: value.indicator.nameZh, actual: text(value.actualInitial)!, consensus: value.consensusExpectation && authorized.has(value.consensusExpectation.id) ? text(value.consensusAtRelease) : null, previous: text(value.previousAtRelease) })) }); } catch { return false; }
+    }
   }
   if (!posts) return false;
   await prisma.socialDraft.update({ where: { id }, data: { textEn: posts.en, textZh: posts.zh, version: { increment: 1 } } });

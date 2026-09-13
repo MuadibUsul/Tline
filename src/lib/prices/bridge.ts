@@ -1,4 +1,5 @@
 import { prisma } from "../db";
+import { evaluateMarketUse } from "../macro/market/quality";
 
 /**
  * Feed `PriceObservation` from the two observation tables the pipeline already fills.
@@ -49,31 +50,31 @@ async function bridgeMacro(assetIds: Map<string, string>, skipped: string[]): Pr
     if (!assetId) { skipped.push(`${ticker}: no matching asset`); continue; }
     const series = await prisma.macroSeriesSource.findFirst({
       where: { externalSeriesId },
-      select: { id: true },
+      select: { id: true, indicator: { select: { unit: true } } },
     });
     if (!series) { skipped.push(`${externalSeriesId}: series not registered`); continue; }
 
     const observations = await prisma.macroObservation.findMany({
       where: { seriesSourceId: series.id, status: "PUBLISHED" },
       orderBy: [{ period: "asc" }, { revisionNo: "desc" }],
-      select: { period: true, value: true, revisionNo: true },
+      select: { id: true, period: true, value: true, revisionNo: true },
     });
 
-    const latestByPeriod = new Map<number, number>();
+    const latestByPeriod = new Map<number, { value: number; id: string }>();
     for (const observation of observations) {
       const key = observation.period.getTime();
       if (latestByPeriod.has(key)) continue; // revisionNo desc: the first row wins
       const value = Number(observation.value);
       if (!Number.isFinite(value) || value <= 0) continue;
-      latestByPeriod.set(key, value);
+      latestByPeriod.set(key, { value, id: observation.id });
     }
 
-    for (const [period, value] of latestByPeriod) {
+    for (const [period, observation] of latestByPeriod) {
       const timestamp = new Date(period);
       await prisma.priceObservation.upsert({
         where: { assetId_timestamp_source: { assetId, timestamp, source } },
-        create: { assetId, timestamp, value, source, sourceRef: externalSeriesId },
-        update: { value, sourceRef: externalSeriesId },
+        create: { assetId, timestamp, value: observation.value, source, sourceRef: externalSeriesId, sourceObservationId: observation.id, domain: "MACRO_REFERENCE", unit: series.indicator.unit, priceType: "REFERENCE", isProxy: true },
+        update: { value: observation.value, sourceRef: externalSeriesId, sourceObservationId: observation.id, domain: "MACRO_REFERENCE", unit: series.indicator.unit, priceType: "REFERENCE", isProxy: true },
       });
       written += 1;
     }
@@ -93,28 +94,33 @@ async function bridgeMarket(assetIds: Map<string, string>, skipped: string[]): P
     if (!assetId) { skipped.push(`${ticker}: no matching asset`); continue; }
     const instrument = await prisma.marketInstrument.findUnique({
       where: { symbol },
-      select: { id: true },
+      select: { id: true, unit: true, priceType: true, isProxy: true },
     });
     if (!instrument) continue; // instruments appear only once a provider key is configured
 
     const observations = await prisma.marketObservation.findMany({
       where: { instrumentId: instrument.id, status: "PUBLISHED" },
       orderBy: { observedAt: "asc" },
-      select: { observedAt: true, close: true },
+      select: { id: true, observedAt: true, fetchedAt: true, close: true, interval: true, status: true, marketState: true, providerDelaySeconds: true, licenseKey: true },
     });
 
-    const lastOfDay = new Map<string, { observedAt: Date; value: number }>();
+    const licenseKey = observations.find((item) => item.licenseKey)?.licenseKey;
+    const license = licenseKey ? await prisma.dataLicensePolicy.findUnique({ where: { datasetKey: licenseKey }, select: { status: true, allowedUses: true, confirmedAt: true, expiresAt: true } }) : null;
+
+    const lastOfDay = new Map<string, { id: string; observedAt: Date; value: number }>();
     for (const observation of observations) {
+      const decision = evaluateMarketUse({ ...observation, license, samplingIntervalSeconds: Math.max(60, Number(process.env.MACRO_MARKET_SYNC_INTERVAL_MS || 30 * 60_000) / 1000) }, "internal_analysis", observation.fetchedAt);
+      if (!decision.usable) continue;
       const value = Number(observation.close);
       if (!Number.isFinite(value) || value <= 0) continue;
-      lastOfDay.set(observation.observedAt.toISOString().slice(0, 10), { observedAt: observation.observedAt, value });
+      lastOfDay.set(observation.observedAt.toISOString().slice(0, 10), { id: observation.id, observedAt: observation.observedAt, value });
     }
 
-    for (const { observedAt, value } of lastOfDay.values()) {
+    for (const { id, observedAt, value } of lastOfDay.values()) {
       await prisma.priceObservation.upsert({
         where: { assetId_timestamp_source: { assetId, timestamp: observedAt, source: MARKET_SOURCE } },
-        create: { assetId, timestamp: observedAt, value, source: MARKET_SOURCE, sourceRef: symbol },
-        update: { value, sourceRef: symbol },
+        create: { assetId, timestamp: observedAt, value, source: MARKET_SOURCE, sourceRef: symbol, sourceObservationId: id, licenseKey, domain: "MARKET", unit: instrument.unit, priceType: instrument.priceType, isProxy: instrument.isProxy },
+        update: { value, sourceRef: symbol, sourceObservationId: id, licenseKey, domain: "MARKET", unit: instrument.unit, priceType: instrument.priceType, isProxy: instrument.isProxy },
       });
       written += 1;
     }

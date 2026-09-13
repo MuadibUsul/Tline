@@ -48,6 +48,8 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
           <span>{tr(locale, "Settled", "已结算")} <b className="mono">{data.forecasts.length}</b></span>
           <span>{tr(locale, "Awaiting prices", "等待价格")} <b className="mono">{data.pending}</b></span>
           <span>{tr(locale, "Direction", "方向") } <b className="mono">{data.directionAccuracy === null ? "—" : `${(data.directionAccuracy * 100).toFixed(1)}%`}</b></span>
+          <span>{tr(locale, "Valid direction sample", "有效方向样本")} <b className="mono">{data.directionSample}</b></span>
+          <span>{tr(locale, "Excluded", "已排除")} <b className="mono">{data.excluded + data.outOfScope}</b></span>
           <span>{tr(locale, "Mean target error", "平均目标误差")} <b className="mono">{data.meanPercentageError === null ? "—" : `${data.meanPercentageError.toFixed(2)}%`}</b></span>
         </div>
         <Link className="minibtn" href={localePath(locale, `/institution/${params.slug}`)}>← {tr(locale, "Institution", "机构")}</Link>
@@ -67,6 +69,7 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
           </tr>)}</tbody>
         </table></div> : <div className="empty-state">{tr(locale, "No forecasts have enough licensed price observations to settle yet.", "暂无具备足够授权价格观测值、可供结算的预测。")}</div>}
       </section>
+      {data.directionInterval && <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{tr(locale, `Wilson 95% interval: ${(data.directionInterval.low * 100).toFixed(1)}%–${(data.directionInterval.high * 100).toFixed(1)}%. ${data.duplicateCount} repeated same-target report(s) are excluded from independent metrics.`, `Wilson 95% 区间：${(data.directionInterval.low * 100).toFixed(1)}%–${(data.directionInterval.high * 100).toFixed(1)}%。${data.duplicateCount} 条同目标重复报告不计入独立统计。`)}</p>}
       {data.outOfScope > 0 && <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>
         {tr(
           locale,

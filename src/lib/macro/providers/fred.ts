@@ -14,7 +14,8 @@ export function createFredProvider(options: ProviderOptions = {}): OfficialMacro
   const now = options.now ?? (() => new Date());
 
   const fetchSeries = async (request: MacroSeriesRequest) => {
-    const apiKey = requireApiKey("fred", options.apiKey ?? process.env.FRED_API_KEY);
+    const configuredKey = options.apiKey ?? (process.env.FRED_DATA_USE_CONFIRMED === "true" ? process.env.FRED_API_KEY : undefined);
+    const apiKey = requireApiKey("fred", configuredKey);
     const fetchedAt = now();
     const url = new URL(ENDPOINT);
     url.searchParams.set("series_id", request.externalSeriesId);

@@ -203,7 +203,7 @@ export async function loadEconomicCalendar(options: { fetch?: FetchLike; now?: D
   if (fomc) add(parseFomcCalendar(fomc));
   if (eia) add(buildEiaSchedule(eia, now, end));
 
-  const fredApiKey = options.fredApiKey ?? process.env.FRED_API_KEY;
+  const fredApiKey = options.fredApiKey ?? (process.env.FRED_DATA_USE_CONFIRMED === "true" ? process.env.FRED_API_KEY : undefined);
   if (fredApiKey) {
     const requestJson = createJsonClient("fred-calendar", { fetch: fetchImpl, minIntervalMs: 250 });
     for (const definition of macroReleaseFamilies.filter((item) => item.calendar.fredReleaseId && !officialCounts.has(item.key))) {

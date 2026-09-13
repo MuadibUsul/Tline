@@ -206,3 +206,8 @@ Costs:
 3. Prompts 4–7: official US providers, calendar/watcher and FOMC policy parsing.
 4. Prompt 11: add Macro queries and pages, then expose a compact home-page module.
 5. Prompt 12 onward: alerts, dedicated scheduler, backfill and quality audit.
+# 2026-09 补充：预期证据语义
+
+系统永久区分四类信息：文章/AtomicView 形成的研究观点共识、发布前调查市场共识、模型预测、实际观测。只有带证据并在发布前已捕获的 `SURVEY_CONSENSUS` 可产生“超预期/不及预期”；模型与研报预测只能单独比较。版本只追加，发布后的历史重建不能追认为当时可用信息。
+
+raw surprise 为首次实际值减冻结调查共识。百分数的差标为百分点，收益率变化标为基点；标准化仅使用此前同口径误差，至少 12 个样本，零方差或样本不足返回空值而非置信度。

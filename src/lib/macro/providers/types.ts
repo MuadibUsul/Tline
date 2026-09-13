@@ -59,7 +59,7 @@ export function createJsonClient(provider: string, options: ProviderOptions = {}
           const retryable = response.status === 429 || response.status >= 500;
           if (retryable && attempt < retries) {
             const retryAfter = Number(response.headers.get("retry-after"));
-            await sleep(Number.isFinite(retryAfter) ? Math.min(retryAfter * 1000, 5_000) : 250 * 2 ** attempt);
+            await sleep(Number.isFinite(retryAfter) ? Math.max(0, retryAfter * 1000) : 250 * 2 ** attempt);
             continue;
           }
           throw new MacroProviderError(provider, "HTTP", `${provider} request failed with HTTP ${response.status}.`, response.status, retryable);

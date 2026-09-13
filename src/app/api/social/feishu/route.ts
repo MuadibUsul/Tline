@@ -6,15 +6,16 @@ export async function POST(request: NextRequest) {
   console.log("[Feishu] webhook received");
   const raw = await request.text();
   let body: Record<string, unknown>;
-  try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
+  try { body = JSON.parse(raw); } catch { console.log("[Feishu] invalid JSON"); return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
 
   let payload = body;
   if (typeof body.encrypt === "string") {
     try {
       const { encryptKey } = await loadFeishuSettings();
       payload = JSON.parse(decryptFeishuPayload(body.encrypt, encryptKey));
-    } catch {
-      return NextResponse.json({ error: "Invalid encrypted payload." }, { status: 400 });
+    } catch (error) {
+      console.error("[Feishu] decrypt failed:", error instanceof Error ? error.message : String(error));
+      return NextResponse.json({ toast: { type: "error", content: "回调消息解密失败：请确认 Encrypt Key 与飞书控制台一致。" } });
     }
   }
 

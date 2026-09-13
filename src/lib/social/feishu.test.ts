@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import test from "node:test";
-import { approverAllowed, feishuConfigStatus, mergeFeishuSettings, requireMessageReceiver, type FeishuFormInput, type FeishuSettings } from "./feishu";
+import { approverAllowed, decryptFeishuPayload, feishuConfigStatus, mergeFeishuSettings, requireMessageReceiver, type FeishuFormInput, type FeishuSettings } from "./feishu";
 
 const empty: FeishuSettings = { appId: "", appSecret: "", encryptKey: "", verificationToken: "", receiveId: "", receiveIdType: "open_id", approverOpenIds: "", source: "none" };
 
@@ -53,4 +54,13 @@ test("configuration status follows completeness", () => {
   assert.equal(feishuConfigStatus({ ...empty, appId: "cli", appSecret: "s", receiveId: "ou_r" }), "receiver_pending");
   assert.equal(feishuConfigStatus({ ...empty, appId: "cli", appSecret: "s", approverOpenIds: "ou_a" }), "receiver_pending");
   assert.equal(feishuConfigStatus({ ...empty, appId: "cli", appSecret: "s", receiveId: "ou_r", approverOpenIds: "ou_a" }), "complete");
+});
+
+test("encrypted Feishu payloads use the official IV-prefixed AES format", () => {
+  const encryptKey = "test-encrypt-key";
+  const plaintext = JSON.stringify({ type: "url_verification", challenge: "test123" });
+  const iv = randomBytes(16);
+  const cipher = createCipheriv("aes-256-cbc", createHash("sha256").update(encryptKey).digest(), iv);
+  const encrypt = Buffer.concat([iv, cipher.update(plaintext), cipher.final()]).toString("base64");
+  assert.equal(decryptFeishuPayload(encrypt, encryptKey), plaintext);
 });

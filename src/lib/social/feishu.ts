@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createDecipheriv, createHash, timingSafeEqual } from "node:crypto";
 import { prisma } from "../db";
 import { decryptSecret } from "../secrets";
 import { siteUrl } from "../site";
@@ -140,6 +140,14 @@ export async function verifyFeishuRequest(body: string, timestamp: string | null
   const left = Buffer.from(signature);
   const right = Buffer.from(expected);
   return left.length === right.length && timingSafeEqual(left, right);
+}
+
+export function decryptFeishuPayload(encrypt: string, encryptKey: string): string {
+  const encrypted = Buffer.from(encrypt, "base64");
+  if (!encryptKey || encrypted.length <= 16) throw new Error("Invalid encrypted Feishu payload.");
+  const key = createHash("sha256").update(encryptKey).digest();
+  const decipher = createDecipheriv("aes-256-cbc", key, encrypted.subarray(0, 16));
+  return Buffer.concat([decipher.update(encrypted.subarray(16)), decipher.final()]).toString("utf8");
 }
 
 export function approverAllowed(openId: string | null, approverOpenIds: string): boolean {

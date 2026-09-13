@@ -4,6 +4,7 @@ import path from "node:path";
 import PDFKit from "pdfkit";
 import { PDFDocument as PDFLibDocument } from "pdf-lib";
 import { prisma } from "../db";
+import { preferredEnglishDocuments } from "../publication";
 import { writePrivateFile } from "./storage";
 import { assertSafeSourcePdf } from "./pdfSafety";
 
@@ -179,9 +180,17 @@ export async function generateArticleDocuments(articleId: string) {
     include: {
       institution: true,
       segments: { orderBy: { position: "asc" } },
+      documents: {
+        where: { kind: "source_native", locale: "en", status: "ready" },
+        select: { kind: true },
+        take: 1,
+      },
     },
   });
   if (!article?.rawText) throw new Error("Article has no canonical English body.");
+  // The institution's PDF is already the canonical English document. Generating a second
+  // rendering wastes storage and creates two downloads whose differences confuse readers.
+  if (preferredEnglishDocuments(article.documents).length) return { original: null };
   const sourceSegments = article.segments.length
     ? article.segments
     : [{ heading: null, text: article.rawText }];

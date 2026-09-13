@@ -79,7 +79,10 @@ async function main() {
       ? { id: articleId, rawText: { not: null } }
       : {
           rawText: { not: null },
-          documents: { none: { kind: "original_pdf", locale: "en", status: "ready" } },
+          AND: [
+            { documents: { none: { kind: "source_native", locale: "en", status: "ready" } } },
+            { documents: { none: { kind: "original_pdf", locale: "en", status: "ready" } } },
+          ],
         },
     select: { id: true, title: true },
     orderBy: { publishedAt: "desc" },

@@ -7,7 +7,7 @@ import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments
 import { prisma } from "@/lib/db";
 import PdfPreview from "@/app/_components/PdfPreview";
 import { JsonLd, breadcrumbJsonLd, canonical, ogImage, reportJsonLd } from "@/lib/seo";
-import { publicationReadyWhere } from "@/lib/publication";
+import { preferredEnglishDocuments, publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
 
 export const dynamic = "force-dynamic";
@@ -129,7 +129,8 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   // The publisher's own document. Where one exists it is the report — the page around it
   // was navigation and teaser copy — so it is shown open and in full, and the text
   // extracted from that same PDF is not repeated underneath it.
-  const publisherPdf = a.documents.find((document) => document.kind === "source_native");
+  const downloadDocuments = preferredEnglishDocuments(a.documents);
+  const publisherPdf = downloadDocuments.find((document) => document.kind === "source_native");
   const previewDocument = publisherPdf ?? a.documents.find((document) => document.kind === "original_pdf");
 
   const heading = locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title;
@@ -270,7 +271,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           </details>
         )}
         <div className="act">
-          {a.documents.map((document) => (
+          {downloadDocuments.map((document) => (
             <a key={document.id} href={localePath(locale, `/api/documents/${document.id}`)} className={`minibtn ${document.kind === "source_native" ? "p" : ""}`}>
               {document.kind === "source_native"
                 ? tr(locale, "Download institution PDF", "下载机构原始 PDF")

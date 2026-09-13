@@ -17,11 +17,6 @@ async function linkFor(kind: string, id: string, language: string) {
     : researchPath(await prisma.article.findUniqueOrThrow({ where: { id }, select: { slug: true } }));
   return `${siteUrl()}${localePath(language === "zh-CN" ? "zh-CN" : "en", path)}`;
 }
-function shanghaiDayStart(now = new Date()) {
-  const shifted = new Date(now.getTime() + 8 * 3600_000);
-  return new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()) - 8 * 3600_000);
-}
-
 async function routeSnapshot(sourceKind: "research" | "macro") {
   const routes = await prisma.socialRoute.findMany({ where: { sourceKind, enabled: true, account: { enabled: true } }, include: { account: true } });
   return routes.map((route) => ({ accountId: route.accountId, label: route.account.label, language: route.account.language, username: route.account.externalUsername }));
@@ -56,17 +51,21 @@ async function createMacroCandidates() {
 async function createResearchCandidates() {
   const targets = await routeSnapshot("research");
   if (!targets.length) return 0;
-  const used = await prisma.socialDraft.count({ where: { sourceKind: "research", createdAt: { gte: shanghaiDayStart() } } });
-  const remaining = Math.max(0, 3 - used);
-  if (!remaining) return 0;
+  // Every report that goes live with a reviewed Chinese summary is a review
+  // candidate, so the Feishu card lands in the same scheduler tick that the
+  // report appears on the site. The unique(sourceKind, sourceId) index dedupes;
+  // the window only bounds how far back a missed backlog reaches, and the
+  // per-cycle take spreads that backlog over a few ticks.
+  const windowMs = Math.max(1, Number(process.env.SOCIAL_RESEARCH_REVIEW_HOURS || 48)) * 3600_000;
+  const perCycle = Math.max(1, Number(process.env.SOCIAL_RESEARCH_REVIEW_PER_CYCLE || 25));
   const analyses = await prisma.analysis.findMany({
-    where: { reviewStatus: "ok", importanceScore: { gte: 0.85 }, confidence: { gte: 0.8 }, summaryZh: { not: null }, article: { rawText: { not: null }, publishedAt: { gte: new Date(Date.now() - 48 * 3600_000) } } },
-    orderBy: { article: { publishedAt: "desc" } }, take: remaining * 4,
+    where: { reviewStatus: "ok", summaryZh: { not: null }, article: { rawText: { not: null }, publishedAt: { gte: new Date(Date.now() - windowMs) } } },
+    orderBy: { article: { publishedAt: "desc" } }, take: perCycle,
     include: { article: { include: { institution: true, translations: { where: { locale: "zh-CN" }, take: 1 } } } },
   });
   let created = 0;
   for (const analysis of analyses) {
-    if (created >= remaining || !analysis.summaryZh) break;
+    if (!analysis.summaryZh) continue;
     const posts = researchPosts({
       title: analysis.article.translations[0]?.title || analysis.article.title,
       institution: analysis.article.institution.name,

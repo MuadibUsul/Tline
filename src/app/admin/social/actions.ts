@@ -146,6 +146,7 @@ export async function decideSocialDraft(form: FormData) {
   const decision = form.get("decision") === "reject" ? "reject" : "approve";
   if (!user || !id || !Number.isInteger(version)) return;
   await decideDraft(id, version, decision, user.id);
+  await refreshDraftCard(id).catch(() => {});
   refresh(id);
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { allowedFeishuApprover, decryptFeishuPayload, loadFeishuSettings, verifyFeishuRequest } from "@/lib/social/feishu";
-import { decideDraft } from "@/lib/social/pipeline";
+import { decideDraft, refreshDraftCard } from "@/lib/social/pipeline";
 
 export async function POST(request: NextRequest) {
   console.log("[Feishu] webhook received");
@@ -58,7 +58,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ toast: { type: "error", content: "无效的审核操作。" } });
     }
     const result = await decideDraft(draftId, version, decision, `feishu:${openId}`);
-    return NextResponse.json({ toast: { type: result.ok ? "success" : "warning", content: result.message } });
+    // The card refresh calls the Feishu API and must not eat into the callback's
+    // 3-second deadline (a slow refresh is exactly the 200341 the client showed).
+    const response = NextResponse.json({ toast: { type: result.ok ? "success" : "warning", content: result.message } });
+    if (result.ok) void refreshDraftCard(draftId).catch(() => {});
+    return response;
   } catch (error) {
     console.error("[Feishu] webhook failed:", error instanceof Error ? error.message : String(error));
     return NextResponse.json({ toast: { type: "error", content: "服务器处理失败，请稍后重试。" } });

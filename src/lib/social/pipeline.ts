@@ -30,8 +30,13 @@ async function createMacroCandidates() {
     orderBy: { releasedAt: "desc" }, take: 20,
     include: { values: { where: { actualInitial: { not: null } }, include: { indicator: true, consensusExpectation: true }, orderBy: { createdAt: "asc" } } },
   });
+  const existing = new Set((await prisma.socialDraft.findMany({
+    where: { sourceKind: "macro", sourceId: { in: releases.map((release) => release.id) } },
+    select: { sourceId: true },
+  })).map((draft) => draft.sourceId));
   let created = 0;
   for (const release of releases) {
+    if (existing.has(release.id)) continue;
     const authorized = await authorizedExpectationIds(release.values.flatMap((value) => value.consensusExpectation ? [value.consensusExpectation] : []), "social");
     let posts;
     try { posts = macroPosts({
@@ -63,9 +68,13 @@ async function createResearchCandidates() {
     orderBy: { article: { publishedAt: "desc" } }, take: perCycle,
     include: { article: { include: { institution: true, translations: { where: { locale: "zh-CN" }, take: 1 } } } },
   });
+  const existing = new Set((await prisma.socialDraft.findMany({
+    where: { sourceKind: "research", sourceId: { in: analyses.map((analysis) => analysis.articleId) } },
+    select: { sourceId: true },
+  })).map((draft) => draft.sourceId));
   let created = 0;
   for (const analysis of analyses) {
-    if (!analysis.summaryZh) continue;
+    if (!analysis.summaryZh || existing.has(analysis.articleId)) continue;
     const posts = researchPosts({
       title: analysis.article.translations[0]?.title || analysis.article.title,
       institution: analysis.article.institution.name,
@@ -121,7 +130,6 @@ export async function decideDraft(id: string, version: number, decision: "approv
     if (!changed.count) return { ok: false, message: "This draft was already decided." };
   }
   await writeAudit({ actorId: actorId.startsWith("feishu:") ? null : actorId, action: `social.draft.${decision}`, targetType: "socialDraft", targetId: id, metadata: { version, actor: actorId } });
-  await refreshDraftCard(id);
   return { ok: true, message: decision === "approve" ? "Approved and queued." : "Rejected." };
 }
 

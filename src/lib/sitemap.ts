@@ -50,6 +50,7 @@ const STATIC_ROUTES: Array<[string, SitemapEntry["changeFrequency"], number]> = 
   ["/institutions", "daily", 0.8],
   ["/macro", "hourly", 0.8],
   ["/macro/calendar", "daily", 0.6],
+  ["/watchlist", "hourly", 0.8],
   ["/about", "monthly", 0.5],
   ["/methodology", "monthly", 0.6],
   ["/editorial-policy", "monthly", 0.5],

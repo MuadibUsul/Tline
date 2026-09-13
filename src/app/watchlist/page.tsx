@@ -1,165 +1,127 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { noIndex } from "@/lib/seo";
-import { getWatchlistView, getAlertsView } from "@/lib/user";
-import { getSessionUser } from "@/lib/auth";
-import { Delta, relTime } from "@/app/_components/ui";
-import { addWatch, removeWatch, toggleRule, deleteRule, setAlertWebhook } from "@/app/actions";
-import MonitoringRuleForm from "@/app/_components/MonitoringRuleForm";
-import { describeRule } from "@/lib/alerts";
 import { prisma } from "@/lib/db";
-import { assetName, formatDate, getLocale, institutionName, localeSafeText, tr, type Locale, localePath } from "@/lib/i18n";
+import { canonical } from "@/lib/seo";
 import { publicationReadyWhere } from "@/lib/publication";
+import { buildTradingThemes, type ThemeDirection } from "@/lib/tradingThemes";
+import { assetName, formatDate, getLocale, institutionName, localizeChineseContent, tr, localePath } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
+import { relTime } from "@/app/_components/ui";
 
 export const dynamic = "force-dynamic";
 
-// Behind a sign-in: robots.txt asks a crawler not to fetch this, which does not keep
-// it out of an index if something links to it. This does.
-export const metadata: Metadata = { title: "Monitoring", ...noIndex };
-
-
-/** "skipped" means no destination was configured — nothing failed, there was nowhere to send. */
-function deliveryLabel(status: string) {
-  const labels: Record<string, string> = {
-    sent: "已送达 / sent",
-    failed: "送达失败 / failed",
-    skipped: "未配置地址 / no destination",
-    pending: "待送达 / pending",
-  };
-  return labels[status] ?? status;
-}
-const TONE: Record<string, string> = { bull: "var(--bull)", bear: "var(--bear)", neu: "var(--neu)" };
-
-function SignInGate({ locale }: { locale: Locale }) {
-  return (
-    <main className="wrap" style={{ maxWidth: 560 }}>
-      <div className="page-head">
-        <div className="eyebrow">{tr(locale, "Monitoring Center", "监控中心")}</div>
-        <h1>{tr(locale, "Sign in to monitor the market", "登录后建立市场监控")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Track assets, institutions, themes and consensus signals in one place.", "在同一处关注资产、机构、交易主线与共识信号。")}</p>
-        <Link href={localePath(locale, "/signin?next=/watchlist")} className="minibtn p" style={{ alignSelf: "flex-start", padding: "9px 14px" }}>{tr(locale, "Sign in", "登录")} →</Link>
-      </div>
-    </main>
-  );
-}
-
-function RemoveButton({ kind, refId, locale }: { kind: string; refId: string; locale: Locale }) {
-  return (
-    <form action={removeWatch}>
-      <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="refId" value={refId} />
-      <button className="iconbtn" title={tr(locale, "Remove", "移除")} type="submit">✕</button>
-    </form>
-  );
-}
-
-export default async function WatchlistPage() {
+export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  const user = await getSessionUser();
-  if (!user) return <SignInGate locale={locale} />;
-
-  const [{ assets, institutions, themes }, { rules, events }, allAssets, allInstitutions, macroIndicators, policyBanks] = await Promise.all([
-    getWatchlistView(user.id), getAlertsView(user.id),
-    prisma.asset.findMany({ orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
-    prisma.institution.findMany({ orderBy: { name: "asc" }, select: { slug: true, name: true } }),
-    prisma.macroIndicator.findMany({ where: { enabled: true }, orderBy: { nameEn: "asc" }, select: { canonicalKey: true, nameEn: true, nameZh: true } }),
-    prisma.macroPolicyDocument.findMany({ distinct: ["centralBank"], orderBy: { centralBank: "asc" }, select: { centralBank: true } }),
-  ]);
-  const eventArticles = events.some((event) => event.targetId) ? await prisma.article.findMany({
-    where: publicationReadyWhere({ id: { in: events.flatMap((event) => event.targetId ? [event.targetId] : []) } }),
-    select: { id: true, slug: true, title: true, institution: { select: { name: true } }, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } } },
-  }) : [];
-  const eventArticleById = new Map(eventArticles.map((article) => [article.id, article]));
-  const releaseIds = events.flatMap((event) => event.targetId ? [event.targetId] : []);
-  const eventReleases = releaseIds.length ? await prisma.macroRelease.findMany({ where: { id: { in: releaseIds } }, select: { id: true } }) : [];
-  const eventReleaseIds = new Set(eventReleases.map((release) => release.id));
-  const assetOptions = allAssets.map((asset) => ({ value: asset.ticker, label: `${assetName(asset.name, locale, asset.ticker)} · ${asset.ticker}` }));
-  const institutionOptions = allInstitutions.map((institution) => ({ value: institution.slug, label: institutionName(institution.name, locale) }));
-  const alertMessage = (event: (typeof events)[number]) => {
-    const article = event.targetId ? eventArticleById.get(event.targetId) : undefined;
-    if (article) return `${institutionName(article.institution.name, locale)}: ${locale === "zh-CN" && article.translations[0] ? article.translations[0].title : article.title}`;
-    const asset = event.assetTicker ? allAssets.find((item) => item.ticker === event.assetTicker) : undefined;
-    if (asset) return `${assetName(asset.name, locale, asset.ticker)} ${tr(locale, "consensus", "共识")} ${event.score ?? "—"}`;
-    return event.message || describeRule(event.rule, locale);
+  return {
+    ...canonical("/watchlist", locale),
+    title: tr(locale, "Market Themes", "交易主线"),
+    description: tr(locale, "The asset narratives currently supported by institutional research, with market confirmation and source evidence.", "从机构研报中识别当前市场正在运转的资产逻辑，并提供行情确认与原始依据。"),
   };
+}
+
+const STATUS = {
+  strengthening: ["Strengthening", "强化中"], active: ["Active", "运转中"],
+  diverging: ["Diverging", "出现分歧"], cooling: ["Cooling", "降温中"],
+} as const;
+
+function directionLabel(direction: ThemeDirection, zh: boolean) {
+  return zh
+    ? ({ bullish: "偏多", bearish: "偏空", neutral: "中性", conditional: "方向分歧" } as const)[direction]
+    : ({ bullish: "Bullish", bearish: "Bearish", neutral: "Neutral", conditional: "Mixed" } as const)[direction];
+}
+
+function displayAsset(name: string, ticker: string | null, locale: "en" | "zh-CN") {
+  return assetName(name, locale, ticker, ticker || name);
+}
+
+export default async function TradingThemesPage() {
+  const locale = await getLocale();
+  const zh = locale === "zh-CN";
+  const now = new Date();
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 864e5);
+  const marketSince = new Date(now.getTime() - 8 * 864e5);
+  const catalystUntil = new Date(now.getTime() + 7 * 864e5);
+
+  const [views, observations, catalysts] = await Promise.all([
+    prisma.atomicView.findMany({
+      where: { reviewStatus: "ok", article: publicationReadyWhere({ publishedAt: { gte: fourteenDaysAgo } }) },
+      select: {
+        id: true, articleId: true, topic: true, asset: true, assetTicker: true, direction: true,
+        importance: true, viewEn: true, viewZh: true, rationaleEn: true, rationaleZh: true,
+        conditionEn: true, conditionZh: true,
+        article: { select: { slug: true, title: true, publishedAt: true, institutionId: true, institution: { select: { slug: true, name: true, rating: true, authorityScore: true } } } },
+      },
+    }),
+    prisma.marketObservation.findMany({
+      where: { observedAt: { gte: marketSince }, instrument: { enabled: true } },
+      orderBy: { observedAt: "asc" },
+      select: { close: true, instrument: { select: { symbol: true } } },
+    }),
+    prisma.macroRelease.findMany({
+      where: { scheduledAt: { gte: now, lte: catalystUntil }, importance: { gte: 4 } },
+      orderBy: { scheduledAt: "asc" }, take: 6,
+      select: { id: true, titleEn: true, titleZh: true, countryCode: true, scheduledAt: true, importance: true },
+    }),
+  ]);
+
+  const priceRanges = new Map<string, { first: number; last: number }>();
+  for (const observation of observations) {
+    const symbol = observation.instrument.symbol.toUpperCase();
+    const close = Number(observation.close);
+    const range = priceRanges.get(symbol);
+    if (range) range.last = close;
+    else priceRanges.set(symbol, { first: close, last: close });
+  }
+  const marketMoves = [...priceRanges].filter(([, range]) => range.first !== 0).map(([symbol, range]) => ({ symbol, changePct: (range.last / range.first - 1) * 100 }));
+  const themes = buildTradingThemes(views, now, marketMoves);
+  const lead = themes[0];
+  const changed = themes.filter((theme) => theme.status !== "active").slice(0, 5);
 
   return (
-    <main className="wrap">
-      <div className="page-head">
-        <div className="eyebrow">{tr(locale, "Signal Monitoring", "信号监控")}</div>
-        <h1>{tr(locale, "Monitoring Center", "监控中心")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Follow what matters, then define exactly when it should surface.", "先关注重要对象，再定义何时需要提醒。")}</p>
+    <main className="wrap themes-page">
+      <header className="page-head themes-head">
+        <div className="eyebrow">{tr(locale, "Live market narratives", "当前市场叙事")}</div>
+        <h1>{tr(locale, "Market Themes", "交易主线")}</h1>
+        <p className="sub">{tr(locale, "What institutions are pricing into assets now — ranked by breadth, importance and freshness, then checked against market direction.", "把机构最近在讨论的驱动因素、传导路径与资产方向连接起来，并用行情判断逻辑是否得到确认。")}</p>
+        <div className="themes-method"><span>{tr(locale, "7-day signal window", "7天信号窗口")}</span><span>{tr(locale, "14-day comparison", "对比此前7天")}</span><span>{tr(locale, "No page-level AI generation", "页面不额外调用 AI")}</span><time>{tr(locale, "Updated", "更新于")} {formatDate(now, locale)}</time></div>
+      </header>
+
+      {lead ? <section className="theme-lead" aria-labelledby="lead-theme-title">
+        <div className="theme-lead-copy">
+          <div className="theme-kicker"><span className={`theme-state ${lead.status}`}>{zh ? STATUS[lead.status][1] : STATUS[lead.status][0]}</span><span>{tr(locale, "Leading theme", "最强主线")}</span></div>
+          <h2 id="lead-theme-title">{zh ? lead.titleZh : lead.titleEn}</h2>
+          <p>{zh ? localizeChineseContent(lead.lead.rationaleZh || lead.lead.viewZh) : lead.lead.rationaleEn || lead.lead.viewEn}</p>
+          <div className="theme-chain" aria-label={tr(locale, "Transmission path", "传导路径")}><b>{zh ? lead.titleZh : lead.titleEn}</b><i>→</i>{lead.assets.slice(0, 3).map((asset) => <span key={asset.ticker || asset.name}>{displayAsset(asset.name, asset.ticker, locale)} <em className={asset.direction}>{directionLabel(asset.direction, zh)}</em></span>)}</div>
+        </div>
+        <div className="theme-lead-score"><strong>{lead.score}</strong><span>{tr(locale, "theme strength", "主线强度")}</span><small>{lead.institutionCount}{tr(locale, " institutions", "家机构")} · {lead.viewCount}{tr(locale, " signals", "条观点")}</small></div>
+      </section> : <div className="theme-empty"><h2>{tr(locale, "No active theme yet", "暂未形成活跃主线")}</h2><p>{tr(locale, "A theme appears once reviewed institutional views enter the seven-day window.", "通过审核的机构观点进入最近7天窗口后，主线会自动形成。")}</p></div>}
+
+      <div className="themes-layout">
+        <section className="themes-ledger" aria-label={tr(locale, "Active market themes", "活跃交易主线")}>
+          <div className="themes-section-head"><h2>{tr(locale, "Active themes", "正在运转")}</h2><span>{themes.length}</span></div>
+          {themes.map((theme, index) => {
+            const condition = zh ? theme.lead.conditionZh : theme.lead.conditionEn;
+            const rationale = zh ? theme.lead.rationaleZh || theme.lead.viewZh : theme.lead.rationaleEn || theme.lead.viewEn;
+            return <article className="theme-row" key={theme.key}>
+              <div className="theme-rank">{String(index + 1).padStart(2, "0")}</div>
+              <div className="theme-body">
+                <div className="theme-row-head"><div><span className={`theme-state ${theme.status}`}>{zh ? STATUS[theme.status][1] : STATUS[theme.status][0]}</span><h3>{zh ? theme.titleZh : theme.titleEn}</h3></div><strong>{theme.score}</strong></div>
+                <p>{zh ? localizeChineseContent(rationale) : rationale}</p>
+                <div className="theme-assets">{theme.assets.map((asset) => <span key={asset.ticker || asset.name} className="theme-asset">{asset.ticker ? <Link href={localePath(locale, `/asset/${asset.ticker}`)}>{displayAsset(asset.name, asset.ticker, locale)}</Link> : displayAsset(asset.name, null, locale)}<em className={asset.direction}>{directionLabel(asset.direction, zh)}</em>{asset.movePct !== null && <small className={asset.marketConfirmed ? "confirmed" : "unconfirmed"}>{asset.movePct > 0 ? "+" : ""}{asset.movePct.toFixed(1)}% · {asset.marketConfirmed ? tr(locale, "confirmed", "行情确认") : tr(locale, "not confirmed", "尚未确认")}</small>}</span>)}</div>
+                <div className="theme-facts"><span>{theme.institutionCount}{tr(locale, " institutions", "家机构")}</span><span>{theme.viewCount}{tr(locale, " signals / 7d", "条观点 / 7天")}</span><span>{tr(locale, "Previous window", "此前7天")} {theme.previousViewCount}</span><span>{relTime(theme.latestAt, locale)}</span></div>
+                {condition && <div className="theme-condition"><b>{tr(locale, "Invalidation / condition", "失效条件 / 前提")}</b><span>{zh ? localizeChineseContent(condition) : condition}</span></div>}
+                <details className="theme-evidence"><summary>{tr(locale, "View source evidence", "查看来源依据")} · {theme.evidence.length}</summary><div>{theme.evidence.map((view) => <Link href={localePath(locale, researchPath(view.article))} key={view.id}><span>{institutionName(view.article.institution.name, locale)}</span><b>{zh ? localizeChineseContent(view.viewZh) : view.viewEn}</b></Link>)}</div></details>
+              </div>
+            </article>;
+          })}
+        </section>
+
+        <aside className="themes-aside">
+          <section><div className="themes-section-head"><h2>{tr(locale, "What changed", "今日变化")}</h2></div><div className="theme-change-list">{changed.map((theme) => <div key={theme.key}><span className={`theme-dot ${theme.status}`} /><p><b>{zh ? theme.titleZh : theme.titleEn}</b><small>{zh ? STATUS[theme.status][1] : STATUS[theme.status][0]} · {theme.viewCount}{tr(locale, " signals this week", "条本周观点")}</small></p></div>)}{changed.length === 0 && <p className="theme-muted">{tr(locale, "No material change in the current window.", "当前窗口暂无明显变化。")}</p>}</div></section>
+          <section><div className="themes-section-head"><h2>{tr(locale, "Next catalysts", "接下来关注")}</h2><span>7D</span></div><div className="theme-catalysts">{catalysts.map((release) => <Link href={localePath(locale, `/macro/release/${release.id}`)} key={release.id}><time>{formatDate(release.scheduledAt, locale)}</time><b>{zh ? release.titleZh || release.titleEn : release.titleEn}</b><small>{release.countryCode} · {"●".repeat(Math.min(5, release.importance))}</small></Link>)}{catalysts.length === 0 && <p className="theme-muted">{tr(locale, "No high-impact release scheduled in the next seven days.", "未来7天暂无已排期的高影响数据。")}</p>}</div></section>
+          <section className="theme-explainer"><div className="themes-section-head"><h2>{tr(locale, "How it is generated", "生成逻辑")}</h2></div><p>{tr(locale, "Reviewed institutional views are normalized into themes. Breadth, importance and freshness determine rank; price direction confirms but does not create a theme.", "将已审核机构观点归一为主题，按跨机构覆盖、重要度和新鲜度排序；行情只负责确认，不负责凭空生成主线。")}</p><Link href={localePath(locale, "/methodology")}>{tr(locale, "Methodology", "查看方法论")} →</Link></section>
+        </aside>
       </div>
-
-      <section className="blk">
-        <div className="section-t">{tr(locale, "Add monitoring target", "添加监控对象")}</div>
-        <div className="monitor-add-grid">
-          <form action={addWatch} className="monitor-add-card"><input type="hidden" name="kind" value="asset" /><label className="field"><span>{tr(locale, "Asset", "资产")}</span><select name="refId" required>{assetOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><button className="minibtn p">{tr(locale, "Follow", "关注")}</button></form>
-          <form action={addWatch} className="monitor-add-card"><input type="hidden" name="kind" value="institution" /><label className="field"><span>{tr(locale, "Institution", "机构")}</span><select name="refId" required>{institutionOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><button className="minibtn p">{tr(locale, "Follow", "关注")}</button></form>
-          <form action={addWatch} className="monitor-add-card"><input type="hidden" name="kind" value="theme" /><label className="field"><span>{tr(locale, "Trading theme", "交易主线")}</span><input name="refId" maxLength={80} placeholder={tr(locale, "e.g. AI capex", "例如：AI 资本开支")} required /></label><button className="minibtn p">{tr(locale, "Follow", "关注")}</button></form>
-        </div>
-      </section>
-
-      <section className="blk">
-        <div className="section-t">{tr(locale, "Followed assets", "已关注资产")} · {assets.length}</div>
-        <div className="ctiles">
-          {assets.map((asset) => (
-            <div key={asset.ticker} className="ctile monitor-asset">
-              <div className="monitor-remove"><RemoveButton kind="asset" refId={asset.ticker} locale={locale} /></div>
-              <Link href={localePath(locale, `/asset/${asset.ticker}`)} style={{ display: "block" }}>
-                <div className="a">{assetName(asset.name, locale, asset.ticker)}</div>
-                {asset.score === null || asset.tone === null || asset.label === null ? <><div className="s tnum">—</div><div className="meta"><span>{tr(locale, "No consensus in the latest 24h", "最近24小时暂无共识")}</span></div></> : <>
-                  <div className="s tnum">{asset.score}<span className={`dir ${asset.tone === "bull" ? "up" : asset.tone === "bear" ? "down" : "flat"}`}>{asset.tone === "bull" ? "↑" : asset.tone === "bear" ? "↓" : "→"} {tr(locale, asset.label, asset.tone === "bull" ? "看多" : asset.tone === "bear" ? "看空" : "中性")}</span></div>
-                  <div className="bar"><i style={{ width: `${asset.score}%`, background: TONE[asset.tone] }} /></div><div className="meta"><span>24h&nbsp;<Delta v={asset.d1} /></span>{asset.isFallback && asset.windowEnd && <span>{tr(locale, "as of", "截至")} {formatDate(asset.windowEnd, locale)}</span>}</div>
-                </>}
-              </Link>
-            </div>
-          ))}
-          {assets.length === 0 && <p className="mono monitor-empty">{tr(locale, "No followed assets yet.", "尚未关注资产。")}</p>}
-        </div>
-        <div className="monitor-object-grid">
-          <div><div className="section-t">{tr(locale, "Institutions", "机构")} · {institutions.length}</div><div className="rowlist">{institutions.map((institution) => <div key={institution.id} className="r"><Link href={localePath(locale, `/institution/${institution.slug}`)} className="inst">{institutionName(institution.name, locale)}</Link><RemoveButton kind="institution" refId={institution.slug} locale={locale} /></div>)}{institutions.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed institutions.", "尚未关注机构。")}</div>}</div></div>
-          <div><div className="section-t">{tr(locale, "Trading themes", "交易主线")} · {themes.length}</div><div className="rowlist">{themes.map((theme) => <div key={theme} className="r"><span>{localeSafeText(theme, locale, tr(locale, "Custom theme", "自定义主题"))}</span><RemoveButton kind="theme" refId={theme} locale={locale} /></div>)}{themes.length === 0 && <div className="r monitor-empty">{tr(locale, "No followed themes.", "尚未关注交易主线。")}</div>}</div></div>
-        </div>
-      </section>
-
-      <section className="blk"><div className="section-t">{tr(locale, "Create monitoring rule", "创建监控规则")}</div><MonitoringRuleForm assets={assetOptions} institutions={institutionOptions} themes={themes} macroIndicators={macroIndicators.map((item) => ({ value: item.canonicalKey, label: locale === "zh-CN" ? item.nameZh ?? item.nameEn : item.nameEn }))} centralBanks={policyBanks.map((item) => ({ value: item.centralBank, label: item.centralBank }))} locale={locale} /></section>
-
-      <section className="blk">
-        <div className="section-t">{tr(locale, "Alert delivery", "提醒送达")}</div>
-        <p className="mono monitor-empty">
-          {tr(
-            locale,
-            "Fired alerts are POSTed as JSON to this https endpoint. Without one they are recorded here only.",
-            "触发的提醒会以 JSON POST 到该 https 地址；未配置时仅在本页留存记录。",
-          )}
-        </p>
-        <form action={setAlertWebhook} className="webhook-form">
-          <label className="field" style={{ flex: 1 }}>
-            <span>{tr(locale, "Webhook URL", "Webhook 地址")}</span>
-            <input
-              name="url"
-              type="url"
-              inputMode="url"
-              placeholder="https://hooks.example.com/..."
-              defaultValue={user.alertWebhookUrl ?? ""}
-            />
-          </label>
-          <button className="minibtn p">{tr(locale, "Save", "保存")}</button>
-        </form>
-      </section>
-
-      <section className="blk monitor-object-grid">
-        <div><div className="section-t">{tr(locale, "Active rules", "监控规则")} · {rules.length}</div><div className="rowlist">
-          {rules.map((rule) => <div key={rule.id} className="r monitor-rule-row"><span><b>{localeSafeText(rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><small>{describeRule(rule, locale)}</small></span><span className="monitor-actions"><form action={toggleRule}><input type="hidden" name="id" value={rule.id} /><button className={`chip ${rule.active ? "acc" : "gray"}`}>{rule.active ? tr(locale, "active", "启用") : tr(locale, "paused", "暂停")}</button></form><form action={deleteRule}><input type="hidden" name="id" value={rule.id} /><button className="iconbtn" title={tr(locale, "Delete", "删除")}>✕</button></form></span></div>)}
-          {rules.length === 0 && <div className="r monitor-empty">{tr(locale, "No monitoring rules yet.", "尚未创建监控规则。")}</div>}
-        </div></div>
-        <div><div className="section-t">{tr(locale, "Recent triggers", "近期触发")} · {events.length}</div><div className="feed">
-          {events.map((event) => { const article = event.targetId ? eventArticleById.get(event.targetId) : undefined; const readyTarget = Boolean(article); const macroTarget = event.targetId ? eventReleaseIds.has(event.targetId) : false; const target = article ? researchPath(article) : macroTarget ? `/macro/release/${event.targetId}` : `/asset/${event.assetTicker}`; return <div key={event.id} className="fcard"><div className="top"><b>{localeSafeText(event.rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><span>· {relTime(event.firedAt, locale)}</span></div><div className="monitor-event-copy">{alertMessage(event)}</div><span className={`chip ${event.deliveryStatus === "sent" ? "bull" : event.deliveryStatus === "failed" ? "bear" : "gray"}`} title={event.deliveryError ?? undefined}>{deliveryLabel(event.deliveryStatus)}</span>{(readyTarget || macroTarget || event.assetTicker) && <Link href={localePath(locale, target)} className="minibtn">{tr(locale, "Open evidence", "查看依据")} →</Link>}</div>; })}
-          {events.length === 0 && <p className="mono monitor-empty">{tr(locale, "No triggers yet.", "尚未触发提醒。")}</p>}
-        </div></div>
-      </section>
     </main>
   );
 }

@@ -15,7 +15,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const SEGMENTS = new Set(["en", "zh"]);
 const LOCALE_COOKIE = "tline_locale";
-const PRIVATE_PREFIXES = ["/admin", "/alerts", "/watchlist", "/signin", "/account"];
+const PRIVATE_PREFIXES = ["/admin", "/alerts", "/signin", "/account"];
 
 function cacheHeaders(response: NextResponse, request: NextRequest, pathname: string) {
   const authenticated = request.cookies.get("ii_session") || request.cookies.get("next-auth.session-token") || request.cookies.get("__Secure-next-auth.session-token");

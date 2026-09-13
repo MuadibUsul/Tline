@@ -7,9 +7,10 @@ test("feishu url verification echoes the challenge verbatim before any other che
   const request = new NextRequest("https://tlines.tech/api/social/feishu", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ challenge: "test123456", type: "url_verification", token: "test-token" }),
+    body: JSON.stringify({ type: "url_verification", challenge: "test123" }),
   });
   const response = await POST(request);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { challenge: "test123456" });
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
+  assert.deepEqual(await response.json(), { challenge: "test123" });
 });

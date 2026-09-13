@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractArticle, extractFeedLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { extractArticle, extractFeedLinks, extractFullArticleLinks, extractLinks, extractPaginationLinks, extractPdfCandidates, extractPdfLinks, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, printsToPdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { stripTrailingDisclaimerSegments } from "../articleText";
 
@@ -348,6 +348,17 @@ test("discovers publisher-declared PDF downloads without a .pdf suffix", () => {
     </article>`, "https://think.ing.com/articles/the-commodities-feed");
   assert.equal(candidate.url, "https://think.ing.com/downloads/pdf/article/the-commodities-feed");
   assert.equal(candidate.title, "The Commodities Feed");
+});
+
+test("discovers an explicit full-article route only on declared publisher hosts", () => {
+  const html = `<main><p>Preview… <a href="https://www.societegenerale.asia/en/insights/wrong/"></a><a href="https://www.societegenerale.asia/en/insights/rethinking-ai/">here</a> to read full article</p>
+    <a href="https://unrelated.example/copied-story">Read the full article</a>
+    <a href="/report.pdf">Read full report PDF</a></main>`;
+  assert.deepEqual(extractFullArticleLinks(
+    html,
+    "https://wholesale.banking.societegenerale.com/en/news-insights/rethinking-ai/",
+    ["https://www.societegenerale.asia"],
+  ), ["https://www.societegenerale.asia/en/insights/rethinking-ai/"]);
 });
 
 test("discovers BNP's public PDF route without a file extension", () => {

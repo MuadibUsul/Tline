@@ -8,6 +8,8 @@ export interface CandidateLink {
   publishedAt: Date | null;
 }
 
+const FULL_ARTICLE_LABEL = /(?:read|view|open|continue(?:\s+to)?)\s+(?:the\s+)?(?:full|complete)\s+(?:article|report|research|story)|(?:full|complete)\s+(?:article|report|research)|(?:阅读|查看|打开)(?:完整)?全文|阅读全文/i;
+
 function jsonScripts($: cheerio.CheerioAPI): unknown[] {
   const values: unknown[] = [];
   $('script[type="application/ld+json"],script[type="application/json"],script#__NEXT_DATA__').each((_, element) => {
@@ -241,6 +243,37 @@ export function extractPdfCandidates(html: string, baseUrl: string, documentOrig
 /** Backward-compatible URL-only PDF discovery. */
 export function extractPdfLinks(html: string, baseUrl: string): string[] {
   return extractPdfCandidates(html, baseUrl).map((candidate) => candidate.url);
+}
+
+/**
+ * Find an explicit route from a public teaser to the publisher's complete HTML article.
+ * Cross-origin routes are accepted only when the source rule names that official host.
+ */
+export function extractFullArticleLinks(html: string, baseUrl: string, contentOrigins: string[] = []): string[] {
+  const $ = cheerio.load(html);
+  const base = new URL(baseUrl);
+  const allowedOrigins = new Set([base.origin, ...contentOrigins]);
+  const out = new Set<string>();
+  $("a[href]").each((_, element) => {
+    if ($(element).closest("nav,header,footer,[role=navigation],[role=contentinfo],[class*=footer],[class*=menu]").length) return;
+    const href = $(element).attr("href") || "";
+    // Publishers often split "click here to read full article" around an anchor whose
+    // own text is only "here". Include the containing sentence when classifying it.
+    const context = $(element).closest("p,li,div").first().text().replace(/\s+/g, " ").trim().slice(0, 500);
+    const ownLabel = `${$(element).text()} ${$(element).attr("aria-label") || ""} ${$(element).attr("title") || ""}`
+      .replace(/\s+/g, " ").trim();
+    if (!FULL_ARTICLE_LABEL.test(ownLabel)
+      && !(FULL_ARTICLE_LABEL.test(context) && /^(?:click\s+)?(?:here|此处|这里)$/i.test(ownLabel))) return;
+    try {
+      const url = new URL(href, base);
+      const clean = url.href.split("#")[0];
+      if (!allowedOrigins.has(url.origin) || clean === base.href.split("#")[0]) return;
+      // Native documents are handled by extractPdfCandidates and retained as such.
+      if (/\.pdf(?:$|\?)/i.test(clean) || /\bpdf\b/i.test(`${ownLabel} ${context}`)) return;
+      out.add(clean);
+    } catch { /* invalid full-article URL */ }
+  });
+  return [...out].slice(0, 2);
 }
 
 /** Discover publisher-declared RSS/Atom feeds without leaving the audited origin. */

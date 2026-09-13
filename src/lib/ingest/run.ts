@@ -2,7 +2,7 @@ import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
-import { extractLinks, extractArticle, extractFeedLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
+import { extractLinks, extractArticle, extractFeedLinks, extractFullArticleLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { ensureAssets, persistArticle, type RawArticle } from "./store";
 import { resolveDocumentTitle } from "./documentTitle";
 import { snapshotAll } from "../consensus";
@@ -13,7 +13,7 @@ import { saveNativePdf } from "../documents/pdf";
 import { urlHash } from "../hash";
 import { fetchBrowserPdf, lastRenderReason, renderHtml, renderPdf } from "./render";
 import { runTrackedJob } from "../jobs";
-import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, printsToPdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
+import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, fullTextOrigins, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, printsToPdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 import { ACCESS_CIRCUIT_FAILURES, crawlIntervalSeconds, healthyScheduleSeconds, jitterSeconds, runSourcesByOrigin, sourceBackoffSeconds } from "./scheduling";
 
@@ -104,7 +104,8 @@ async function ingestInstitution(
   // Document hosts join that set: a publisher whose files sit on an asset CDN is still
   // the publisher, and each host is checked against its own robots.txt below.
   const publisherDocumentOrigins = documentOrigins(inst.slug).map(originOf).filter((o): o is string => o !== null);
-  const allowedOrigins = new Set([origin, ...configuredListings.map(originOf).filter((o): o is string => o !== null), ...publisherDocumentOrigins]);
+  const publisherFullTextOrigins = fullTextOrigins(inst.slug).map(originOf).filter((o): o is string => o !== null);
+  const allowedOrigins = new Set([origin, ...configuredListings.map(originOf).filter((o): o is string => o !== null), ...publisherDocumentOrigins, ...publisherFullTextOrigins]);
   const sourceListings = configuredListings.filter((url) => allowedOrigins.has(originOf(url) ?? ""));
   const deadline = Date.now() + sourceSeconds * 1000;
   const withinBudget = () => Date.now() < deadline;
@@ -164,10 +165,10 @@ async function ingestInstitution(
   const seenCandidates = new Set<string>();
   const knownRows = await prisma.article.findMany({
     where: { institutionId: inst.id },
-    select: { urlHash: true, title: true, sourceUrl: true, publishedAt: true, documents: { where: { kind: "source_native", status: "ready" }, select: { id: true }, take: 1 } },
+    select: { urlHash: true, title: true, sourceUrl: true, publishedAt: true, rawText: true, documents: { where: { kind: "source_native", status: "ready" }, select: { id: true }, take: 1 } },
     orderBy: { publishedAt: "desc" },
   });
-  const knownCandidates = new Map(knownRows.map((article) => [article.urlHash, { title: article.title, hasNativePdf: article.documents.length > 0 }]));
+  const knownCandidates = new Map(knownRows.map((article) => [article.urlHash, { title: article.title, contentLength: article.rawText?.length ?? 0, hasNativePdf: article.documents.length > 0 }]));
   let listingHtml: string | null = null;
   const candidateLimit = Math.min(500, Math.max(perLimit * 3, scanLimit));
   const stage = (raw: RawArticle) => {
@@ -191,12 +192,32 @@ async function ingestInstitution(
     if (seenCandidates.has(clean)) return true;
     seenCandidates.add(clean);
     const known = knownCandidates.get(urlHash(clean));
-    if (known && !refreshKnownCandidate(inst.slug, known.title) && !(prefersNativePdf(inst.slug) && !known.hasNativePdf)) { dup++; return true; }
+    const mayUpgradeShortTeaser = publisherFullTextOrigins.length > 0 && Boolean(known && known.contentLength < 5_000);
+    if (known && !refreshKnownCandidate(inst.slug, known.title) && !mayUpgradeShortTeaser && !(prefersNativePdf(inst.slug) && !known.hasNativePdf)) { dup++; return true; }
     return false;
   };
   const replacesKnownArticle = (url: string) => {
     const known = knownCandidates.get(urlHash(url));
     return Boolean(known && refreshKnownCandidate(inst.slug, known.title));
+  };
+  const followFullArticle = async (html: string, pageUrl: string, current: ReturnType<typeof extractArticle>) => {
+    for (const fullUrl of extractFullArticleLinks(html, pageUrl, publisherFullTextOrigins)) {
+      if (!allowsUrl(fullUrl) || !withinBudget()) continue;
+      await sleep(delayMs);
+      let fullHtml = await fetchText(fullUrl);
+      if (!fullHtml) fullHtml = await renderPublic(fullUrl);
+      if (!fullHtml) continue;
+      const complete = readArticle(fullHtml, fullUrl);
+      const materiallyLonger = complete.text.length - current.text.length >= Math.max(500, Math.round(current.text.length * 0.1));
+      if (!materiallyLonger || !looksLikeArticle(complete.title || current.title, complete.text)) continue;
+      return {
+        ...complete,
+        title: current.title || complete.title,
+        author: current.author || complete.author,
+        publishedAt: current.publishedAt || complete.publishedAt,
+      };
+    }
+    return current;
   };
   /**
    * Read the native documents a page links, and stage each as a report.
@@ -403,6 +424,7 @@ async function ingestInstitution(
         // data-download-url PDF (MUFG). Recover it here before the shared seen-set
         // prevents the sitemap/listing passes from revisiting the same page.
         if (await stageEmbeddedPdf(html, item.link, article.title || item.title || "", publishedAt)) continue;
+        article = await followFullArticle(html, item.link, article);
         stage({
           title: article.title || item.title || "",
           text: article.text,
@@ -485,6 +507,7 @@ async function ingestInstitution(
         // first is how a "Download PDF" button ends up as a title with a menu for a body,
         // so the document is preferred and the page kept only as a fallback.
         if (await stageEmbeddedPdf(artHtml, candidate.url, article.title, publishedAt)) continue;
+        article = await followFullArticle(artHtml, candidate.url, article);
         if (!publishedAt || !looksLikeArticle(article.title, article.text)) { empty++; continue; }
         stage({
           title: article.title,
@@ -548,6 +571,7 @@ async function ingestInstitution(
         // under 5,000 characters as a result, with analysis and translation derived from
         // the teaser rather than the research.
         if (await stageEmbeddedPdf(artHtml, link.url, a.title || link.title, publishedAt)) continue;
+        a = await followFullArticle(artHtml, link.url, a);
         if (!publishedAt || !looksLikeArticle(a.title || link.title, a.text)) {
           empty++;
           continue;

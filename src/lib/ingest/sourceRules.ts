@@ -11,6 +11,7 @@ type SourceRule = {
   preferNativePdf?: boolean;
   printToPdf?: boolean;
   documentOrigins?: string[];
+  fullTextOrigins?: string[];
 };
 
 // Publisher-specific exceptions discovered during source acceptance. Scheduled
@@ -286,6 +287,11 @@ const RULES: Record<string, SourceRule> = {
     // disclaimer redirects and only delays reaching the usable listing.
     skipSitemap: true,
   },
+  "soci-t-g-n-rale": {
+    // The wholesale site publishes a short introduction and links the complete public
+    // article on Société Générale's official Asia-Pacific domain.
+    fullTextOrigins: ["https://www.societegenerale.asia"],
+  },
 };
 
 /**
@@ -361,6 +367,11 @@ export function minimumLookbackHours(slug: string): number {
  */
 export function documentOrigins(slug: string): string[] {
   return RULES[slug]?.documentOrigins ?? [];
+}
+
+/** Official publisher hosts used by teaser pages to expose their complete HTML text. */
+export function fullTextOrigins(slug: string): string[] {
+  return RULES[slug]?.fullTextOrigins ?? [];
 }
 
 export function prefersNativePdf(slug: string): boolean {

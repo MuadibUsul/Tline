@@ -66,7 +66,7 @@ async function createResearchCandidates() {
   const analyses = await prisma.analysis.findMany({
     where: { reviewStatus: "ok", summaryZh: { not: null }, article: { rawText: { not: null }, publishedAt: { gte: new Date(Date.now() - windowMs) } } },
     orderBy: { article: { publishedAt: "desc" } }, take: perCycle,
-    include: { article: { include: { institution: true, translations: { where: { locale: "zh-CN" }, take: 1 } } } },
+    include: { article: { include: { institution: true } } },
   });
   const existing = new Set((await prisma.socialDraft.findMany({
     where: { sourceKind: "research", sourceId: { in: analyses.map((analysis) => analysis.articleId) } },
@@ -76,7 +76,6 @@ async function createResearchCandidates() {
   for (const analysis of analyses) {
     if (!analysis.summaryZh || existing.has(analysis.articleId)) continue;
     const posts = researchPosts({
-      title: analysis.article.translations[0]?.title || analysis.article.title,
       institution: analysis.article.institution.name,
       summaryEn: analysis.summary, summaryZh: analysis.summaryZh,
       interpretationEn: analysis.interpretation, interpretationZh: analysis.interpretationZh,
@@ -165,8 +164,8 @@ export async function regenerateDraft(id: string) {
   if (!draft || draft.status !== "PENDING_REVIEW") return false;
   let posts: { en: string; zh: string } | null = null;
   if (draft.sourceKind === "research") {
-    const analysis = await prisma.analysis.findUnique({ where: { articleId: draft.sourceId }, include: { article: { include: { institution: true, translations: { where: { locale: "zh-CN" }, take: 1 } } } } });
-    if (analysis?.summaryZh) posts = researchPosts({ title: analysis.article.translations[0]?.title || analysis.article.title, institution: analysis.article.institution.name, summaryEn: analysis.summary, summaryZh: analysis.summaryZh, interpretationEn: analysis.interpretation, interpretationZh: analysis.interpretationZh });
+    const analysis = await prisma.analysis.findUnique({ where: { articleId: draft.sourceId }, include: { article: { include: { institution: true } } } });
+    if (analysis?.summaryZh) posts = researchPosts({ institution: analysis.article.institution.name, summaryEn: analysis.summary, summaryZh: analysis.summaryZh, interpretationEn: analysis.interpretation, interpretationZh: analysis.interpretationZh });
   } else if (draft.sourceKind === "macro") {
     const release = await prisma.macroRelease.findUnique({ where: { id: draft.sourceId }, include: { values: { where: { actualInitial: { not: null } }, include: { indicator: true, consensusExpectation: true }, orderBy: { createdAt: "asc" } } } });
     if (release?.analysisEn && release.analysisZh) {

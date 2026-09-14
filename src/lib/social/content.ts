@@ -28,7 +28,6 @@ export function validatePost(text: string): string | null {
 }
 
 type ResearchInput = {
-  title: string;
   institution: string;
   summaryEn: string;
   summaryZh: string;
@@ -36,10 +35,13 @@ type ResearchInput = {
   interpretationZh?: string | null;
 };
 
+// The report title is deliberately left out of the post body: it repeats what the
+// linked card already shows and the summary already conveys, so dropping it frees the
+// weighted-character budget for the analysis itself.
 export function researchPosts(input: ResearchInput) {
   return {
-    en: fitX(`RESEARCH | ${input.institution}\n${input.title}\n\n${input.summaryEn}\n\nMarket read: ${input.interpretationEn || "See the sourced analysis for implications and risks."}`),
-    zh: fitX(`研报 | ${input.institution}\n${input.title}\n\n${input.summaryZh}\n\n市场解读：${input.interpretationZh || "完整影响与风险请查看来源分析。"}`),
+    en: fitX(`RESEARCH | ${input.institution}\n\n${input.summaryEn}\n\nMarket read: ${input.interpretationEn || "See the sourced analysis for implications and risks."}`),
+    zh: fitX(`研报 | ${input.institution}\n\n${input.summaryZh}\n\n市场解读：${input.interpretationZh || "完整影响与风险请查看来源分析。"}`),
   };
 }
 

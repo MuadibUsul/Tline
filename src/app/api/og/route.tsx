@@ -1,9 +1,13 @@
+import { readFileSync } from "node:fs";
 import { ImageResponse } from "next/og";
 import { SITE_NAME } from "@/lib/site";
 
-export const runtime = "edge";
+// Node runtime, not edge: the bundled fonts are read from disk. In the edge runtime
+// `fetch(new URL(...))` resolves the asset to a file:// URL, which the runtime's fetch
+// does not implement, so every card 500'd in the production build.
+export const runtime = "nodejs";
 
-const loadFont = (name: string) => fetch(new URL(`./${name}`, import.meta.url)).then((response) => response.arrayBuffer());
+const loadFont = (name: string) => readFileSync(new URL(`./${name}`, import.meta.url));
 const notoRegular = loadFont("NotoSansSC-Regular.ttf");
 const notoBold = loadFont("NotoSansSC-Bold.ttf");
 
@@ -23,8 +27,8 @@ export async function GET(request: Request) {
       width: 1200,
       height: 630,
       fonts: [
-        { name: "Noto Sans SC", data: await notoRegular, weight: 400 },
-        { name: "Noto Sans SC", data: await notoBold, weight: 700 },
+        { name: "Noto Sans SC", data: notoRegular, weight: 400 },
+        { name: "Noto Sans SC", data: notoBold, weight: 700 },
       ],
       headers: { "cache-control": "public, max-age=86400, immutable" },
     },

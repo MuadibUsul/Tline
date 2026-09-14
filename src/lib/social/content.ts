@@ -9,7 +9,9 @@ export function xWeightedLength(text: string): number {
 }
 
 export function fitX(text: string, limit = 275): string {
-  const clean = text.replace(/\s+\n/g, "\n").replace(/[ \t]+/g, " ").trim();
+  // Strip trailing space before a newline, but keep the breaks themselves: a blank
+  // line between sections is part of the template's layout, not padding to fold.
+  const clean = text.replace(/[ \t\r]+\n/g, "\n").replace(/[ \t]+/g, " ").trim();
   if (xWeightedLength(clean) <= limit) return clean;
   let out = "";
   for (const char of clean) {

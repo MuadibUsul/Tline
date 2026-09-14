@@ -2,7 +2,7 @@ import { prisma } from "./db";
 import { computeConsensus, consensusDeltas, type ConsensusResult } from "./consensus";
 import { directionLabel } from "./assets";
 import { publicationReadyWhere } from "./publication";
-import { articleTimestamp } from "./i18n";
+import { articleTimestamp, type Locale } from "./i18n";
 
 export interface FeedPulse {
   latestId: string | null;
@@ -49,9 +49,9 @@ export function byDisplayRecency<T extends { publishedAt: Date; createdAt: Date 
  * ordering buried it six days down, and a day's worth of new research could land without
  * anything visibly changing.
  */
-export async function latestFeed(limit = 8) {
+export async function latestFeed(limit = 8, locale?: Locale) {
   return prisma.article.findMany({
-    where: publicationReadyWhere(),
+    where: publicationReadyWhere(undefined, locale),
     orderBy: [{ createdAt: "desc" }, { publishedAt: "desc" }],
     take: limit,
     include: {
@@ -79,7 +79,7 @@ export async function mostActive(days = 7, limit = 6) {
   return rows.map((r) => ({ inst: map.get(r.institutionId)!, count: r._count._all }));
 }
 
-export async function getAssetView(ticker: string) {
+export async function getAssetView(ticker: string, locale?: Locale) {
   const asset = await prisma.asset.findUnique({ where: { ticker: ticker.toUpperCase() } });
   if (!asset) return null;
   const [c, deltas] = await Promise.all([computeConsensus(asset.id), consensusDeltas([asset.id], [1, 7, 30])]);
@@ -96,7 +96,7 @@ export async function getAssetView(ticker: string) {
       }
     : null;
   const articles = await prisma.article.findMany({
-    where: publicationReadyWhere({ articleAssets: { some: { assetId: asset.id } } }),
+    where: publicationReadyWhere({ articleAssets: { some: { assetId: asset.id } } }, locale),
     orderBy: { publishedAt: "desc" },
     take: 8,
     include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } }, articleAssets: { include: { asset: true } } },
@@ -157,12 +157,12 @@ export async function getAssetTimeline(assetId: string): Promise<InstTimeline[]>
   return out;
 }
 
-export async function getInstitutionView(slug: string) {
+export async function getInstitutionView(slug: string, locale?: Locale) {
   const inst = await prisma.institution.findUnique({ where: { slug } });
   if (!inst) return null;
   const since = new Date(Date.now() - 90 * 864e5);
   const articles = await prisma.article.findMany({
-    where: publicationReadyWhere({ institutionId: inst.id, publishedAt: { gte: since } }),
+    where: publicationReadyWhere({ institutionId: inst.id, publishedAt: { gte: since } }, locale),
     orderBy: { publishedAt: "desc" },
     include: { analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } }, articleAssets: { include: { asset: true } } },
   });

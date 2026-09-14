@@ -21,6 +21,14 @@ for (const family of macroReleaseFamilies) {
   for (const key of family.indicators) {
     if (!indicators.has(key)) throw new Error(`Unknown macro indicator ${key} in ${family.key}.`);
   }
+  // A Chinese title is mandatory: the macro pages render titleZh on /zh, so a family
+  // without one would surface the English title there. Enforce it at startup so a new
+  // release family can never ship untranslated.
+  if (!family.titleZh?.trim()) throw new Error(`Macro release family ${family.key} is missing a Chinese title (titleZh).`);
+}
+// The same for every indicator name, rendered as nameZh on the Chinese macro pages.
+for (const indicator of macroIndicators) {
+  if (!indicator.nameZh?.trim()) throw new Error(`Macro indicator ${indicator.canonicalKey} is missing a Chinese name (nameZh).`);
 }
 
 export function getMacroIndicator(canonicalKey: string): MacroIndicatorDefinition | null {

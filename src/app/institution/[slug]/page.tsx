@@ -37,7 +37,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
 export default async function InstitutionPage(props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
   const locale = await getLocale();
-  const data = await getInstitutionView(params.slug);
+  const data = await getInstitutionView(params.slug, locale);
   if (!data) notFound();
   const { inst, articles, count30, views, coverage } = data;
 

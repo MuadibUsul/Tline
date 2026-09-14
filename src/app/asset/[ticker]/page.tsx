@@ -42,7 +42,7 @@ export async function generateMetadata(props: { params: Promise<{ ticker: string
 export default async function AssetPage(props: { params: Promise<{ ticker: string }> }) {
   const params = await props.params;
   const locale = await getLocale();
-  const data = await getAssetView(tickerFromAssetSlug(params.ticker));
+  const data = await getAssetView(tickerFromAssetSlug(params.ticker), locale);
   if (!data) notFound();
   const { asset, consensus, d1, d7, d30, dist, articles } = data;
   const [timelineRows, market] = await Promise.all([getAssetTimeline(asset.id), getAssetMarketSnapshot(asset.ticker)]);

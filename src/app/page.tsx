@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Home() {
   const locale = await getLocale();
   const [feed, active, thisWeek, pulse] = await Promise.all([
-    latestFeed(8),
+    latestFeed(8, locale),
     mostActive(30, 6),
     importantReleasesThisWeek(5),
     feedPulse(),

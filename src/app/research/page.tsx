@@ -62,7 +62,7 @@ export default async function ResearchIndex(
         },
       },
     } : {}),
-  });
+  }, locale);
   const [articles, institutions, assets, countries, pulse] = await Promise.all([
     prisma.article.findMany({
       where,

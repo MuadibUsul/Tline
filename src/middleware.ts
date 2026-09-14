@@ -48,6 +48,26 @@ export function middleware(request: NextRequest) {
 
   if (MACHINE_PATH.test(pathname)) return NextResponse.next();
 
+  // The Chinese section lives at /zh; /cn is accepted as an alias and redirected there so
+  // a hand-typed or externally linked /cn address lands on the site instead of a 404.
+  const cnAlias = /^\/cn(?=\/|$)/i.exec(pathname);
+  if (cnAlias) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/zh${pathname.slice(cnAlias[0].length)}`.replace(/\/$/, "") || "/zh";
+    url.search = search;
+    return NextResponse.redirect(url, 308);
+  }
+
+  // Retired sections (/consensus, /search) no longer exist. Send their old links to the
+  // research feed in the same language rather than 308-ing them into a dead page.
+  const retired = /^(?:\/(en|zh))?\/(?:consensus|search)(?:\/|$)/i.exec(pathname);
+  if (retired) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/${retired[1] ?? preferredSegment(request)}/research`;
+    url.search = "";
+    return NextResponse.redirect(url, 308);
+  }
+
   const legacyAsset = /^\/(en|zh)?\/?asset\/([^/]+)\/?$/i.exec(pathname);
   if (legacyAsset) {
     const url = request.nextUrl.clone();

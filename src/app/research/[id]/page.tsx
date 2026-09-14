@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
 import { assetName, formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale, localePath } from "@/lib/i18n";
 import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
 import { prisma } from "@/lib/db";
 import PdfPreview from "@/app/_components/PdfPreview";
 import { JsonLd, breadcrumbJsonLd, canonical, localizedUrl, ogImage, reportJsonLd } from "@/lib/seo";
-import { preferredEnglishDocuments, publicationReadyWhere } from "@/lib/publication";
+import { preferredEnglishDocuments, publicationReadyWhere, LOCALE_STRICT_ZH_SINCE } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
 import { contentQuality } from "@/lib/contentQuality";
 import { assetPath } from "@/lib/assetPath";
@@ -128,6 +128,12 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const a = await getResearchView(params.id);
   if (!a) notFound();
   if (params.id !== a.slug) permanentRedirect(localePath(locale, researchPath(a)));
+  // A report first seen after the cutoff with no Chinese translation yet must not render a
+  // half-English page in Chinese: send the reader to the English report instead, until the
+  // translation lands. Older reports are grandfathered and shown as before.
+  if (locale === "zh-CN" && !a.translations[0] && a.createdAt >= LOCALE_STRICT_ZH_SINCE) {
+    redirect(localePath("en", researchPath(a)));
+  }
   const an = a.analysis;
   const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);
   const risks = parseJson<string[]>(locale === "zh-CN" ? an?.risksZh : an?.risks, []);

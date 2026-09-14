@@ -84,7 +84,17 @@ export function middleware(request: NextRequest) {
     url.pathname = `/${rest.join("/")}` || "/";
     const headers = new Headers(request.headers);
     headers.set("x-pathname", pathname);
-    return cacheHeaders(NextResponse.rewrite(url, { request: { headers } }), request, `/${rest.join("/")}` || "/");
+    const response = cacheHeaders(NextResponse.rewrite(url, { request: { headers } }), request, `/${rest.join("/")}` || "/");
+    // Remember the language the reader is actually viewing, so it sticks. Without this the
+    // cookie is never written, the switch button never persists, and any address without a
+    // prefix (the bare domain, a shared link, a reload) sends them back to their
+    // Accept-Language default — the "switch doesn't work" bug. Only written when it changes,
+    // so a returning reader with the right cookie keeps a cacheable response.
+    const desired = first === "zh" ? "zh-CN" : "en";
+    if (request.cookies.get(LOCALE_COOKIE)?.value !== desired) {
+      response.cookies.set(LOCALE_COOKIE, desired, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+    }
+    return response;
   }
 
   // No language in the address: send the reader to the one they are likely to want. A

@@ -23,6 +23,21 @@ test("both explicit language prefixes serve the requested locale", () => {
   }
 });
 
+test("viewing a prefixed page persists the language so the switch sticks", () => {
+  const zh = middleware(new NextRequest("https://tlines.tech/zh/research"));
+  assert.equal(zh.cookies.get("tline_locale")?.value, "zh-CN");
+  const en = middleware(new NextRequest("https://tlines.tech/en/research"));
+  assert.equal(en.cookies.get("tline_locale")?.value, "en");
+  // Already-correct cookie is left alone, so the response stays cacheable.
+  const unchanged = middleware(new NextRequest("https://tlines.tech/en/research", { headers: { cookie: "tline_locale=en" } }));
+  assert.equal(unchanged.cookies.get("tline_locale"), undefined);
+});
+
+test("the persisted language wins the unprefixed redirect over Accept-Language", () => {
+  const response = middleware(new NextRequest("https://tlines.tech/research", { headers: { "accept-language": "en", cookie: "tline_locale=zh-CN" } }));
+  assert.equal(response.headers.get("location"), "https://tlines.tech/zh/research");
+});
+
 test("legacy asset URLs permanently redirect to the readable market canonical", () => {
   const response = middleware(new NextRequest("https://tlines.tech/zh/asset/XAUUSD"));
   assert.equal(response.status, 308);

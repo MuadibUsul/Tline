@@ -85,7 +85,7 @@ export function draftCard(draft: DraftCard) {
     schema: "2.0",
     header: { template: pending ? "blue" : draft.status === "SUCCEEDED" ? "green" : draft.status === "REJECTED" ? "grey" : "orange", title: { tag: "plain_text", content: `Tlines 发布审核 · ${draft.title}`.slice(0, 100) } },
     body: { elements: [
-      { tag: "markdown", content: `**固定发布目标**\n${md(routeText)}\n\n**中文稿（v${draft.version}）**\n${md(draft.textZh)}\n\n**English**\n${md(draft.textEn)}${results}` },
+      { tag: "markdown", content: `**固定发布目标**\n${md(routeText)}\n\n**中文稿（v${draft.version}）**\n${md(draft.textZh)}${results}` },
       ...(pending ? [
         { tag: "button", type: "primary", text: { tag: "plain_text", content: "批准并发布" }, behaviors: [{ type: "callback", value: { action: "approve", draftId: draft.id, version: draft.version } }] },
         { tag: "button", type: "danger", text: { tag: "plain_text", content: "拒绝" }, behaviors: [{ type: "callback", value: { action: "reject", draftId: draft.id, version: draft.version } }] },

@@ -54,9 +54,9 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
       title: searchTitle,
       description: description.slice(0, 160),
       publishedTime: article.publishedAt.toISOString(),
-      images: [{ url: ogImage("Research", article.title, article.institution.name), width: 1200, height: 630 }],
+      images: [{ url: ogImage("Research", title, article.institution.name), width: 1200, height: 630 }],
     },
-    twitter: { card: "summary_large_image", images: [ogImage("Research", article.title, article.institution.name)] },
+    twitter: { card: "summary_large_image", images: [ogImage("Research", title, article.institution.name)] },
   };
 }
 

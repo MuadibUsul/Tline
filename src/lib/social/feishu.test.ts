@@ -69,6 +69,7 @@ test("review card uses schema 2.0 buttons instead of the legacy action container
   const base = { id: "draft_1", title: "标题", textEn: "English", textZh: "中文", version: 3, deliveries: [] };
   const card = draftCard({ ...base, status: "PENDING_REVIEW" });
   assert.equal(card.schema, "2.0");
+  assert.doesNotMatch(JSON.stringify(card), /English/);
   const elements = card.body.elements as Array<Record<string, unknown>>;
   assert.ok(elements.every((element) => element.tag !== "action" && !("actions" in element) && element.tag !== "note"), "no legacy action container or note element");
   const buttons = elements.filter((element) => element.tag === "button");

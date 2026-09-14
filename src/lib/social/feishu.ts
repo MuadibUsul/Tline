@@ -125,7 +125,7 @@ export async function updateDraftCard(messageId: string, draft: DraftCard) {
 export async function sendFeishuTestMessage() {
   const settings = await loadFeishuSettings();
   requireMessageReceiver(settings);
-  await feishu(`/im/v1/messages?receive_id_type=${encodeURIComponent(settings.receiveIdType)}`, "POST", {
+  await feishu(`/im/v1/messages?receive_id_type=${encodeURIComponent(settings.receiveIdType || "open_id")}`, "POST", {
     receive_id: settings.receiveId,
     msg_type: "text",
     content: JSON.stringify({ text: "Tlines 飞书审核机器人连接成功。后续发布候选会发送到这里等待审核。" }),
@@ -138,7 +138,13 @@ export function feishuSignature(timestamp: string, nonce: string, encryptKey: st
 
 export async function verifyFeishuRequest(body: string, timestamp: string | null, nonce: string | null, signature: string | null): Promise<boolean> {
   const key = (await loadFeishuSettings()).encryptKey;
-  if (!timestamp || !nonce || !signature || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  // Fail closed when no Encrypt Key is configured. The Feishu signature is
+  // sha256(timestamp + nonce + encryptKey + body); with an empty key the "secret"
+  // disappears and anyone who reaches this endpoint can compute a matching
+  // signature, leaving the approver open_id (which is not a secret) as the only
+  // gate on approve/publish. Requiring a non-empty key means callbacks only work
+  // once encryption is enabled in the Feishu console, which is the intended posture.
+  if (!key || !timestamp || !nonce || !signature || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
   const left = Buffer.from(signature);
   const right = Buffer.from(feishuSignature(timestamp, nonce, key, body));
   return left.length === right.length && timingSafeEqual(left, right);

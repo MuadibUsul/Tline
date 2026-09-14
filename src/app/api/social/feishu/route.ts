@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { allowedFeishuApprover, decryptFeishuPayload, loadFeishuSettings, verifyFeishuRequest } from "@/lib/social/feishu";
 import { decideDraft, refreshDraftCard } from "@/lib/social/pipeline";
 
+// Per-request info logging is noisy in production; keep it behind a flag while
+// leaving error and rejection diagnostics (console.error / console.log below) on.
+const debug = (message: string) => { if (process.env.FEISHU_DEBUG === "1") console.log(message); };
+
 export async function POST(request: NextRequest) {
-  console.log("[Feishu] webhook received");
+  debug("[Feishu] webhook received");
   const raw = await request.text();
   let body: Record<string, unknown>;
-  try { body = JSON.parse(raw); } catch { console.log("[Feishu] invalid JSON"); return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
+  try { body = JSON.parse(raw); } catch { debug("[Feishu] invalid JSON"); return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
 
   let payload = body;
   if (typeof body.encrypt === "string") {
@@ -22,9 +26,9 @@ export async function POST(request: NextRequest) {
   // Feishu URL verification must answer before signature, token, approver and
   // business checks, or the console reports "Challenge code没有返回" when saving.
   if (payload.type === "url_verification" && typeof payload.challenge === "string") {
-    console.log("[Feishu] url verification");
+    debug("[Feishu] url verification");
     const response = NextResponse.json({ challenge: payload.challenge });
-    console.log("[Feishu] challenge returned");
+    debug("[Feishu] challenge returned");
     return response;
   }
 

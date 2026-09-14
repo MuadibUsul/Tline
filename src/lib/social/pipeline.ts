@@ -94,16 +94,37 @@ export async function createEligibleDrafts() {
   return { macro, research };
 }
 
-export async function notifyPendingDrafts(limit = 10) {
-  const drafts = await prisma.socialDraft.findMany({ where: { status: "PENDING_REVIEW", feishuMessageId: null, notifyAttempts: { lt: 3 } }, orderBy: { createdAt: "asc" }, take: limit });
+// Once a draft has failed this many times, record an audit event so a lasting
+// Feishu outage surfaces instead of the card silently never being delivered.
+const NOTIFY_ALERT_THRESHOLD = Math.max(1, Number(process.env.SOCIAL_NOTIFY_ALERT_ATTEMPTS || 5));
+
+/** Exponential backoff (capped at 30 min) between notification attempts. */
+function notifyReadyAt(draft: { notifyAttempts: number; updatedAt: Date }) {
+  if (draft.notifyAttempts <= 0) return 0;
+  return draft.updatedAt.getTime() + Math.min(30 * 60_000, 60_000 * 2 ** Math.min(draft.notifyAttempts - 1, 5));
+}
+
+export async function notifyPendingDrafts(limit = 10, now = new Date()) {
+  // No permanent attempt cap: a transient Feishu outage must not strand a review
+  // card forever. Backoff between attempts keeps a persistently failing draft from
+  // being retried every cycle, and an audit event is written once it looks stuck.
+  const drafts = await prisma.socialDraft.findMany({ where: { status: "PENDING_REVIEW", feishuMessageId: null }, orderBy: { createdAt: "asc" }, take: limit * 5 });
   let sent = 0;
   for (const draft of drafts) {
+    if (sent >= limit) break;
+    if (notifyReadyAt(draft) > now.getTime()) continue;
     try {
       const messageId = await sendDraftCard(draft);
-      await prisma.socialDraft.update({ where: { id: draft.id }, data: { feishuMessageId: messageId, notifiedAt: new Date(), notifyAttempts: { increment: 1 }, notifyError: null } });
+      await prisma.socialDraft.update({ where: { id: draft.id }, data: { feishuMessageId: messageId, notifiedAt: now, notifyAttempts: { increment: 1 }, notifyError: null } });
       sent++;
     } catch (error) {
-      await prisma.socialDraft.update({ where: { id: draft.id }, data: { notifyAttempts: { increment: 1 }, notifyError: String(error).slice(0, 500) } });
+      const attempts = draft.notifyAttempts + 1;
+      const message = String(error).slice(0, 500);
+      await prisma.socialDraft.update({ where: { id: draft.id }, data: { notifyAttempts: { increment: 1 }, notifyError: message } });
+      // Fire exactly once, when the counter first crosses the threshold.
+      if (attempts === NOTIFY_ALERT_THRESHOLD) {
+        await writeAudit({ action: "social.notify.stuck", targetType: "socialDraft", targetId: draft.id, metadata: { attempts, error: message } });
+      }
     }
   }
   return sent;

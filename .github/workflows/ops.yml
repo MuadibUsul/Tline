@@ -4,9 +4,11 @@
 # the only way back into an account is a command on the server — which is exactly what
 # an operator who is locked out may have no way to run. This exposes the two commands
 # that resolve that, using the SSH credentials the deployment already holds, so they can
-# be triggered from a browser.
+# be triggered from a browser. The same door also runs occasional data-maintenance
+# commands that need the production database (e.g. dedupe-regional), which are dry-run
+# unless their apply box is checked.
 #
-# Deliberately narrow: two fixed actions, no free-form command, manual trigger only.
+# Deliberately narrow: a fixed set of actions, no free-form command, manual trigger only.
 name: Operations
 
 on:
@@ -20,10 +22,16 @@ on:
         options:
           - diagnose-mail
           - set-password
+          - dedupe-regional
       email:
-        description: "Account email address"
+        description: "Account email address (for diagnose-mail / set-password)"
         type: string
-        required: true
+        required: false
+      apply:
+        description: "dedupe-regional only: actually merge & delete (unchecked = dry-run)"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: ops-production
@@ -37,6 +45,7 @@ jobs:
     environment: production
     steps:
       - name: Validate the address
+        if: inputs.action == 'diagnose-mail' || inputs.action == 'set-password'
         env:
           EMAIL: ${{ inputs.email }}
         run: |
@@ -54,11 +63,12 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           EMAIL: ${{ inputs.email }}
+          APPLY: ${{ inputs.apply }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: ACTION,EMAIL
+          envs: ACTION,EMAIL,APPLY
           script: |
             set -eu
             cd ~/tline
@@ -76,6 +86,18 @@ jobs:
                 echo "Sign in with it, then change it immediately at /account/password."
                 echo ""
                 $COMPOSE exec -T app npm run user:password -- --email="$EMAIL"
+                ;;
+              dedupe-regional)
+                # Merge reports the same publication reached at more than one URL (e.g. a
+                # State Street report syndicated across regional sites). Dry-run by default;
+                # only writes when the 'apply' box was checked.
+                if [ "$APPLY" = "true" ]; then
+                  echo "Applying: duplicate reports will be merged and deleted."
+                  $COMPOSE exec -T app npm run dedupe:regional -- --apply
+                else
+                  echo "Dry-run — nothing is written. Check the 'apply' box to merge."
+                  $COMPOSE exec -T app npm run dedupe:regional
+                fi
                 ;;
               *)
                 echo "Unknown action: $ACTION"

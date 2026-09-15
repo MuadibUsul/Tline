@@ -107,7 +107,7 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
         </label>
         <label className="field">
           <span>{tr(locale, "Name (optional)", "姓名（可选）")}</span>
-          <input name="name" type="text" placeholder="Jane Trader" />
+          <input name="name" type="text" placeholder={tr(locale, "Jane Trader", "张三")} />
         </label>
         <button type="submit" className="minibtn p" style={{ padding: "9px 14px", justifyContent: "center" }}>{tr(locale, "Continue", "继续")} →</button>
       </form>

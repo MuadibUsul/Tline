@@ -11,6 +11,8 @@ const intervalMs = Math.max(60_000, Number(process.env.INGEST_INTERVAL_MS || 60_
 const processingIntervalMs = Math.max(60_000, Number(process.env.PROCESS_INTERVAL_MS || 60_000));
 const limit = Math.max(1, Number(process.env.INGEST_ARTICLE_LIMIT || 6));
 const processLimit = Math.max(1, Number(process.env.PROCESS_ARTICLE_LIMIT || 50));
+// Translation is the most expensive step, so it drains in smaller batches than the rest.
+const translateLimit = Math.max(1, Number(process.env.TRANSLATION_ARTICLE_LIMIT || 20));
 const retryLimit = Math.max(1, Number(process.env.JOB_RETRY_LIMIT || 3));
 const retryBatch = Math.max(1, Number(process.env.CONTENT_RETRY_BATCH || 5));
 const retryDelayMs = Math.max(10_000, Number(process.env.JOB_RETRY_DELAY_MS || 60_000));
@@ -109,10 +111,11 @@ async function processPending() {
     // AI output poor and asked for it again. Ahead of the routine backlog, not behind it.
     ["run", "retries", "--", `--batch=${retryBatch}`],
     ["run", "reparse", "--", `--limit=${processLimit}`],
-    // Translation is not in this list. The site is English-only, so translating every
-    // article body produced output nothing renders — and it was the largest single
-    // consumer in the pipeline. The command still exists and still works if it is ever
-    // wanted again; nothing runs it on a schedule.
+    // The Chinese site is live again, so translation is back in the pass: without it a new
+    // report reaches /zh with the publisher's English title and body. The command's own
+    // automatic pass only translates reports ingested on or after the cutoff (no backfill),
+    // and its backoff keeps an untranslatable one from being re-billed every minute.
+    ["run", "translate", "--", `--limit=${translateLimit}`],
     ["run", "documents", "--", `--limit=${processLimit}`],
     // Last, so it judges the pass that has just finished. A non-zero exit here means the
     // pipeline is quiet rather than broken, which no other signal reports.

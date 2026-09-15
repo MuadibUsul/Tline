@@ -6,6 +6,7 @@ import { translateAndPersist } from "../src/lib/translation/translate";
 import { generateArticleDocuments } from "../src/lib/documents/pdf";
 import { clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
 import { queueRetry } from "../src/lib/contentRetry";
+import { LOCALE_STRICT_ZH_SINCE } from "../src/lib/publication";
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -24,10 +25,15 @@ async function main() {
   const qualityBelow = Math.max(0, Math.min(1, Number(arg("quality-below") || 0.8)));
   const concurrency = Math.min(8, Math.max(1, Number(arg("concurrency") || process.env.TRANSLATION_CONCURRENCY || 3)));
   // An operator who named ids, or asked for everything, gets what they asked for; backoff
-  // only governs the automatic pass the scheduler runs every minute.
+  // and the new-article cutoff only govern the automatic pass the scheduler runs every minute.
   const operatorSelected = articleIds.length > 0 || flag("all");
   const selection: Prisma.ArticleWhereInput[] = [];
-  if (!operatorSelected) selection.push(dueFilter("translation"));
+  if (!operatorSelected) {
+    selection.push(dueFilter("translation"));
+    // No backfill: the automatic pass only translates reports first ingested on or after the
+    // cutoff. The existing backlog is left untouched (run `translate --all` to backfill by hand).
+    selection.push({ createdAt: { gte: LOCALE_STRICT_ZH_SINCE } });
+  }
   const rows = await prisma.article.findMany({
     where: {
       rawText: { not: null },

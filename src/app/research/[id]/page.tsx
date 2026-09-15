@@ -259,7 +259,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         )}
         {!publisherPdf && locale === "zh-CN" && !usableTranslation && a.rawText && (
           <div style={{ marginBottom: 22 }}>
-            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
+            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>完整英文原文</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
           </div>
         )}

@@ -20,12 +20,14 @@ import { canonicalizeUrl, urlHash } from "../src/lib/hash";
 
 const apply = process.argv.includes("--apply");
 
-// A survivor is chosen to lose the least: keep the most finished, most complete row, and
-// prefer a properly-cased title over a degraded lowercase one ("aug 26 emd monthly
-// commentary") when everything else ties.
-function score(a: { rawTextLen: number; hasAnalysis: boolean; hasZh: boolean; title: string; createdAt: Date }) {
+// A survivor is chosen to lose the least. A report a social draft points at wins outright,
+// so any published post keeps a working link; after that, keep the most finished, most
+// complete row, preferring a properly-cased title over a degraded lowercase one ("aug 26
+// emd monthly commentary") when everything else ties.
+function score(a: { hasDraft: boolean; rawTextLen: number; hasAnalysis: boolean; hasZh: boolean; title: string; createdAt: Date }) {
   const properTitle = /[A-Z]/.test(a.title) && a.title !== a.title.toLowerCase();
   return [
+    a.hasDraft ? 1 : 0,
     a.hasZh ? 1 : 0,
     a.hasAnalysis ? 1 : 0,
     a.rawTextLen,
@@ -63,21 +65,24 @@ async function main() {
         translations: { where: { locale: "zh-CN" }, select: { id: true } },
       },
     });
+    // Which members a social draft points at (sourceId is not a FK, so deleting one would
+    // strand its draft). The keeper prefers a drafted row, so the dropped set carries none.
+    const drafted = new Set((await prisma.socialDraft.findMany({ where: { sourceKind: "research", sourceId: { in: members.map((m) => m.id) } }, select: { sourceId: true } })).map((d) => d.sourceId));
+
+    // More than one drafted duplicate can't be collapsed without abandoning a draft; leave
+    // the whole group for an operator to resolve.
+    if (drafted.size > 1) {
+      console.log(`  SKIP (${drafted.size} duplicates each have a social draft — resolve by hand) · ${canonical}`);
+      continue;
+    }
+
     const scored = members.map((m) => ({
       m,
-      s: score({ rawTextLen: m.rawText?.length ?? 0, hasAnalysis: !!m.analysis, hasZh: m.translations.length > 0, title: m.title, createdAt: m.createdAt }),
+      s: score({ hasDraft: drafted.has(m.id), rawTextLen: m.rawText?.length ?? 0, hasAnalysis: !!m.analysis, hasZh: m.translations.length > 0, title: m.title, createdAt: m.createdAt }),
     }));
     let keep = scored[0];
     for (const c of scored) if (better(c.s, keep.s)) keep = c;
     const drop = members.filter((m) => m.id !== keep.m.id);
-
-    // Never delete a report a social draft points at (sourceId is not a FK): removing it
-    // would strand the draft. Leave the whole group untouched and flag it.
-    const draftBlocked = await prisma.socialDraft.findFirst({ where: { sourceKind: "research", sourceId: { in: drop.map((m) => m.id) } }, select: { id: true } });
-    if (draftBlocked) {
-      console.log(`  SKIP (social draft references a duplicate) · ${canonical}`);
-      continue;
-    }
 
     console.log(`  ${canonical}`);
     console.log(`    keep   ${keep.m.id} · ${keep.m.title}`);

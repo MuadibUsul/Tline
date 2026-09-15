@@ -14,6 +14,13 @@ export function canonicalizeUrl(raw: string): string {
       if (drop.some((re) => re.test(key))) u.searchParams.delete(key);
     }
     let path = u.pathname.replace(/\/amp\/?$/i, "/").replace(/\.amp$/i, "");
+    // State Street (SSGA) publishes the same report on regional sites — /nz/en_gb, /sg/en,
+    // /hk/en, /us/en, each a distinct URL — so a single report was ingested several times.
+    // Drop the leading region/language pair so those copies share one canonical URL and
+    // dedup to a single report. The real regional sourceUrl is still stored for the link.
+    if (/(?:^|\.)ssga\.com$/i.test(u.host)) {
+      path = path.replace(/^\/[a-z]{2}\/[a-z]{2}(?:_[a-z]{2})?(?=\/)/i, "");
+    }
     if (path.length > 1) path = path.replace(/\/+$/, "");
     return `${u.protocol}//${u.host.toLowerCase()}${path}${u.search}`;
   } catch {

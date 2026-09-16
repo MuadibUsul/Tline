@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { canonical } from "@/lib/seo";
+import { noIndex } from "@/lib/seo";
+import { getSessionUser } from "@/lib/auth";
+import ThemesGate from "./ThemesGate";
 import { publicationReadyWhere } from "@/lib/publication";
 import { buildTradingThemes, type ThemeDirection } from "@/lib/tradingThemes";
 import { assetName, formatDate, getLocale, institutionName, localizeChineseContent, tr, localePath } from "@/lib/i18n";
@@ -16,8 +18,10 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
+  // Signed-in only, so it must not sit in an index: a crawler asking for it would be served
+  // the gate, and a search result pointing here would be a dead end for everyone else.
   return {
-    ...canonical("/watchlist", locale),
+    ...noIndex,
     title: tr(locale, "Market Themes", "交易主线"),
     description: tr(locale, "The asset narratives currently supported by institutional research, with market confirmation and source evidence.", "从机构研报中识别当前市场正在运转的资产逻辑，并提供行情确认与原始依据。"),
   };
@@ -44,6 +48,10 @@ function displayAsset(name: string, ticker: string | null, locale: "en" | "zh-CN
 
 export default async function TradingThemesPage() {
   const locale = await getLocale();
+  // Checked before any query runs: an anonymous visitor has no business loading the desk's
+  // data, and the gate is a cheaper answer than rendering it and hiding it.
+  const user = await getSessionUser();
+  if (!user) return <ThemesGate locale={locale} />;
   const zh = locale === "zh-CN";
   const now = new Date();
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 864e5);

@@ -7,6 +7,7 @@ import { createXPost } from "./x";
 import { localePath } from "../i18n";
 import { researchPath } from "../researchPath";
 import { authorizedExpectationIds } from "../macro/expectationUse";
+import { autoApproveDrafts } from "./autoApprove";
 
 const MAX_ATTEMPTS = Math.max(1, Number(process.env.SOCIAL_PUBLISH_ATTEMPTS || 6));
 
@@ -103,11 +104,18 @@ function notifyReadyAt(draft: { notifyAttempts: number; updatedAt: Date }) {
   return draft.updatedAt.getTime() + Math.min(30 * 60_000, 60_000 * 2 ** Math.min(draft.notifyAttempts - 1, 5));
 }
 
-export async function notifyPendingDrafts(limit = 10, now = new Date()) {
+export async function notifyDrafts(limit = 10, now = new Date()) {
   // No permanent attempt cap: a transient Feishu outage must not strand a review
   // card forever. Backoff between attempts keeps a persistently failing draft from
   // being retried every cycle, and an audit event is written once it looks stuck.
-  const drafts = await prisma.socialDraft.findMany({ where: { status: "PENDING_REVIEW", feishuMessageId: null }, orderBy: { createdAt: "asc" }, take: limit * 5 });
+  //
+  // Drafts that approved themselves are notified too: the group still has to see what
+  // went out, and the card is the record of it. The card renders differently, without the
+  // approve/reject buttons, because there is nothing left to decide.
+  const drafts = await prisma.socialDraft.findMany({
+    where: { feishuMessageId: null, OR: [{ status: "PENDING_REVIEW" }, { approvalMode: "auto" }] },
+    orderBy: { createdAt: "asc" }, take: limit * 5,
+  });
   let sent = 0;
   for (const draft of drafts) {
     if (sent >= limit) break;
@@ -129,28 +137,44 @@ export async function notifyPendingDrafts(limit = 10, now = new Date()) {
   return sent;
 }
 
-export async function decideDraft(id: string, version: number, decision: "approve" | "reject", actorId: string) {
+/**
+ * The one approval transition, used by the reviewer and by the automatic path.
+ *
+ * `actorId` is null when nobody decided — the caller passes the mode, so the audit trail
+ * records an automatic approval as exactly that rather than as a review that never
+ * happened.
+ */
+export async function approveDraft(id: string, version: number, actorId: string | null, mode: "manual" | "auto") {
   const draft = await prisma.socialDraft.findUnique({ where: { id } });
   if (!draft || draft.status !== "PENDING_REVIEW" || draft.version !== version) return { ok: false, message: "This draft version is no longer pending." };
+  let snapshot: Array<{ accountId: string; language: string }> = [];
+  try { const parsed = JSON.parse(draft.routeSnapshot); if (Array.isArray(parsed)) snapshot = parsed; } catch {}
+  const accounts = await prisma.socialAccount.findMany({ where: { id: { in: snapshot.map((item) => item.accountId) }, enabled: true } });
+  const routes = snapshot.flatMap((item) => accounts.some((account) => account.id === item.accountId) ? [item] : []);
+  if (!routes.length) return { ok: false, message: "No reviewed publishing target is currently enabled." };
+  const changed = await prisma.$transaction(async (tx) => {
+    const changed = await tx.socialDraft.updateMany({ where: { id, version, status: "PENDING_REVIEW" }, data: { status: "APPROVED", approvalMode: mode, approvedById: actorId, approvedAt: new Date() } });
+    if (!changed.count) return false;
+    await tx.socialDelivery.createMany({ data: routes.map((route) => ({ draftId: id, accountId: route.accountId, language: route.language })) });
+    return true;
+  });
+  if (!changed) return { ok: false, message: "This draft was already decided." };
+  // A Feishu reviewer is identified by their open id, which is not a user row: the audit
+  // entry keeps the reason but drops the actor reference, as it always has.
+  const actorRef = actorId && actorId.startsWith("feishu:") ? null : actorId;
+  await writeAudit({ actorId: actorRef, action: mode === "auto" ? "social.draft.auto_approve" : "social.draft.approve", targetType: "socialDraft", targetId: id, metadata: { version, actor: actorId ?? "system:auto-approve" } });
+  return { ok: true, message: mode === "auto" ? "Approved automatically and queued." : "Approved and queued." };
+}
+
+export async function decideDraft(id: string, version: number, decision: "approve" | "reject", actorId: string) {
   if (decision === "approve") {
-    let snapshot: Array<{ accountId: string; language: string }> = [];
-    try { const parsed = JSON.parse(draft.routeSnapshot); if (Array.isArray(parsed)) snapshot = parsed; } catch {}
-    const accounts = await prisma.socialAccount.findMany({ where: { id: { in: snapshot.map((item) => item.accountId) }, enabled: true } });
-    const routes = snapshot.flatMap((item) => accounts.some((account) => account.id === item.accountId) ? [item] : []);
-    if (!routes.length) return { ok: false, message: "No reviewed publishing target is currently enabled." };
-    const changed = await prisma.$transaction(async (tx) => {
-      const changed = await tx.socialDraft.updateMany({ where: { id, version, status: "PENDING_REVIEW" }, data: { status: "APPROVED", approvedById: actorId, approvedAt: new Date() } });
-      if (!changed.count) return false;
-      await tx.socialDelivery.createMany({ data: routes.map((route) => ({ draftId: id, accountId: route.accountId, language: route.language })) });
-      return true;
-    });
-    if (!changed) return { ok: false, message: "This draft was already decided." };
-  } else {
-    const changed = await prisma.socialDraft.updateMany({ where: { id, version, status: "PENDING_REVIEW" }, data: { status: "REJECTED", rejectedById: actorId, rejectedAt: new Date() } });
-    if (!changed.count) return { ok: false, message: "This draft was already decided." };
+    const result = await approveDraft(id, version, actorId, "manual");
+    return { ok: result.ok, message: result.ok ? "Approved and queued." : result.message };
   }
-  await writeAudit({ actorId: actorId.startsWith("feishu:") ? null : actorId, action: `social.draft.${decision}`, targetType: "socialDraft", targetId: id, metadata: { version, actor: actorId } });
-  return { ok: true, message: decision === "approve" ? "Approved and queued." : "Rejected." };
+  const changed = await prisma.socialDraft.updateMany({ where: { id, version, status: "PENDING_REVIEW" }, data: { status: "REJECTED", rejectedById: actorId, rejectedAt: new Date() } });
+  if (!changed.count) return { ok: false, message: "This draft was already decided." };
+  await writeAudit({ actorId: actorId.startsWith("feishu:") ? null : actorId, action: "social.draft.reject", targetType: "socialDraft", targetId: id, metadata: { version, actor: actorId } });
+  return { ok: true, message: "Rejected." };
 }
 
 export async function refreshDraftCard(id: string) {
@@ -228,7 +252,10 @@ export async function publishApproved(limit = 10) {
 
 export async function runSocialCycle() {
   const created = await createEligibleDrafts();
-  const notified = await notifyPendingDrafts();
+  // Before notifying, so an automatically approved release is announced as published
+  // rather than as waiting for a decision that is never going to be asked for.
+  const auto = await autoApproveDrafts();
+  const notified = await notifyDrafts();
   const published = await publishApproved();
-  return { ...created, notified, published };
+  return { ...created, autoApproved: auto.approved.length, notified, published };
 }

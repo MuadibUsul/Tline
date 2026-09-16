@@ -58,3 +58,26 @@
 核对 dry-run 后去掉该参数保存。发布后补录必须显式 `--historical=true`，且永远不能成为实时 surprise 的发布前快照。样本量、调查方法、原始字段只有来源真实提供时才填写。
 
 行情回填先预演：`npm run macro:market -- --from=2026-01-01 --to=2026-03-31 --limit=2 --dry-run`。确认时间窗和批次后去掉 `--dry-run`；重复执行通过观测唯一键保持幂等，且与在线行情共享持久化预算。
+
+## 市场预期（共识）自动采集
+
+`macro:expectations`（调度器每 30 分钟一次）读取公开经济日历的当周数据文件，把每个发布的市场预期写成 `SURVEY_CONSENSUS` 预期记录。预期只在其对应发布之前写入才有价值：发布后的同一数字是事后回顾，不能进入实时快照。
+
+日历口径与指标口径不同，换算规则写在 `src/lib/macro/consensus/mapping.ts`：原油库存、非农是「变化量」按前值换算成水平值；CPI/PPI/核心 PCE 是环比百分比按上一期指数水平折算；利率与 GDP 直接采用。每条记录的 `rawField` 保留原始字段与推算过程，便于核对。换算结果与前值偏离超过 25% 会被拒绝并记入 `rejected`，那通常意味着单位读错。
+
+授权闸门默认关闭：没有 `forexfactory:calendar` 的 `CONFIRMED` 授权记录时，预期会照常入库但所有读取方（AI 解读、页面、推文、警报）都不会使用它，同步日志会打印 `macro.consensus.license.missing`。确认授权：
+
+- 控制台：Operations 工作流选择 `consensus-license`，勾选 apply
+- 命令行：`npm run licenses` 查看全部授权，`npm run licenses -- confirm --dataset=forexfactory:calendar --provider=... --uses=internal_analysis,public_display,social --evidence-url=<url> --by=<name> --apply` 记录确认
+
+想要收紧公开范围时，去掉 `public_display`（页面不显示共识）或 `social`（推文不带共识列）重新确认即可。
+
+## 五级数据自动发布
+
+`内容发布 → 审核与投递` 顶部的「五级数据自动发布」开关（默认关闭）控制一项例外：重要度为五级的宏观发布在**全部**条件满足时跳过人工批准直接发到账号。条件为：
+
+1. 该发布已捕获数值，且推文会打印的序列（最多两条）都有前值与市场预期；
+2. 双语 AI 解读已生成；
+3. 推文文案通过发布校验（无链接、无违禁表述、长度合规）。
+
+任一条件不满足的候选仍留在待审核，由人工决定；四~五级之外的发布完全不受此开关影响。自动通过的草稿记 `approvalMode=auto`，后台列表标注「自动发布」，审计动作是 `social.draft.auto_approve`（actor 记 `system:auto-approve`），飞书群仍会收到卡片——标题为「已自动发布」、不带批准按钮，因此群里的记录仍然完整。关闭开关后立即恢复人工审核，不影响已发布的记录。

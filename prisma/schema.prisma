@@ -580,6 +580,10 @@ model SocialDraft {
   routeSnapshot   String    @default("[]")
   version         Int       @default(1)
   status          String    @default("PENDING_REVIEW")
+  // How this draft was approved. "auto" marks releases that publish without a human
+  // decision once the operator switches that on, so the card, the console and the audit
+  // trail never present an automatic approval as a reviewed one.
+  approvalMode    String    @default("manual") // manual | auto
   feishuMessageId String?
   notifyAttempts  Int       @default(0)
   notifyError     String?
@@ -595,6 +599,17 @@ model SocialDraft {
 
   @@unique([sourceKind, sourceId])
   @@index([status, createdAt])
+}
+
+/// Operator switches for the publishing pipeline.
+///
+/// One row per switch, so turning one on never quietly changes another, and an absent row
+/// means the documented default — which for every switch here is "off": something that
+/// posts to a public account has to be enabled deliberately.
+model SocialSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model SocialAccount {

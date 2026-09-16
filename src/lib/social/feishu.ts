@@ -11,6 +11,7 @@ type DraftCard = {
   routeSnapshot?: string;
   version: number;
   status: string;
+  approvalMode?: string;
   deliveries?: Array<{ status: string; lastError: string | null; mainPostId: string | null; replyPostId: string | null; account: { label: string; externalUsername: string | null } }>;
 };
 
@@ -75,6 +76,7 @@ function md(value: string) { return value.replace(/([\\`*_[\]<>])/g, "\\$1"); }
 
 export function draftCard(draft: DraftCard) {
   const pending = draft.status === "PENDING_REVIEW";
+  const auto = draft.approvalMode === "auto";
   let targets: Array<{ label: string; language: string; username?: string | null }> = [];
   try { const parsed = JSON.parse(draft.routeSnapshot || "[]"); if (Array.isArray(parsed)) targets = parsed; } catch {}
   const routeText = targets.map((target) => `${target.label}${target.username ? ` (@${target.username})` : ""} · ${target.language}`).join("、") || "未配置";
@@ -83,7 +85,7 @@ export function draftCard(draft: DraftCard) {
     : "";
   return {
     schema: "2.0",
-    header: { template: pending ? "blue" : draft.status === "SUCCEEDED" ? "green" : draft.status === "REJECTED" ? "grey" : "orange", title: { tag: "plain_text", content: `Tlines 发布审核 · ${draft.title}`.slice(0, 100) } },
+    header: { template: pending ? "blue" : draft.status === "SUCCEEDED" ? "green" : draft.status === "REJECTED" ? "grey" : "orange", title: { tag: "plain_text", content: `${auto ? "Tlines 已自动发布" : "Tlines 发布审核"} · ${draft.title}`.slice(0, 100) } },
     body: { elements: [
       { tag: "markdown", content: `**固定发布目标**\n${md(routeText)}\n\n**中文稿（v${draft.version}）**\n${md(draft.textZh)}${results}` },
       ...(pending ? [
@@ -91,7 +93,7 @@ export function draftCard(draft: DraftCard) {
         { tag: "button", type: "danger", text: { tag: "plain_text", content: "拒绝" }, behaviors: [{ type: "callback", value: { action: "reject", draftId: draft.id, version: draft.version } }] },
         { tag: "button", type: "default", text: { tag: "plain_text", content: "网页改稿" }, behaviors: [{ type: "open_url", default_url: `${siteUrl()}/admin/social/${draft.id}` }] },
       ] : []),
-      { tag: "div", text: { tag: "plain_text", content: pending ? "只有指定审核人可批准；旧版本按钮自动失效。" : `状态：${draft.status}`, text_size: "notation" } },
+      { tag: "div", text: { tag: "plain_text", content: auto ? `五级数据在数值与前值、预期齐备且解读已生成后自动发布 · 状态：${draft.status}` : pending ? "只有指定审核人可批准；旧版本按钮自动失效。" : `状态：${draft.status}`, text_size: "notation" } },
     ] },
   };
 }

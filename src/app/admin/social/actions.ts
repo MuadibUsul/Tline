@@ -8,6 +8,7 @@ import { can } from "@/lib/permissions";
 import { validatePost } from "@/lib/social/content";
 import { loadFeishuSettings, mergeFeishuSettings, sendFeishuTestMessage } from "@/lib/social/feishu";
 import { decideDraft, refreshDraftCard, regenerateDraft } from "@/lib/social/pipeline";
+import { setAutoApproveRelease } from "@/lib/social/autoApprove";
 import { encryptSecret, hasSecretKey, secretHint } from "@/lib/secrets";
 
 async function admin() { const user = await getSessionUser(); return user && can(user, "admin.social") ? user : null; }
@@ -174,6 +175,22 @@ export async function retryFeishuNotification(form: FormData) {
   const user = await admin();
   const id = form.get("id")?.toString();
   if (!user || !id) return;
-  await prisma.socialDraft.updateMany({ where: { id, status: "PENDING_REVIEW", feishuMessageId: null }, data: { notifyAttempts: 0, notifyError: null } });
+  await prisma.socialDraft.updateMany({ where: { id, status: { in: ["PENDING_REVIEW", "APPROVED"] }, feishuMessageId: null }, data: { notifyAttempts: 0, notifyError: null } });
   refresh(id);
+}
+
+/**
+ * The five-star auto-approval switch.
+ *
+ * Turning it on means a five-star release whose numbers and read-out are complete will be
+ * posted to the account without waiting for anyone, so the action says which way it is
+ * being set rather than toggling: a form post that arrives twice must not flip it back.
+ */
+export async function setAutoApprove(_state: SocialActionResult, form: FormData): Promise<SocialActionResult> {
+  const user = await admin();
+  if (!user) return { error: "无权执行此操作。" };
+  const enabled = form.get("enabled") === "on";
+  await setAutoApproveRelease(enabled, user.id);
+  refresh();
+  return { ok: enabled ? "已开启：五级数据将自动通过并发布。" : "已关闭：五级数据恢复人工审核。" };
 }

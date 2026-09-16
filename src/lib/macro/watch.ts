@@ -122,6 +122,25 @@ async function latestObservation(seriesSourceId: string, period: Date, before?: 
   });
 }
 
+/**
+ * The same lookup across every source of an indicator. A release value belongs to the
+ * indicator, not to one series, and the source that captures a print may not carry the
+ * previous period's history — the print-time CSV has none on its first use. Fall back to
+ * the most recent vintage among the indicator's other official sources.
+ */
+async function latestIndicatorObservation(canonicalKey: string, period: Date, before: Date, excludeSourceId: string) {
+  const sources = await prisma.macroSeriesSource.findMany({
+    where: { indicator: { canonicalKey }, id: { not: excludeSourceId } },
+    select: { id: true },
+  });
+  if (!sources.length) return null;
+  return prisma.macroObservation.findFirst({
+    where: { seriesSourceId: { in: sources.map((source) => source.id) }, period, fetchedAt: { lt: before } },
+    orderBy: [{ vintageAt: "desc" }, { revisionNo: "desc" }],
+    select: { value: true, fetchedAt: true },
+  });
+}
+
 async function pollIndicator(release: ReleaseRow, canonicalKey: string, targetPeriod: Date, now: Date) {
   const previousPeriod = previousObservationPeriod(targetPeriod, release.releaseFamily);
   const errors: Array<{ provider: string; code: string }> = [];
@@ -132,7 +151,10 @@ async function pollIndicator(release: ReleaseRow, canonicalKey: string, targetPe
     });
     if (!storedSource) throw new Error(`Macro registry is missing ${source.provider}:${source.externalSeriesId}.`);
     const beforeTarget = await latestObservation(storedSource.id, targetPeriod);
-    const previousAtRelease = previousPeriod ? await latestObservation(storedSource.id, previousPeriod, release.scheduledAt) : null;
+    const previousAtRelease = previousPeriod
+      ? (await latestObservation(storedSource.id, previousPeriod, release.scheduledAt))
+        ?? (await latestIndicatorObservation(canonicalKey, previousPeriod, release.scheduledAt, storedSource.id))
+      : null;
     try {
       const rows = await provider(source.provider).fetchSeries({
         externalSeriesId: source.externalSeriesId,

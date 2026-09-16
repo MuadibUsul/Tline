@@ -23,6 +23,7 @@ on:
           - diagnose-mail
           - set-password
           - dedupe-regional
+          - macro-analyze
       email:
         description: "Account email address (for diagnose-mail / set-password)"
         type: string
@@ -98,6 +99,13 @@ jobs:
                   echo "Dry-run — nothing is written. Check the 'apply' box to merge."
                   $COMPOSE exec -T app npm run dedupe:regional
                 fi
+                ;;
+              macro-analyze)
+                # Regenerates missing bilingual read-outs for releases that already
+                # captured values but whose one-shot inline analysis failed at capture.
+                # Respects the retry/backoff bookkeeping, so it is cheap when nothing
+                # is due and safe to click after any release that shows no analysis.
+                $COMPOSE exec -T app npm run macro:forecasts -- --analyze
                 ;;
               *)
                 echo "Unknown action: $ACTION"

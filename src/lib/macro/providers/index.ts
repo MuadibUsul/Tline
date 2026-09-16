@@ -5,6 +5,7 @@ import { createEiaProvider } from "./eia";
 import { createEcbProvider } from "./ecb";
 import { createEurostatProvider } from "./eurostat";
 import { createFredProvider } from "./fred";
+import { createWpsrProvider } from "./wpsr";
 
 export const macroProviderFactories: Record<string, () => MacroProvider> = {
   bls: createBlsProvider,
@@ -13,6 +14,7 @@ export const macroProviderFactories: Record<string, () => MacroProvider> = {
   ecb: createEcbProvider,
   eurostat: createEurostatProvider,
   fred: createFredProvider,
+  "eia-wpsr": createWpsrProvider,
 };
 
 export function createMacroProvider(name: string): MacroProvider {

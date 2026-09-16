@@ -228,6 +228,18 @@
     "enabled": true
   },
   {
+    "canonicalKey": "US_EIA_CRUDE_INVENTORIES",
+    "provider": "eia-wpsr",
+    "externalSeriesId": "wpsr.table1.crude-stocks",
+    "priority": 5,
+    "sourceUrl": "https://ir.eia.gov/wpsr/table1.csv",
+    "metadata": {
+      "frequency": "weekly",
+      "valueScale": 1000
+    },
+    "enabled": true
+  },
+  {
     "canonicalKey": "EA_HICP_HEADLINE",
     "provider": "eurostat",
     "externalSeriesId": "EA_HICP_HEADLINE",

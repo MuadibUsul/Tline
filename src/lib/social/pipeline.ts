@@ -26,7 +26,7 @@ async function createMacroCandidates() {
   const targets = await routeSnapshot("macro");
   if (!targets.length) return 0;
   const releases = await prisma.macroRelease.findMany({
-    where: { status: "RELEASED", importance: 5, analysisAt: { gte: new Date(Date.now() - 24 * 3600_000) }, analysisEn: { not: null }, analysisZh: { not: null }, values: { some: { actualInitial: { not: null } } } },
+    where: { status: "RELEASED", importance: { gte: 4 }, analysisAt: { gte: new Date(Date.now() - 24 * 3600_000) }, analysisEn: { not: null }, analysisZh: { not: null }, values: { some: { actualInitial: { not: null } } } },
     orderBy: { releasedAt: "desc" }, take: 20,
     include: { values: { where: { actualInitial: { not: null } }, include: { indicator: true, consensusExpectation: true }, orderBy: { createdAt: "asc" } } },
   });

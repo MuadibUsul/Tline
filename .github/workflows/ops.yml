@@ -27,6 +27,7 @@ on:
           - consensus-license
           - macro-repair
           - social-diagnose
+          - daily-report
       email:
         description: "Account email address (for diagnose-mail / set-password)"
         type: string
@@ -109,6 +110,18 @@ jobs:
                 # Respects the retry/backoff bookkeeping, so it is cheap when nothing
                 # is due and safe to click after any release that shows no analysis.
                 $COMPOSE exec -T app npm run macro:forecasts -- --analyze
+                ;;
+              daily-report)
+                # The morning report, on demand. Prints it and sends nothing unless apply is
+                # checked, so the content can be reviewed before the 08:00 send or re-sent
+                # after a day the gate already closed.
+                if [ "$APPLY" = "true" ]; then
+                  $COMPOSE exec -T app npm run daily:report
+                else
+                  $COMPOSE exec -T app npm run daily:report -- --print
+                  echo ""
+                  echo "Dry-run — printed above, nothing sent. Check the 'apply' box to send it."
+                fi
                 ;;
               social-diagnose)
                 # Read-only account of why a review card did or did not reach the group:

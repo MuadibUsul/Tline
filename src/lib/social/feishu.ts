@@ -124,6 +124,37 @@ export async function updateDraftCard(messageId: string, draft: DraftCard) {
   await feishu(`/im/v1/messages/${encodeURIComponent(messageId)}`, "PATCH", { content: JSON.stringify(draftCard(draft)) });
 }
 
+/**
+ * A plain message to the configured receiver.
+ *
+ * Everything the desk sends out — review cards, operational notices, the daily report —
+ * goes to the same place, so the receiver guard lives in one helper rather than in each
+ * caller: a missing receive id is a configuration state, and it must fail loudly instead of
+ * silently sending nowhere.
+ */
+export async function sendFeishuText(text: string) {
+  const settings = await loadFeishuSettings();
+  requireMessageReceiver(settings);
+  return feishu(`/im/v1/messages?receive_id_type=${encodeURIComponent(settings.receiveIdType || "open_id")}`, "POST", {
+    receive_id: settings.receiveId,
+    msg_type: "text",
+    content: JSON.stringify({ text }),
+  }, settings);
+}
+
+/** An interactive card, built by the caller. Returns the message id so it can be updated. */
+export async function sendFeishuCard(card: unknown): Promise<string> {
+  const settings = await loadFeishuSettings();
+  requireMessageReceiver(settings);
+  const result = await feishu(`/im/v1/messages?receive_id_type=${encodeURIComponent(settings.receiveIdType || "open_id")}`, "POST", {
+    receive_id: settings.receiveId,
+    msg_type: "interactive",
+    content: JSON.stringify(card),
+  }, settings);
+  if (!result.data?.message_id) throw new Error("Feishu did not return a message id.");
+  return result.data.message_id;
+}
+
 export async function sendFeishuTestMessage() {
   const settings = await loadFeishuSettings();
   requireMessageReceiver(settings);

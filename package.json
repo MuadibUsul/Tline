@@ -24,6 +24,7 @@
     "macro:scheduler": "node scripts/macro-scheduler.mjs",
     "social:scheduler": "tsx scripts/social-scheduler.ts",
     "social:diagnose": "tsx scripts/social-diagnose.ts",
+    "daily:report": "tsx scripts/daily-report.ts",
     "macro:backfill": "tsx scripts/macro-backfill.ts",
     "macro:forecasts": "tsx prisma/macro-forecasts.ts",
     "macro:expectations": "tsx scripts/macro-expectations-sync.ts",

@@ -189,5 +189,22 @@ async function analyticsLoop() {
   }
 }
 
-await Promise.all([ingestLoop(), processingLoop(), analyticsLoop()]);
+/**
+ * The morning report.
+ *
+ * Ticks every ten minutes and only acts inside the 08:00 hour in Beijing; the script itself
+ * decides whether today's report has already gone out, so a restart mid-morning neither
+ * duplicates nor skips it.
+ */
+const REPORT_ZONE = "Asia/Shanghai";
+async function dailyReportLoop() {
+  const zoneHour = () => Number(new Intl.DateTimeFormat("en-GB", { timeZone: REPORT_ZONE, hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+  for (;;) {
+    if (stopping) return;
+    if (zoneHour() === Number(process.env.DAILY_REPORT_HOUR || 8)) await runCommand(["run", "daily:report"]);
+    await wait(10 * 60_000);
+  }
+}
+
+await Promise.all([ingestLoop(), processingLoop(), analyticsLoop(), dailyReportLoop()]);
 await stopHeartbeat();

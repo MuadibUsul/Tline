@@ -8,6 +8,7 @@ import { prisma } from "./db";
 import { writeAudit } from "./audit";
 import { verifyPassword } from "./password";
 import { rateLimit } from "./rateLimit";
+import { notifyNewRegistration } from "./social/registrationNotice";
 
 export type AuthProviderId = "azure-ad" | "email" | "google";
 
@@ -181,6 +182,15 @@ export const authOptions: NextAuthOptions = {
     },
   },
   events: {
+    /**
+     * Fired once when the adapter creates the account — the registration moment, and the
+     * only one: an existing reader signing in never reaches it, so the notice cannot repeat.
+     * The send is best-effort and never awaited into the sign-in path.
+     */
+    async createUser({ user }) {
+      await writeAudit({ actorId: user.id, action: "auth.user_created", metadata: { email: user.email ?? null, provider: selectedProvider() } });
+      if (user.email) void notifyNewRegistration({ email: user.email, name: user.name ?? null }, selectedProvider() ?? "oauth");
+    },
     async signIn({ user }) {
       await writeAudit({ actorId: user.id, action: "auth.oauth_sign_in", metadata: { provider: selectedProvider() } });
     },

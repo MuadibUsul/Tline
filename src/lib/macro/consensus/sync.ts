@@ -54,13 +54,6 @@ async function previousLevel(canonicalKey: string, period: Date, before: Date) {
   return earlier ? { value: Number(earlier.value.toString()), period: earlier.period, provider: earlier.seriesSource.provider } : null;
 }
 
-interface Recorded {
-  releaseId: string;
-  indicatorId: string;
-  value: string;
-  source: string;
-}
-
 /** Re-recording the same forecast every half hour would append a revision each time. */
 async function alreadyRecorded(releaseId: string, indicatorId: string, value: string) {
   const latest = await prisma.macroExpectation.findFirst({

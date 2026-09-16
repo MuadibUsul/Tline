@@ -25,6 +25,8 @@ on:
           - dedupe-regional
           - macro-analyze
           - consensus-license
+          - macro-repair
+          - social-diagnose
       email:
         description: "Account email address (for diagnose-mail / set-password)"
         type: string
@@ -107,6 +109,26 @@ jobs:
                 # Respects the retry/backoff bookkeeping, so it is cheap when nothing
                 # is due and safe to click after any release that shows no analysis.
                 $COMPOSE exec -T app npm run macro:forecasts -- --analyze
+                ;;
+              social-diagnose)
+                # Read-only account of why a review card did or did not reach the group:
+                # Feishu configuration completeness, accounts, routes, the last drafts with
+                # their notification state, and the social audit trail. Prints no secrets.
+                $COMPOSE exec -T app npm run social:diagnose
+                ;;
+              macro-repair)
+                # Fills in a previous value the capture could not resolve — an event release
+                # captured before this rule existed, or a source that carried no history —
+                # and clears the read-outs written without it, so the analysis pass that
+                # follows regenerates them. Listing first: the count is what says whether
+                # anything is missing at all.
+                $COMPOSE exec -T app npm run macro:repair
+                if [ "$APPLY" = "true" ]; then
+                  $COMPOSE exec -T app npm run macro:repair -- --apply
+                  $COMPOSE exec -T app npm run macro:forecasts -- --analyze
+                else
+                  echo "Dry-run — nothing written. Check the 'apply' box to fill these in."
+                fi
                 ;;
               consensus-license)
                 # The consensus feed is an external publisher's calendar data, so the

@@ -141,6 +141,32 @@ async function latestIndicatorObservation(canonicalKey: string, period: Date, be
   });
 }
 
+/** The most recent observation strictly before a period, as it stood before a moment. */
+async function priorObservation(seriesSourceIds: string[], period: Date, before: Date) {
+  return prisma.macroObservation.findFirst({
+    where: { seriesSourceId: { in: seriesSourceIds }, period: { lt: period }, fetchedAt: { lt: before } },
+    orderBy: [{ period: "desc" }, { vintageAt: "desc" }, { revisionNo: "desc" }],
+    select: { value: true, fetchedAt: true, period: true, seriesSource: { select: { provider: true } } },
+  });
+}
+
+/**
+ * What "previous" means for a release with no preceding period.
+ *
+ * A policy decision is an event, not a period: there is no last month to compare against,
+ * but there is a rate in force before the announcement, and that is what the page, the post
+ * and the read-out all mean by "previous". Reading it from the source that captured the
+ * decision finds nothing — the statement carries no history — so the indicator's other
+ * official sources supply it.
+ */
+async function previousForEventRelease(canonicalKey: string, targetPeriod: Date, scheduledAt: Date, captureSourceId: string) {
+  const own = await priorObservation([captureSourceId], targetPeriod, scheduledAt);
+  if (own) return own;
+  const others = await prisma.macroSeriesSource.findMany({ where: { indicator: { canonicalKey }, id: { not: captureSourceId } }, select: { id: true } });
+  if (!others.length) return null;
+  return priorObservation(others.map((source) => source.id), targetPeriod, scheduledAt);
+}
+
 async function pollIndicator(release: ReleaseRow, canonicalKey: string, targetPeriod: Date, now: Date) {
   const previousPeriod = previousObservationPeriod(targetPeriod, release.releaseFamily);
   const errors: Array<{ provider: string; code: string }> = [];
@@ -154,7 +180,7 @@ async function pollIndicator(release: ReleaseRow, canonicalKey: string, targetPe
     const previousAtRelease = previousPeriod
       ? (await latestObservation(storedSource.id, previousPeriod, release.scheduledAt))
         ?? (await latestIndicatorObservation(canonicalKey, previousPeriod, release.scheduledAt, storedSource.id))
-      : null;
+      : await previousForEventRelease(canonicalKey, targetPeriod, release.scheduledAt, storedSource.id);
     try {
       const rows = await provider(source.provider).fetchSeries({
         externalSeriesId: source.externalSeriesId,
@@ -285,4 +311,56 @@ export async function watchMacroReleases(now = new Date(), releaseId?: string) {
     waiting: results.filter((result) => result.status === "waiting").length,
     expired: results.filter((result) => result.status === "expired").length,
   };
+}
+
+/**
+ * Fill in a previous value the capture could not resolve.
+ *
+ * Two ways a release ends up without one: it was captured before the rule for its release
+ * type existed (event releases had no previous at all, so every policy decision published
+ * "previous n/a"), or the source that captured it carries no history and no other source
+ * had the earlier vintage yet. The value is derived exactly as a fresh capture would derive
+ * it, from vintages that existed before the release, so the audit's no-lookahead check still
+ * holds.
+ *
+ * A repaired value invalidates the read-out: it was written without the comparison, and
+ * leaving it in place would keep the weaker text forever. The next analysis pass regenerates
+ * it; nothing else about the release changes.
+ */
+export async function repairReleasePreviousValues(now = new Date(), days = 7) {
+  const releases = await prisma.macroRelease.findMany({
+    where: { status: "RELEASED", releasedAt: { gte: new Date(now.getTime() - days * 86_400_000) }, values: { some: { previousAtRelease: null } } },
+    select: {
+      id: true, releaseKey: true, releaseFamily: true, scheduledAt: true, sourceTimezone: true, externalReleaseId: true,
+      values: { where: { previousAtRelease: null }, select: { id: true, observationPeriod: true, indicator: { select: { canonicalKey: true } } } },
+    },
+  });
+  const repaired: Array<{ releaseId: string; releaseKey: string; indicator: string; previous: string }> = [];
+  const releasesWithRepair = new Set<string>();
+  for (const release of releases) {
+    const targetPeriod = releaseTargetPeriod(release.releaseFamily, release.scheduledAt, release.sourceTimezone, release.externalReleaseId);
+    for (const value of release.values) {
+      // The source that captured this print is the one holding the initial observation for
+      // the period; the previous value is read from the same place the watcher would read it.
+      const initial = await prisma.macroObservation.findFirst({
+        where: { period: value.observationPeriod, isInitial: true, seriesSource: { indicator: { canonicalKey: value.indicator.canonicalKey } } },
+        orderBy: { vintageAt: "desc" },
+        select: { seriesSourceId: true },
+      });
+      if (!initial) continue;
+      const previousPeriod = previousObservationPeriod(targetPeriod, release.releaseFamily);
+      const previous = previousPeriod
+        ? (await latestObservation(initial.seriesSourceId, previousPeriod, release.scheduledAt))
+          ?? (await latestIndicatorObservation(value.indicator.canonicalKey, previousPeriod, release.scheduledAt, initial.seriesSourceId))
+        : await previousForEventRelease(value.indicator.canonicalKey, targetPeriod, release.scheduledAt, initial.seriesSourceId);
+      if (!previous) continue;
+      await prisma.macroReleaseValue.update({ where: { id: value.id }, data: { previousAtRelease: new Prisma.Decimal(previous.value) } });
+      releasesWithRepair.add(release.id);
+      repaired.push({ releaseId: release.id, releaseKey: release.releaseKey ?? release.id, indicator: value.indicator.canonicalKey, previous: previous.value.toString() });
+    }
+  }
+  for (const releaseId of releasesWithRepair) {
+    await prisma.macroRelease.update({ where: { id: releaseId }, data: { analysisEn: null, analysisZh: null, analysisAt: null } });
+  }
+  return { releases: releases.length, repaired, staleReadOuts: releasesWithRepair.size };
 }

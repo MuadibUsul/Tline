@@ -24,6 +24,7 @@ on:
           - set-password
           - dedupe-regional
           - macro-analyze
+          - consensus-license
       email:
         description: "Account email address (for diagnose-mail / set-password)"
         type: string
@@ -106,6 +107,24 @@ jobs:
                 # Respects the retry/backoff bookkeeping, so it is cheap when nothing
                 # is due and safe to click after any release that shows no analysis.
                 $COMPOSE exec -T app npm run macro:forecasts -- --analyze
+                ;;
+              consensus-license)
+                # The consensus feed is an external publisher's calendar data, so the
+                # licence gate stays closed until an operator records the decision here.
+                # Printing first makes the current state part of the transcript; the
+                # uses are listed in the workflow so a change to them is reviewable.
+                $COMPOSE exec -T app npm run licenses
+                if [ "$APPLY" = "true" ]; then
+                  echo "Recording the confirmation for the consensus calendar feed."
+                  $COMPOSE exec -T app npm run licenses -- confirm \
+                    --dataset=forexfactory:calendar \
+                    --provider="ForexFactory calendar feed" \
+                    --uses=internal_analysis,public_display,social \
+                    --evidence-url=https://nfs.faireconomy.media/ff_calendar_thisweek.json \
+                    --by=operator --apply
+                else
+                  echo "Dry-run — nothing recorded. Check the 'apply' box to confirm the licence."
+                fi
                 ;;
               *)
                 echo "Unknown action: $ACTION"

@@ -10,6 +10,9 @@ const retryLimit = positive("MACRO_JOB_RETRY_LIMIT", 3, 1);
 const retryDelayMs = positive("MACRO_JOB_RETRY_DELAY_MS", 30_000, 1_000);
 const tasks = [
   task("calendar", "MACRO_CALENDAR_INTERVAL_MS", 6 * 60 * 60_000, ["run", "macro:calendar"]),
+  // Half-hourly, so a consensus is captured well before the print it describes and well
+  // inside the calendar feed's two-downloads-per-five-minutes request.
+  task("expectations", "MACRO_EXPECTATION_SYNC_INTERVAL_MS", 30 * 60_000, ["run", "macro:expectations"]),
   task("provider-sync", "MACRO_PROVIDER_SYNC_INTERVAL_MS", 60 * 60_000, ["run", "macro:sync", "--", "--all"], "observations"),
   // The watcher also generates the bilingual read-out inline, once, the moment a print is
   // captured (see watchRelease) — so a fresh release is analysed within seconds of landing,

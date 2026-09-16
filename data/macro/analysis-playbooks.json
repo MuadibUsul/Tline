@@ -1,0 +1,145 @@
+[
+  {
+    "family": "BLS_CPI",
+    "topic": "通胀动能与政策路径",
+    "primary": "US_CPI_HEADLINE",
+    "metrics": ["mom", "annualized3m", "yoy", "changePercentile", "meanDeviation12m"],
+    "compare": ["US_CPI_CORE", "US_CORE_PCE_PRICE", "US_WTI_SPOT"],
+    "market": ["EURUSD", "USDJPY", "XAUUSD"],
+    "questions": [
+      "整体与核心的背离扩大了还是收敛了，主要来自哪一侧",
+      "三个月折年率相对 2% 目标的位置，以及相对过去一年的变化",
+      "本次意外在历史分布中的位置：是噪音还是趋势改变",
+      "对政策路径的含义：市场是否已定价、下一步看什么数据"
+    ],
+    "notes": "月度环比是市场的交易口径；同比是叙事口径。两者不一致时以环比与三个月折年为准。"
+  },
+  {
+    "family": "BLS_EMPLOYMENT_SITUATION",
+    "topic": "劳动力市场松紧与政策空间",
+    "primary": "US_NFP",
+    "metrics": ["change", "average3m", "changePercentile", "revision", "unemploymentRate"],
+    "compare": ["US_UNEMPLOYMENT_RATE", "US_JOLTS_OPENINGS", "US_CPI_HEADLINE"],
+    "market": ["EURUSD", "USDJPY", "XAUUSD"],
+    "questions": [
+      "三个月均值相对前值的动能方向，单月是否被噪音主导",
+      "新增就业与失业率的组合是否自洽（家庭调查与机构调查背离）",
+      "前几个月是否被修订，修订的方向说明什么",
+      "对降息/加息路径的含义与市场定价的差距"
+    ],
+    "notes": "单月数据噪音大，必须有三个月均值与前值修订；失业率与新增就业背离时要明确指出。"
+  },
+  {
+    "family": "BLS_PPI",
+    "topic": "上游价格压力与利润率",
+    "primary": "US_PPI",
+    "metrics": ["mom", "annualized3m", "yoy", "changePercentile"],
+    "compare": ["US_CPI_HEADLINE", "US_CORE_PCE_PRICE"],
+    "market": ["EURUSD", "XAUUSD"],
+    "questions": [
+      "上游价格压力是否在向消费端传导（与 CPI 的相对位置）",
+      "三个月折年率的趋势方向",
+      "对通胀预期与政策路径的边际含义"
+    ],
+    "notes": "PPI 的价值在于领先性：重点是对 CPI 的传导方向，而不是绝对水平。"
+  },
+  {
+    "family": "BLS_JOLTS",
+    "topic": "劳动力需求与工资压力",
+    "primary": "US_JOLTS_OPENINGS",
+    "metrics": ["level", "change", "changePercentile", "meanDeviation12m"],
+    "compare": ["US_UNEMPLOYMENT_RATE", "US_NFP"],
+    "market": ["EURUSD", "XAUUSD"],
+    "questions": [
+      "职位空缺相对疫情前正常区间的水平",
+      "空缺与失业人数的比例方向（劳动力市场松紧）",
+      "对工资增速与核心通胀的领先含义"
+    ],
+    "notes": "JOLTS 滞后一个月，市场看重方向而非点位；务必标注数据所对应的月份。"
+  },
+  {
+    "family": "BEA_PERSONAL_INCOME_OUTLAYS",
+    "topic": "消费动能与核心通胀（美联储目标口径）",
+    "primary": "US_CORE_PCE_PRICE",
+    "metrics": ["mom", "annualized3m", "yoy", "changePercentile"],
+    "compare": ["US_CPI_HEADLINE", "US_PERSONAL_INCOME", "US_PERSONAL_SPENDING"],
+    "market": ["EURUSD", "USDJPY", "XAUUSD"],
+    "questions": [
+      "核心 PCE 三个月折年率相对 2% 的位置（美联储的实际目标口径）",
+      "实际消费动能与收入增速是否匹配，储蓄率隐含的可持续性",
+      "与 CPI 的分歧说明什么（口径差异：住房权重等）"
+    ],
+    "notes": "核心 PCE 是美联储目标口径，权重高于 CPI；表述时明确这是决策依据。"
+  },
+  {
+    "family": "BEA_GDP",
+    "topic": "增长动能与产出缺口",
+    "primary": "US_GDP",
+    "metrics": ["saar", "changePercentile", "meanDeviation12m"],
+    "compare": ["US_UNEMPLOYMENT_RATE", "US_CPI_HEADLINE", "US_PERSONAL_SPENDING"],
+    "market": ["EURUSD", "USDJPY", "XAUUSD"],
+    "questions": [
+      "增长与潜在增速的相对位置（是否过热）",
+      "增长的构成：消费、投资、净出口、库存，哪一项在驱动",
+      "这是第几次估计（初值/修正/终值），修订方向说明什么"
+    ],
+    "notes": "必须说明这是第几次估计；修正值与初值的差异本身就是信息。"
+  },
+  {
+    "family": "EIA_PETROLEUM_STATUS",
+    "topic": "原油库存与供需平衡",
+    "primary": "US_EIA_CRUDE_INVENTORIES",
+    "metrics": ["level", "change", "changeVsSeason", "meanDeviation5y", "changePercentile"],
+    "compare": ["US_WTI_SPOT"],
+    "market": ["XAUUSD", "USDCAD", "AUDUSD"],
+    "questions": [
+      "库存相对五年同期均值的偏离，以及偏离是在扩大还是收敛",
+      "本次变化相对季节性常态的强度（炼厂开工、进出口的季节性）",
+      "对原油价格与相关货币的含义"
+    ],
+    "notes": "库存必须放在季节性与五年均值背景下解读；单周变化的噪音很大。"
+  },
+  {
+    "family": "FOMC_DECISION",
+    "topic": "政策立场、点阵图与市场定价",
+    "primary": "US_FED_FUNDS_TARGET_UPPER",
+    "metrics": ["changeBps", "levelVsYearAgo", "statementDelta", "projectionMedian"],
+    "compare": ["US_CPI_HEADLINE", "US_UNEMPLOYMENT_RATE", "US_NFP"],
+    "market": ["EURUSD", "USDJPY", "XAUUSD"],
+    "questions": [
+      "本次决定与市场定价的差异（是完全定价还是意外）",
+      "声明措辞相对上一份的实质变化：通胀/就业评估、前瞻指引、资产负债表",
+      "点阵图中位利率路径相对上一季度的变化，与市场定价的差距",
+      "投票分歧的程度与方向说明了什么"
+    ],
+    "notes": "完全定价的会议，价格反应来自措辞与点阵图的边际变化，而非利率本身；必须给出市场定价与点阵图的对比。"
+  },
+  {
+    "family": "ECB_DECISION",
+    "topic": "政策立场与欧元区通胀路径",
+    "primary": "ECB_DEPOSIT_RATE",
+    "metrics": ["changeBps", "levelVsYearAgo", "statementDelta"],
+    "compare": ["EA_HICP_HEADLINE", "EA_HICP_CORE", "EA_UNEMPLOYMENT"],
+    "market": ["EURUSD", "XAUUSD"],
+    "questions": [
+      "本次决定与市场定价的差异",
+      "声明措辞相对上一份的变化",
+      "对欧元区通胀与增长评估的边际调整"
+    ],
+    "notes": "欧元区政策以存款机制利率为基准；重点在措辞与前瞻指引。"
+  },
+  {
+    "family": "EUROSTAT_HICP",
+    "topic": "欧元区通胀动能",
+    "primary": "EA_HICP_HEADLINE",
+    "metrics": ["mom", "annualized3m", "yoy", "changePercentile"],
+    "compare": ["EA_HICP_CORE", "EA_UNEMPLOYMENT"],
+    "market": ["EURUSD", "XAUUSD"],
+    "questions": [
+      "整体与核心的背离，能源与食品的贡献",
+      "三个月折年率相对 2% 目标的位置",
+      "对欧洲央行路径的含义"
+    ],
+    "notes": "首次估计与终值差异可能较大；标题须标注是初值还是终值。"
+  }
+]

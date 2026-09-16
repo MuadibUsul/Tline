@@ -1,16 +1,10 @@
 import { prisma } from "../db";
 import { resolveLLMProvider } from "../llm/config";
-import { completeJSON, type LLMProvider } from "../llm/provider";
-import { getReleaseConsensus } from "./releaseConsensus";
-
-const SYSTEM = `You are a macro strategist writing a concise professional read-out for institutional readers.
-Write 300–400 words in BOTH English and Simplified Chinese. Keep these evidence classes separate:
-1. surveyConsensus is the only market consensus and the only basis for beat/miss/in-line language;
-2. modelForecast is a platform model output, never market consensus;
-3. institutionResearchForecasts are forecasts mined from research, never market consensus;
-4. previous is a historical comparison, not an expectation.
-If surveyConsensus is null, do not claim that the release beat, missed, exceeded, disappointed, or matched expectations/consensus. State plainly that no verified pre-release survey consensus is available. Discuss the change from previous and separately compare any model or institution forecasts. Be factual and restrained. Do not give investment advice or price targets.
-Return ONLY JSON: {"en":string,"zh":string}.`;
+import type { LLMProvider } from "../llm/provider";
+import { buildAnalysisContext } from "./analysis/context";
+import { composeReleaseAnalysis, formatAnalysis } from "./analysis/compose";
+import { toNumber, type FactInput, type FactSeriesPoint } from "./analysis/facts";
+import { getPlaybook } from "./analysis/playbooks";
 
 const UNSUPPORTED_EXPECTATION_CLAIM = /\b(?:beat|miss(?:ed)?|above|below|exceed(?:ed)?|disappoint(?:ed)?|in[- ]line with|matched?)\s+(?:the\s+)?(?:market\s+)?(?:consensus|expectations?)\b|(?:超出|超过|高于|低于|不及|逊于|符合|持平于)(?:市场)?预期|超预期|不及预期/iu;
 
@@ -18,7 +12,51 @@ export function analysisContainsUnsupportedExpectationClaim(text: string, hasSur
   return !hasSurveyConsensus && UNSUPPORTED_EXPECTATION_CLAIM.test(text);
 }
 
-/** Generate and store the AI read-out for a released macro print. Idempotent-ish: overwrites. */
+/** Enough periods to place a change in its own distribution without loading the series. */
+const HISTORY_PERIODS = 36;
+
+/**
+ * The series a read-out is read against, up to but excluding the period under review.
+ *
+ * One source per indicator — the enabled one with the most history — so a print captured
+ * from a release-time file and its API twin do not appear as two different histories.
+ */
+async function indicatorHistory(canonicalKey: string, before: Date): Promise<FactSeriesPoint[]> {
+  const sources = await prisma.macroSeriesSource.findMany({
+    where: { enabled: true, indicator: { canonicalKey } },
+    select: { id: true, priority: true },
+    orderBy: { priority: "asc" },
+  });
+  for (const source of sources) {
+    const rows = await prisma.macroObservation.findMany({
+      where: { seriesSourceId: source.id, period: { lt: before } },
+      orderBy: { period: "desc" },
+      take: HISTORY_PERIODS,
+      select: { period: true, value: true },
+    });
+    if (rows.length >= 6) return rows.map((row) => ({ period: row.period, value: Number(row.value.toString()) })).reverse();
+  }
+  return [];
+}
+
+/** The latest vintage for a period, to tell an untouched print from a revised one. */
+async function latestForPeriod(canonicalKey: string, period: Date) {
+  const row = await prisma.macroObservation.findFirst({
+    where: { period, seriesSource: { enabled: true, indicator: { canonicalKey } } },
+    orderBy: [{ vintageAt: "desc" }, { revisionNo: "desc" }],
+    select: { value: true },
+  });
+  return row ? Number(row.value.toString()) : null;
+}
+
+/**
+ * Generate and store the read-out for a released macro print.
+ *
+ * The work is split so that only the writing needs a model: the figures are computed from
+ * stored history, the context is retrieved, and the draft is checked against those figures
+ * before it is stored. A draft that cannot be made acceptable falls back to the arithmetic
+ * itself rather than leaving the release without a read-out.
+ */
 export async function generateReleaseAnalysis(
   releaseId: string,
   injected?: LLMProvider | null,
@@ -30,49 +68,53 @@ export async function generateReleaseAnalysis(
     include: { values: { include: { indicator: true, modelExpectation: true } } },
   });
   if (!release) return false;
-  const value = release.values[0];
-  const consensus = await getReleaseConsensus(release);
-  const facts = {
-    indicator: value?.indicator ? value.indicator.nameEn : release.titleEn,
-    unit: value?.indicator?.unit ?? consensus?.unit ?? "",
-    referencePeriod: value?.observationPeriod?.toISOString().slice(0, 10) ?? null,
-    actual: value?.actualInitial != null ? Number(value.actualInitial.toString()) : null,
-    previous: value ? Number((value.revisedPreviousAtRelease ?? value.previousAtRelease)?.toString() ?? "") || null : null,
-    surveyConsensus: value?.consensusAtRelease != null ? Number(value.consensusAtRelease.toString()) : null,
-    surveyConsensusSource: value?.consensusProvider ?? null,
-    surveyConsensusAsOf: value?.consensusAsOf?.toISOString() ?? null,
-    modelForecast: value?.modelExpectation ? {
-      value: Number(value.modelExpectation.value.toString()),
-      source: value.modelExpectation.source,
-      capturedAt: value.modelExpectation.capturedAt.toISOString(),
-    } : null,
-    institutionResearchForecasts: consensus ? {
-      median: consensus.median,
-      range: { min: consensus.min, max: consensus.max },
-      count: consensus.count,
-      contributors: consensus.contributors.slice(0, 12),
-    } : null,
-  };
-  const { value: out } = await completeJSON<{ en?: string; zh?: string }>(provider, {
-    system: SYSTEM,
-    user: JSON.stringify(facts),
-    // 300-400 words of English plus the same again in Chinese does not fit in 2000 tokens.
-    // The completion was being cut mid-string, which reads as invalid JSON, so completeJSON
-    // burned its repair retry and threw — every call failed and nothing was ever stored.
-    // Output is billed on what is generated, not on the ceiling, so a higher cap is free.
-    maxTokens: 4000,
-  });
-  // Both locales are public. Treat a partial completion as retryable instead of
-  // leaving one locale stuck on "Analysis generating…" forever.
-  if (!out.en?.trim() || !out.zh?.trim()) return false;
-  const hasSurveyConsensus = value?.consensusAtRelease != null;
-  if (analysisContainsUnsupportedExpectationClaim(`${out.en}\n${out.zh}`, hasSurveyConsensus)) {
-    throw new Error("Model claimed an expectations surprise without a verified survey-consensus snapshot.");
+  const playbook = getPlaybook(release.releaseFamily, release.titleEn);
+  const releasedAt = release.releasedAt ?? new Date();
+
+  const values = await Promise.all(release.values.map(async (value) => {
+    const period = value.observationPeriod;
+    return {
+      canonicalKey: value.indicator.canonicalKey,
+      nameEn: value.indicator.nameEn,
+      nameZh: value.indicator.nameZh,
+      unit: value.indicator.unit,
+      actual: toNumber(value.actualInitial)!,
+      consensus: toNumber(value.consensusAtRelease),
+      previous: toNumber(value.revisedPreviousAtRelease) ?? toNumber(value.previousAtRelease),
+      initialActual: toNumber(value.actualInitial),
+      latestActual: await latestForPeriod(value.indicator.canonicalKey, period),
+    };
+  }));
+  if (!values.length || values.some((value) => value.actual === null)) return false;
+
+  const history: Record<string, FactSeriesPoint[]> = {};
+  for (const value of values) {
+    history[value.canonicalKey] = await indicatorHistory(value.canonicalKey, release.scheduledAt);
   }
+
+  const factInput: FactInput = {
+    family: release.releaseFamily,
+    title: release.titleEn,
+    now: releasedAt,
+    playbook,
+    values: values as FactInput["values"],
+    history,
+  };
+  const context = await buildAnalysisContext(release, playbook, releasedAt);
+  const composed = await composeReleaseAnalysis({ provider, factInput, context, playbook });
   await prisma.macroRelease.update({
     where: { id: releaseId },
-    data: { analysisEn: out.en?.trim() ?? null, analysisZh: out.zh?.trim() ?? null, analysisAt: new Date() },
+    data: {
+      analysisEn: formatAnalysis(composed.en).slice(0, 8000),
+      analysisZh: formatAnalysis(composed.zh).slice(0, 8000),
+      analysisAt: new Date(),
+    },
   });
+  if (composed.fallback) {
+    console.error(JSON.stringify({ event: "macro.release.analysis.fallback", releaseId, violations: composed.violations.slice(0, 6) }));
+  } else if (composed.violations.length) {
+    console.warn(JSON.stringify({ event: "macro.release.analysis.partial", releaseId, violations: composed.violations.slice(0, 6) }));
+  }
   return true;
 }
 
@@ -184,7 +226,7 @@ export async function generatePendingReleaseAnalyses(limit = 5, now = new Date()
         generated++;
         await recordAttempt(release.id, attempts, null);
       } else {
-        await recordAttempt(release.id, attempts, "Model returned an incomplete bilingual read-out.");
+        await recordAttempt(release.id, attempts, "The read-out could not be generated from the captured values.");
       }
     } catch (error) {
       // Keep official-data polling alive; backoff decides when this item is selected again.

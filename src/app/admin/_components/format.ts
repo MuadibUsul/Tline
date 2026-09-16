@@ -41,7 +41,7 @@ export function tone(status: string | null | undefined): string {
 
 const ZH_LABELS: Record<string, string> = {
   member: "普通用户", reviewer: "审核员", admin: "管理员",
-  free: "免费版", professional: "专业版", enterprise: "企业版",
+  free: "免费版", professional: "专业版", enterprise: "企业版", founding: "创始会员",
   running: "运行中", queued: "已排队", succeeded: "成功", failed: "失败", stopped: "已停止", stale: "心跳异常",
   ok: "正常", active: "启用", paused: "已暂停", new: "未运行", circuit_open: "熔断中",
   allowed: "允许抓取", delayed: "延迟抓取", blocked: "禁止抓取", refused: "已拒绝",

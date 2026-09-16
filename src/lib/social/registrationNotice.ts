@@ -32,6 +32,8 @@ export interface RegistrationNotice {
   totalUsers: number;
   newToday: number;
   adminUrl: string;
+  /** Set when this account took one of the hundred founding seats. */
+  foundingSeat?: number | null;
 }
 
 export function registrationNoticeText(notice: RegistrationNotice): string {
@@ -41,12 +43,13 @@ export function registrationNoticeText(notice: RegistrationNotice): string {
     notice.name ? `姓名：${notice.name}` : null,
     `来源：${SOURCE_LABELS[notice.source] ?? notice.source}`,
     `时间：${zoneLabel(notice.createdAt, REPORT_ZONE)}（北京）`,
+    notice.foundingSeat ? `创始会员：第 ${notice.foundingSeat} 号` : null,
     `累计注册：${notice.totalUsers} 人 · 今日新增 ${notice.newToday} 人`,
     `用户管理：${notice.adminUrl}`,
   ].filter(Boolean).join("\n");
 }
 
-export async function notifyNewRegistration(user: { email: string; name?: string | null }, source: string, now = new Date()): Promise<void> {
+export async function notifyNewRegistration(user: { email: string; name?: string | null }, source: string, now = new Date(), foundingSeat: number | null = null): Promise<void> {
   try {
     const startOfDay = startOfZoneDay(now, REPORT_ZONE);
     const [totalUsers, newToday] = await Promise.all([
@@ -61,6 +64,7 @@ export async function notifyNewRegistration(user: { email: string; name?: string
       totalUsers,
       newToday,
       adminUrl: `${siteUrl()}/zh/admin/users`,
+      foundingSeat,
     };
     await sendFeishuText(registrationNoticeText(notice));
     await writeAudit({ action: "auth.user_notified", targetType: "user", metadata: { email: user.email, source, totalUsers } });

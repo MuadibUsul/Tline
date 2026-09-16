@@ -884,6 +884,10 @@ model User {
   // An operator suspension. Kept as a timestamp rather than a flag so the record says
   // when access was withdrawn, and restoring is a single field back to null.
   suspendedAt       DateTime?
+  // Founding membership: the first hundred accounts, numbered. The seat is a unique column
+  // rather than a count, so the hundredth and hundred-and-first registrations cannot both
+  // be last — two concurrent sign-ups resolve in the database, not in a race.
+  foundingSeat      Int?      @unique
   // Written at most once every ten minutes per user, so "who is still using this" is
   // answerable without a write on every request.
   lastSeenAt        DateTime?

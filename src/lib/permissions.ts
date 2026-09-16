@@ -72,7 +72,10 @@ export function can(user: PermissionUser | null, action: PermissionAction): bool
     case "alerts.manage":
       return user !== null;
     case "api.use":
-      return user?.tier === "professional";
+      // Founding members hold the highest entitlement there is: the promise made to them is
+      // that nothing on the site is ever charged for, so every commercial gate has to clear
+      // — including ones added after their seat was issued.
+      return user?.tier === "professional" || user?.tier === "founding";
     // A reviewer is an editorial role: they judge content and want to see how it lands,
     // so review and the read-only analytics come with the job. Anything that changes who
     // can sign in, what the crawler does, or which machines hold a key is an admin's.

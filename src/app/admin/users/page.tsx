@@ -110,7 +110,7 @@ export default async function UsersPage(props: {
               <small>{account.name ?? "—"}</small>
             </td>
             <td><span className={`chip ${account.role === "admin" ? "acc" : "gray"}`}>{adminLabel(account.role)}</span></td>
-            <td><span className="chip gray">{adminLabel(account.tier)}</span></td>
+            <td><span className="chip gray">{adminLabel(account.tier)}</span>{account.foundingSeat !== null && <span className="chip acc" title="创始会员">#{account.foundingSeat}</span>}</td>
             <td><span className={`chip ${tone(account.status)}`}>{tr(locale, ...STATUS_LABEL[account.status])}</span></td>
             <td className="mono-cell">{when(account.createdAt, locale)}</td>
             <td className="mono-cell">{age(account.lastSeenAt, locale)}</td>

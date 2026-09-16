@@ -28,6 +28,7 @@ on:
           - macro-repair
           - social-diagnose
           - daily-report
+          - founding-members
       email:
         description: "Account email address (for diagnose-mail / set-password)"
         type: string
@@ -110,6 +111,17 @@ jobs:
                 # Respects the retry/backoff bookkeeping, so it is cheap when nothing
                 # is due and safe to click after any release that shows no analysis.
                 $COMPOSE exec -T app npm run macro:forecasts -- --analyze
+                ;;
+              founding-members)
+                # Numbers the accounts that registered before founding membership existed,
+                # earliest first, up to the hundredth. Prints the roll either way; only the
+                # apply box writes it.
+                $COMPOSE exec -T app npm run members:founding
+                if [ "$APPLY" = "true" ]; then
+                  $COMPOSE exec -T app npm run members:founding -- --apply
+                else
+                  echo "Dry-run — nothing written. Check the 'apply' box to assign these seats."
+                fi
                 ;;
               daily-report)
                 # The morning report, on demand. Prints it and sends nothing unless apply is

@@ -112,6 +112,8 @@ export interface UserListRow {
   name: string | null;
   role: string;
   tier: string;
+  /** Set for a founding member: the seat number they hold, 1..100. */
+  foundingSeat: number | null;
   status: UserStatus;
   createdAt: Date;
   lastSeenAt: Date | null;
@@ -130,7 +132,7 @@ export async function listUsers(filters: UserFilters, page: number) {
       skip: Math.max(0, page - 1) * USER_PAGE_SIZE,
       take: USER_PAGE_SIZE,
       select: {
-        id: true, email: true, name: true, role: true, tier: true,
+        id: true, email: true, name: true, role: true, tier: true, foundingSeat: true,
         createdAt: true, lastSeenAt: true, suspendedAt: true, passwordHash: true,
         _count: { select: { watchlist: true, rules: true } },
       },
@@ -144,6 +146,7 @@ export async function listUsers(filters: UserFilters, page: number) {
     name: row.name,
     role: isRole(row.role) ? row.role : "member",
     tier: row.tier,
+    foundingSeat: row.foundingSeat,
     status: statusOf(row),
     createdAt: row.createdAt,
     lastSeenAt: row.lastSeenAt,

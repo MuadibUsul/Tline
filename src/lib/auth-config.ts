@@ -9,6 +9,7 @@ import { writeAudit } from "./audit";
 import { verifyPassword } from "./password";
 import { rateLimit } from "./rateLimit";
 import { notifyNewRegistration } from "./social/registrationNotice";
+import { grantFoundingMembership } from "./membership";
 
 export type AuthProviderId = "azure-ad" | "email" | "google";
 
@@ -189,7 +190,10 @@ export const authOptions: NextAuthOptions = {
      */
     async createUser({ user }) {
       await writeAudit({ actorId: user.id, action: "auth.user_created", metadata: { email: user.email ?? null, provider: selectedProvider() } });
-      if (user.email) void notifyNewRegistration({ email: user.email, name: user.name ?? null }, selectedProvider() ?? "oauth");
+      // The first hundred registrations are founding members. Best-effort and never allowed
+      // to fail the sign-up: a full house or a transient error must not block an account.
+      const seat = await grantFoundingMembership(user.id).catch(() => null);
+      if (user.email) void notifyNewRegistration({ email: user.email, name: user.name ?? null }, selectedProvider() ?? "oauth", new Date(), seat?.granted ? seat.seat : null);
     },
     async signIn({ user }) {
       await writeAudit({ actorId: user.id, action: "auth.oauth_sign_in", metadata: { provider: selectedProvider() } });

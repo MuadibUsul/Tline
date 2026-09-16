@@ -85,7 +85,7 @@ export default async function TradingThemesPage() {
       <LiveRefresh />
       <header className="page-head themes-head">
         <div className="eyebrow">{tr(locale, "Live market narratives", "当前市场叙事")}</div>
-        <h1>{tr(locale, "Market Themes", "交易主线")}</h1>
+        <h1>{tr(locale, "Market Themes", "交易主线")}{user.tier === "founding" && user.foundingSeat !== null && <span className="chip acc" style={{ marginLeft: 10, verticalAlign: "middle" }} title={tr(locale, "Founding member — permanent access", "创始会员 · 永久权益")}>{tr(locale, `Founding member #${user.foundingSeat}`, `创始会员 #${user.foundingSeat}`)}</span>}</h1>
         <p className="sub">{tr(locale, "What institutions are pricing into assets now — ranked by breadth, importance and freshness, then checked against market direction.", "把机构最近在讨论的驱动因素、传导路径与资产方向连接起来，并用行情判断逻辑是否得到确认。")}</p>
         <div className="themes-method"><span>{tr(locale, "7-day signal window", "7天信号窗口")}</span><span>{tr(locale, "14-day comparison", "对比此前7天")}</span><span>{tr(locale, "No page-level AI generation", "页面不额外调用 AI")}</span><time dateTime={now.toISOString()}>{tr(locale, "Updated", "更新于")} {macroDateTime(now, locale, zh ? "Asia/Shanghai" : "UTC")}</time></div>
       </header>

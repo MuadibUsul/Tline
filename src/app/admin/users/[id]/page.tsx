@@ -54,7 +54,7 @@ export default async function UserDetailPage(props: { params: Promise<{ id: stri
       <div className="tag-row">
         <span className={`chip ${tone(status)}`}>{status}</span>
         <span className={`chip ${account.role === "admin" ? "acc" : "gray"}`}>{adminLabel(account.role)}</span>
-        <span className="chip gray">{adminLabel(account.tier)}</span>
+        <span className="chip gray">{adminLabel(account.tier)}</span>{account.foundingSeat !== null && <span className="chip acc" title="创始会员">#{account.foundingSeat}</span>}
         {owner && <span className="chip acc" title="ADMIN_EMAILS">所有者</span>}
       </div>
     </header>

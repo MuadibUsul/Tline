@@ -419,7 +419,7 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
     || (article.analysis?.importanceScore ?? 0) >= 0.6
     || (article.atomicViews[0]?.importance ?? 0) >= 4;
   const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider, reviewer, important);
-  return prisma.$transaction(async (tx) => {
+  const persisted = await prisma.$transaction(async (tx) => {
     if (expectedContentHash) {
       const claimed = await tx.article.updateMany({
         where: { id: articleId, contentHash: expectedContentHash },
@@ -468,4 +468,63 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
     }
     return { translation, quality: result.quality, review: result.review };
   }, { isolationLevel: "Serializable" });
+
+  // The atomic views are extracted from the English source by rule, which copies the
+  // English sentence into the zh fields (they carried no text when the site was English
+  // only). Translate them now so /zh — the wire, the themes, the API — is actually Chinese.
+  // Best-effort: a failure here must not undo a good article translation.
+  try {
+    await translateAtomicViews(articleId, translationProvider, article.institution.name);
+  } catch (error) {
+    console.error(JSON.stringify({ event: "translation.atomicViews.failed", articleId, error: String(error) }));
+  }
+  return persisted;
+}
+
+/** Translate a flat list of short strings in one request, protecting numbers as elsewhere. */
+async function translateStrings(provider: LLMProvider, institution: string, strings: string[]): Promise<string[]> {
+  if (!strings.length) return [];
+  const numbers: string[] = [];
+  const segments = strings.map((text, position) => ({ id: String(position), position, heading: null, text: protectNumbers(text, numbers) }));
+  const { draft } = await requestDraft(provider, institution, institution, segments);
+  const byPosition = new Map(draft.segments.map((segment) => [segment.position, segment.text]));
+  return strings.map((original, index) => {
+    const translated = byPosition.get(index);
+    return translated ? restoreNumbers(translated, numbers) : original;
+  });
+}
+
+/**
+ * Fill in the Chinese atomic-view fields for one article. Only the rule-extracted views
+ * need it — those still carry the English sentence in `viewZh` (viewZh === viewEn) — so an
+ * article whose views were produced in Chinese is left alone and nothing is re-billed.
+ */
+export async function translateAtomicViews(articleId: string, provider?: LLMProvider | null, institution?: string): Promise<number> {
+  const resolved = provider ?? await resolveLLMProvider("translation");
+  if (!resolved) return 0;
+  const views = await prisma.atomicView.findMany({
+    where: { articleId },
+    select: { id: true, viewEn: true, viewZh: true, conditionEn: true, conditionZh: true, rationaleEn: true, rationaleZh: true },
+  });
+  const pending = views.filter((view) => view.viewZh === view.viewEn);
+  if (!pending.length) return 0;
+  const name = institution ?? (await prisma.article.findUnique({ where: { id: articleId }, select: { institution: { select: { name: true } } } }))?.institution.name ?? "";
+
+  type Slot = { id: string; field: "viewZh" | "conditionZh" | "rationaleZh" };
+  const slots: Slot[] = [];
+  const texts: string[] = [];
+  for (const view of pending) {
+    slots.push({ id: view.id, field: "viewZh" }); texts.push(view.viewEn);
+    if (view.conditionEn && !view.conditionZh) { slots.push({ id: view.id, field: "conditionZh" }); texts.push(view.conditionEn); }
+    if (view.rationaleEn && !view.rationaleZh) { slots.push({ id: view.id, field: "rationaleZh" }); texts.push(view.rationaleEn); }
+  }
+  const translated = await translateStrings(resolved, name, texts);
+  const updates = new Map<string, Record<string, string>>();
+  slots.forEach((slot, index) => {
+    const data = updates.get(slot.id) ?? {};
+    data[slot.field] = translated[index];
+    updates.set(slot.id, data);
+  });
+  await prisma.$transaction([...updates].map(([id, data]) => prisma.atomicView.update({ where: { id }, data })));
+  return pending.length;
 }

@@ -208,6 +208,28 @@
     "enabled": true
   },
   {
+    "canonicalKey": "US_FED_FUNDS_TARGET_LOWER",
+    "provider": "fomc-statement",
+    "externalSeriesId": "target-range.lower",
+    "priority": 5,
+    "sourceUrl": "https://www.federalreserve.gov/newsevents/pressreleases/",
+    "metadata": {
+      "frequency": "daily"
+    },
+    "enabled": true
+  },
+  {
+    "canonicalKey": "US_FED_FUNDS_TARGET_UPPER",
+    "provider": "fomc-statement",
+    "externalSeriesId": "target-range.upper",
+    "priority": 5,
+    "sourceUrl": "https://www.federalreserve.gov/newsevents/pressreleases/",
+    "metadata": {
+      "frequency": "daily"
+    },
+    "enabled": true
+  },
+  {
     "canonicalKey": "US_FED_FUNDS_TARGET_UPPER",
     "provider": "fred",
     "externalSeriesId": "DFEDTARU",

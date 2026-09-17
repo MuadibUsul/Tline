@@ -94,10 +94,12 @@ async function main() {
     take: 1000,
   });
 
-  let repaired = 0;
+  // Pass one: read the documents and collect proposals. Nothing is written yet, because a
+  // recovered title is only trustworthy once it can be compared with the other proposals.
+  const proposals: Array<{ id: string; before: string; recovered: string; translation?: { id: string; title: string } }> = [];
   let skipped = 0;
   for (const article of candidates) {
-    if (repaired >= limit) break;
+    if (proposals.length >= limit) break;
     if (!unusable(article.title)) continue;
     const document = article.documents[0];
     if (!document) continue;
@@ -121,18 +123,41 @@ async function main() {
       skipped++;
       continue;
     }
+    proposals.push({ id: article.id, before: article.title, recovered, translation: article.translations[0] });
+  }
 
-    const translation = article.translations[0];
-    const zh = dryRun || !translation ? null : await translateTitle(recovered);
+  /**
+   * A title that several reports recover is a template, not a title.
+   *
+   * A recurring daily publication — thirteen ingestions of one "Morning Report" PDF — all
+   * read their heading off the page as the same string. Writing it would give thirteen pages
+   * the identical title, which is the duplicate-title problem this command exists downstream
+   * of, and would put a generic label in the index where there had been nothing. A recovery
+   * unique to one report is trusted; a shared one is left for a person.
+   */
+  const claims = new Map<string, number>();
+  for (const proposal of proposals) claims.set(proposal.recovered, (claims.get(proposal.recovered) ?? 0) + 1);
+  const existing = new Set((await prisma.article.findMany({ select: { title: true } })).map((row) => row.title.trim().toLowerCase()));
 
-    console.log(`  ${dryRun ? "WOULD" : "FIX  "} ${article.id}`);
-    console.log(`        ${article.title}  ->  ${recovered}`);
-    if (translation) console.log(`        ${translation.title}  ->  ${zh ?? "(译文未变更)"}`);
+  let repaired = 0;
+  for (const proposal of proposals) {
+    const shared = (claims.get(proposal.recovered) ?? 0) > 1;
+    const collides = existing.has(proposal.recovered.trim().toLowerCase());
+    if (shared || collides) {
+      console.log(`  KEEP ${proposal.id} · recovered title is ${shared ? `shared by ${claims.get(proposal.recovered)} reports` : "already another report's title"}: "${proposal.recovered}"`);
+      skipped++;
+      continue;
+    }
+
+    const zh = dryRun || !proposal.translation ? null : await translateTitle(proposal.recovered);
+    console.log(`  ${dryRun ? "WOULD" : "FIX  "} ${proposal.id}`);
+    console.log(`        ${proposal.before}  ->  ${proposal.recovered}`);
+    if (proposal.translation) console.log(`        ${proposal.translation.title}  ->  ${zh ?? "(译文未变更)"}`);
 
     if (!dryRun) {
-      await prisma.article.update({ where: { id: article.id }, data: { title: recovered } });
-      if (translation && zh) {
-        await prisma.articleTranslation.update({ where: { id: translation.id }, data: { title: zh } });
+      await prisma.article.update({ where: { id: proposal.id }, data: { title: proposal.recovered } });
+      if (proposal.translation && zh) {
+        await prisma.articleTranslation.update({ where: { id: proposal.translation.id }, data: { title: zh } });
       }
     }
     repaired++;

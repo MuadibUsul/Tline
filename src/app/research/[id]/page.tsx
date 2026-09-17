@@ -52,12 +52,14 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   // institution name alone was a four-character description on Chinese pages; the fallback
   // now carries the publisher, the date and what the page is.
   const summary = (zh ? article.analysis?.summaryZh : article.analysis?.summary)?.trim();
-  const description = (summary
+  // clamp rather than slice: a description cut at exactly 158 characters ends mid-word,
+  // and every report page was doing that.
+  const description = clamp(summary
     || tr(
       locale,
       `${article.institution.name} published this report on ${formatDate(article.publishedAt, locale)}. This page is Tlines' structured reading of it.`,
       `${article.institution.name} 于 ${formatDate(article.publishedAt, locale)} 发布该研报，本页为 Tlines 的结构化解读。`,
-    )).slice(0, 158);
+    ), 158);
   return {
     // Absolute: the subject is what a searcher matches, and the layout's brand suffix costs
     // nine characters of it. Search results already show the site name separately.

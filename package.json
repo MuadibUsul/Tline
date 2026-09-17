@@ -63,7 +63,8 @@
     "macro:market": "tsx scripts/market-sync.ts",
     "macro:expectation": "tsx scripts/macro-expectation.ts",
     "themes:snapshot": "tsx scripts/trading-theme-snapshot.ts",
-    "analytics:rollup": "tsx scripts/analytics-rollup.ts"
+    "analytics:rollup": "tsx scripts/analytics-rollup.ts",
+    "seo:status": "tsx scripts/seo-status.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

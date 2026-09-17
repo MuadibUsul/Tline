@@ -34,7 +34,7 @@ function cacheHeaders(response: NextResponse, request: NextRequest, pathname: st
  * `sitemap` covers both the index at /sitemap.xml and the shards under /sitemap/1.xml: a
  * language prefix on a shard would make the index point at addresses that redirect.
  */
-export const MACHINE_PATH = /^\/(?:api|_next|pdfjs|sitemap(?:\.xml)?|robots\.txt|llms(?:-full)?\.txt|(?:rss|feed)\.xml|favicon\.ico|icon|opengraph-image|apple-icon)(?:\/|$|\.)/;
+export const MACHINE_PATH = /^\/(?:api|_next|pdfjs|sitemap(?:\.xml)?|robots\.txt|llms(?:-full)?\.txt|(?:rss|feed)\.xml|favicon\.ico|icon|opengraph-image|apple-icon|manifest\.webmanifest)(?:\/|$|\.)/;
 
 function preferredSegment(request: NextRequest): string {
   const cookie = request.cookies.get(LOCALE_COOKIE)?.value;

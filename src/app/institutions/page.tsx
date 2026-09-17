@@ -69,6 +69,15 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
       },
     },
   });
+  // Every publisher that has at least one report, not only the ones active this week.
+  // The stream above is ranked by heat, so a house writing less often never appeared on it —
+  // and fourteen of the fifty institution pages had no link from any hub at all, which left
+  // their only inbound path their own reports. This is the index that gives them one.
+  const publishers = await prisma.institution.findMany({
+    where: { articles: { some: publicationReadyWhere() } },
+    orderBy: { name: "asc" },
+    select: { slug: true, name: true, country: true },
+  });
   const ranked = clusterViewsNewestFirst(rankAtomicViews(allViews, new Date(), marketEvents as MarketEvent[]));
   const total = ranked.length;
   const views = ranked.slice((page - 1) * take, page * take);
@@ -131,6 +140,17 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
         <span>{tr(locale, `Page ${page} / ${pages}`, `第 ${page} / ${pages} 页`)}</span>
         {page < pages && <Link href={localePath(locale, `/institutions?page=${page + 1}`)} rel="next">{tr(locale, "Next", "下一页")} →</Link>}
       </nav>}
+
+      {publishers.length > 0 && <section className="blk" aria-label={tr(locale, "All publishing institutions", "全部机构")}>
+        <h2 className="section-t">{tr(locale, `All ${publishers.length} publishing institutions`, `全部 ${publishers.length} 家机构`)}</h2>
+        <div className="tag-row">
+          {publishers.map((publisher) => (
+            <Link key={publisher.slug} className="chip gray" href={localePath(locale, `/institution/${publisher.slug}`)}>
+              {institutionName(publisher.name, locale)}{publisher.country ? ` · ${publisher.country}` : ""}
+            </Link>
+          ))}
+        </div>
+      </section>}
     </main>
   );
 }

@@ -28,6 +28,7 @@ on:
           - consensus-license
           - macro-repair
           - social-diagnose
+          - seo-status
           - daily-report
           - founding-members
       email:
@@ -139,6 +140,13 @@ jobs:
                 else
                   echo "Dry-run — nothing written. Check the 'apply' box to assign these seats."
                 fi
+                ;;
+              seo-status)
+                # What the index holds and what it is withholding, by reason, read from the
+                # same gate the sitemap and the page robots tags read. The list is the part
+                # an operator acts on: each withheld page with the reason it was withheld.
+                # Read-only — this writes nothing and is safe to run at any time.
+                $COMPOSE exec -T app npm run seo:status -- --list
                 ;;
               daily-report)
                 # The morning report, on demand. Prints it and sends nothing unless apply is

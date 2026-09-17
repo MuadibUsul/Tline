@@ -55,11 +55,11 @@ export async function generateMetadata(props: { params: Promise<TopicParams> }):
   const title = clamp(locale === "zh-CN"
     ? `${label}：机构观点与研报`
     : `${label} — institutional views, forecasts and research`, 60);
-  const description = tr(
+  const description = clamp(tr(
     locale,
     `${stat.institutions} institutions have published ${stat.articles} reports touching ${label}. Compare their views, the assets involved and the source reports.`,
     `${stat.institutions} 家机构发布了 ${stat.articles} 篇涉及${label}的研报。比较各家观点、涉及的资产与原始研报。`,
-  ).slice(0, 158);
+  ), 158);
   // Chinese is declared only when the translated views actually exist: an hreflang pair where
   // one side is an empty page tells a search engine the site has a translation it does not have.
   const availableLocales: Locale[] = data.views.length >= ZH_MIN_VIEWS ? ["en", "zh-CN"] : ["en"];

@@ -5,13 +5,31 @@ import { LOCALES, localePath } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
 import { assetPath } from "@/lib/assetPath";
 import { contentQuality } from "@/lib/contentQuality";
+import { listIndexableTopics, topicPath } from "@/lib/topics";
+import { loadPublicThemes } from "@/lib/marketThemesPublic";
 
+export interface SitemapAlternate { hreflang: string; href: string }
 export interface SitemapEntry {
   url: string;
   lastModified: Date;
   changeFrequency?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
   priority?: number;
+  /**
+   * The same page in its other language.
+   *
+   * Declared here as well as in the page head because the two disagree by construction: a
+   * page can be listed only in the language that passed the quality gate, and the sitemap is
+   * where a crawler reads which languages exist for a URL without rendering it.
+   */
+  alternates?: SitemapAlternate[];
 }
+
+/** Every entry is listed in both languages, so both are declared, with English as default. */
+const PAGE_ALTERNATES: Array<{ hreflang: string; locale: (typeof LOCALES)[number] }> = [
+  { hreflang: "en", locale: "en" },
+  { hreflang: "zh-CN", locale: "zh-CN" },
+  { hreflang: "x-default", locale: "en" },
+];
 
 /**
  * Articles per research shard. Each article contributes up to one URL per locale, so this
@@ -43,7 +61,12 @@ const ARTICLE_SELECT = {
   language: true,
   createdAt: true,
   updatedAt: true,
-  analysis: { select: { summary: true, summaryZh: true, reviewStatus: true } },
+  analysis: {
+    select: {
+      summary: true, summaryZh: true, reviewStatus: true,
+      keyArguments: true, keyNumbers: true, risks: true, interpretation: true,
+    },
+  },
   translations: {
     where: { locale: "zh-CN" },
     take: 1,
@@ -62,6 +85,7 @@ const STATIC_ROUTES: Array<[string, SitemapEntry["changeFrequency"], number]> = 
   ["/institutions", "daily", 0.8],
   ["/macro", "hourly", 0.8],
   ["/macro/calendar", "daily", 0.6],
+  ["/topics", "daily", 0.7],
   ["/about", "monthly", 0.5],
   ["/methodology", "monthly", 0.6],
   ["/editorial-policy", "monthly", 0.5],
@@ -102,6 +126,10 @@ export async function buildPagesShard(): Promise<SitemapEntry[]> {
   // once and never indexed; they stay reachable, just not advertised.
   const hasSettledForecasts = new Set(settledInstitutions.map((row) => row.institutionId));
 
+  // Listed only when the public summary has something to summarise, by the same call the page
+  // makes — otherwise the sitemap would advertise a URL that answers noindex.
+  const liveThemes = (await loadPublicThemes()).length > 0;
+
   const pages: SitemapEntry[] = [
     ...STATIC_ROUTES.map(([path, changeFrequency, priority]) => ({
       url: `${base}${path}`,
@@ -133,6 +161,15 @@ export async function buildPagesShard(): Promise<SitemapEntry[]> {
       changeFrequency: "daily" as const,
       priority: 0.5,
     })),
+    // Topic hubs are listed only when the corpus clears the threshold for one: the same gate
+    // the page itself applies, so the sitemap never advertises a subject with no page behind it.
+    ...(liveThemes ? [{ url: `${base}/market-themes`, lastModified: STATIC_UPDATED_AT, changeFrequency: "daily" as const, priority: 0.7 }] : []),
+    ...(await listIndexableTopics()).map((topic) => ({
+      url: `${base}${topicPath(topic.key)}`,
+      lastModified: topic.lastAt,
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    })),
   ];
 
   /**
@@ -141,7 +178,8 @@ export async function buildPagesShard(): Promise<SitemapEntry[]> {
    */
   return pages.flatMap((page) => {
     const path = page.url.startsWith(base) ? page.url.slice(base.length) || "/" : page.url;
-    return LOCALES.map((locale) => ({ ...page, url: base + localePath(locale, path) }));
+    const alternates = PAGE_ALTERNATES.map(({ hreflang, locale }) => ({ hreflang, href: base + localePath(locale, path) }));
+    return LOCALES.map((locale) => ({ ...page, url: base + localePath(locale, path), alternates }));
   });
 }
 
@@ -161,12 +199,19 @@ export async function buildResearchShard(index: number): Promise<SitemapEntry[]>
       select: ARTICLE_SELECT,
     });
     for (const article of articles) {
-      for (const locale of indexableSitemapLocales(article)) {
+      const locales = indexableSitemapLocales(article);
+      if (!locales.length) continue;
+      // Only the languages that actually have an indexable page are declared as alternates.
+      // Pointing an alternate at a URL that answers noindex would be a contradiction.
+      const alternates: SitemapAlternate[] = locales.map((locale) => ({ hreflang: locale, href: base + localePath(locale, researchPath(article)) }));
+      if (locales.includes("en")) alternates.push({ hreflang: "x-default", href: base + localePath("en", researchPath(article)) });
+      for (const locale of locales) {
         entries.push({
           url: base + localePath(locale, researchPath(article)),
           lastModified: locale === "zh-CN" ? article.translations[0]?.updatedAt ?? article.updatedAt : article.updatedAt,
           changeFrequency: "monthly",
           priority: 0.7,
+          alternates,
         });
       }
     }
@@ -206,12 +251,13 @@ export function renderUrlset(entries: SitemapEntry[]): string {
   const urls = entries.map((entry) => [
     "  <url>",
     `    <loc>${escapeXml(entry.url)}</loc>`,
+    ...(entry.alternates ?? []).map((alternate) => `    <xhtml:link rel="alternate" hreflang="${escapeXml(alternate.hreflang)}" href="${escapeXml(alternate.href)}"/>`),
     `    <lastmod>${entry.lastModified.toISOString()}</lastmod>`,
     entry.changeFrequency ? `    <changefreq>${entry.changeFrequency}</changefreq>` : null,
     entry.priority === undefined ? null : `    <priority>${entry.priority}</priority>`,
     "  </url>",
   ].filter((line) => line !== null).join("\n")).join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`;
 }
 
 export function renderSitemapIndex(shards: Array<{ url: string; lastModified: Date }>): string {

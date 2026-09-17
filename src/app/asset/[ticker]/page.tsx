@@ -6,7 +6,9 @@ import { getAssetView, getAssetTimeline } from "@/lib/queries";
 import { FeedCard, DirChip, Delta, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
-import { assetSeoTitle, breadcrumbJsonLd, canonical, datasetJsonLd, JsonLd, localizedUrl, ogImage, webPageJsonLd } from "@/lib/seo";
+import { assetSeoTitle, breadcrumbJsonLd, canonical, datasetJsonLd, itemListJsonLd, JsonLd, localizedUrl, ogImage, webPageJsonLd } from "@/lib/seo";
+import { getAssetIndicators, getAssetTopics } from "@/lib/related";
+import { topicHref } from "@/lib/related";
 import { assetPath, tickerFromAssetSlug } from "@/lib/assetPath";
 import { publicationReadyWhere } from "@/lib/publication";
 import { getAssetMarketSnapshot } from "@/lib/macro/market/read";
@@ -46,6 +48,12 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
   if (!data) notFound();
   const { asset, consensus, d1, d7, d30, dist, articles } = data;
   const [timelineRows, market] = await Promise.all([getAssetTimeline(asset.id), getAssetMarketSnapshot(asset.ticker)]);
+  // Topics and indicators come from the reports that mention this asset, so both blocks are
+  // evidence about this asset rather than a hand-written list of plausible associations.
+  const [assetTopics, assetIndicators] = await Promise.all([
+    getAssetTopics(asset.ticker, locale),
+    getAssetIndicators(asset.ticker, locale),
+  ]);
   const timeline = timelineRows.filter((t) => t.hasTargetMove || t.hasDirFlip);
   const toneColor = consensus?.tone === "bull" ? "var(--bull)" : consensus?.tone === "bear" ? "var(--bear)" : "var(--neu)";
   const marketSeries = market.available ? market.history.map((row) => Number(row.close)).filter(Number.isFinite) : [];
@@ -58,10 +66,15 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
       <JsonLd data={webPageJsonLd(locale, assetPath(asset.ticker), assetName(asset.name, locale, asset.ticker), tr(locale, `Cross-institution views and consensus for ${asset.name}.`, `${assetName(asset.name, locale, asset.ticker)}的跨机构观点与共识。`))} />
       {consensus && consensus.institutionCount >= 2 && <JsonLd data={datasetJsonLd(locale, assetPath(asset.ticker), tr(locale, `${asset.name} institutional consensus`, `${assetName(asset.name, locale, asset.ticker)}机构共识`), tr(locale, "Authority-weighted, time-decayed public institutional views.", "按权威度加权并经时间衰减的公开机构观点。"), consensus.windowEnd)} />}
       <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Markets", "资产市场"), path: "/markets" }, { name: assetName(asset.name, locale, asset.ticker), path: assetPath(asset.ticker) }])} />
+      {/* The institutions listed below, in the order the table shows them. */}
+      {consensus && consensus.contributors.length > 1 && <JsonLd data={itemListJsonLd(locale, assetPath(asset.ticker), tr(locale, `Institutions covering ${asset.name}`, `覆盖${assetName(asset.name, locale, asset.ticker)}的机构`), consensus.contributors.map((contributor) => ({
+        name: institutionName(contributor.institutionName, locale),
+        path: `/institution/${contributor.slug}`,
+      })))} />}
       <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")}><Link href={localePath(locale, "/markets")}>{tr(locale, "Markets", "资产市场")}</Link><span>›</span><span>{assetName(asset.name, locale, asset.ticker)}</span></nav>
       <div className="page-head">
         <div className="eyebrow">{consensus?.isFallback ? tr(locale, `Institutional Consensus · latest available 24h · as of ${formatDate(consensus.windowEnd, locale)}`, `机构共识 · 最近可用24小时 · 截至 ${formatDate(consensus.windowEnd, locale)}`) : tr(locale, "Institutional Consensus · last 24h", "机构共识 · 最近24小时")} · {domainTerm(asset.assetClass, locale)}</div>
-        <h1>{assetName(asset.name, locale, asset.ticker)}</h1>
+        <h1>{tr(locale, `${assetName(asset.name, locale, asset.ticker)} — what institutions are forecasting`, `${assetName(asset.name, locale, asset.ticker)}：机构正在预测什么`)}</h1>
         {consensus && consensus.institutionCount >= 2 ? <>
           <div className="big-score">
             <span className="num" style={{ color: toneColor }}>{consensus.score}</span>
@@ -83,8 +96,20 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
         </form>
       </div>
 
+      {/* The paragraph a reader needs and a crawler reads first: what this page is, on what
+          evidence, and where the rules live. Counts come from the rows rendered below. */}
+      <p className="sub" style={{ maxWidth: "72ch", color: "var(--muted)" }}>
+        {tr(locale,
+          `${assetName(asset.name, locale, asset.ticker)} (${asset.ticker}) is covered by ${new Set(consensus?.contributors.map((c) => c.slug) ?? []).size || 0} institutions in the current window, across ${articles.length} recent reports. Below: the balance of views, each published target with its date, every recorded change of view, and the original reports.`,
+          `${assetName(asset.name, locale, asset.ticker)}（${asset.ticker}）当前窗口内由 ${new Set(consensus?.contributors.map((c) => c.slug) ?? []).size || 0} 家机构覆盖，涉及 ${articles.length} 篇近期研报。下方为多空分布、各家目标价与日期、记录到的观点变化，以及原始研报。`)}
+        {" "}
+        <Link href={localePath(locale, "/methodology")}>{tr(locale, "How consensus is computed", "共识如何计算")}</Link>
+        {" · "}
+        <Link href={localePath(locale, "/sources")}>{tr(locale, "Sources", "来源政策")}</Link>
+      </p>
+
       <section className="blk">
-        <div className="section-t">{tr(locale, "Market observation", "行情观测")}</div>
+        <h2 className="section-t">{tr(locale, "Market observation", "行情观测")}</h2>
         {market.available ? <>
           <div className="deltas">
             <span>{tr(locale, "Latest", "最新")} <b className="mono">{Number(market.observation.close).toLocaleString()} {market.observation.quoteCurrency}</b></span>
@@ -99,7 +124,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
       </section>
 
       {consensus && <section className="blk">
-        <div className="section-t">{consensus.isFallback ? tr(locale, "Institutional Views · latest available 24h", "机构观点 · 最近可用24小时") : tr(locale, "Institutional Views · last 24h", "机构观点 · 最近24小时")}</div>
+        <h2 className="section-t">{consensus.isFallback ? tr(locale, "Institutional Views · latest available 24h", "机构观点 · 最近可用24小时") : tr(locale, "Institutional Views · last 24h", "机构观点 · 最近24小时")}</h2>
         <div className="tbl-wrap">
           <table>
             <thead><tr><th>{tr(locale, "Institution", "机构")}</th><th>{tr(locale, "Direction", "方向")}</th><th>{tr(locale, "Target", "目标价")}</th><th>{tr(locale, "Previous", "此前")}</th><th>{tr(locale, "Updated", "更新于")}</th></tr></thead>
@@ -120,7 +145,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
 
       {timeline.length > 0 && (
         <section className="blk">
-          <div className="section-t">{tr(locale, "Recent View Changes", "近期观点变化")}</div>
+          <h2 className="section-t">{tr(locale, "Recent View Changes", "近期观点变化")}</h2>
           <div className="changes">
             {timeline.map((t) => (
               <div key={t.slug} className="chg">
@@ -156,7 +181,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
 
       {dist && (
         <section className="blk">
-          <div className="section-t">{tr(locale, "Target Distribution", "目标价分布")}</div>
+          <h2 className="section-t">{tr(locale, "Target Distribution", "目标价分布")}</h2>
           <div className="dist">
             <div className="stat"><span>{tr(locale, "Lowest", "最低")}</span><b>${dist.low.toLocaleString()}</b></div>
             <div className="stat"><span>{tr(locale, "Median", "中位数")}</span><b>${dist.median.toLocaleString()}</b></div>
@@ -166,8 +191,28 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
         </section>
       )}
 
+      {(assetTopics.length > 0 || assetIndicators.length > 0) && (
+        <section className="blk">
+          <h2 className="section-t">{tr(locale, "What the coverage is about", "这些研报在讨论什么")}</h2>
+          {assetTopics.length > 0 && <div className="tag-row" style={{ marginBottom: assetIndicators.length ? 14 : 0 }}>
+            {assetTopics.map((topic) => <Link className="chip gray" key={topic.key} href={localePath(locale, topicHref(topic.key))}>{topic.label} · {topic.views}</Link>)}
+          </div>}
+          {assetIndicators.length > 0 && <div className="rowlist">
+            <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 6 }}>
+              {tr(locale, "Economic data this coverage forecasts", "这些研报涉及的经济数据")}
+            </div>
+            {assetIndicators.map((indicator) => (
+              <Link className="r" key={indicator.canonicalKey} href={localePath(locale, `/macro/indicator/${indicator.canonicalKey}`)}>
+                <span className="inst">{indicator.name}</span>
+                <span className="mono" style={{ color: "var(--faint)", fontSize: 11 }}>{indicator.canonicalKey}</span>
+              </Link>
+            ))}
+          </div>}
+        </section>
+      )}
+
       <section style={{ paddingTop: 26 }}>
-        <div className="section-t">{tr(locale, "Related Research", "相关研报")}</div>
+        <h2 className="section-t">{tr(locale, "Related Research", "相关研报")}</h2>
         <div className="feed">
           {articles.map((a) => <FeedCard key={a.id} a={a} locale={locale} />)}
         </div>

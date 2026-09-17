@@ -6,7 +6,8 @@ import { getInstitutionView } from "@/lib/queries";
 import { FeedCard, DirChip, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
-import { breadcrumbJsonLd, canonical, institutionProfileJsonLd, institutionSeoTitle, JsonLd, localizedUrl, ogImage } from "@/lib/seo";
+import { breadcrumbJsonLd, canonical, institutionProfileJsonLd, institutionSeoTitle, itemListJsonLd, JsonLd, localizedUrl, ogImage } from "@/lib/seo";
+import { getInstitutionAssets, getInstitutionTopics, topicHref } from "@/lib/related";
 import { assetPath } from "@/lib/assetPath";
 import { publicationReadyWhere } from "@/lib/publication";
 
@@ -20,16 +21,19 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   });
   if (!institution) return { title: tr(locale, "Institution not found", "机构未找到") };
   const name = institutionName(institution.name, locale);
+  const title = institutionSeoTitle(name, locale);
+  const description = tr(
+    locale,
+    `What ${name}${institution.country ? ` (${institution.country})` : ""} is currently forecasting: their published views by asset, the targets attached to them, and every source-linked report behind them.`,
+    `${name}${institution.country ? `（${institution.country}）` : ""}当前的公开预测：按资产整理的观点、对应的目标价，以及背后的每一篇可溯源研报。`,
+  ).slice(0, 158);
   return {
-    title: { absolute: institutionSeoTitle(name, locale) },
-    description: tr(
-      locale,
-      `Published research and extracted views from ${name}${institution.country ? ` (${institution.country})` : ""}.`,
-      `${name}${institution.country ? `（${institution.country}）` : ""}的公开研报与提取观点。`,
-    ),
+    title: { absolute: title },
+    description,
     ...canonical(`/institution/${slug}`, locale),
     ...(institution._count.articles ? {} : { robots: { index: false, follow: true } }),
-    openGraph: { url: localizedUrl(`/institution/${slug}`, locale), locale, images: [{ url: ogImage("Institution", institution.name, institution.country ?? undefined), width: 1200, height: 630 }] },
+    openGraph: { type: "website", title, description, url: localizedUrl(`/institution/${slug}`, locale), locale, images: [{ url: ogImage("Institution", institution.name, institution.country ?? undefined), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
@@ -40,15 +44,28 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
   const data = await getInstitutionView(params.slug, locale);
   if (!data) notFound();
   const { inst, articles, count30, views, coverage } = data;
+  // Where this publisher concentrates, and on what. Both are counted from its own rows.
+  const [mainAssets, mainTopics] = await Promise.all([
+    getInstitutionAssets(inst.slug),
+    getInstitutionTopics(inst.slug, locale),
+  ]);
 
   return (
     <main className="wrap">
       <JsonLd data={institutionProfileJsonLd(locale, `/institution/${inst.slug}`, institutionName(inst.name, locale), tr(locale, `Structured public research, current views and source links for ${inst.name}.`, `${institutionName(inst.name, locale)}的结构化公开研报、当前观点与来源链接。`), inst.researchUrl)} />
       <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Institutions", "机构"), path: "/institutions" }, { name: institutionName(inst.name, locale), path: `/institution/${inst.slug}` }])} />
+      {/* The assets in the Current Views table, in that order. */}
+      {views.length > 0 && <JsonLd data={itemListJsonLd(locale, `/institution/${inst.slug}`, tr(locale, `Assets ${inst.name} currently covers`, `${inst.name}当前覆盖的资产`), views.slice(0, 25).map((view) => ({ name: assetName(view.name, locale, view.ticker), path: assetPath(view.ticker) })))} />}
       <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")}><Link href={localePath(locale, "/institutions")}>{tr(locale, "Institutions", "机构")}</Link><span>›</span><span>{institutionName(inst.name, locale)}</span></nav>
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Institution", "机构")}</div>
-        <h1>{institutionName(inst.name, locale)}</h1>
+        <h1>{tr(locale, `${institutionName(inst.name, locale)} — published research and current views`, `${institutionName(inst.name, locale)}：公开研报与当前观点`)}</h1>
+        {/* Required by the brand rules: this page must never read as the institution's own. */}
+        <p className="sub" style={{ color: "var(--muted)", maxWidth: "72ch" }}>
+          {tr(locale,
+            `Tlines indexes and structures research that ${inst.name} publishes publicly. Tlines is not affiliated with, endorsed by, or acting on behalf of ${inst.name}, and takes no position on the views shown.`,
+            `Tlines 仅对 ${inst.name} 公开发布的研究进行索引与结构化整理，与 ${inst.name} 无关联、未经其授权或背书，也不对相关观点持立场。`)}
+        </p>
         <div className="deltas">
           <span className="stars">{"★".repeat(inst.rating)}{"☆".repeat(5 - inst.rating)}</span>
           <span>{tr(locale, "Authority weight", "权威权重")} <b className="mono">{inst.authorityScore.toFixed(2)}</b></span>
@@ -69,7 +86,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
 
       {views.length > 0 && (
         <section className="blk">
-          <div className="section-t">{tr(locale, "Current Views", "当前观点")}</div>
+          <h2 className="section-t">{tr(locale, "Current Views", "当前观点")}</h2>
           <div className="tbl-wrap">
             <table>
               <thead><tr><th>{tr(locale, "Asset", "资产")}</th><th>{tr(locale, "Direction", "方向")}</th><th>{tr(locale, "Target", "目标价")}</th><th>{tr(locale, "Updated", "更新于")}</th></tr></thead>
@@ -88,8 +105,24 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
         </section>
       )}
 
+      {(mainAssets.length > 0 || mainTopics.length > 0) && (
+        <section className="blk">
+          <h2 className="section-t">{tr(locale, "Where this publisher concentrates", "该机构的主要覆盖")}</h2>
+          {mainAssets.length > 0 && <div className="tag-row" style={{ marginBottom: mainTopics.length ? 14 : 0 }}>
+            {mainAssets.map((asset) => <Link className="chip acc" key={asset.ticker} href={localePath(locale, assetPath(asset.ticker))}>{assetName(asset.name, locale, asset.ticker)} · {asset.ticker}</Link>)}
+          </div>}
+          {mainTopics.length > 0 && <div className="tag-row">
+            {mainTopics.map((topic) => <Link className="chip gray" key={topic.key} href={localePath(locale, topicHref(topic.key))}>{topic.label} · {topic.views}</Link>)}
+          </div>}
+          <p className="sub" style={{ marginTop: 12, color: "var(--muted)" }}>
+            {tr(locale, "Counted from this publisher's own indexed reports. ", "按该机构已收录研报统计。")}
+            <Link href={localePath(locale, `/institution/${inst.slug}/accuracy`)}>{tr(locale, "Forecast record — how its settled calls turned out", "预测记录：已结算观点的实际结果")}</Link>
+          </p>
+        </section>
+      )}
+
       <section style={{ paddingTop: 26 }}>
-        <div className="section-t">{tr(locale, "Recent Research", "近期研报")}</div>
+        <h2 className="section-t">{tr(locale, "Recent Research", "近期研报")}</h2>
         <div className="feed">
           {articles.slice(0, 10).map((a) => (
             <FeedCard key={a.id} a={{ ...a, institution: { name: inst.name, slug: inst.slug } }} locale={locale} />

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assetSeoTitle, breadcrumbJsonLd, canonical, homeSeoTitle, institutionProfileJsonLd, institutionSeoTitle, reportJsonLd, siteJsonLd } from "./seo";
+import { absoluteTitle, assetSeoTitle, breadcrumbJsonLd, canonical, clamp, DESCRIPTION_MAX, homeSeoTitle, institutionProfileJsonLd, institutionSeoTitle, reportJsonLd, siteJsonLd, TITLE_MAX, TITLE_SUFFIX } from "./seo";
 
 process.env.SITE_URL = "https://tlines.tech";
 
@@ -51,7 +51,25 @@ test("missing translations do not emit a nonexistent Chinese alternate", () => {
 });
 
 test("home, asset and institution metadata use localized entity templates", () => {
-  assert.match(homeSeoTitle("en"), /^Tlines Institutional Intelligence/);
-  assert.equal(assetSeoTitle("黄金", "zh-CN"), "黄金机构展望与银行预测｜Tlines");
-  assert.equal(institutionSeoTitle("UBS", "en"), "UBS Market Outlook, Forecasts & Research | Tlines");
+  // The home title leads with the brand and states the category inside the visible width
+  // rather than running past it: "Tlines Institutional Intelligence | Bank Research &
+  // Market Consensus" was 68 characters, and a search result shows about 60.
+  assert.match(homeSeoTitle("en"), /^Tlines — Institutional Research/);
+  assert.equal(assetSeoTitle("黄金", "zh-CN"), "黄金机构展望、目标价与共识");
+  assert.equal(assetSeoTitle("Gold", "en", "XAUUSD"), "Gold (XAUUSD) Institutional Outlook & Bank Forecasts");
+  // Every builder honours the width a result actually shows, whatever the subject's length.
+  const long = institutionSeoTitle("Commonwealth Bank of Australia", "en");
+  assert.ok(long.length <= TITLE_MAX, `expected <= ${TITLE_MAX} chars, got ${long.length}: ${long}`);
+  assert.ok(assetSeoTitle("Philadelphia Semiconductor Index", "en", "SOX").length <= TITLE_MAX);
+});
+
+test("a composed title has room for the layout suffix, and an absolute one does not need it", () => {
+  // This is the check whose absence let three templates ship at 62-64 characters: clamping a
+  // builder to 60 and then letting the layout append a 9-character suffix yields 69.
+  assert.ok(TITLE_SUFFIX.length < 12, "the suffix must stay short enough to leave room for a subject");
+  assert.equal(clamp("x".repeat(200), TITLE_MAX).length, TITLE_MAX);
+  assert.ok(clamp("a".repeat(40) + " " + "b".repeat(40), TITLE_MAX).length <= TITLE_MAX);
+  assert.ok(clamp("a".repeat(40) + " " + "b".repeat(40), TITLE_MAX).endsWith("…"), "cut titles end in an ellipsis, not mid-word");
+  assert.equal(absoluteTitle("Gold (XAUUSD) Institutional Outlook & Bank Forecasts").absolute.length <= TITLE_MAX, true);
+  assert.equal(clamp("short", DESCRIPTION_MAX), "short");
 });

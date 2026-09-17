@@ -1,17 +1,25 @@
 import type { Metadata } from "next";
-import { canonical, ogImage } from "@/lib/seo";
+import { JsonLd, canonical, clamp, itemListJsonLd, localizedUrl, ogImage, researchSeoTitle } from "@/lib/seo";
 import Link from "next/link";
 import { ResearchCard } from "@/app/_components/ui";
 import LiveFeed from "@/app/_components/LiveFeed";
 import { prisma } from "@/lib/db";
 import { assetName, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
+import { researchPath } from "@/lib/researchPath";
 import { byDisplayRecency, feedPulse } from "@/lib/queries";
 import { paginationWindow } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
-type ResearchSearchParams = { institution?: string; country?: string; category?: string; ticker?: string; direction?: string; page?: string; q?: string };
+/**
+ * `q` is deliberately absent. It was declared and counted as a filter, which turned a URL
+ * with a query string into a noindex response, but it was never applied to the query — so
+ * `?q=gold` returned the unfiltered feed under a canonical pointing at `/research`. Either a
+ * parameter filters or it does not exist; halfway is the version a crawler reads as a
+ * duplicate page with a contradictory robots tag.
+ */
+type ResearchSearchParams = { institution?: string; country?: string; category?: string; ticker?: string; direction?: string; page?: string };
 
 export async function generateMetadata(props: { searchParams: Promise<ResearchSearchParams> }): Promise<Metadata> {
   const searchParams = await props.searchParams;
@@ -19,9 +27,20 @@ export async function generateMetadata(props: { searchParams: Promise<ResearchSe
   const page = Math.max(1, Number(searchParams.page) || 1);
   const filtered = Object.entries(searchParams).some(([key, value]) => key !== "page" && Boolean(value));
   const emptyPage = !filtered && page > 1 && (page - 1) * 20 >= await prisma.article.count({ where: publicationReadyWhere() });
-  const title = tr(locale, "Verified Institutional Research & Structured Views", "已验证机构研报与结构化观点");
-  const description = tr(locale, "Source-linked public research with comparable asset views, horizons, risks and institutional context.", "带原始来源的公开研报，包含可比较的资产观点、期限、风险与机构上下文。");
-  return { ...canonical(!filtered && page > 1 ? `/research?page=${page}` : "/research", locale), ...(filtered || emptyPage ? { robots: { index: false, follow: true } } : {}), title, description, openGraph: { images: [{ url: ogImage("Research", "Verified Institutional Research", "Sources, horizons, risks and comparable views"), width: 1200, height: 630 }] } };
+  const title = researchSeoTitle(locale);
+  const description = tr(
+    locale,
+    "Bank and asset-manager research, each report reduced to its conclusion, asset views, targets, horizons and risks, with a link to the original.",
+    "银行与资管机构的公开研报：每篇提炼为结论、资产观点、目标价、期限与风险，并保留原始来源链接。",
+  );
+  return {
+    ...canonical(!filtered && page > 1 ? `/research?page=${page}` : "/research", locale),
+    ...(filtered || emptyPage ? { robots: { index: false, follow: true } } : {}),
+    title: { absolute: title },
+    description: clamp(description, 158),
+    openGraph: { type: "website", title, description, url: localizedUrl("/research", locale), locale, images: [{ url: ogImage("Research", title, tr(locale, "Sources, horizons, risks and comparable views", "来源、期限、风险与可比较的观点")), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description },
+  };
 }
 
 const ASSET_CLASSES: Array<[string, string]> = [["equity", "股票"], ["rate", "利率"], ["fx", "外汇"], ["commodity", "大宗商品"], ["crypto", "加密资产"], ["macro", "宏观"]];
@@ -34,6 +53,8 @@ export default async function ResearchIndex(
   const searchParams = await props.searchParams;
   const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
+  // Same test the metadata uses: a filtered view is not the feed, so it does not claim its list.
+  const filtered = Object.entries(searchParams).some(([key, value]) => key !== "page" && Boolean(value));
   const take = 20;
   const direction = searchParams.direction === "bull"
     ? { gt: 0 }
@@ -103,6 +124,26 @@ export default async function ResearchIndex(
       <div className="page-head"><div className="eyebrow">{tr(locale, "Feed", "研报流")}</div><h1>{tr(locale, "Latest Research", "最新研报")}</h1>
         <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, `${total} structured institutional reports.`, `共 ${total} 篇结构化机构研报。`)}</p>
       </div>
+      {/* The list itself is an ItemList: the items are exactly the cards rendered below, so
+          the markup and the structured data cannot drift apart. Paginated and filtered views
+          are not the list, so they do not claim to be it. */}
+      {!filtered && page === 1 && feed.length > 0 && (
+        <JsonLd data={itemListJsonLd(locale, "/research", tr(locale, "Institutional research feed", "机构研报流"), feed.map((article) => ({
+          name: locale === "zh-CN" && article.translations?.[0]?.title ? article.translations[0].title : article.title,
+          path: researchPath(article),
+        })))} />
+      )}
+      <p className="sub" style={{ maxWidth: "72ch", color: "var(--muted)" }}>
+        {tr(locale, "Reports are admitted only from public, source-verifiable pages. ", "仅收录公开发布、来源可核验的研报。")}
+        <Link href={localePath(locale, "/methodology")}>{tr(locale, "How Tlines structures a report", "Tlines 如何结构化一篇研报")}</Link>
+        {tr(locale, ", grouped by ", "，可按")}
+        <Link href={localePath(locale, "/markets")}>{tr(locale, "asset", "资产")}</Link>
+        {tr(locale, ", ", "、")}
+        <Link href={localePath(locale, "/institutions")}>{tr(locale, "publishing institution", "机构")}</Link>
+        {tr(locale, " or ", "或")}
+        <Link href={localePath(locale, "/topics")}>{tr(locale, "topic", "主题")}</Link>
+        {tr(locale, " below.", "查看。")}
+      </p>
       <section style={{ paddingTop: 22 }}>
         <form className="research-filters">
           {countries.length > 0 && (

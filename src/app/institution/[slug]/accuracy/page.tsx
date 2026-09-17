@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getInstitutionAccuracy } from "@/lib/forecast";
 import { assetName, formatDate, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { prisma } from "@/lib/db";
-import { canonical, noIndex } from "@/lib/seo";
+import { breadcrumbJsonLd, canonical, clamp, datasetJsonLd, JsonLd, noIndex } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,9 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   // out of the index rather than crawled, compared and dropped.
   const settled = await prisma.forecast.count({ where: { institutionId: institution.id, status: "settled" } });
   return {
-    title: tr(locale, `${name} forecast record`, `${name} 预测准确率`),
+    // Absolute: the layout's " · Tlines" suffix would push a 60-character subject past the
+    // width a result shows, and the institution's name in front is what a searcher matches.
+    title: { absolute: clamp(tr(locale, `${name} forecast accuracy — how its calls settled`, `${name}预测准确率：已结算观点的实际结果`), 60) },
     ...(settled === 0 ? { robots: { index: false, follow: true } } : {}),
     description: tr(
       locale,
@@ -43,7 +45,7 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
     <main className="wrap">
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Forecast Accuracy", "预测准确率")}</div>
-        <h1>{institutionName(data.institution.name, locale)}</h1>
+        <h1>{tr(locale, `${institutionName(data.institution.name, locale)} — forecast accuracy`, `${institutionName(data.institution.name, locale)}：预测准确率`)}</h1>
         <div className="deltas">
           <span>{tr(locale, "Settled", "已结算")} <b className="mono">{data.forecasts.length}</b></span>
           <span>{tr(locale, "Awaiting prices", "等待价格")} <b className="mono">{data.pending}</b></span>
@@ -55,8 +57,25 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
         <Link className="minibtn" href={localePath(locale, `/institution/${params.slug}`)}>← {tr(locale, "Institution", "机构")}</Link>
       </div>
 
+      <JsonLd data={breadcrumbJsonLd(locale, [
+        { name: tr(locale, "Institutions", "机构"), path: "/institutions" },
+        { name: institutionName(data.institution.name, locale), path: `/institution/${params.slug}` },
+        { name: tr(locale, "Forecast accuracy", "预测准确率"), path: `/institution/${params.slug}/accuracy` },
+      ])} />
+      {data.forecasts.length > 0 && <JsonLd data={datasetJsonLd(locale, `/institution/${params.slug}/accuracy`, tr(locale, `${data.institution.name} settled forecast record`, `${data.institution.name} 已结算预测记录`), tr(locale, `Published forecasts by ${data.institution.name}, settled against the first same-source observation on or after the target date. ${data.forecasts.length} settled calls.`, `${data.institution.name} 已发布预测，按目标日期当天或之后同一来源的首个观测值结算，共 ${data.forecasts.length} 条。`))} />}
+
+      <p className="sub" style={{ maxWidth: "72ch", color: "var(--muted)" }}>
+        {tr(locale,
+          `Every forecast below was published publicly by ${data.institution.name} with a stated target and date. Tlines records the first same-source observation on or after the target date, marks the call settled, and does not adjust the record afterwards. Calls that could not be settled are counted as excluded above rather than dropped silently.`,
+          `下列每一条预测均由 ${data.institution.name} 公开发布，并带有明确的目标价与日期。Tlines 取目标日期当天或之后同一来源的首个观测值进行结算，且事后不调整记录；无法结算的判断计入上方"已排除"，而不是静默丢弃。`)}
+        {" "}
+        <Link href={localePath(locale, "/methodology")}>{tr(locale, "Settlement method", "结算方法")}</Link>
+        {" · "}
+        <Link href={localePath(locale, "/corrections")}>{tr(locale, "Dispute a record", "对记录提出异议")}</Link>
+      </p>
+
       <section className="blk">
-        <div className="section-t">{tr(locale, "Settled forecasts", "已结算预测")}</div>
+        <h2 className="section-t">{tr(locale, "Settled forecasts", "已结算预测")}</h2>
         {data.forecasts.length ? <div className="tbl-wrap"><table>
           <thead><tr><th>{tr(locale, "Asset", "资产")}</th><th>{tr(locale, "Forecast", "预测值")}</th><th>{tr(locale, "Actual", "实际值")}</th><th>{tr(locale, "Direction", "方向")}</th><th>{tr(locale, "Error", "误差")}</th><th>{tr(locale, "Target date", "目标日期")}</th></tr></thead>
           <tbody>{data.forecasts.map((forecast) => <tr key={forecast.id}>

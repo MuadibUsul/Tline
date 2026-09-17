@@ -2,15 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
-import { assetName, formatDate, getLocale, institutionName, localizeChineseContent, tr, type Locale, localePath } from "@/lib/i18n";
+import { assetName, formatDate, getLocale, institutionName, localizeChineseContent, tr, LOCALES, type Locale, localePath } from "@/lib/i18n";
 import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
 import { prisma } from "@/lib/db";
 import PdfPreview from "@/app/_components/PdfPreview";
-import { JsonLd, breadcrumbJsonLd, canonical, localizedUrl, ogImage, reportJsonLd } from "@/lib/seo";
+import { JsonLd, breadcrumbJsonLd, canonical, clamp, displayTitle, localizedUrl, ogImage, reportJsonLd, stripPublisherPrefix } from "@/lib/seo";
 import { preferredEnglishDocuments, publicationReadyWhere, LOCALE_STRICT_ZH_SINCE } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
 import { contentQuality } from "@/lib/contentQuality";
 import { assetPath } from "@/lib/assetPath";
+import { getArticleTopics, getPeerReports, topicHref } from "@/lib/related";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -26,7 +27,12 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
       language: true,
       publishedAt: true,
       institution: { select: { name: true } },
-      analysis: { select: { seoTitle: true, summary: true, summaryZh: true, reviewStatus: true } },
+      analysis: {
+        select: {
+          seoTitle: true, summary: true, summaryZh: true, reviewStatus: true,
+          keyArguments: true, keyNumbers: true, risks: true, interpretation: true,
+        },
+      },
       translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true, qualityScore: true, status: true } },
     },
   });
@@ -37,22 +43,34 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   // — which tells a search engine nothing about the subject, so a generated title leads
   // instead when there is one. The page heading is unchanged: the institution's own wording
   // is what the reader is shown and what the citation carries.
-  const searchTitle = zh ? title : article.analysis?.seoTitle?.trim() || title;
-  const description = (zh ? article.analysis?.summaryZh : article.analysis?.summary)
-    ?? institutionName(article.institution.name, locale);
+  const searchTitle = clamp(stripPublisherPrefix(zh ? title : article.analysis?.seoTitle?.trim() || title, article.institution.name), 60);
   const quality = contentQuality(article, locale);
-  const availableLocales = article.translations[0] ? (["en", "zh-CN"] as const) : (["en"] as const);
+  // Only the languages that pass the gate are declared to each other. An hreflang pair where
+  // one side answers noindex tells a search engine the site has a page it does not have.
+  const indexableLocales = LOCALES.filter((candidate) => contentQuality(article, candidate).eligibility === "INDEX");
+  // The description is the page's own summary where one exists. Where none does, the
+  // institution name alone was a four-character description on Chinese pages; the fallback
+  // now carries the publisher, the date and what the page is.
+  const summary = (zh ? article.analysis?.summaryZh : article.analysis?.summary)?.trim();
+  const description = (summary
+    || tr(
+      locale,
+      `${article.institution.name} published this report on ${formatDate(article.publishedAt, locale)}. This page is Tlines' structured reading of it.`,
+      `${article.institution.name} 于 ${formatDate(article.publishedAt, locale)} 发布该研报，本页为 Tlines 的结构化解读。`,
+    )).slice(0, 158);
   return {
-    title: searchTitle,
-    description: description.slice(0, 160),
-    ...canonical(researchPath(article), locale, availableLocales),
+    // Absolute: the subject is what a searcher matches, and the layout's brand suffix costs
+    // nine characters of it. Search results already show the site name separately.
+    title: { absolute: searchTitle },
+    description,
+    ...canonical(researchPath(article), locale, indexableLocales.length ? indexableLocales : ["en"]),
     ...(quality.eligibility === "INDEX" ? {} : { robots: { index: false, follow: true } }),
     openGraph: {
       type: "article",
       url: localizedUrl(researchPath(article), locale),
       locale,
       title: searchTitle,
-      description: description.slice(0, 160),
+      description,
       publishedTime: article.publishedAt.toISOString(),
       images: [{ url: ogImage("Research", title, article.institution.name), width: 1200, height: 630 }],
     },
@@ -149,9 +167,16 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const publisherPdf = downloadDocuments.find((document) => document.kind === "source_native");
   const previewDocument = publisherPdf ?? a.documents.find((document) => document.kind === "original_pdf");
 
-  const heading = locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title;
+  const heading = displayTitle(locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title);
   const summary = (locale === "zh-CN" ? an?.summaryZh : an?.summary) ?? institutionName(a.institution.name, locale);
   const relatedAssets = [...new Map(a.atomicViews.filter((view) => view.assetTicker).map((view) => [view.assetTicker!, view.asset])).entries()];
+  // Both come from stored rows: the topics the extraction tagged, and other houses' reports
+  // on the same asset. Nothing is inferred, and an absent relation renders nothing.
+  const primaryTicker = a.atomicViews.find((view) => view.assetTicker)?.assetTicker ?? null;
+  const [articleTopics, peerReports] = await Promise.all([
+    getArticleTopics(a.id, locale),
+    primaryTicker ? getPeerReports({ articleId: a.id, ticker: primaryTicker, institutionId: a.institution.id }) : Promise.resolve([]),
+  ]);
 
   return (
     <main className="wrap" style={{ maxWidth: publisherPdf ? 1080 : 820 }}>
@@ -193,12 +218,12 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         </dl>
         {relatedAssets.length > 0 && <div className="tag-row" aria-label={tr(locale, "Related assets", "相关资产")}>{relatedAssets.map(([ticker, name]) => <Link className="chip acc" href={localePath(locale, assetPath(ticker))} key={ticker}>{assetName(name, locale, ticker)} · {ticker}</Link>)}</div>}
         {keyArgs.length > 0 && <section className="citation-arguments" aria-labelledby="key-arguments-heading">
-          <h3 id="key-arguments-heading">{tr(locale, "Key arguments", "关键论点")}</h3>
+          <h2 id="key-arguments-heading">{tr(locale, "Key arguments", "关键论点")}</h2>
           <ul className="citation-list">{keyArgs.map((item, index) => <li key={`${item}-${index}`}>{locale === "zh-CN" ? localizeChineseContent(item) : item}</li>)}</ul>
         </section>}
         {(keyNumbers.length > 0 || risks.length > 0) && <div className="citation-evidence">
           {keyNumbers.length > 0 && <section aria-labelledby="key-numbers-heading">
-            <h3 id="key-numbers-heading">{tr(locale, "Key numbers", "关键数字")}</h3>
+            <h2 id="key-numbers-heading">{tr(locale, "Key numbers", "关键数字")}</h2>
             <dl className="key-number-grid">
               {keyNumbers.map((item, index) => <div key={`${item.label}-${item.value}-${index}`}>
                 <dt>{item.label || tr(locale, "Value", "数值")}</dt>
@@ -207,12 +232,12 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             </dl>
           </section>}
           {risks.length > 0 && <section aria-labelledby="main-risks-heading">
-            <h3 id="main-risks-heading">{tr(locale, "Main risks", "主要风险")}</h3>
+            <h2 id="main-risks-heading">{tr(locale, "Main risks", "主要风险")}</h2>
             <ul className="citation-list">{risks.map((risk, index) => <li key={`${risk}-${index}`}>{risk}</li>)}</ul>
           </section>}
         </div>}
         {a.atomicViews.some((view) => view.conditionEn || view.conditionZh) && <section className="citation-conditions">
-          <h3>{tr(locale, "Conditions / invalidation", "条件 / 失效条件")}</h3>
+          <h2>{tr(locale, "Conditions / invalidation", "条件 / 失效条件")}</h2>
           <ul className="citation-list">{a.atomicViews.map((view) => locale === "zh-CN" ? view.conditionZh : view.conditionEn).filter(Boolean).map((condition, index) => <li key={`${condition}-${index}`}>{condition}</li>)}</ul>
         </section>}
         <p className="citation-source">{tr(locale, "Context: this is Tlines' automated structure of a public institutional report, not the institution's wording. Scope and date above travel with the conclusion.", "上下文：这是 Tlines 对公开机构研报的自动结构化结果，并非机构原话；引用结论时须同时保留上述机构与日期范围。")}</p>
@@ -303,7 +328,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
       </section>
 
       {(keyArgs.length > 0 || risks.length > 0) && <section className="blk">
-        <div className="section-t">{tr(locale, "AI analysis", "AI 分析")}</div>
+        <h2 className="section-t">{tr(locale, "AI analysis", "AI 分析")}</h2>
         {/* The body above is the institution's own text. Everything in this block is
             model-written about that text, and the distinction has to be legible. */}
         <div className="ai-analysis-label">
@@ -314,6 +339,45 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           )}
         </div>
       </section>}
+
+      {(articleTopics.length > 0 || peerReports.length > 0) && <section className="blk">
+        <h2 className="section-t">{tr(locale, "Related institutional views", "相关机构观点")}</h2>
+        {articleTopics.length > 0 && <div className="tag-row" style={{ marginBottom: peerReports.length ? 14 : 0 }}>
+          {articleTopics.map((topic) => (
+            <Link className="chip gray" href={localePath(locale, topicHref(topic.key))} key={topic.key}>
+              {topic.label} · {topic.views}
+            </Link>
+          ))}
+        </div>}
+        {peerReports.length > 0 && <>
+          <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 6 }}>
+            {tr(locale, `Other institutions on ${primaryTicker}`, `其他机构对 ${primaryTicker} 的观点`)}
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18, color: "var(--ink-2)", fontSize: 13 }}>
+            {peerReports.map((peer) => (
+              <li key={peer.slug} style={{ marginBottom: 5 }}>
+                <Link href={localePath(locale, `/research/${peer.slug}`)}>{peer.title}</Link>
+                <span className="mono" style={{ color: "var(--faint)" }}> — {institutionName(peer.institution.name, locale)}</span>
+              </li>
+            ))}
+          </ul>
+        </>}
+      </section>}
+
+      <section className="blk">
+        <h2 className="section-t">{tr(locale, "How this page was produced", "本页如何生成")}</h2>
+        {/* The accountability entries in the page's own context rather than only in the footer:
+            who wrote what, where the original is, when it was last touched, how to dispute it. */}
+        <p style={{ color: "var(--muted)", fontSize: 13, maxWidth: "72ch" }}>
+          {tr(locale,
+            `Tlines extracted the conclusion, arguments, numbers and risks above from the report published by ${a.institution.name} on ${date}, then structured them for comparison. The publisher's own wording is reachable through the source link on this page${publisherPdf ? " and is displayed in full above" : ""}. Last updated ${formatDate(a.updatedAt, locale)}. `,
+            `本页的结论、论点、数字与风险由 Tlines 从 ${a.institution.name} 于 ${date} 发布的研报中提取并结构化，用于横向比较。机构原文可通过本页来源链接访问${publisherPdf ? "，并已在上方完整展示" : ""}。最后更新于 ${formatDate(a.updatedAt, locale)}。`)}
+          <Link href={localePath(locale, "/methodology")}>{tr(locale, "Methodology", "方法论")}</Link>{" · "}
+          <Link href={localePath(locale, "/sources")}>{tr(locale, "Source policy", "来源政策")}</Link>{" · "}
+          <Link href={localePath(locale, "/ai-usage")}>{tr(locale, "AI usage", "AI 使用说明")}</Link>{" · "}
+          <Link href={localePath(locale, "/corrections")}>{tr(locale, "Request a correction", "申请更正")}</Link>
+        </p>
+      </section>
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { canonical } from "@/lib/seo";
+import { JsonLd, breadcrumbJsonLd, canonical, collectionPageJsonLd, itemListJsonLd, localizedUrl, macroSeoTitle, ogImage } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr, localePath } from "@/lib/i18n";
@@ -11,7 +11,19 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { ...canonical("/macro", locale), title: tr(locale, "Economic Data", "经济数据"), description: tr(locale, "Macro releases, indicators and the calendar ahead.", "宏观发布、指标与前瞻日历。") };
+  const title = macroSeoTitle(locale);
+  const description = tr(
+    locale,
+    "Scheduled releases with the consensus institutions expected before the print, the figures as published, every revision, and which banks forecast what.",
+    "已排期的数据发布：发布前机构预期的共识、实际公布值、后续修订，以及各家银行的预测。",
+  );
+  return {
+    ...canonical("/macro", locale),
+    title: { absolute: title },
+    description,
+    openGraph: { type: "website", title, description, url: localizedUrl("/macro", locale), locale, images: [{ url: ogImage("Economic Data", title, tr(locale, "Releases, consensus and institutional forecasts", "发布、共识与机构预测")), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description },
+  };
 }
 
 const toNum = (value: { toString(): string } | null | undefined) => (value === null || value === undefined ? null : Number(value.toString()));
@@ -71,10 +83,26 @@ export default async function MacroPage() {
 
   return (
     <main className="wrap">
+      <JsonLd data={collectionPageJsonLd(locale, "/macro", macroSeoTitle(locale), tr(locale, "Macro releases, the indicators behind them and the consensus before each print.", "宏观发布、对应指标，以及每次公布前的市场共识。"), tr(locale, "Economic data", "经济数据"))} />
+      <JsonLd data={itemListJsonLd(locale, "/macro", tr(locale, "Macro indicators", "宏观指标"), rows.map(({ indicator }) => ({ name: locale === "zh-CN" ? indicator.nameZh ?? indicator.nameEn : indicator.nameEn, path: `/macro/indicator/${indicator.canonicalKey}` })))} />
+      <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "Economic Data", "经济数据"), path: "/macro" }])} />
+      <div className="page-head">
+        <div className="eyebrow">{tr(locale, "Macro", "宏观")}</div>
+        <h1>{tr(locale, "Economic Data", "经济数据")}</h1>
+        <p className="sub">{tr(locale, `${rows.length} indicators with their release history, and the scheduled prints ahead.`, `${rows.length} 个指标的历史发布序列，以及接下来的发布日程。`)}</p>
+        <p className="sub" style={{ color: "var(--muted)", maxWidth: "72ch" }}>
+          {tr(locale, "Every release page shows what institutions expected before the print, what was published, and how the figure was revised afterwards. ", "每个发布页都展示发布前机构预期、实际公布值，以及之后的修订情况。")}
+          <Link href={localePath(locale, "/topics")}>{tr(locale, "Browse by topic", "按主题浏览")}</Link>
+          {" · "}
+          <Link href={localePath(locale, "/macro/calendar")}>{tr(locale, "Full calendar", "完整日历")}</Link>
+          {" · "}
+          <Link href={localePath(locale, "/methodology")}>{tr(locale, "How consensus is computed", "共识如何计算")}</Link>
+        </p>
+      </div>
       <ReleaseSpotlight releases={spotlight} locale={locale} initialNow={Date.now()} />
       <section className="blk">
         <div className="macro-calendar-head">
-          <div className="section-t">{tr(locale, "Economic calendar · Beijing time", "经济日历 · 北京时间")}</div>
+          <h2 className="section-t">{tr(locale, "Economic calendar · Beijing time", "经济日历 · 北京时间")}</h2>
           <Link className="minibtn" href={localePath(locale, "/macro/calendar")}>{tr(locale, "Full calendar ↗", "完整日历 ↗")}</Link>
         </div>
         <div className="tbl-wrap"><table>
@@ -111,7 +139,7 @@ export default async function MacroPage() {
       <div className="markets-grid">
         {categories.map((category) => (
           <section className="blk" key={category}>
-            <div className="section-t">{CATEGORY_ZH[category] && locale === "zh-CN" ? CATEGORY_ZH[category] : category}</div>
+            <h2 className="section-t">{CATEGORY_ZH[category] && locale === "zh-CN" ? CATEGORY_ZH[category] : category}</h2>
             <div className="tbl-wrap"><table>
               <thead><tr>
                 <th>{tr(locale, "Indicator", "指标")}</th>

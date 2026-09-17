@@ -53,14 +53,68 @@ interface ReportSchema {
 
 export const brandName = (locale: Locale) => locale === "zh-CN" ? SITE_NAME_ZH : SITE_NAME;
 export const homeSeoTitle = (locale: Locale) => locale === "zh-CN"
-  ? "Tlines 全球机构情报｜银行研报、市场共识与资产信号"
-  : "Tlines Institutional Intelligence | Bank Research & Market Consensus";
-export const assetSeoTitle = (name: string, locale: Locale) => locale === "zh-CN"
-  ? `${name}机构展望与银行预测｜Tlines`
-  : `${name} Institutional Outlook & Bank Forecasts | Tlines`;
+  ? "Tlines 全球机构情报：银行研报与市场共识"
+  : "Tlines — Institutional Research & Bank Consensus";
+
+/**
+ * Titles and descriptions are built to a length, not to a template.
+ *
+ * A search result shows roughly 60 characters of a title and 158 of a description, and
+ * everything past that is either truncated or dropped. TITLE_SUFFIX is what the root layout
+ * appends to a title it composes itself, so a builder whose output is *composed* (rather than
+ * passed as `absolute`) must leave room for it — a 60-character builder then yields a
+ * 69-character title. Every page-level template therefore passes `{ absolute: clamp(...) }`,
+ * and seo.test.ts asserts both the suffix length and the clamp boundary.
+ */
+export const TITLE_SUFFIX = " · Tlines";
+export const TITLE_MAX = 60;
+export const DESCRIPTION_MAX = 158;
+
+export function clamp(text: string, max: number) {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max - 1);
+  const boundary = cut.lastIndexOf(" ");
+  return `${(boundary > max * 0.6 ? cut.slice(0, boundary) : cut).replace(/[,;:.·|\-—]\s*$/, "")}…`;
+}
+
+/** A title that owns its full width instead of sharing it with the layout's brand suffix. */
+export function absoluteTitle(subject: string, max = TITLE_MAX) {
+  return { absolute: clamp(subject, max) };
+}
+
+/** Title for a page whose own name is the query, so the name leads and the qualifier follows. */
+export function namedSeoTitle(subject: string, intent: string, locale: Locale) {
+  return clamp(locale === "zh-CN" ? `${subject}${intent}` : `${subject} — ${intent}`, 60);
+}
+
+export const assetSeoTitle = (name: string, locale: Locale, ticker?: string | null) => locale === "zh-CN"
+  ? clamp(`${name}机构展望、目标价与共识`, 60)
+  : clamp(`${name}${ticker && ticker.toUpperCase() !== name.toUpperCase() ? ` (${ticker.toUpperCase()})` : ""} Institutional Outlook & Bank Forecasts`, 60);
+
 export const institutionSeoTitle = (name: string, locale: Locale) => locale === "zh-CN"
-  ? `${name}市场观点、预测与研报｜Tlines`
-  : `${name} Market Outlook, Forecasts & Research | Tlines`;
+  ? clamp(`${name}研报、市场观点与预测`, 60)
+  : clamp(`${name} Research, Market Views & Forecasts`, 60);
+
+export const marketsSeoTitle = (locale: Locale) => locale === "zh-CN"
+  ? "资产机构展望：各资产机构观点与共识"
+  : clamp("Institutional Market Outlooks by Asset", 60);
+export const researchSeoTitle = (locale: Locale) => locale === "zh-CN"
+  ? "机构研报流：可溯源的银行研究"
+  : clamp("Institutional Research Feed: Source-Linked Bank Reports", 60);
+export const viewsSeoTitle = (locale: Locale) => locale === "zh-CN"
+  ? "机构观点：按热度排序的银行市场观点"
+  : clamp("Institutional Market Views, Ranked by Heat", 60);
+export const macroSeoTitle = (locale: Locale) => locale === "zh-CN"
+  ? "经济数据：发布、预期与机构预测"
+  : clamp("Economic Data: Releases, Consensus & Institutional Forecasts", 60);
+export const topicsSeoTitle = (locale: Locale) => locale === "zh-CN"
+  ? "宏观与市场主题：机构正在研究什么"
+  : clamp("Market Topics: What Institutions Are Researching", 60);
+export const marketThemesSeoTitle = (locale: Locale) => locale === "zh-CN"
+  ? "交易主线：机构研报支持的当期市场逻辑"
+  : clamp("Market Themes: Narratives Backed by Institutional Research", 60);
+
 export const localizedUrl = (path: string, locale: Locale) => new URL(localePath(locale, path), siteUrl()).toString();
 export const organizationId = () => `${siteUrl()}${ORGANIZATION_ID_PATH}`;
 export function ogImage(kind: string, title: string, subtitle?: string) {
@@ -77,7 +131,90 @@ export function organizationJsonLd(locale: Locale) {
     "@context": "https://schema.org", "@type": "Organization", "@id": organizationId(),
     name: brandName(locale), alternateName: locale === "zh-CN" ? SITE_NAME : SITE_NAME_ZH,
     url: base, logo: { "@type": "ImageObject", url: `${base}/icon.svg` }, sameAs,
+    // What the organization is, in its own words, on the entity rather than only on a policy page.
+    description: locale === "zh-CN"
+      ? "Tlines 把全球金融机构公开发布的研报，整理成可比较、可追踪、可溯源的结构化市场观点、共识与信号。"
+      : "Tlines structures publicly published institutional research into comparable, source-linked market views, consensus and signals.",
+    // Where the editorial rules are written down, so the entity points at its own accountability.
+    publishingPrinciples: `${base}${localePath(locale, "/editorial-policy")}`,
+    diversityPolicy: `${base}${localePath(locale, "/sources")}`,
+    correctionsPolicy: `${base}${localePath(locale, "/corrections")}`,
+    ...(process.env.BRAND_FOUNDED ? { foundingDate: process.env.BRAND_FOUNDED } : {}),
   };
+}
+
+/**
+ * A list of things that are on the page, in the order a reader sees them.
+ *
+ * Only for pages that really render the items: a hub page naming its assets, a feed naming
+ * its reports. The items are the page's own links, so nothing here is a claim the HTML does
+ * not already make.
+ */
+export function itemListJsonLd(locale: Locale, path: string, name: string, items: Array<{ name: string; path: string }>) {
+  const url = localizedUrl(path, locale);
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "@id": `${url}#itemlist`,
+    name,
+    numberOfItems: items.length,
+    itemListOrder: "https://schema.org/ItemListOrderAscending",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      url: localizedUrl(item.path, locale),
+    })),
+  };
+}
+
+/** A hub page: the collection itself, plus what it is a collection of. */
+export function collectionPageJsonLd(locale: Locale, path: string, name: string, description: string, about?: string) {
+  const page = webPageJsonLd(locale, path, name, description, "CollectionPage");
+  return about ? { ...page, about: { "@type": "Thing", name: about } } : page;
+}
+
+/**
+ * The report page's search-facing title.
+ *
+ * The stored title is the publisher's own wording, which is right for the H1 and wrong for a
+ * result: many series titles start with the institution's name, bracket noise or a document
+ * label. The cleaned title is used only where a search engine reads it.
+ */
+const NOISE_IN_TITLE = /^(?:pdf|document|file of entire text|untitled)\b/i;
+export function researchSeoSubject(title: string) {
+  const clean = title.replace(/\s*[·|]\s*(?:global economics|fixed income commentary|macro)\s*$/i, "")
+    .replace(/【[^】]*】/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean || NOISE_IN_TITLE.test(clean)) return null;
+  return clean;
+}
+
+/**
+ * The publisher's headline, as shown to a reader.
+ *
+ * Extraction occasionally lower-cases a whole headline, so report pages have gone live titled
+ * "the turkish central bank stays on hold signals continued caution". Capitalising the first
+ * letter is the whole of the safe repair here — re-casing proper nouns is a rewrite, and the
+ * institution's wording is the thing being preserved.
+ */
+export function displayTitle(title: string) {
+  const clean = title.replace(/\s+/g, " ").trim();
+  if (!clean) return clean;
+  if (/^[a-z]/.test(clean) && !/[A-Z]/.test(clean)) return clean.charAt(0).toLocaleUpperCase() + clean.slice(1);
+  return clean;
+}
+
+/** Drops a publisher name that the headline repeats, e.g. "UOB Group Research · UOB Group". */
+export function stripPublisherPrefix(title: string, publisher: string) {
+  const clean = displayTitle(title);
+  const prefix = publisher.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!prefix || prefix.length < 4) return clean;
+  const match = clean.match(new RegExp(`^${prefix}\\b[\\s:·\\-—|]*`, "i"));
+  if (!match) return clean;
+  const rest = clean.slice(match[0].length).trim();
+  return rest.length >= 12 ? rest : clean;
 }
 
 /**

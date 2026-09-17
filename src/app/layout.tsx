@@ -13,7 +13,7 @@ import Analytics from "./_components/Analytics";
 import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { siteUrl } from "@/lib/site";
-import { brandName, localizedUrl, ogImage } from "@/lib/seo";
+import { brandName, localizedUrl, ogImage, TITLE_SUFFIX } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -25,7 +25,9 @@ export async function generateMetadata(): Promise<Metadata> {
   );
   return {
     metadataBase: new URL(siteUrl()),
-    title: { default: title, template: `%s · ${title}` },
+    // The suffix is short on purpose: the full brand name costs 26 characters of every
+    // composed title. Pages that own their full width pass `absolute` instead — see TITLE_SUFFIX.
+    title: { default: title, template: `%s${TITLE_SUFFIX}` },
     description,
     applicationName: title,
     openGraph: { type: "website", siteName: title, title, description, locale, url: localizedUrl("/", locale), images: [{ url: ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal"), width: 1200, height: 630 }] },

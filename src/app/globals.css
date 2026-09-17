@@ -623,7 +623,7 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .citation-facts div{padding:10px;background:var(--panel-2);border-radius:8px}.citation-facts dt{font:10px var(--mono);color:var(--faint);text-transform:uppercase}.citation-facts dd{margin:3px 0 0;font-size:13px}
 .citation-evidence{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:12px;margin:16px 0}
 .citation-evidence section,.citation-conditions,.citation-arguments{padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
-.citation-evidence h3,.citation-conditions h3,.citation-arguments h3{margin:0 0 10px;font:600 13px var(--sans);color:var(--ink)}
+.citation-evidence h3,.citation-evidence h2,.citation-conditions h3,.citation-conditions h2,.citation-arguments h3,.citation-arguments h2{margin:0 0 10px;font:600 13px var(--sans);color:var(--ink)}
 /* Full width and ahead of the evidence grid: the arguments are what the report claims,
    and the figures and risks below are what support and qualify them. */
 .citation-arguments{margin:16px 0 0}

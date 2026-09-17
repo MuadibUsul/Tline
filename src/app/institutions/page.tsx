@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { canonical } from "@/lib/seo";
+import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, localizedUrl, ogImage, viewsSeoTitle } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { relTime } from "@/app/_components/ui";
@@ -16,7 +16,19 @@ export async function generateMetadata(props: { searchParams: Promise<{ page?: s
   const searchParams = await props.searchParams;
   const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
-  return { ...canonical(page > 1 ? `/institutions?page=${page}` : "/institutions", locale), title: tr(locale, "Views", "观点"), description: tr(locale, "Atomic institutional views ranked by heat, authority and freshness.", "按热度、机构权威与新鲜度排序的机构原子观点。") };
+  const title = viewsSeoTitle(locale);
+  const description = tr(
+    locale,
+    "The most consequential institutional views of the last seven days, ranked by cross-institution heat, publisher authority and freshness, each linked to the report it came from.",
+    "最近 7 天最值得关注的机构观点，按跨机构热度、机构权威度与新鲜度排序，每条都链接到原始研报。",
+  );
+  return {
+    ...canonical(page > 1 ? `/institutions?page=${page}` : "/institutions", locale),
+    title: { absolute: title },
+    description: clamp(description, 158),
+    openGraph: { type: "website", title, description, url: localizedUrl("/institutions", locale), locale, images: [{ url: ogImage("Views", title, tr(locale, "Ranked by heat, authority and freshness", "按热度、机构权威与新鲜度排序")), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description },
+  };
 }
 
 const TYPE_ZH: Record<string, string> = {
@@ -64,10 +76,20 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
 
   return (
     <main className="wrap view-stream-wrap">
+      <JsonLd data={collectionPageJsonLd(locale, "/institutions", viewsSeoTitle(locale), tr(locale, "Evidence-backed institutional views published in the last seven days.", "最近 7 天发布的、可追溯的机构观点。"), tr(locale, "Institutional market views", "机构市场观点"))} />
+      <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "Views", "观点"), path: "/institutions" }])} />
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Institutional Wire", "机构短讯")}</div>
         <h1>{tr(locale, "Views", "观点")}</h1>
         <p className="sub">{tr(locale, `${total} evidence-backed views published in the latest 7 days, newest first with same-topic and same-event views grouped together.`, `共 ${total} 条最近7天发布的可追溯观点，最新优先，同主题、同事件的观点聚合在一起。`)}</p>
+        <p className="sub" style={{ color: "var(--muted)", maxWidth: "72ch" }}>
+          {tr(locale, "Each line is one claim extracted from one report: what the publisher expects, in which direction, on which asset, over what horizon. ", "每一条都是从一篇研报中提取的具体主张：哪家机构、对哪个资产、什么方向、什么期限。")}
+          <Link href={localePath(locale, "/methodology")}>{tr(locale, "How views are extracted", "观点如何提取")}</Link>
+          {" · "}
+          <Link href={localePath(locale, "/markets")}>{tr(locale, "By asset", "按资产查看")}</Link>
+          {" · "}
+          <Link href={localePath(locale, "/topics")}>{tr(locale, "By topic", "按主题查看")}</Link>
+        </p>
       </div>
 
       <section className="view-flash-list" aria-label={tr(locale, "Latest institutional views", "最新机构观点")}>
@@ -105,9 +127,9 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
       </section>
 
       {pages > 1 && <nav className="pagination" aria-label={tr(locale, "View pages", "观点分页")}>
-        {page > 1 && <Link href={localePath(locale, `/institutions?page=${page - 1}`)}>← {tr(locale, "Previous", "上一页")}</Link>}
+        {page > 1 && <Link href={localePath(locale, `/institutions?page=${page - 1}`)} rel="prev">← {tr(locale, "Previous", "上一页")}</Link>}
         <span>{tr(locale, `Page ${page} / ${pages}`, `第 ${page} / ${pages} 页`)}</span>
-        {page < pages && <Link href={localePath(locale, `/institutions?page=${page + 1}`)}>{tr(locale, "Next", "下一页")} →</Link>}
+        {page < pages && <Link href={localePath(locale, `/institutions?page=${page + 1}`)} rel="next">{tr(locale, "Next", "下一页")} →</Link>}
       </nav>}
     </main>
   );

@@ -36,12 +36,23 @@ const DOC_SIZE_LABEL = /\b(?:pdf|document|file)\b[^a-z]{0,20}\b\d+\s*(?:kb|mb|k|
 const HAN = /\p{Script=Han}/u;
 const COMMON_COMPOUNDS = new Set(["viewpoint", "investment", "institution", "institutional", "research", "outlook", "forecast", "consensus", "economics", "strategy"]);
 
-/** True when a title is a document caption, a size label, or too short to be a subject. */
+/**
+ * True when a title is a document caption, a size label, or too short to be a subject.
+ *
+ * Shared with the title-repair command, so the pages this withholds are exactly the pages
+ * that command can find. They were two predicates before, and the difference was invisible:
+ * twenty-four report pages were withheld as labels while the repair saw only eight
+ * candidates, because each tool had its own idea of what a label is.
+ */
 export function isNoiseTitle(title: string) {
   const clean = title.trim();
   if (BAD_TITLE.test(clean)) return true;
   if (NOISE_TITLE.test(clean)) return true;
   if (DOC_SIZE_LABEL.test(clean)) return true;
+  // The letter count is a test for a Latin title that carries no words. A title written in
+  // Chinese is short of letters by nature and is not thereby a label — the language check
+  // above already covers a Chinese title on an English source.
+  if (HAN.test(clean)) return false;
   return (clean.match(/\p{L}/gu) ?? []).length < 6;
 }
 

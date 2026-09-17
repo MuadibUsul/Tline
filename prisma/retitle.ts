@@ -3,6 +3,7 @@ import { prisma } from "../src/lib/db";
 import { readPrivateFile } from "../src/lib/documents/storage";
 import { extractPdf } from "../src/lib/documents/extractPdf";
 import { isCallToActionOnly, resolveDocumentTitle } from "../src/lib/ingest/documentTitle";
+import { isNoiseTitle } from "../src/lib/contentQuality";
 import { resolveLLMProvider } from "../src/lib/llm/config";
 import { completeJSON } from "../src/lib/llm/provider";
 import { protectTitleDates, restoreTitleDates } from "../src/lib/translation/titleDates";
@@ -37,6 +38,10 @@ const flag = (name: string) => process.argv.includes(`--${name}`);
  * whether anything descriptive survives once the numbers are set aside.
  */
 function unusable(title: string) {
+  // The same predicate the index gate withholds on. Two definitions of "this title is a
+  // label" meant the repair could never reach twenty-four of the pages the gate had taken
+  // out of the index, and nothing said so. One definition, used by both.
+  if (isNoiseTitle(title)) return true;
   if (isCallToActionOnly(title)) return true;
   if (/[一-鿿]/.test(title)) return false;
   // A publisher that wrapped the real title inside the instruction — which is how

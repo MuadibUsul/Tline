@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./admin.css";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";

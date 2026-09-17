@@ -10,6 +10,8 @@ const config = [
       ".next-tline/**",
       ".next-*/**",
       ".runtime/**",
+      // Local audit and one-off scripts: not part of the build, not linted.
+      ".preview/**",
       "storage/**",
       // Vendored pdf.js assets: shipped as published, not ours to lint.
       "public/pdfjs/**",

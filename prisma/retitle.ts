@@ -39,6 +39,14 @@ const flag = (name: string) => process.argv.includes(`--${name}`);
 function unusable(title: string) {
   if (isCallToActionOnly(title)) return true;
   if (/[一-鿿]/.test(title)) return false;
+  // A publisher that wrapped the real title inside the instruction — which is how
+  // `Download the PDF "Ongoing Developments Part 1"` went live, indexed under the label
+  // while its subject sat in the quotes. The instruction is stripped on the way in, but
+  // only for pages fetched after that rule existed, so a stored title still carrying a
+  // quoted phrase of three words or more is a wrapper that needs unwrapping. One word in
+  // quotes is a normal headline quoting a term, and is left alone.
+  const quoted = /["“”「『]\s*([^"“”「」『』]{6,180}?)\s*["”」』]/.exec(title);
+  if (quoted && quoted[1].trim().split(/\s+/).length >= 3) return true;
   // Two descriptive words is the bar. Set the digits aside first: a date in the title is
   // not what makes it uninformative.
   const words = title.replace(/[0-9]+/g, " ").split(/[\s·|:–—-]+/).filter((word) => /[a-z]/i.test(word) && word.length > 1);

@@ -23,6 +23,7 @@ on:
           - diagnose-mail
           - set-password
           - dedupe-regional
+          - retitle
           - macro-analyze
           - consensus-license
           - macro-repair
@@ -103,6 +104,22 @@ jobs:
                 else
                   echo "Dry-run — nothing is written. Check the 'apply' box to merge."
                   $COMPOSE exec -T app npm run dedupe:regional
+                fi
+                ;;
+              retitle)
+                # Recovers titles for reports stored under a button label or a filename,
+                # by reading the title out of the document already in storage. Printed
+                # first because the recovered titles are the thing being reviewed: a row
+                # whose document yields nothing better is skipped, so this converges and
+                # is cheap to run again after new reports arrive.
+                $COMPOSE exec -T app npm run retitle -- --dry-run
+                if [ "$APPLY" = "true" ]; then
+                  echo ""
+                  echo "Applying: the titles printed above will be written."
+                  $COMPOSE exec -T app npm run retitle
+                else
+                  echo ""
+                  echo "Dry-run — nothing written. Check the 'apply' box to rename these."
                 fi
                 ;;
               macro-analyze)

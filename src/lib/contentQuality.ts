@@ -22,10 +22,16 @@ const BAD_TITLE = /^(?:untitled|title|document|report|research|go to article|dow
  *
  * Extraction reads a PDF's first lines and occasionally returns the file caption: a report
  * page went live titled "PDF 777 Kb" and another "file of entire text", both indexed, because
- * the only guard was a list of bare words. These are not the institution's headline in any
- * sense, so a page carrying one has no subject a searcher could have been looking for.
+ * the only guard was a list of bare words. A third went live as "Download the PDF \"Ongoing
+ * Developments Part 1\"" — its real subject, EU and UK financial services regulation, was
+ * only in the schema's isBasedOn. These are not the institution's headline in any sense, so
+ * a page carrying one has no subject a searcher could have been looking for.
+ *
+ * The action verb is required to sit at the start, and only the file nouns are listed: a real
+ * headline beginning "Download the report on Q3 earnings" is not a label for a document, and
+ * is left alone.
  */
-const NOISE_TITLE = /^(?:pdf|document|attachment|file)\b|(?:^|\b)(?:of entire text|full document|entire document)\b|uploaded (?:document|file)|^untitled\b/i;
+const NOISE_TITLE = /^(?:pdf|document|attachment|file)\b|^(?:download|view|open|read|get|fetch|see)\s+(?:the\s+|this\s+)?(?:pdf|document|attachment|file)\b|(?:^|\b)(?:of entire text|full document|entire document)\b|uploaded (?:document|file)|^untitled\b/i;
 const DOC_SIZE_LABEL = /\b(?:pdf|document|file)\b[^a-z]{0,20}\b\d+\s*(?:kb|mb|k|m)\b/i;
 const HAN = /\p{Script=Han}/u;
 const COMMON_COMPOUNDS = new Set(["viewpoint", "investment", "institution", "institutional", "research", "outlook", "forecast", "consensus", "economics", "strategy"]);
@@ -48,16 +54,6 @@ function hasBrokenWord(value: string) {
   return false;
 }
 
-function hasEntries(value: string | null | undefined) {
-  if (!value) return false;
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.length > 0 : Boolean(parsed);
-  } catch {
-    return value.trim().length > 0;
-  }
-}
-
 export function contentQuality(article: IndexableArticleInput, locale: Locale): ContentQualityResult {
   const issues: string[] = [];
   const title = article.title.trim();
@@ -72,17 +68,18 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
   if (!article.sourceUrl || !/^https?:\/\//i.test(article.sourceUrl)) issues.push("missing_source");
   if (article.language === "en" && HAN.test(title)) issues.push("source_language_mismatch");
   if (article.analysis && article.analysis.reviewStatus !== "ok") issues.push("analysis_needs_review");
-  // A report whose analysis carries no conclusion, no arguments, no numbers and no risks
-  // adds nothing to the source it points at. The source text alone is the publisher's work,
-  // so the page has no independent value to rank on — it stays reachable and out of the index.
-  // Only evaluated when the caller actually selected those columns: an absent column is not
-  // an empty one, and treating it as empty would take the whole corpus out of the index.
-  const a = article.analysis;
-  if (a
-    && (a.keyArguments !== undefined || a.keyNumbers !== undefined || a.risks !== undefined || a.interpretation !== undefined)
-    && !hasEntries(a.keyArguments) && !hasEntries(a.keyNumbers) && !hasEntries(a.risks) && !hasEntries(a.interpretation)) {
-    issues.push("no_structured_analysis");
-  }
+  /**
+   * There was a rule here that withheld a report whose analysis carried no key arguments,
+   * numbers, risks or interpretation, on the reasoning that the source text alone is the
+   * publisher's work and the page had nothing of its own to rank on.
+   *
+   * Production measured it at 17% of report pages, and the pages it caught were not the ones
+   * it was written for: they carried a Tlines-written conclusion and thousands of words, and
+   * a whole legitimate class — the market-commentary roundup, which makes no falsifiable call
+   * — has empty arrays by nature. A rule that takes one page in six out of the index on an
+   * assumption the data does not support is worse than no rule; the genuinely empty case is
+   * already covered by empty_summary and thin_content below.
+   */
 
   if (locale === "zh-CN") {
     if (!translation?.title.trim() || !translation.text?.trim()) issues.push("missing_translation");

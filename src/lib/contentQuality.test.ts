@@ -40,6 +40,27 @@ test("quality gate withholds call-to-action titles from indexing", () => {
   assert.ok(result.issues.includes("abnormal_title"));
 });
 
+test("document labels are withheld, and real headlines that mention a file are not", () => {
+  // Both were live and indexed: a page whose subject (EU and UK financial services
+  // regulation) appeared only in the schema, and one extracted from a PDF caption.
+  for (const title of ['Download the PDF "Ongoing Developments Part 1"', "PDF 777 Kb", "file of entire text", "View the document"]) {
+    assert.equal(contentQuality({ ...valid, title }, "en").indexable, false, `should be withheld: ${title}`);
+  }
+  // A publisher's headline that happens to mention a download is still a headline.
+  assert.equal(contentQuality({ ...valid, title: "Download the report on Q3 earnings" }, "en").indexable, true);
+  assert.equal(contentQuality({ ...valid, title: "Gold heads for third weekly gain" }, "en").indexable, true);
+});
+
+test("an analysis without structured arrays is not by itself grounds for noindex", () => {
+  // A rule that withheld these was measured at 17% of production report pages, including
+  // market-commentary roundups that make no falsifiable call and so have empty arrays by
+  // nature, and pages carrying a written conclusion and thousands of words. It was removed;
+  // this keeps it from returning without evidence.
+  const analysis = { summary: "A sourced conclusion for a defined period.", summaryZh: "有来源支持的结论。", reviewStatus: "ok", keyArguments: "[]", keyNumbers: "[]", risks: "[]", interpretation: null };
+  assert.equal(contentQuality({ ...valid, analysis }, "en").indexable, true);
+  assert.equal(contentQuality({ ...valid, analysis: { ...analysis, summary: "" } }, "en").indexable, false);
+});
+
 test("missing essential content is not generated as a public SEO page", () => {
   const result = contentQuality({ ...valid, rawText: null }, "en");
   assert.equal(result.eligibility, "NOT_GENERATED");

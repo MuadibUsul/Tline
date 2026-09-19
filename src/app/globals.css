@@ -736,6 +736,12 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 
 .chart-axis{fill:var(--faint);font:9px var(--mono)}
 
+/* Dual axis. Each axis wears the colour of the line it measures, so a reader never has to
+   infer the scale from which side of the plot a line happens to sit on. */
+.chart-axis-l{fill:var(--accent)}
+
+.chart-axis-r{fill:var(--bull)}
+
 .chart-area{fill:var(--accent);opacity:.10}
 
 .chart-line{fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}

@@ -32,8 +32,12 @@ function shortNumber(value: number): string {
 /**
  * Views and visitors over time.
  *
- * Two series on one axis: the gap between them is the story (many views per visitor means
- * people are reading on; a flat gap means they arrive and leave).
+ * The two series are counts of different size, so each one gets its own scale: views on
+ * the left axis, visitors on the right, both anchored at zero. On a shared axis the
+ * smaller series was pressed against the floor and its shape — the only thing a line
+ * chart is for — could not be read. The trade-off is that the gap between the lines stops
+ * meaning anything; each axis label carries the colour of the line it belongs to, so which
+ * scale a line reads against is never a guess.
  */
 export function TimeSeries({
   points,
@@ -52,17 +56,22 @@ export function TimeSeries({
   bare?: boolean;
 }) {
   if (points.length === 0) return <div className="empty-state">—</div>;
-  const max = niceMax(Math.max(1, ...points.map((point) => Math.max(point.primary, point.secondary ?? 0))));
-  const pad = bare ? { top: 3, right: 2, bottom: 3, left: 2 } : PAD;
+  // The second axis exists only when there is a second series to read against it: a label
+  // with no numbers behind it would claim a scale that nothing is measured on.
+  const dual = !bare && secondaryLabel !== undefined && points.some((point) => point.secondary !== undefined);
+  const pad = bare ? { top: 3, right: 2, bottom: 3, left: 2 } : dual ? { ...PAD, right: 40 } : PAD;
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
+  const ceiling = (pick: (point: SeriesPoint) => number) => niceMax(Math.max(1, ...points.map(pick)));
+  const max = ceiling(dual ? (point) => point.primary : (point) => Math.max(point.primary, point.secondary ?? 0));
+  const maxSecondary = dual ? ceiling((point) => point.secondary ?? 0) : max;
   // A single point has no span to divide by; it is drawn in the middle of the plot.
   const x = (index: number) => pad.left + (points.length === 1 ? plotW / 2 : (index / (points.length - 1)) * plotW);
-  const y = (value: number) => pad.top + plotH - (value / max) * plotH;
+  const y = (value: number, top: number) => pad.top + plotH - (value / top) * plotH;
 
-  const line = (pick: (point: SeriesPoint) => number) =>
-    points.map((point, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(pick(point)).toFixed(1)}`).join(" ");
-  const area = `${line((point) => point.primary)} L${x(points.length - 1).toFixed(1)},${(pad.top + plotH).toFixed(1)} L${x(0).toFixed(1)},${(pad.top + plotH).toFixed(1)} Z`;
+  const line = (pick: (point: SeriesPoint) => number, top: number) =>
+    points.map((point, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(pick(point), top).toFixed(1)}`).join(" ");
+  const area = `${line((point) => point.primary, max)} L${x(points.length - 1).toFixed(1)},${(pad.top + plotH).toFixed(1)} L${x(0).toFixed(1)},${(pad.top + plotH).toFixed(1)} Z`;
 
   // At most six labels: past that they collide and the axis becomes a grey smear.
   const every = Math.max(1, Math.ceil(points.length / 6));
@@ -73,13 +82,14 @@ export function TimeSeries({
         aria-label={`${primaryLabel}${secondaryLabel ? ` and ${secondaryLabel}` : ""}, ${points[0].label} to ${points.at(-1)!.label}`}>
         {!bare && [0, 0.5, 1].map((fraction) => (
           <g key={fraction}>
-            <line className="chart-grid" x1={pad.left} x2={width - pad.right} y1={y(max * fraction)} y2={y(max * fraction)} />
-            <text className="chart-axis" x={pad.left - 6} y={y(max * fraction) + 3} textAnchor="end">{shortNumber(max * fraction)}</text>
+            <line className="chart-grid" x1={pad.left} x2={width - pad.right} y1={y(max * fraction, max)} y2={y(max * fraction, max)} />
+            <text className={`chart-axis${dual ? " chart-axis-l" : ""}`} x={pad.left - 6} y={y(max * fraction, max) + 3} textAnchor="end">{shortNumber(max * fraction)}</text>
+            {dual && <text className="chart-axis chart-axis-r" x={width - pad.right + 6} y={y(max * fraction, max) + 3} textAnchor="start">{shortNumber(maxSecondary * fraction)}</text>}
           </g>
         ))}
         <path className="chart-area" d={area} />
-        <path className="chart-line" d={line((point) => point.primary)} />
-        {secondaryLabel && <path className="chart-line chart-line-2" d={line((point) => point.secondary ?? 0)} />}
+        <path className="chart-line" d={line((point) => point.primary, max)} />
+        {secondaryLabel && <path className="chart-line chart-line-2" d={line((point) => point.secondary ?? 0, maxSecondary)} />}
         {!bare && points.map((point, index) => index % every === 0 || index === points.length - 1 ? (
           <text className="chart-axis" key={point.label} x={x(index)} y={height - 6} textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}>{point.label}</text>
         ) : null)}

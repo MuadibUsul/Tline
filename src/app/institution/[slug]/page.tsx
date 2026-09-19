@@ -3,13 +3,15 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getInstitutionView } from "@/lib/queries";
-import { FeedCard, DirChip, relTime } from "@/app/_components/ui";
+import { FeedCard, DirChip, relTime, ResearchCard } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { breadcrumbJsonLd, canonical, institutionProfileJsonLd, institutionSeoTitle, itemListJsonLd, JsonLd, localizedUrl, ogImage } from "@/lib/seo";
 import { getInstitutionAssets, getInstitutionTopics, topicHref } from "@/lib/related";
 import { assetPath } from "@/lib/assetPath";
 import { publicationReadyWhere } from "@/lib/publication";
+import { queryClassifiedArticleIds } from "@/lib/classification/query";
+import { taxonomy } from "@/lib/classification/taxonomy";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -19,7 +21,16 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
     where: { slug },
     select: { name: true, country: true, _count: { select: { articles: { where: publicationReadyWhere() } } } },
   });
-  if (!institution) return { title: tr(locale, "Institution not found", "机构未找到") };
+  if (!institution) {
+    const subject = taxonomy.institutions.find((item) => item.key === slug);
+    if (!subject) return { title: tr(locale, "Institution not found", "机构未找到") };
+    const name = locale === "zh-CN" ? subject.nameZh : subject.nameEn;
+    return {
+      ...canonical(`/institution/${slug}`, locale),
+      title: tr(locale, `${name} policy and related research`, `${name}政策与相关研报`),
+      description: tr(locale, `Policy documents and research whose subject is ${name}, distinct from the report publisher.`, `以${name}为内容主体的政策文件与研报，与研报发布机构明确区分。`),
+    };
+  }
   const name = institutionName(institution.name, locale);
   const title = institutionSeoTitle(name, locale);
   const description = tr(
@@ -42,7 +53,43 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
   const params = await props.params;
   const locale = await getLocale();
   const data = await getInstitutionView(params.slug, locale);
-  if (!data) notFound();
+  if (!data) {
+    const subject = taxonomy.institutions.find((item) => item.key === params.slug);
+    if (!subject) notFound();
+    const articleIds = await queryClassifiedArticleIds({ institutions: [subject.key] }, 100);
+    const articles = articleIds.length ? await prisma.article.findMany({
+      where: publicationReadyWhere({ id: { in: articleIds } }, locale),
+      orderBy: { publishedAt: "desc" },
+      take: 12,
+      include: {
+        institution: true,
+        analysis: true,
+        translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } },
+        articleAssets: { include: { asset: true } },
+        classification: { include: { jurisdictions: true, topics: true, institutions: true } },
+      },
+    }) : [];
+    const name = locale === "zh-CN" ? subject.nameZh : subject.nameEn;
+    return (
+      <main className="wrap">
+        <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Institutions", "机构"), path: "/institutions" }, { name, path: `/institution/${subject.key}` }])} />
+        <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")}><Link href={localePath(locale, "/institutions")}>{tr(locale, "Institutions", "机构")}</Link><span>›</span><span>{name}</span></nav>
+        <div className="page-head">
+          <div className="eyebrow">{tr(locale, "Subject institution", "内容涉及机构")}</div>
+          <h1>{name}</h1>
+          <p className="sub">{tr(locale, `Policy and research about ${name}. The publishing institution remains a separate field on every report.`, `关于${name}的政策与研究。每篇研报的发布机构仍作为独立字段展示。`)}</p>
+          <div className="tag-row">
+            <Link className="chip acc" href={localePath(locale, `/economies/${subject.jurisdictionKey}`)}>{tr(locale, "Economy dashboard", "经济体看板")}</Link>
+            <Link className="chip gray" href={localePath(locale, `/research?subjectInstitution=${subject.key}`)}>{tr(locale, "Filtered research", "筛选研报")}</Link>
+          </div>
+        </div>
+        <section className="blk">
+          <h2 className="section-t">{tr(locale, "Related institutional research", "相关机构研报")}</h2>
+          {articles.length ? <div className="research-grid">{articles.map((article) => <ResearchCard key={article.id} a={article} locale={locale} />)}</div> : <div className="empty-state">{tr(locale, "No publication-ready classified research yet.", "暂时没有已分类且可公开的相关研报。")}</div>}
+        </section>
+      </main>
+    );
+  }
   const { inst, articles, count30, views, coverage } = data;
   // Where this publisher concentrates, and on what. Both are counted from its own rows.
   const [mainAssets, mainTopics] = await Promise.all([

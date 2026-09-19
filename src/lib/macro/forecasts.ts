@@ -1,5 +1,8 @@
 import { resolveLLMProvider } from "../llm/config";
 import { completeJSON, type LLMProvider } from "../llm/provider";
+import { buildTaskContext, CONTEXT_BUILDER_VERSION } from "../llm/context-builder";
+import { decideAiExecution, recordAiExecutionEvent } from "../llm/execution-policy";
+import { controlledGateAllowsSkip, runRoutingShadow } from "../decision/routing";
 
 // Generic expectations engine: turn any institution's research preview into normalized
 // numeric forecasts for tracked releases, and aggregate them into a consensus + distribution.
@@ -55,6 +58,7 @@ For each kept forecast output the country, indicator name, reference period (e.g
 Return ONLY JSON: {"forecasts":[{"country":string,"indicator":string,"referencePeriod":string,"value":string,"unit":string,"quote":string}]}.`;
 
 interface RawForecast { country?: string; indicator?: string; referencePeriod?: string; value?: string; unit?: string; quote?: string }
+export const FORECAST_PROMPT_VERSION = "macro-forecast-v2";
 
 const IS_US = /\b(u\.?s\.?a?|united states|america)\b/i;
 // Past-tense actuals masquerading as forecasts — belt-and-braces alongside the prompt.
@@ -65,13 +69,57 @@ export async function extractForecasts(
   title: string,
   text: string,
   injected?: LLMProvider | null,
+  audit?: { contentId?: string; contentHash?: string },
 ): Promise<ExtractedForecast[]> {
   const provider = injected ?? await resolveLLMProvider("forecast");
   if (!provider) throw new Error("No LLM provider is configured for forecast extraction.");
-  const { value } = await completeJSON<{ forecasts?: RawForecast[] }>(provider, {
+  const context = buildTaskContext("forecast", { title, text });
+  const policy = decideAiExecution({
+    taskType: "forecast",
+    contentId: audit?.contentId,
+    contentHash: audit?.contentHash ?? title,
+    promptVersion: FORECAST_PROMPT_VERSION,
+    contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+    requestedOutput: "forecast",
+    route: { provider: provider.name, model: provider.model },
+  });
+  const routing = await runRoutingShadow({
+    task: "forecast", contentId: audit?.contentId, title, excerpt: context.selectedText,
+    structuredMetadata: {}, policy,
+  });
+  if (controlledGateAllowsSkip("forecast", routing)) {
+    await recordAiExecutionEvent({
+      task: "forecast", contentId: audit?.contentId,
+      policy: { ...policy, executionLevel: "LEVEL_1", requiresLLM: false, reasonCodes: ["DECISION_ONLY"] },
+      cacheStatus: "NOT_APPLICABLE", attribution: "JEV_GATE",
+      originalEstimatedTokens: context.originalEstimatedTokens,
+      optimizedEstimatedTokens: 0,
+    });
+    return [];
+  }
+  const { value, meta } = await completeJSON<{ forecasts?: RawForecast[] }>(provider, {
     system: SYSTEM,
-    user: JSON.stringify({ title, body: text.slice(0, 12_000) }),
+    user: JSON.stringify({ title, body: context.selectedText }),
     maxTokens: 1500,
+    audit: {
+      contentId: audit?.contentId,
+      requestFingerprint: policy.fingerprint,
+      promptVersion: FORECAST_PROMPT_VERSION,
+      executionLevel: policy.executionLevel,
+      contextStrategy: context.strategy,
+      cacheStatus: "MISS",
+      reasonCodes: policy.reasonCodes,
+      savingsAttribution: context.strategy === "FULL" ? undefined : "CONTEXT_REDUCTION",
+      originalEstimatedTokens: context.originalEstimatedTokens,
+      optimizedEstimatedTokens: context.estimatedTokens,
+    },
+  });
+  await recordAiExecutionEvent({
+    task: "forecast", contentId: audit?.contentId, policy, cacheStatus: "MISS",
+    attribution: context.strategy === "FULL" ? undefined : "CONTEXT_REDUCTION",
+    originalEstimatedTokens: context.originalEstimatedTokens,
+    optimizedEstimatedTokens: context.estimatedTokens,
+    actualInputTokens: meta.usage?.inputTokens,
   });
   const rows = Array.isArray(value.forecasts) ? value.forecasts : [];
   const out: ExtractedForecast[] = [];

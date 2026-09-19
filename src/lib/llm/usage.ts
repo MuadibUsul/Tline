@@ -1,5 +1,5 @@
 import { dayKey } from "../analytics/identity";
-import type { CompletionUsage, FinishReason, LlmTask } from "./types";
+import type { CompletionAudit, CompletionUsage, FinishReason, LlmTask } from "./types";
 
 /**
  * Recording of what each model call actually cost.
@@ -17,6 +17,7 @@ export interface LlmCallRecord {
   durationMs: number;
   ok: boolean;
   error?: string;
+  audit?: CompletionAudit;
 }
 
 let warned = false;
@@ -40,6 +41,16 @@ export async function recordLlmCall(record: LlmCallRecord): Promise<void> {
         ok: record.ok,
         finishReason: record.finishReason ?? null,
         error: record.error?.slice(0, 500) ?? null,
+        contentId: record.audit?.contentId ?? null,
+        requestFingerprint: record.audit?.requestFingerprint ?? null,
+        promptVersion: record.audit?.promptVersion ?? null,
+        executionLevel: record.audit?.executionLevel ?? null,
+        contextStrategy: record.audit?.contextStrategy ?? null,
+        cacheStatus: record.audit?.cacheStatus ?? null,
+        reasonCodes: record.audit?.reasonCodes ? JSON.stringify(record.audit.reasonCodes) : null,
+        savingsAttribution: record.audit?.savingsAttribution ?? null,
+        originalEstimatedTokens: record.audit?.originalEstimatedTokens ?? null,
+        optimizedEstimatedTokens: record.audit?.optimizedEstimatedTokens ?? null,
       },
     });
   } catch (error) {

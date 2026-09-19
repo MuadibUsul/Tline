@@ -6,6 +6,8 @@ import { syncForecastsForArticle } from "../src/lib/forecast";
 import { clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
 import { anyProviderConfigured } from "../src/lib/llm/config";
 import { queueRetry } from "../src/lib/contentRetry";
+import { classifyDeterministically } from "../src/lib/classification/classifier";
+import { articleClassificationSourceFingerprint, persistDeterministicClassification } from "../src/lib/classification/store";
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
 const articleIds = (process.argv.find((arg) => arg.startsWith("--ids="))?.slice(6) || process.argv.find((arg) => arg.startsWith("--id="))?.slice(5) || "").split(",").filter(Boolean);
@@ -44,11 +46,21 @@ async function main() {
       id: true,
       title: true,
       contentHash: true,
+      titleHash: true,
       rawText: true,
       publishedAt: true,
       institution: { select: { name: true } },
       segments: { select: { heading: true, text: true }, orderBy: { position: "asc" } },
       analysis: { select: { reviewStatus: true } },
+      classification: { select: {
+        jurisdictionState: true, contentType: true,
+        jurisdictions: { select: { jurisdictionKey: true } },
+        institutions: { select: { institutionKey: true } },
+        topics: { select: { topicKey: true } },
+        assets: { select: { asset: { select: { ticker: true } } } },
+        assetClasses: { select: { assetClassKey: true } },
+        events: { select: { eventKey: true } },
+      } },
     },
     orderBy: { publishedAt: "desc" },
     take: limit,
@@ -64,10 +76,22 @@ async function main() {
     await Promise.all(candidates.slice(offset, offset + concurrency).map(async (article) => {
       try {
       const parsed = await parseArticle({
+        contentId: article.id,
+        contentHash: article.contentHash,
         institution: article.institution.name,
         title: article.title,
         text: article.rawText!,
         publishedAt: article.publishedAt.toISOString(),
+        classification: article.classification ? {
+          jurisdictionState: article.classification.jurisdictionState,
+          jurisdictions: article.classification.jurisdictions.map((item) => item.jurisdictionKey),
+          institutions: article.classification.institutions.map((item) => item.institutionKey),
+          topics: article.classification.topics.map((item) => item.topicKey),
+          assets: article.classification.assets.map((item) => item.asset.ticker),
+          assetClasses: article.classification.assetClasses.map((item) => item.assetClassKey),
+          events: article.classification.events.map((item) => item.eventKey),
+          contentType: article.classification.contentType,
+        } : null,
       }, article.segments);
 
       if (parsed.needsLLM) {
@@ -108,6 +132,7 @@ async function main() {
             model: parsed.model,
             promptVersion: parsed.promptVersion,
             reviewStatus: parsed.reviewStatus,
+            sourceContentHash: article.contentHash,
           },
           update: {
             summary: parsed.summary,
@@ -127,6 +152,7 @@ async function main() {
             model: parsed.model,
             promptVersion: parsed.promptVersion,
             reviewStatus: parsed.reviewStatus,
+            sourceContentHash: article.contentHash,
           },
         }),
         tx.articleAsset.deleteMany({ where: { articleId: article.id } }),
@@ -170,6 +196,12 @@ async function main() {
         })),
         ]);
       }, { isolationLevel: "Serializable" });
+      await persistDeterministicClassification({
+        target: { kind: "ARTICLE", id: article.id },
+        result: classifyDeterministically({ assets: uniqueSignals.map((signal) => signal.ticker), contentType: "RESEARCH_ARTICLE" }),
+        sourceFingerprint: articleClassificationSourceFingerprint(article.contentHash, article.titleHash, uniqueSignals.map((signal) => signal.ticker)),
+        apply: true,
+      }).catch((error) => console.error(JSON.stringify({ event: "classification.analysis.failed", articleId: article.id, error: String(error).slice(0, 300) })));
       // One automatic second pass for low-quality model output. During that retry the
       // queue row is already "running", so queueRetry is a no-op and cannot loop forever.
       if (parsed.reviewStatus === "needs_review") await queueRetry(article.id, "analysis");

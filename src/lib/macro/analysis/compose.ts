@@ -2,6 +2,7 @@ import { completeJSON, type LLMProvider } from "../../llm/provider";
 import { buildFacts, toNumber, type FactInput, type Playbook, type ReleaseFacts } from "./facts";
 import { fallbackReadOut, readOutViolations, type ReadOut } from "./guard";
 import type { AnalysisContext } from "./context";
+import type { CompletionAudit } from "../../llm/types";
 
 /**
  * Writing the read-out.
@@ -103,8 +104,8 @@ export interface ComposedReadOut {
   fallback: boolean;
 }
 
-async function attempt(provider: LLMProvider, system: string, user: string, maxTokens: number) {
-  const { value } = await completeJSON<Partial<ReadOut>>(provider, { system, user, maxTokens });
+async function attempt(provider: LLMProvider, system: string, user: string, maxTokens: number, audit?: CompletionAudit) {
+  const { value } = await completeJSON<Partial<ReadOut>>(provider, { system, user, maxTokens, audit });
   return { headline: value.headline?.trim() ?? "", read: value.read?.trim() ?? "", implication: value.implication?.trim() ?? "", watch: value.watch?.trim() ?? "" };
 }
 
@@ -121,6 +122,7 @@ export async function composeReadOut(input: {
   context: AnalysisContext;
   playbook: Playbook;
   locale: "en" | "zh-CN";
+  audit?: CompletionAudit;
 }): Promise<ComposedReadOut> {
   const base = analysisPrompt(input.facts, input.context, input.playbook);
   const user = input.locale === "en"
@@ -130,7 +132,7 @@ export async function composeReadOut(input: {
     : `${base}\n\n只输出中文解读（JSON 中的四个字段都用中文，术语用市场通行译法）。`;
   let violations: string[] = [];
   for (let round = 0; round < 2; round++) {
-    const draft = await attempt(input.provider, systemFor(input.locale), round === 0 ? user : `${user}\n\nThe previous draft was rejected. Fix exactly these and keep everything else:\n- ${violations.join("\n- ")}`, 4000);
+    const draft = await attempt(input.provider, systemFor(input.locale), round === 0 ? user : `${user}\n\nThe previous draft was rejected. Fix exactly these and keep everything else:\n- ${violations.join("\n- ")}`, 4000, input.audit);
     if (!draft.headline && !draft.read) { violations = ["the response was empty"]; continue; }
     violations = readOutViolations({ readOut: draft, facts: input.facts });
     if (!violations.length) return { readOut: draft, violations: [], fallback: false };
@@ -152,11 +154,12 @@ export async function composeReleaseAnalysis(input: {
   factInput: FactInput;
   context: AnalysisContext;
   playbook: Playbook;
+  audit?: CompletionAudit;
 }): Promise<ReleaseAnalysisResult> {
   const facts = buildFacts(input.factInput);
   const [en, zh] = await Promise.all([
-    composeReadOut({ provider: input.provider, facts, context: input.context, playbook: input.playbook, locale: "en" }),
-    composeReadOut({ provider: input.provider, facts, context: input.context, playbook: input.playbook, locale: "zh-CN" }),
+    composeReadOut({ provider: input.provider, facts, context: input.context, playbook: input.playbook, locale: "en", audit: input.audit }),
+    composeReadOut({ provider: input.provider, facts, context: input.context, playbook: input.playbook, locale: "zh-CN", audit: input.audit }),
   ]);
   // A beat/miss claim in one language and not the other is still a claim: check both against
   // both, since the two drafts are written independently.

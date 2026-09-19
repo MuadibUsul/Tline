@@ -9,6 +9,9 @@ import { publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
 import { byDisplayRecency, feedPulse } from "@/lib/queries";
 import { paginationWindow } from "@/lib/pagination";
+import { classificationWhere } from "@/lib/classification/query";
+import { resolveCanonicalKey, taxonomy } from "@/lib/classification/taxonomy";
+import type { ContentFilter } from "@/lib/classification/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +22,19 @@ export const dynamic = "force-dynamic";
  * parameter filters or it does not exist; halfway is the version a crawler reads as a
  * duplicate page with a contradictory robots tag.
  */
-type ResearchSearchParams = { institution?: string; country?: string; category?: string; ticker?: string; direction?: string; page?: string };
+type ResearchSearchParams = {
+  institution?: string;
+  country?: string;
+  category?: string;
+  ticker?: string;
+  direction?: string;
+  jurisdiction?: string;
+  subjectInstitution?: string;
+  topic?: string;
+  assetClass?: string;
+  event?: string;
+  page?: string;
+};
 
 export async function generateMetadata(props: { searchParams: Promise<ResearchSearchParams> }): Promise<Metadata> {
   const searchParams = await props.searchParams;
@@ -67,8 +82,23 @@ export default async function ResearchIndex(
     ...(searchParams.ticker ? { ticker: searchParams.ticker } : {}),
     ...(searchParams.category ? { assetClass: searchParams.category } : {}),
   };
+  const requestedFacets = [searchParams.jurisdiction, searchParams.subjectInstitution, searchParams.topic, searchParams.assetClass, searchParams.event].filter(Boolean);
+  const jurisdiction = searchParams.jurisdiction ? resolveCanonicalKey("jurisdiction", searchParams.jurisdiction) : null;
+  const subjectInstitution = searchParams.subjectInstitution ? resolveCanonicalKey("institution", searchParams.subjectInstitution) : null;
+  const topic = searchParams.topic ? resolveCanonicalKey("topic", searchParams.topic) : null;
+  const assetClass = searchParams.assetClass ? resolveCanonicalKey("assetClass", searchParams.assetClass) : null;
+  const event = searchParams.event ? resolveCanonicalKey("event", searchParams.event) : null;
+  const facetFilter: ContentFilter = {
+    ...(jurisdiction ? { jurisdictions: [jurisdiction] } : {}),
+    ...(subjectInstitution ? { institutions: [subjectInstitution] } : {}),
+    ...(topic ? { topics: [topic] } : {}),
+    ...(assetClass ? { assetClasses: [assetClass] } : {}),
+    ...(event ? { events: [event] } : {}),
+  };
+  const invalidFacet = requestedFacets.length > Object.values(facetFilter).filter(Boolean).length;
   const hasAssetFilter = searchParams.ticker || searchParams.category || direction;
   const where = publicationReadyWhere({
+    ...(invalidFacet ? { id: "__invalid_classification_filter__" } : requestedFacets.length ? { classification: { is: classificationWhere(facetFilter) } } : {}),
     ...((searchParams.institution || searchParams.country) ? {
       institution: {
         ...(searchParams.institution ? { slug: searchParams.institution } : {}),
@@ -99,7 +129,7 @@ export default async function ResearchIndex(
   const pageIds = articles.sort(byDisplayRecency).slice((page - 1) * take, page * take).map(({ id }) => id);
   const feed = (await prisma.article.findMany({
     where: { ...where, id: { in: pageIds } },
-    include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } }, articleAssets: { include: { asset: true } } },
+    include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } }, articleAssets: { include: { asset: true } }, classification: { include: { jurisdictions: true, topics: true, institutions: true } } },
   })).sort(byDisplayRecency);
   const pages = Math.max(1, Math.ceil(total / take));
   const query = new URLSearchParams();
@@ -108,6 +138,11 @@ export default async function ResearchIndex(
   if (searchParams.category) query.set("category", searchParams.category);
   if (searchParams.ticker) query.set("ticker", searchParams.ticker);
   if (searchParams.direction) query.set("direction", searchParams.direction);
+  if (searchParams.jurisdiction) query.set("jurisdiction", searchParams.jurisdiction);
+  if (searchParams.subjectInstitution) query.set("subjectInstitution", searchParams.subjectInstitution);
+  if (searchParams.topic) query.set("topic", searchParams.topic);
+  if (searchParams.assetClass) query.set("assetClass", searchParams.assetClass);
+  if (searchParams.event) query.set("event", searchParams.event);
   const pageHref = (target: number) => {
     const params = new URLSearchParams(query);
     params.set("page", String(target));
@@ -146,9 +181,29 @@ export default async function ResearchIndex(
       </p>
       <section style={{ paddingTop: 22 }}>
         <form className="research-filters">
+          <select name="jurisdiction" defaultValue={searchParams.jurisdiction ?? ""} aria-label={tr(locale, "Jurisdiction", "经济体")}>
+            <option value="">{tr(locale, "All economies", "全部经济体")}</option>
+            {taxonomy.jurisdictions.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
+          </select>
+          <select name="subjectInstitution" defaultValue={searchParams.subjectInstitution ?? ""} aria-label={tr(locale, "Subject institution", "内容涉及机构")}>
+            <option value="">{tr(locale, "All subject institutions", "全部内容涉及机构")}</option>
+            {taxonomy.institutions.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
+          </select>
+          <select name="topic" defaultValue={searchParams.topic ?? ""} aria-label={tr(locale, "Topic", "主题")}>
+            <option value="">{tr(locale, "All topics", "全部主题")}</option>
+            {taxonomy.topics.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
+          </select>
+          <select name="assetClass" defaultValue={searchParams.assetClass ?? ""} aria-label={tr(locale, "Asset class", "资产类别")}>
+            <option value="">{tr(locale, "All asset classes", "全部资产类别")}</option>
+            {taxonomy.assetClasses.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
+          </select>
+          <select name="event" defaultValue={searchParams.event ?? ""} aria-label={tr(locale, "Event", "事件")}>
+            <option value="">{tr(locale, "All events", "全部事件")}</option>
+            {taxonomy.events.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
+          </select>
           {countries.length > 0 && (
-            <select name="country" defaultValue={searchParams.country ?? ""} aria-label={tr(locale, "Country", "国家")}>
-              <option value="">{tr(locale, "All countries", "全部国家")}</option>
+            <select name="country" defaultValue={searchParams.country ?? ""} aria-label={tr(locale, "Publisher country", "发布机构所在国")}>
+              <option value="">{tr(locale, "All publisher countries", "全部发布机构所在国")}</option>
               {countries.map(({ country }) => <option key={country!} value={country!}>{country}</option>)}
             </select>
           )}

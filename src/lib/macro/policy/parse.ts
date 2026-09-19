@@ -1,6 +1,9 @@
 import { resolveLLMProvider } from "../../llm/config";
 import { completeJSON, type LLMProvider } from "../../llm/provider";
 import type { ParsedPolicyDocument, PolicyDecision, PolicyParseResult, PolicySourceQuote, PolicyStance } from "./types";
+import { buildTaskContext, CONTEXT_BUILDER_VERSION } from "../../llm/context-builder";
+import { decideAiExecution, recordAiExecutionEvent } from "../../llm/execution-policy";
+import { createHash } from "node:crypto";
 
 export const POLICY_PROMPT_VERSION = "fomc-policy-v1";
 const RATE = String.raw`(?:\d+(?:\.\d+)?(?:[- ]\d+\/\d+)?|\d+\/\d+)`;
@@ -137,7 +140,37 @@ export async function parsePolicyDocument(text: string, injected?: LLMProvider |
   const deterministic = extractDeterministicPolicy(text);
   if (!provider) return { parsed: deterministic, provider: "deterministic", model: null, promptVersion: POLICY_PROMPT_VERSION, reviewStatus: "deterministic" };
   try {
-    const result = await completeJSON<unknown>(provider, { system: SYSTEM, user: text.slice(0, 50_000), maxTokens: 2200 });
+    const context = buildTaskContext("policy", { text });
+    const policy = decideAiExecution({
+      taskType: "policy",
+      contentHash: createHash("sha256").update(text).digest("hex"),
+      promptVersion: POLICY_PROMPT_VERSION,
+      contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+      requestedOutput: "policy",
+      sourceInfo: { requiresFullText: true },
+      route: { provider: provider.name, model: provider.model },
+    });
+    const result = await completeJSON<unknown>(provider, {
+      system: SYSTEM,
+      user: context.selectedText,
+      maxTokens: 2200,
+      audit: {
+        requestFingerprint: policy.fingerprint,
+        promptVersion: POLICY_PROMPT_VERSION,
+        executionLevel: policy.executionLevel,
+        contextStrategy: context.strategy,
+        cacheStatus: "MISS",
+        reasonCodes: policy.reasonCodes,
+        originalEstimatedTokens: context.originalEstimatedTokens,
+        optimizedEstimatedTokens: context.estimatedTokens,
+      },
+    });
+    await recordAiExecutionEvent({
+      task: "policy", policy, cacheStatus: "MISS",
+      originalEstimatedTokens: context.originalEstimatedTokens,
+      optimizedEstimatedTokens: context.estimatedTokens,
+      actualInputTokens: result.meta.usage?.inputTokens,
+    });
     return {
       parsed: mergeLlm(deterministic, result.value, text),
       provider: result.meta.provider,

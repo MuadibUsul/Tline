@@ -86,6 +86,23 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           source: docker-compose.yml,docker-compose.prod.yml
           target: ~/tline
+      - name: Configure JEV credential
+        uses: appleboy/ssh-action@v1
+        env:
+          JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: JEV_API_KEY
+          script: |
+            set -eu
+            umask 077
+            ENV_FILE="$HOME/tline/.env"
+            TMP_FILE=$(mktemp "$HOME/tline/.env.XXXXXX")
+            grep -v '^JEV_API_KEY=' "$ENV_FILE" > "$TMP_FILE" || true
+            printf 'JEV_API_KEY=%s\n' "$JEV_API_KEY" >> "$TMP_FILE"
+            mv "$TMP_FILE" "$ENV_FILE"
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         env:
@@ -133,6 +150,8 @@ jobs:
               SOCIAL_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q social-scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
               if [ "$RESEARCH_HEALTH" = healthy ] && [ "$MACRO_HEALTH" = healthy ] && [ "$SOCIAL_HEALTH" = healthy ] && docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
                 node -e "fetch('http://127.0.0.1:3000/api/health').then(async r=>{const b=await r.json();if(!r.ok||b.status!=='ok')process.exit(1)}).catch(()=>process.exit(1))"; then
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
+                  npm run classification:backfill -- --apply --limit=1000
                 echo "$NEW_TAG" > .deploy-tag
 
                 # Retain the three most recent images: the one now running, the rollback

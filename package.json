@@ -64,7 +64,13 @@
     "macro:expectation": "tsx scripts/macro-expectation.ts",
     "themes:snapshot": "tsx scripts/trading-theme-snapshot.ts",
     "analytics:rollup": "tsx scripts/analytics-rollup.ts",
-    "seo:status": "tsx scripts/seo-status.ts"
+    "seo:status": "tsx scripts/seo-status.ts",
+    "classification:shadow": "tsx scripts/classification-shadow.ts",
+    "classification:eval": "tsx scripts/classification-eval.ts",
+    "classification:backfill": "tsx scripts/classification-backfill.ts",
+    "decision:consistency": "tsx scripts/decision-shadow.ts consistency",
+    "decision:policy": "tsx scripts/decision-shadow.ts policy",
+    "decision:views": "tsx scripts/decision-shadow.ts views"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

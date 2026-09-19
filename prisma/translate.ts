@@ -62,7 +62,7 @@ async function main() {
   for (let offset = 0; offset < candidates.length; offset += concurrency) {
     await Promise.all(candidates.slice(offset, offset + concurrency).map(async (article) => {
       try {
-        const result = await translateAndPersist(article.id, provider, article.contentHash);
+        const result = await translateAndPersist(article.id, provider, article.contentHash, { force: operatorSelected });
         await generateArticleDocuments(article.id);
         await clearFailures(article.id, "translation");
         if (result.translation.status === "needs_review") await queueRetry(article.id, "translation");

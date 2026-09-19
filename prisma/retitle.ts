@@ -7,6 +7,11 @@ import { isNoiseTitle } from "../src/lib/contentQuality";
 import { resolveLLMProvider } from "../src/lib/llm/config";
 import { completeJSON } from "../src/lib/llm/provider";
 import { protectTitleDates, restoreTitleDates } from "../src/lib/translation/titleDates";
+import { buildTaskContext, CONTEXT_BUILDER_VERSION } from "../src/lib/llm/context-builder";
+import { decideAiExecution, recordAiExecutionEvent } from "../src/lib/llm/execution-policy";
+import { controlledGateAllowsSkip, runRoutingShadow } from "../src/lib/decision/routing";
+
+const RETITLE_PROMPT_VERSION = "retitle-v2";
 
 /**
  * Recovers titles for reports already stored under a button label or a filename.
@@ -58,25 +63,51 @@ function unusable(title: string) {
   return words.length < 2;
 }
 
-async function translateTitle(english: string): Promise<string | null> {
+async function translateTitle(english: string, contentId: string, contentHash: string): Promise<{ title: string | null; gated: boolean }> {
   const provider = await resolveLLMProvider("retitle");
-  if (!provider) return null;
+  if (!provider) return { title: null, gated: false };
   // Dates are placed before translation and restored after, so a model cannot reformat
   // "2 September 2026" into something that no longer reads as that day.
   const dates: string[] = [];
   const protectedTitle = protectTitleDates(english, dates);
+  const context = buildTaskContext("retitle", { title: english, text: protectedTitle });
+  const policy = decideAiExecution({
+    taskType: "retitle", contentId, contentHash,
+    promptVersion: RETITLE_PROMPT_VERSION, contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+    requestedOutput: "retitle", route: { provider: provider.name, model: provider.model },
+  });
+  const routing = await runRoutingShadow({ task: "retitle", contentId, title: english, excerpt: protectedTitle, policy });
+  if (controlledGateAllowsSkip("retitle", routing)) {
+    await recordAiExecutionEvent({
+      task: "retitle", contentId,
+      policy: { ...policy, executionLevel: "LEVEL_1", requiresLLM: false, reasonCodes: ["DECISION_ONLY"] },
+      cacheStatus: "NOT_APPLICABLE", attribution: "JEV_GATE",
+      originalEstimatedTokens: context.originalEstimatedTokens, optimizedEstimatedTokens: 0,
+    });
+    return { title: null, gated: true };
+  }
   try {
     const response = await completeJSON<{ title?: string }>(provider, {
       system:
         "Translate the title of an institutional research report from English into professional Simplified Chinese. " +
         "Keep tickers, numbers and placeholder tokens exactly as they appear. Return ONLY JSON: {\"title\":string}.",
-      user: JSON.stringify({ title: protectedTitle }),
+      user: JSON.stringify({ title: context.selectedText }),
       maxTokens: 200,
+      audit: {
+        contentId, requestFingerprint: policy.fingerprint, promptVersion: RETITLE_PROMPT_VERSION,
+        executionLevel: policy.executionLevel, contextStrategy: context.strategy, cacheStatus: "MISS",
+        reasonCodes: [...policy.reasonCodes, ...context.reasonCodes],
+        originalEstimatedTokens: context.originalEstimatedTokens, optimizedEstimatedTokens: context.estimatedTokens,
+      },
+    });
+    await recordAiExecutionEvent({
+      task: "retitle", contentId, policy: { ...policy, contextStrategy: context.strategy }, cacheStatus: "MISS",
+      originalEstimatedTokens: context.originalEstimatedTokens, optimizedEstimatedTokens: context.estimatedTokens,
     });
     const translated = response.value.title?.trim();
-    return translated ? restoreTitleDates(translated, dates) : null;
+    return { title: translated ? restoreTitleDates(translated, dates) : null, gated: false };
   } catch {
-    return null;
+    return { title: null, gated: false };
   }
 }
 
@@ -149,7 +180,11 @@ async function main() {
       continue;
     }
 
-    const zh = dryRun || !proposal.translation ? null : await translateTitle(proposal.recovered);
+    const article = candidates.find((candidate) => candidate.id === proposal.id);
+    const translated = dryRun || !proposal.translation || !article
+      ? { title: null, gated: false }
+      : await translateTitle(proposal.recovered, proposal.id, article.contentHash);
+    const zh = translated.title;
     console.log(`  ${dryRun ? "WOULD" : "FIX  "} ${proposal.id}`);
     console.log(`        ${proposal.before}  ->  ${proposal.recovered}`);
     if (proposal.translation) console.log(`        ${proposal.translation.title}  ->  ${zh ?? "(译文未变更)"}`);
@@ -158,6 +193,10 @@ async function main() {
       await prisma.article.update({ where: { id: proposal.id }, data: { title: proposal.recovered } });
       if (proposal.translation && zh) {
         await prisma.articleTranslation.update({ where: { id: proposal.translation.id }, data: { title: zh } });
+      } else if (proposal.translation) {
+        // The English title changed but no replacement translation was produced. Keep the
+        // old text visible only as a review item, never as a silently "reviewed" artifact.
+        await prisma.articleTranslation.update({ where: { id: proposal.translation.id }, data: { status: "needs_review" } });
       }
     }
     repaired++;

@@ -2,6 +2,8 @@ import { prisma } from "../db";
 import { resolveLLMProvider } from "../llm/config";
 import type { LLMProvider } from "../llm/provider";
 import { buildAnalysisContext } from "./analysis/context";
+import { CONTEXT_BUILDER_VERSION, estimateTokens } from "../llm/context-builder";
+import { decideAiExecution, hasRecordedAiExecution, recordAiExecutionEvent } from "../llm/execution-policy";
 import { composeReleaseAnalysis, formatAnalysis } from "./analysis/compose";
 import { toNumber, type FactInput, type FactSeriesPoint } from "./analysis/facts";
 import { getPlaybook } from "./analysis/playbooks";
@@ -61,13 +63,43 @@ export async function generateReleaseAnalysis(
   releaseId: string,
   injected?: LLMProvider | null,
 ): Promise<boolean> {
-  const provider = injected ?? await resolveLLMProvider("release_analysis");
-  if (!provider) throw new Error("No LLM provider is configured for release analysis.");
   const release = await prisma.macroRelease.findUnique({
     where: { id: releaseId },
     include: { values: { include: { indicator: true, modelExpectation: true } } },
   });
   if (!release) return false;
+  // Keep this independent of MacroRelease.updatedAt: writing the analysis itself updates
+  // that column and would otherwise manufacture a new fingerprint on every cache hit.
+  const contentHash = JSON.stringify({
+    releaseKey: release.releaseKey,
+    releasedAt: release.releasedAt?.toISOString() ?? null,
+    values: release.values.map((value) => ({
+      id: value.id,
+      period: value.observationPeriod.toISOString(),
+      actual: value.actualInitial?.toString() ?? null,
+      consensus: value.consensusAtRelease?.toString() ?? null,
+      previous: value.revisedPreviousAtRelease?.toString() ?? value.previousAtRelease?.toString() ?? null,
+    })),
+  });
+  if (release.analysisAt && release.analysisEn && release.analysisZh) {
+    const policy = decideAiExecution({
+      taskType: "release_analysis", contentId: release.id, contentHash,
+      promptVersion: "release-analysis-v1", contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+      requestedOutput: "analysis", existingArtifacts: { reusable: true },
+    });
+    if (!(await hasRecordedAiExecution(policy.fingerprint, "HIT"))) {
+      await recordAiExecutionEvent({ task: "release_analysis", contentId: release.id, policy, cacheStatus: "HIT", attribution: "ARTIFACT_REUSE" });
+    }
+    return true;
+  }
+  const provider = injected ?? await resolveLLMProvider("release_analysis");
+  if (!provider) throw new Error("No LLM provider is configured for release analysis.");
+  const policy = decideAiExecution({
+    taskType: "release_analysis", contentId: release.id, contentHash,
+    promptVersion: "release-analysis-v1", contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+    requestedOutput: "analysis", structuredMetadata: { releaseFamily: release.releaseFamily, countryCode: release.countryCode },
+    route: { provider: provider.name, model: provider.model },
+  });
   const playbook = getPlaybook(release.releaseFamily, release.titleEn);
   const releasedAt = release.releasedAt ?? new Date();
 
@@ -101,7 +133,16 @@ export async function generateReleaseAnalysis(
     history,
   };
   const context = await buildAnalysisContext(release, playbook, releasedAt);
-  const composed = await composeReleaseAnalysis({ provider, factInput, context, playbook });
+  const estimatedTokens = estimateTokens(JSON.stringify({ factInput, context, playbook }));
+  const composed = await composeReleaseAnalysis({
+    provider, factInput, context, playbook,
+    audit: {
+      contentId: release.id, requestFingerprint: policy.fingerprint,
+      promptVersion: "release-analysis-v1", executionLevel: policy.executionLevel,
+      contextStrategy: "STRUCTURED", cacheStatus: "MISS", reasonCodes: policy.reasonCodes,
+      originalEstimatedTokens: estimatedTokens, optimizedEstimatedTokens: estimatedTokens,
+    },
+  });
   await prisma.macroRelease.update({
     where: { id: releaseId },
     data: {
@@ -109,6 +150,10 @@ export async function generateReleaseAnalysis(
       analysisZh: formatAnalysis(composed.zh).slice(0, 8000),
       analysisAt: new Date(),
     },
+  });
+  await recordAiExecutionEvent({
+    task: "release_analysis", contentId: release.id, policy, cacheStatus: "MISS",
+    originalEstimatedTokens: estimatedTokens, optimizedEstimatedTokens: estimatedTokens,
   });
   if (composed.fallback) {
     console.error(JSON.stringify({ event: "macro.release.analysis.fallback", releaseId, violations: composed.violations.slice(0, 6) }));

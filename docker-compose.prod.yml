@@ -31,6 +31,15 @@ services:
       # The app is reachable only through the Caddy service on the private web network.
       TRUST_PROXY_HEADERS: "true"
       HEALTH_DETAIL_TOKEN: ${HEALTH_DETAIL_TOKEN:?Set HEALTH_DETAIL_TOKEN}
+      # JEV is deployed in advisory/shadow mode only. Classification writeback and
+      # hard gating remain separately disabled until their formal gates are approved.
+      JEV_API_KEY: ${JEV_API_KEY:?Set JEV_API_KEY}
+      JEV_DECISION_ENABLED: "true"
+      JEV_SHADOW_MODE: "true"
+      JEV_CLASSIFICATION_APPLY_ENABLED: "false"
+      AI_PREFLIGHT_ENABLED: "false"
+      LLM_HARD_GATE_ENABLED: "false"
+      JEV_GATE_EVAL_APPROVED: "false"
       # Full report bodies are held in both locale indexes. Keep the production
       # working set bounded as the corpus grows, rather than exhausting V8 at boot.
       SEARCH_INDEX_MAX_ARTICLES: ${SEARCH_INDEX_MAX_ARTICLES:-1000}

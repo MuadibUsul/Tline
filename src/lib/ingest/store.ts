@@ -4,6 +4,8 @@ import { isJunk, looksLikeArticle, type Segment } from "./extract";
 import { ASSETS } from "../assets";
 import { partitionArticleSegments } from "../articleText";
 import { buildResearchSlug } from "../researchPath";
+import { classifyDeterministically } from "../classification/classifier";
+import { articleClassificationSourceFingerprint, persistDeterministicClassification } from "../classification/store";
 
 export interface RawArticle {
   title: string;
@@ -30,6 +32,23 @@ export async function ensureAssets() {
 }
 
 export type PersistResult = "created" | "updated" | "duplicate" | "empty";
+
+async function refreshClassification(articleId: string, cHash: string, tHash: string) {
+  try {
+    // Preserve human facets, but put them back in the review queue when their source changed.
+    await prisma.contentClassification.updateMany({ where: { articleId, source: "MANUAL" }, data: { status: "REVIEW", fingerprint: null } });
+    await persistDeterministicClassification({
+      target: { kind: "ARTICLE", id: articleId },
+      result: classifyDeterministically({ contentType: "RESEARCH_ARTICLE" }),
+      sourceFingerprint: articleClassificationSourceFingerprint(cHash, tHash, []),
+      apply: true,
+    });
+  } catch (error) {
+    // Classification is downstream enrichment; it must not turn a stored article into an
+    // ingest failure. The deterministic backfill can repair this row later.
+    console.error(JSON.stringify({ event: "classification.ingest.failed", articleId, error: String(error).slice(0, 300) }));
+  }
+}
 
 export async function persistArticle(
   institutionId: string,
@@ -75,6 +94,7 @@ export async function persistArticle(
             ...(layoutImproved ? { segments: { create: partitioned.body.map((segment, position) => ({ position, heading: segment.heading, text: segment.text })) } } : {}),
           } });
         });
+        if (titleChanged || layoutImproved) await refreshClassification(sameUrl.id, cHash, tHash);
         return "updated";
       }
       return "duplicate";
@@ -103,6 +123,7 @@ export async function persistArticle(
         },
       });
     });
+    await refreshClassification(sameUrl.id, cHash, tHash);
     return "updated";
   }
 
@@ -129,7 +150,7 @@ export async function persistArticle(
     where: { id: institutionId },
     select: { name: true },
   });
-  await prisma.article.create({
+  const created = await prisma.article.create({
     data: {
       slug: buildResearchSlug({ institution: institution.name, title: raw.title, fingerprint: uHash }),
       institutionId,
@@ -152,5 +173,6 @@ export async function persistArticle(
       },
     },
   });
+  await refreshClassification(created.id, cHash, tHash);
   return "created";
 }

@@ -4,6 +4,9 @@ import { resolveLLMProvider } from "../llm/config";
 import { completeJSON, type LLMProvider } from "../llm/provider";
 import { assessTranslationRisk, validateTranslation, type TranslationQuality, type TranslationRisk } from "./quality";
 import { protectTitleDates, restoreTitleDates } from "./titleDates";
+import { CONTEXT_BUILDER_VERSION, estimateTokens } from "../llm/context-builder";
+import { decideAiExecution, hasRecordedAiExecution, recordAiExecutionEvent } from "../llm/execution-policy";
+import type { CompletionAudit } from "../llm/types";
 
 const PROMPT_VERSION = "finance-translation-v3";
 
@@ -113,6 +116,7 @@ async function requestDraft(
   title: string,
   segments: SourceSegment[],
   issues?: string[],
+  audit?: CompletionAudit,
 ) {
   let lastMeta = { provider: provider.name, model: provider.model };
   let retryIssues = issues;
@@ -123,6 +127,7 @@ async function requestDraft(
         system: TRANSLATION_SYSTEM,
         user: sourcePayload(institution, title, segments, retryIssues),
         maxTokens: 9000,
+        audit,
       });
     } catch (error) {
       if (attempt === 1) throw error;
@@ -231,6 +236,7 @@ async function reviewDraft(
   provider: LLMProvider,
   source: string,
   translated: string,
+  audit?: CompletionAudit,
 ): Promise<ReviewResult> {
   const result = await completeJSON<unknown>(provider, {
     system: `You are an independent bilingual quality reviewer for institutional financial research.
@@ -240,6 +246,7 @@ Publisher tables, chart axes, and contact details may intentionally remain verba
 Return ONLY JSON: {"pass":boolean,"score":number,"issues":string[]}.`,
     user: JSON.stringify({ source, translation: translated }),
     maxTokens: 1800,
+    audit,
   });
   const value = result.value as Partial<ReviewResult>;
   return {
@@ -282,11 +289,30 @@ export async function translateArticle(
   injectedReviewer?: LLMProvider | null,
   enableReview = true,
   reviewSampleRate = defaultReviewSampleRate(),
+  execution?: { contentId?: string; contentHash: string },
 ): Promise<TranslationResult> {
   const provider = injected ?? await resolveLLMProvider("translation");
   if (!provider) throw new Error("No LLM provider is configured for translation.");
   const reviewer = injectedReviewer === undefined ? provider : injectedReviewer;
   const source = articleText(title, segments);
+  const policy = decideAiExecution({
+    taskType: "translation", contentId: execution?.contentId, contentHash: execution?.contentHash ?? title,
+    promptVersion: PROMPT_VERSION, contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+    requestedOutput: "translation", sourceInfo: { requiresFullText: true },
+    route: { provider: provider.name, model: provider.model },
+  });
+  const estimatedTokens = estimateTokens(source);
+  const completionAudit: CompletionAudit = {
+    contentId: execution?.contentId,
+    requestFingerprint: policy.fingerprint,
+    promptVersion: PROMPT_VERSION,
+    executionLevel: policy.executionLevel,
+    contextStrategy: "FULL",
+    cacheStatus: "MISS",
+    reasonCodes: policy.reasonCodes,
+    originalEstimatedTokens: estimatedTokens,
+    optimizedEstimatedTokens: estimatedTokens,
+  };
   const parts = translationParts(segments);
   const translatedParts: DraftSegment[] = parts
     .filter((part) => part.passthrough)
@@ -304,7 +330,7 @@ export async function translateArticle(
       heading: part.heading ? protectNumbers(part.heading, numbers) : null,
       text: protectNumbers(part.text, numbers),
     }));
-    let generated = await requestDraft(provider, institution, protectedTitle, protectedBatch);
+    let generated = await requestDraft(provider, institution, protectedTitle, protectedBatch, undefined, completionAudit);
     generated.draft.title = restoreTitleDates(restoreNumbers(generated.draft.title, numbers), dates);
     generated.draft.segments = generated.draft.segments.map((segment) => ({
       ...segment,
@@ -318,7 +344,7 @@ export async function translateArticle(
       generated.draft.segments.length,
     );
     if (!batchQuality.passed) {
-      generated = await requestDraft(provider, institution, protectedTitle, protectedBatch, batchQuality.issues.map((issue) => issue.message));
+      generated = await requestDraft(provider, institution, protectedTitle, protectedBatch, batchQuality.issues.map((issue) => issue.message), completionAudit);
       generated.draft.title = restoreTitleDates(restoreNumbers(generated.draft.title, numbers), dates);
       generated.draft.segments = generated.draft.segments.map((segment) => ({
         ...segment,
@@ -353,7 +379,7 @@ export async function translateArticle(
   if (enableReview && quality.passed && reviewer && reviewIsWorthwhile(risk, reviewSampleRate)) {
     reviewAttempted = true;
     try {
-      review = await reviewDraft(reviewer, source, translated);
+      review = await reviewDraft(reviewer, source, translated, { ...completionAudit, promptVersion: `${PROMPT_VERSION}-review-v1` });
     } catch {
       review = null;
     }
@@ -365,6 +391,11 @@ export async function translateArticle(
   const qualityScore = reviewed
     ? Number(((quality.score + (review?.score ?? quality.score)) / 2).toFixed(2))
     : Number((quality.score * 0.7).toFixed(2));
+
+  await recordAiExecutionEvent({
+    task: "translation", contentId: execution?.contentId, policy, cacheStatus: "MISS",
+    originalEstimatedTokens: estimatedTokens, optimizedEstimatedTokens: estimatedTokens,
+  });
 
   return {
     title: translatedTitle,
@@ -383,7 +414,7 @@ export async function translateArticle(
   };
 }
 
-export async function translateAndPersist(articleId: string, provider?: LLMProvider, expectedContentHash?: string) {
+export async function translateAndPersist(articleId: string, provider?: LLMProvider, expectedContentHash?: string, options: { force?: boolean } = {}) {
   let article = await prisma.article.findUnique({
     where: { id: articleId },
     include: {
@@ -391,6 +422,7 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
       segments: { orderBy: { position: "asc" } },
       analysis: { select: { importanceScore: true } },
       atomicViews: { select: { importance: true }, orderBy: { importance: "desc" }, take: 1 },
+      translations: { where: { locale: "zh-CN" }, take: 1 },
     },
   });
   if (!article?.rawText) throw new Error("Article has no canonical English body.");
@@ -406,8 +438,24 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
         segments: { orderBy: { position: "asc" } },
         analysis: { select: { importanceScore: true } },
         atomicViews: { select: { importance: true }, orderBy: { importance: "desc" }, take: 1 },
+        translations: { where: { locale: "zh-CN" }, take: 1 },
       },
     });
+  }
+
+  const sourceContentHash = expectedContentHash ?? article.contentHash;
+  const existing = article.translations[0];
+  if (!options.force && existing?.status === "reviewed" && existing.promptVersion === PROMPT_VERSION
+    && existing.glossaryVersion === glossary.version && existing.sourceContentHash === sourceContentHash) {
+    const policy = decideAiExecution({
+      taskType: "translation", contentId: article.id, contentHash: sourceContentHash,
+      promptVersion: PROMPT_VERSION, contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+      requestedOutput: "translation", existingArtifacts: { reusable: true },
+    });
+    if (!(await hasRecordedAiExecution(policy.fingerprint, "HIT"))) {
+      await recordAiExecutionEvent({ task: "translation", contentId: article.id, policy, cacheStatus: "HIT", attribution: "ARTIFACT_REUSE" });
+    }
+    return { translation: existing, quality: null, review: null, reused: true };
   }
 
   // Production may review with a distinct provider; resolve it here (not inside the
@@ -418,7 +466,7 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
   const important = article.institution.rating >= 5
     || (article.analysis?.importanceScore ?? 0) >= 0.6
     || (article.atomicViews[0]?.importance ?? 0) >= 4;
-  const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider, reviewer, important);
+  const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider, reviewer, important, defaultReviewSampleRate(), { contentId: article.id, contentHash: sourceContentHash });
   const persisted = await prisma.$transaction(async (tx) => {
     if (expectedContentHash) {
       const claimed = await tx.article.updateMany({
@@ -440,6 +488,7 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
         glossaryVersion: result.glossaryVersion,
         status: result.status,
         qualityScore: result.qualityScore,
+        sourceContentHash,
       },
       update: {
         title: result.title,
@@ -450,6 +499,7 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
         glossaryVersion: result.glossaryVersion,
         status: result.status,
         qualityScore: result.qualityScore,
+        sourceContentHash,
         translatedAt: new Date(),
       },
     });

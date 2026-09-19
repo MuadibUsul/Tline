@@ -42,6 +42,25 @@ export interface UsageReport {
   unpricedModels: string[];
 }
 
+export interface AiEfficiencyReport {
+  days: number;
+  events: number;
+  callsAvoided: number;
+  cacheHits: number;
+  cacheMisses: number;
+  cacheHitRate: number | null;
+  decisionGated: number;
+  deterministicResolutions: number;
+  contextEscalations: number;
+  originalEstimatedTokens: number;
+  optimizedEstimatedTokens: number;
+  estimatedTokensAvoided: number;
+  tokenReductionRate: number | null;
+  measuredBaselineEvents: number;
+  byAttribution: { label: string; value: number; estimatedTokensAvoided: number }[];
+  byContext: { label: string; value: number }[];
+}
+
 function emptyTotals(currency: string): UsageTotals {
   return { calls: 0, failed: 0, truncated: 0, inputTokens: 0, outputTokens: 0, cost: 0, currency };
 }
@@ -119,6 +138,59 @@ export async function llmUsageReport(days = 30, now = new Date()): Promise<Usage
     byModel: listed(byModel),
     series: dayRange(days, now).map((day) => ({ label: day, ...(perDay.get(day) ?? { primary: 0, secondary: 0 }) })),
     unpricedModels: [...unpriced].sort(),
+  };
+}
+
+/** Preflight and context metrics. Estimated savings are shown only where both baselines exist. */
+export async function aiEfficiencyReport(days = 30, now = new Date()): Promise<AiEfficiencyReport> {
+  const from = shiftDay(now, -(days - 1));
+  const rows = await prisma.aiExecutionEvent.findMany({
+    where: { day: { gte: from } },
+    select: {
+      requiresLLM: true, cacheStatus: true, savingsAttribution: true, contextStrategy: true, reasonCodes: true,
+      originalEstimatedTokens: true, optimizedEstimatedTokens: true,
+    },
+  });
+  const attribution = new Map<string, { value: number; estimatedTokensAvoided: number }>();
+  const context = new Map<string, number>();
+  let originalEstimatedTokens = 0;
+  let optimizedEstimatedTokens = 0;
+  let measuredBaselineEvents = 0;
+  for (const row of rows) {
+    context.set(row.contextStrategy, (context.get(row.contextStrategy) ?? 0) + 1);
+    if (row.originalEstimatedTokens > 0) {
+      originalEstimatedTokens += row.originalEstimatedTokens;
+      optimizedEstimatedTokens += row.optimizedEstimatedTokens;
+      measuredBaselineEvents++;
+    }
+    if (row.savingsAttribution) {
+      const item = attribution.get(row.savingsAttribution) ?? { value: 0, estimatedTokensAvoided: 0 };
+      item.value++;
+      if (row.originalEstimatedTokens > 0) item.estimatedTokensAvoided += Math.max(0, row.originalEstimatedTokens - row.optimizedEstimatedTokens);
+      attribution.set(row.savingsAttribution, item);
+    }
+  }
+  const cacheHits = rows.filter((row) => row.cacheStatus === "HIT").length;
+  const cacheMisses = rows.filter((row) => row.cacheStatus === "MISS").length;
+  const cacheLookups = cacheHits + cacheMisses;
+  const estimatedTokensAvoided = Math.max(0, originalEstimatedTokens - optimizedEstimatedTokens);
+  return {
+    days,
+    events: rows.length,
+    callsAvoided: rows.filter((row) => !row.requiresLLM).length,
+    cacheHits,
+    cacheMisses,
+    cacheHitRate: cacheLookups ? cacheHits / cacheLookups : null,
+    decisionGated: rows.filter((row) => row.savingsAttribution === "JEV_GATE").length,
+    deterministicResolutions: rows.filter((row) => row.savingsAttribution === "DETERMINISTIC").length,
+    contextEscalations: rows.filter((row) => row.reasonCodes.includes("LOW_CONFIDENCE_ESCALATION")).length,
+    originalEstimatedTokens,
+    optimizedEstimatedTokens,
+    estimatedTokensAvoided,
+    tokenReductionRate: originalEstimatedTokens ? estimatedTokensAvoided / originalEstimatedTokens : null,
+    measuredBaselineEvents,
+    byAttribution: [...attribution.entries()].map(([label, value]) => ({ label, ...value })).sort((a, b) => b.value - a.value),
+    byContext: [...context.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
   };
 }
 

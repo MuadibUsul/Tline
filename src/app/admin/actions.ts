@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { can, type PermissionAction } from "@/lib/permissions";
 import { isRetryKind, queueRetry } from "@/lib/contentRetry";
 import { API_SCOPES, generateToken, hashToken, tokenPrefix } from "@/lib/apiKeys";
+import { taxonomy } from "@/lib/classification/taxonomy";
 
 /** The actor, if they hold `action`; null otherwise. Every mutation names its own gate. */
 async function authorized(action: PermissionAction) {
@@ -80,6 +81,94 @@ export async function resolveContentReview(formData: FormData) {
   }
   await writeAudit({ actorId: user.id, action: "content.review.resolve", targetType: "article", targetId: articleId, metadata: { kind, title: article.title } });
   revalidatePath(`/research/${articleId}`);
+  revalidatePath("/admin/review");
+}
+
+export async function approveClassificationReview(formData: FormData) {
+  const user = await authorized("admin.review");
+  const id = formData.get("classificationId")?.toString();
+  if (!user || !id) return;
+  const classification = await prisma.contentClassification.findUnique({
+    where: { id },
+    select: { id: true, articleId: true, status: true, source: true, confidence: true },
+  });
+  if (!classification || classification.status !== "REVIEW") return;
+  await prisma.contentClassification.update({ where: { id }, data: { status: "CLASSIFIED" } });
+  await writeAudit({
+    actorId: user.id,
+    action: "classification.review.approve",
+    targetType: "contentClassification",
+    targetId: id,
+    metadata: { source: classification.source, confidence: classification.confidence, articleId: classification.articleId },
+  });
+  if (classification.articleId) revalidatePath(`/research/${classification.articleId}`);
+  revalidatePath("/admin/review");
+}
+
+const selected = (formData: FormData, name: string) => formData.getAll(name).map(String).map((value) => value.trim()).filter(Boolean);
+
+export async function correctClassificationReview(formData: FormData) {
+  const user = await authorized("admin.review");
+  const id = formData.get("classificationId")?.toString();
+  if (!user || !id) return;
+  const existing = await prisma.contentClassification.findUnique({
+    where: { id },
+    include: { jurisdictions: true, institutions: true, topics: true, assets: { include: { asset: true } }, assetClasses: true, events: true },
+  });
+  if (!existing) return;
+
+  const jurisdictionKeys = new Set(taxonomy.jurisdictions.map((item) => item.key));
+  const institutionKeys = new Set(taxonomy.institutions.map((item) => item.key));
+  const topicKeys = new Set(taxonomy.topics.map((item) => item.key));
+  const eventKeys = new Set(taxonomy.events.map((item) => item.key));
+  const assetClassKeys = new Set(taxonomy.assetClasses.map((item) => item.key));
+  const contentTypes = new Set(taxonomy.contentTypes.map((item) => item.key));
+  const primaryJurisdiction = jurisdictionKeys.has(String(formData.get("primaryJurisdiction"))) ? String(formData.get("primaryJurisdiction")) : null;
+  const relatedJurisdictions = selected(formData, "relatedJurisdictions").filter((key) => jurisdictionKeys.has(key) && key !== primaryJurisdiction);
+  const requestedState = String(formData.get("jurisdictionState") ?? "UNKNOWN");
+  const nonKnownStates = new Set(["GLOBAL", "UNKNOWN", "NONE", "NOT_APPLICABLE"]);
+  const jurisdictionState = primaryJurisdiction ? "KNOWN" : relatedJurisdictions.length >= 2 ? "MULTIPLE" : nonKnownStates.has(requestedState) ? requestedState : "UNKNOWN";
+  const primaryInstitution = institutionKeys.has(String(formData.get("primaryInstitution"))) ? String(formData.get("primaryInstitution")) : null;
+  const relatedInstitutions = selected(formData, "relatedInstitutions").filter((key) => institutionKeys.has(key) && key !== primaryInstitution);
+  const topics = selected(formData, "topics").filter((key) => topicKeys.has(key));
+  const events = selected(formData, "events").filter((key) => eventKeys.has(key));
+  const assetClasses = selected(formData, "assetClasses").filter((key) => assetClassKeys.has(key));
+  const contentType = contentTypes.has(String(formData.get("contentType"))) ? String(formData.get("contentType")) : "UNKNOWN";
+  const requestedTickers = [...new Set(String(formData.get("assets") ?? "").split(/[\s,]+/).map((value) => value.trim().toUpperCase()).filter(Boolean))];
+  const assets = requestedTickers.length ? await prisma.asset.findMany({ where: { ticker: { in: requestedTickers } }, select: { id: true, ticker: true } }) : [];
+
+  const before = {
+    jurisdictionState: existing.jurisdictionState,
+    jurisdictions: existing.jurisdictions.map((item) => [item.jurisdictionKey, item.role]),
+    institutions: existing.institutions.map((item) => [item.institutionKey, item.role]),
+    topics: existing.topics.map((item) => item.topicKey), assets: existing.assets.map((item) => item.asset.ticker),
+    assetClasses: existing.assetClasses.map((item) => item.assetClassKey), events: existing.events.map((item) => item.eventKey),
+    contentType: existing.contentType, source: existing.source,
+  };
+  await prisma.contentClassification.update({
+    where: { id },
+    data: {
+      jurisdictionState, contentType, confidence: 1, source: "MANUAL", status: "CLASSIFIED",
+      classifier: "admin", classifierVersion: "manual-v1", classifiedAt: new Date(),
+      jurisdictions: { deleteMany: {}, create: [
+        ...(primaryJurisdiction ? [{ jurisdictionKey: primaryJurisdiction, role: "PRIMARY" }] : []),
+        ...relatedJurisdictions.map((jurisdictionKey) => ({ jurisdictionKey, role: "RELATED" })),
+      ] },
+      institutions: { deleteMany: {}, create: [
+        ...(primaryInstitution ? [{ institutionKey: primaryInstitution, role: "PRIMARY", confidence: 1 }] : []),
+        ...relatedInstitutions.map((institutionKey) => ({ institutionKey, role: "RELATED", confidence: 1 })),
+      ] },
+      topics: { deleteMany: {}, create: topics.map((topicKey) => ({ topicKey, confidence: 1 })) },
+      events: { deleteMany: {}, create: events.map((eventKey) => ({ eventKey, confidence: 1 })) },
+      assetClasses: { deleteMany: {}, create: assetClasses.map((assetClassKey) => ({ assetClassKey, confidence: 1 })) },
+      assets: { deleteMany: {}, create: assets.map((asset) => ({ assetId: asset.id, confidence: 1 })) },
+    },
+  });
+  await writeAudit({
+    actorId: user.id, action: "classification.review.correct", targetType: "contentClassification", targetId: id,
+    metadata: { before, after: { jurisdictionState, primaryJurisdiction, relatedJurisdictions, primaryInstitution, relatedInstitutions, topics, assets: assets.map((item) => item.ticker), assetClasses, events, contentType }, articleId: existing.articleId },
+  });
+  if (existing.articleId) revalidatePath(`/research/${existing.articleId}`);
   revalidatePath("/admin/review");
 }
 

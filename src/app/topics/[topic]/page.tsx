@@ -9,6 +9,9 @@ import { assetPath } from "@/lib/assetPath";
 import { ResearchCard } from "@/app/_components/ui";
 import { getTopicArticleIds, getTopicStat, getTopicViews, topicPath, TOPIC_MIN_ARTICLES } from "@/lib/topics";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, itemListJsonLd, localizedUrl, ogImage } from "@/lib/seo";
+import { queryClassifiedArticleIds } from "@/lib/classification/query";
+import { resolveCanonicalKey, taxonomy } from "@/lib/classification/taxonomy";
+import type { JurisdictionKey } from "@/lib/classification/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +26,18 @@ const directionLabel = (direction: string, locale: Locale) => {
 };
 const directionTone = (direction: string) => (direction === "bullish" ? "bull" : direction === "bearish" ? "bear" : "neu");
 
-const loadTopic = cache(async (key: string, locale: Locale) => {
-  const stat = await getTopicStat(key);
-  if (!stat) return null;
-  const [views, articleIds] = await Promise.all([getTopicViews(key, locale), getTopicArticleIds(key)]);
+const loadTopic = cache(async (key: string, locale: Locale, jurisdiction: JurisdictionKey | null = null) => {
+  const [legacyStat, canonicalTopic] = await Promise.all([
+    getTopicStat(key),
+    Promise.resolve(taxonomy.topics.find((item) => item.key === key) ?? null),
+  ]);
+  if (!legacyStat && !canonicalTopic) return null;
+  const [views, legacyArticleIds, classifiedArticleIds] = await Promise.all([
+    legacyStat && !jurisdiction ? getTopicViews(key, locale) : Promise.resolve([]),
+    legacyStat && !jurisdiction ? getTopicArticleIds(key) : Promise.resolve([]),
+    canonicalTopic ? queryClassifiedArticleIds({ topics: [canonicalTopic.key], ...(jurisdiction ? { jurisdictions: [jurisdiction] } : {}) }, 100) : Promise.resolve([]),
+  ]);
+  const articleIds = [...new Set([...classifiedArticleIds, ...legacyArticleIds])];
   const usableViews = locale === "zh-CN" ? views.filter((view) => view.view?.trim()) : views;
   const articles = articleIds.length
     ? await prisma.article.findMany({
@@ -39,16 +50,38 @@ const loadTopic = cache(async (key: string, locale: Locale) => {
           analysis: { select: { summary: true, summaryZh: true } },
           translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } },
           articleAssets: { select: { direction: true, target: true, previousTarget: true, asset: { select: { ticker: true, name: true } } } },
+          classification: { include: { jurisdictions: true, topics: true, institutions: true } },
         },
       })
     : [];
-  return { stat, views: usableViews, articles };
+  const institutions = new Set(articles.map((article) => article.institution.slug));
+  const stat = legacyStat ?? {
+    key: canonicalTopic!.key,
+    labelEn: canonicalTopic!.nameEn,
+    labelZh: canonicalTopic!.nameZh,
+    raw: [],
+    views: 0,
+    articles: articleIds.length,
+    institutions: institutions.size,
+    tickers: [...new Set(articles.flatMap((article) => article.articleAssets.map((item) => item.asset.ticker)))],
+    lastAt: articles[0]?.publishedAt ?? null,
+  };
+  if (jurisdiction) {
+    stat.articles = articleIds.length;
+    stat.institutions = institutions.size;
+    stat.views = usableViews.length;
+    stat.tickers = [...new Set(articles.flatMap((article) => article.articleAssets.map((item) => item.asset.ticker)))];
+    stat.lastAt = articles[0]?.publishedAt ?? null;
+  }
+  return { stat, views: usableViews, articles, canonicalTopic };
 });
 
-export async function generateMetadata(props: { params: Promise<TopicParams> }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<TopicParams>; searchParams: Promise<{ jurisdiction?: string }> }): Promise<Metadata> {
   const { topic } = await props.params;
+  const search = await props.searchParams;
   const locale = await getLocale();
-  const data = await loadTopic(topic, locale);
+  const jurisdiction = search.jurisdiction ? resolveCanonicalKey("jurisdiction", search.jurisdiction) : null;
+  const data = await loadTopic(topic, locale, jurisdiction);
   if (!data) return { title: tr(locale, "Topic not found", "主题未找到") };
   const { stat } = data;
   const label = locale === "zh-CN" ? stat.labelZh : stat.labelEn;
@@ -66,7 +99,7 @@ export async function generateMetadata(props: { params: Promise<TopicParams> }):
   const indexable = data.articles.length >= TOPIC_MIN_ARTICLES && data.views.length > 0;
   return {
     ...canonical(topicPath(stat.key), locale, locale === "zh-CN" ? availableLocales : ["en", "zh-CN"]),
-    ...(indexable ? {} : { robots: { index: false, follow: true } }),
+    ...(indexable && !search.jurisdiction ? {} : { robots: { index: false, follow: true } }),
     // Absolute: the topic name leads and the layout's " · Tlines" suffix would push a
     // 60-character subject past the width a result shows.
     title: { absolute: title },
@@ -76,12 +109,15 @@ export async function generateMetadata(props: { params: Promise<TopicParams> }):
   };
 }
 
-export default async function TopicPage(props: { params: Promise<TopicParams> }) {
+export default async function TopicPage(props: { params: Promise<TopicParams>; searchParams: Promise<{ jurisdiction?: string }> }) {
   const { topic } = await props.params;
+  const search = await props.searchParams;
   const locale = await getLocale();
-  const data = await loadTopic(topic, locale);
+  const jurisdiction = search.jurisdiction ? resolveCanonicalKey("jurisdiction", search.jurisdiction) : null;
+  if (search.jurisdiction && !jurisdiction) notFound();
+  const data = await loadTopic(topic, locale, jurisdiction);
   if (!data) notFound();
-  const { stat, views, articles } = data;
+  const { stat, views, articles, canonicalTopic } = data;
   const label = locale === "zh-CN" ? stat.labelZh : stat.labelEn;
   // Only assets that are themselves covered pages, so a topic never links somewhere that 404s.
   const covered = stat.tickers.length
@@ -121,13 +157,25 @@ export default async function TopicPage(props: { params: Promise<TopicParams> })
         </p>
         <p className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>
           {tr(locale, "Last updated ", "最后更新 ")}
-          <time dateTime={stat.lastAt.toISOString()}>{relativeTime(stat.lastAt, locale)}</time>
+          {stat.lastAt ? <time dateTime={stat.lastAt.toISOString()}>{relativeTime(stat.lastAt, locale)}</time> : tr(locale, "awaiting classified coverage", "等待已分类内容")}
           {" · "}
           <Link href={localePath(locale, "/methodology")}>{tr(locale, "How views are extracted", "观点如何提取")}</Link>
           {" · "}
           <Link href={localePath(locale, "/sources")}>{tr(locale, "Source policy", "来源政策")}</Link>
         </p>
       </div>
+
+      {canonicalTopic && <section className="blk">
+        <h2 className="section-t">{tr(locale, "Filter by economy", "按经济体筛选")}</h2>
+        <form className="research-filters">
+          <select name="jurisdiction" defaultValue={jurisdiction ?? ""} aria-label={tr(locale, "Jurisdiction", "经济体")}>
+            <option value="">{tr(locale, "All economies", "全部经济体")}</option>
+            {taxonomy.jurisdictions.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
+          </select>
+          <button className="minibtn p" type="submit">{tr(locale, "Apply", "应用")}</button>
+          {jurisdiction && <Link className="minibtn" href={localePath(locale, topicPath(stat.key))}>{tr(locale, "Clear", "清除")}</Link>}
+        </form>
+      </section>}
 
       {views.length > 0 && (
         <section className="blk">

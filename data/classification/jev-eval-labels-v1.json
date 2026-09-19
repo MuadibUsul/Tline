@@ -1,0 +1,60 @@
+[
+  {
+    "requestFingerprint": "4464ffd40d99f9228e175c17666a3f0bafac470c01d48a07ed9e39e1b025656c",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "expected": { "primaryTopic": "employment" }
+  },
+  {
+    "requestFingerprint": "78f7b7f807f7831492a16b8bded0f8b2232daa2440c8dc2f170451a5942a1026",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "note": "Czech Republic is not represented in taxonomy v1 jurisdictions.",
+    "expected": { "jurisdiction": "UNKNOWN", "primaryTopic": "inflation" }
+  },
+  {
+    "requestFingerprint": "87a0fd2878ee7c2fc622c572c964db6755a797a9377b53d4233c09a3728f93fb",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "note": "Kazakhstan is not represented in taxonomy v1 jurisdictions.",
+    "expected": { "jurisdiction": "UNKNOWN", "primaryTopic": "monetary-policy" }
+  },
+  {
+    "requestFingerprint": "abe377543776c39e68cab2b038b92d53ac434531e79defae2593b8272c0c1abe",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "expected": { "jurisdiction": "MULTIPLE", "primaryTopic": "monetary-policy" }
+  },
+  {
+    "requestFingerprint": "9ac8df8c9fbd8499b0fb6bd28ba704a352880dd55cb76f9d2da043bcbae2386b",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "expected": { "jurisdiction": "MULTIPLE", "primaryTopic": ["trade", "inflation", "economic-growth"] }
+  },
+  {
+    "requestFingerprint": "83eef6432731ec32e6164b3d0b603b4b5ee44ea5f5fc9e32171a0d918bf67f90",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "expected": { "jurisdiction": "eurozone", "primaryTopic": "economic-growth" }
+  },
+  {
+    "requestFingerprint": "4196836648cc8d740dca347e236235e247dcb043fae529e49338f0ae4bade5dc",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "expected": { "jurisdiction": "eurozone", "primaryTopic": ["housing", "economic-growth"] }
+  },
+  {
+    "requestFingerprint": "be7d3c97d22ed742f1a6f94d3278ea450d8f3101d1f5110b09e3f6042f98cb34",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "note": "Turkey is not represented in taxonomy v1 jurisdictions.",
+    "expected": { "jurisdiction": "UNKNOWN", "primaryTopic": "inflation" }
+  },
+  {
+    "requestFingerprint": "da9f60ba887baae344da5edf3b9e4e0cb9350015373343d6b86b8d601d77a92a",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "expected": { "jurisdiction": "GLOBAL" }
+  },
+  {
+    "requestFingerprint": "67f5ada78883ba13099df4d607316aa5ba6f502ef001213c764d9003c6a983b2",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "expected": { "jurisdiction": "eurozone", "primaryTopic": "manufacturing" }
+  },
+  {
+    "requestFingerprint": "11ce696b3c44b96e4844af9071cd3bb725621c98ce3f21509346c64ff26fe28d",
+    "reviewer": "CODEX_MANUAL_REVIEW",
+    "expected": { "jurisdiction": "GLOBAL", "primaryTopic": "energy" }
+  }
+]

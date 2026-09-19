@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getLocale, localePath, tr } from "@/lib/i18n";
 import { listIndexableTopics, topicPath, TOPIC_MIN_ARTICLES, TOPIC_MIN_INSTITUTIONS } from "@/lib/topics";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, itemListJsonLd, localizedUrl, ogImage, topicsSeoTitle } from "@/lib/seo";
+import { taxonomy } from "@/lib/classification/taxonomy";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function TopicsPage() {
   const locale = await getLocale();
   const topics = await listIndexableTopics();
+  const featuredKeys = ["inflation", "employment", "energy", "equities"];
+  const featured = taxonomy.topics.filter((item) => featuredKeys.includes(item.key));
 
   return (
     <main className="wrap">
@@ -44,6 +47,14 @@ export default async function TopicsPage() {
             `下列每个主题都至少由 ${TOPIC_MIN_INSTITUTIONS} 家机构、${TOPIC_MIN_ARTICLES} 篇研报支撑，数据来自这些研报中提取的观点。只有一家机构讨论的主题不会列出——它没有可展示的跨机构视角。`)}
         </p>
       </div>
+      <section className="blk" aria-label={tr(locale, "Featured structured sections", "重点结构化专区")}>
+        <h2 className="section-t">{tr(locale, "Featured sections", "重点专区")}</h2>
+        <div className="tag-row">
+          <Link className="chip acc" href={localePath(locale, "/institution/federal-reserve")}>{tr(locale, "Federal Reserve", "美联储")}</Link>
+          {featured.map((topic) => <Link className="chip acc" href={localePath(locale, topicPath(topic.key))} key={topic.key}>{locale === "zh-CN" ? topic.nameZh : topic.nameEn}</Link>)}
+        </div>
+        <p className="sub">{tr(locale, "Topic sections can be narrowed by economy; the Federal Reserve section is institution-based rather than a fake topic.", "主题专区可按经济体筛选；美联储专区按机构关系构建，不创建虚假的美联储主题。")}</p>
+      </section>
       <section className="ctiles" aria-label={tr(locale, "Research topics", "研究主题")}>
         {topics.map((topic) => (
           <Link className="ctile" href={localePath(locale, topicPath(topic.key))} key={topic.key}>

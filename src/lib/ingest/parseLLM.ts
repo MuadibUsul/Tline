@@ -5,6 +5,10 @@ import type { Segment } from "./extract";
 import type { ParsedAtomicView } from "./atomicViews";
 import { validateAnalysisGrounding } from "./analysisGrounding";
 import { extractAtomicViewsByRule, splitSentences } from "./atomicViewsRules";
+import { buildTaskContext, CONTEXT_BUILDER_VERSION, estimateTokens } from "../llm/context-builder";
+import { decideAiExecution, recordAiExecutionEvent } from "../llm/execution-policy";
+import { createHash } from "node:crypto";
+import { runRoutingShadow } from "../decision/routing";
 
 export interface ParsedAsset {
   ticker: string;
@@ -41,10 +45,22 @@ export interface ParsedArticle {
 }
 
 export interface ParseInput {
+  contentId?: string;
+  contentHash?: string;
   institution: string;
   title: string;
   text: string;
   publishedAt: string;
+  classification?: {
+    jurisdictionState: string;
+    jurisdictions: string[];
+    institutions: string[];
+    topics: string[];
+    assets: string[];
+    assetClasses: string[];
+    events: string[];
+    contentType: string;
+  } | null;
 }
 
 const BULL = ["bullish", "upgrade", "raise", "raised", "upside", "outperform", "overweight", "rally", "tailwind", "strong demand", "beat", "higher target", "constructive", "buy"];
@@ -328,18 +344,65 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
   };
 }
 
-async function realParse(input: ParseInput, provider: LLMProvider): Promise<ParsedArticle | null> {
-  const sourceText = input.text.slice(0, 50000);
-  const evidence = selectAnalysisEvidence({ ...input, text: sourceText });
+async function realParse(input: ParseInput, provider: LLMProvider, segments: Segment[]): Promise<ParsedArticle | null> {
+  const sourceText = input.text;
+  const built = buildTaskContext("analysis", { title: input.title, text: sourceText, sections: segments });
+  const evidence = built.strategy === "FULL" ? sourceText : selectAnalysisEvidence({ ...input, text: built.selectedText });
   const contexts = evidence === sourceText ? [sourceText] : [evidence, sourceText];
+  const evidenceTokens = estimateTokens(evidence);
+  const evidenceStrategy = evidence === sourceText ? "FULL" : built.strategy === "FULL" ? "SELECTIVE" : built.strategy;
+  const policy = decideAiExecution({
+    taskType: "analysis",
+    contentId: input.contentId,
+    contentHash: input.contentHash ?? createHash("sha256").update(sourceText).digest("hex"),
+    promptVersion: ANALYSIS_PROMPT_VERSION,
+    contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+    requestedOutput: "analysis",
+    route: { provider: provider.name, model: provider.model },
+  });
+  await runRoutingShadow({
+    task: "analysis",
+    contentId: input.contentId,
+    title: input.title,
+    excerpt: evidence,
+    structuredMetadata: { institution: input.institution, publishedAt: input.publishedAt },
+    policy,
+  });
   let best: ParsedArticle | null = null;
   for (const context of contexts) {
     try {
       const result = await completeJSON<unknown>(provider, {
         system: SYSTEM,
-        user: `INSTITUTION: ${input.institution}\nPUBLISHED: ${input.publishedAt}\nTITLE: ${input.title}\n\n${context === evidence && evidence !== sourceText ? "CODE-SELECTED EVIDENCE" : "ARTICLE"}:\n${context}`,
+        user: `PUBLISHER: ${input.institution}\nPUBLISHED: ${input.publishedAt}\nTITLE: ${input.title}\nSTRUCTURED FACETS (already classified; do not re-derive): ${JSON.stringify(input.classification ?? {})}\n\n${context === evidence && evidence !== sourceText ? "CODE-SELECTED EVIDENCE" : "ARTICLE"}:\n${context}`,
         maxTokens: 3_200,
+        audit: {
+          contentId: input.contentId,
+          requestFingerprint: policy.fingerprint,
+          promptVersion: ANALYSIS_PROMPT_VERSION,
+          executionLevel: context === sourceText ? "LEVEL_3" : policy.executionLevel,
+          contextStrategy: context === sourceText ? "FULL" : evidenceStrategy,
+          cacheStatus: "MISS",
+          reasonCodes: context === sourceText && evidence !== sourceText ? ["LOW_CONFIDENCE_ESCALATION"] : policy.reasonCodes,
+          savingsAttribution: context === sourceText ? undefined : "CONTEXT_REDUCTION",
+          originalEstimatedTokens: built.originalEstimatedTokens,
+          optimizedEstimatedTokens: context === sourceText ? built.originalEstimatedTokens : evidenceTokens,
+        },
       }, 1);
+      const fullFallback = context === sourceText;
+      await recordAiExecutionEvent({
+        task: "analysis", contentId: input.contentId,
+        policy: {
+          ...policy,
+          executionLevel: fullFallback ? "LEVEL_3" : policy.executionLevel,
+          contextStrategy: fullFallback ? "FULL" : evidenceStrategy,
+          reasonCodes: fullFallback && evidence !== sourceText ? ["LOW_CONFIDENCE_ESCALATION"] : policy.reasonCodes,
+        },
+        cacheStatus: "MISS",
+        attribution: fullFallback ? undefined : "CONTEXT_REDUCTION",
+        originalEstimatedTokens: built.originalEstimatedTokens,
+        optimizedEstimatedTokens: fullFallback ? built.originalEstimatedTokens : evidenceTokens,
+        actualInputTokens: result.meta.usage?.inputTokens,
+      });
       const parsed = coerceModelResponse(result.value, result.meta.provider, result.meta.model, sourceText);
       if (parsed?.reviewStatus === "ok") return parsed;
       if (parsed) best = parsed;
@@ -361,7 +424,7 @@ export async function parseArticle(input: ParseInput, segments: Segment[] = []):
   const ruleViews = extractAtomicViewsByRule(input.text);
   const provider = await resolveLLMProvider("analysis");
   if (provider) {
-    const real = await realParse(input, provider);
+    const real = await realParse(input, provider, segments);
     if (real) return { ...real, atomicViews: ruleViews };
     heuristic.reviewStatus = "needs_review";
     heuristic.model = "heuristic-fallback";

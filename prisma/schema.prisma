@@ -72,7 +72,7 @@ model Article {
   translationFailCount     Int       @default(0)
   translationNextAttemptAt DateTime?
 
-  institution    Institution          @relation(fields: [institutionId], references: [id])
+  institution    Institution            @relation(fields: [institutionId], references: [id])
   analysis       Analysis?
   articleAssets  ArticleAsset[]
   segments       ArticleSegment[]
@@ -82,6 +82,7 @@ model Article {
   figures        ArticleFigure[]
   macroForecasts MacroForecast[]
   contentRetries ContentRetry[]
+  classification ContentClassification?
 
   @@index([institutionId, publishedAt])
   // The home feed and /research order globally by recency; without this the planner sorts the whole table.
@@ -128,10 +129,10 @@ model AtomicView {
 }
 
 model Analysis {
-  id               String   @id @default(cuid())
-  articleId        String   @unique
-  summary          String
-  summaryZh        String?
+  id                String   @id @default(cuid())
+  articleId         String   @unique
+  summary           String
+  summaryZh         String?
   /// A title written for search, not for the page heading.
   ///
   /// Publisher titles are written for a reader who already has the PDF open: "The
@@ -139,23 +140,24 @@ model Analysis {
   /// subject, so a search engine has nothing to match a query against. This one leads with
   /// what the report is actually about. The publisher's own title still heads the page —
   /// attribution does not change because search needs something else.
-  seoTitle         String?
-  keyArguments     String   @default("[]") // JSON string
-  keyArgumentsZh   String   @default("[]")
-  keyNumbers       String   @default("[]") // JSON string [{label,value}]
-  keyNumbersZh     String   @default("[]")
-  risks            String   @default("[]") // JSON string
-  risksZh          String   @default("[]")
-  interpretation   String? // AI trading interpretation
-  interpretationZh String?
-  importanceScore  Float    @default(0.5)
-  confidence       Float    @default(0.6)
-  provider         String   @default("local")
-  model            String   @default("mock-rules-v1")
-  promptVersion    String   @default("v1")
-  reviewStatus     String   @default("ok") // ok | needs_review
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @default(now()) @updatedAt
+  seoTitle          String?
+  keyArguments      String   @default("[]") // JSON string
+  keyArgumentsZh    String   @default("[]")
+  keyNumbers        String   @default("[]") // JSON string [{label,value}]
+  keyNumbersZh      String   @default("[]")
+  risks             String   @default("[]") // JSON string
+  risksZh           String   @default("[]")
+  interpretation    String? // AI trading interpretation
+  interpretationZh  String?
+  importanceScore   Float    @default(0.5)
+  confidence        Float    @default(0.6)
+  provider          String   @default("local")
+  model             String   @default("mock-rules-v1")
+  promptVersion     String   @default("v1")
+  reviewStatus      String   @default("ok") // ok | needs_review
+  sourceContentHash String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
 
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 }
@@ -196,19 +198,20 @@ model ArticleFigure {
 }
 
 model ArticleTranslation {
-  id              String   @id @default(cuid())
-  articleId       String
-  locale          String   @default("zh-CN")
-  title           String
-  text            String
-  provider        String
-  model           String
-  promptVersion   String
-  glossaryVersion String
-  status          String   @default("translated") // translated | reviewed | needs_review
-  qualityScore    Float?
-  translatedAt    DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String   @id @default(cuid())
+  articleId         String
+  locale            String   @default("zh-CN")
+  title             String
+  text              String
+  provider          String
+  model             String
+  promptVersion     String
+  glossaryVersion   String
+  status            String   @default("translated") // translated | reviewed | needs_review
+  qualityScore      Float?
+  sourceContentHash String?
+  translatedAt      DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   article   Article                     @relation(fields: [articleId], references: [id], onDelete: Cascade)
   segments  ArticleTranslationSegment[]
@@ -288,6 +291,7 @@ model Asset {
   aliases    String @default("[]") // JSON string of match terms
 
   articleAssets     ArticleAsset[]
+  classifications   ClassificationAsset[]
   forecasts         Forecast[]
   consensusHistory  ConsensusHistory[]
   priceObservations PriceObservation[]
@@ -311,6 +315,122 @@ model ArticleAsset {
 
   @@unique([articleId, assetId])
   @@index([assetId, direction])
+}
+
+/// Current faceted classification for one research, macro, or policy record.
+/// Article.institutionId remains the publisher; subject institutions live in a facet row.
+model ContentClassification {
+  id                String    @id @default(cuid())
+  contentKind       String // ARTICLE | MACRO_INDICATOR | MACRO_RELEASE | POLICY_DOCUMENT
+  articleId         String?   @unique
+  macroIndicatorId  String?   @unique
+  macroReleaseId    String?   @unique
+  policyDocumentId  String?   @unique
+  jurisdictionState String
+  contentType       String    @default("UNKNOWN")
+  confidence        Float     @default(0)
+  source            String
+  status            String    @default("PENDING") // PENDING | CLASSIFIED | REVIEW
+  classifier        String?
+  classifierVersion String?
+  taxonomyVersion   String
+  fingerprint       String?
+  classifiedAt      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  article        Article?                     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  macroIndicator MacroIndicator?              @relation(fields: [macroIndicatorId], references: [id], onDelete: Cascade)
+  macroRelease   MacroRelease?                @relation(fields: [macroReleaseId], references: [id], onDelete: Cascade)
+  policyDocument MacroPolicyDocument?         @relation(fields: [policyDocumentId], references: [id], onDelete: Cascade)
+  jurisdictions  ClassificationJurisdiction[]
+  institutions   ClassificationInstitution[]
+  topics         ClassificationTopic[]
+  assets         ClassificationAsset[]
+  assetClasses   ClassificationAssetClass[]
+  events         ClassificationEvent[]
+  decisionCalls  DecisionCall[]
+
+  @@index([contentKind])
+  @@index([jurisdictionState])
+  @@index([contentType])
+  @@index([source])
+  @@index([status])
+  @@index([fingerprint])
+}
+
+model ClassificationJurisdiction {
+  id               String @id @default(cuid())
+  classificationId String
+  jurisdictionKey  String
+  role             String // PRIMARY | RELATED
+
+  classification ContentClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+
+  @@unique([classificationId, jurisdictionKey])
+  @@index([jurisdictionKey, role])
+}
+
+model ClassificationInstitution {
+  id               String @id @default(cuid())
+  classificationId String
+  institutionKey   String
+  role             String // PRIMARY | RELATED
+  confidence       Float?
+
+  classification ContentClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+
+  @@unique([classificationId, institutionKey])
+  @@index([institutionKey, role])
+}
+
+model ClassificationTopic {
+  id               String @id @default(cuid())
+  classificationId String
+  topicKey         String
+  confidence       Float  @default(1)
+
+  classification ContentClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+
+  @@unique([classificationId, topicKey])
+  @@index([topicKey])
+}
+
+model ClassificationAsset {
+  id               String @id @default(cuid())
+  classificationId String
+  assetId          String
+  confidence       Float  @default(1)
+
+  classification ContentClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+  asset          Asset                 @relation(fields: [assetId], references: [id])
+
+  @@unique([classificationId, assetId])
+  @@index([assetId])
+}
+
+model ClassificationAssetClass {
+  id               String @id @default(cuid())
+  classificationId String
+  assetClassKey    String
+  confidence       Float  @default(1)
+
+  classification ContentClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+
+  @@unique([classificationId, assetClassKey])
+  @@index([assetClassKey])
+}
+
+model ClassificationEvent {
+  id               String @id @default(cuid())
+  classificationId String
+  eventKey         String
+  confidence       Float  @default(1)
+
+  classification ContentClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+
+  @@unique([classificationId, eventKey])
+  @@index([eventKey])
 }
 
 model Forecast {
@@ -400,9 +520,10 @@ model MacroIndicator {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  seriesSources MacroSeriesSource[]
-  releaseValues MacroReleaseValue[]
-  expectations  MacroExpectation[]
+  seriesSources  MacroSeriesSource[]
+  releaseValues  MacroReleaseValue[]
+  expectations   MacroExpectation[]
+  classification ContentClassification?
 
   @@index([countryCode, category, enabled])
 }
@@ -477,6 +598,7 @@ model MacroRelease {
   values          MacroReleaseValue[]
   policyDocuments MacroPolicyDocument[]
   expectations    MacroExpectation[]
+  classification  ContentClassification?
 
   @@index([status, scheduledAt])
   @@index([releaseFamily, scheduledAt])
@@ -700,7 +822,8 @@ model MacroPolicyDocument {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  release MacroRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  release        MacroRelease?          @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  classification ContentClassification?
 
   @@unique([sourceUrl, contentHash])
   @@index([releaseId])
@@ -1228,25 +1351,94 @@ model LlmCall {
   day  String
   task String
 
-  provider     String
-  model        String
-  inputTokens  Int      @default(0)
-  outputTokens Int      @default(0)
-  durationMs   Int      @default(0)
-  ok           Boolean  @default(true)
+  provider                 String
+  model                    String
+  inputTokens              Int      @default(0)
+  outputTokens             Int      @default(0)
+  durationMs               Int      @default(0)
+  ok                       Boolean  @default(true)
   /// Why the model stopped, normalised across vendors: "stop" (finished on its own),
   /// "length" (hit the output ceiling and was cut mid-answer), "filter", or whatever else
   /// the vendor reported. Truncation is invisible in the token counts — a cut-off reply
   /// bills for every token it generated — and it is the difference between "the ceiling is
   /// fine" and "the ceiling is why this call is being retried".
-  finishReason String?
-  error        String?
-  createdAt    DateTime @default(now())
+  finishReason             String?
+  error                    String?
+  contentId                String?
+  requestFingerprint       String?
+  promptVersion            String?
+  executionLevel           String?
+  contextStrategy          String?
+  cacheStatus              String?
+  reasonCodes              String?
+  savingsAttribution       String?
+  originalEstimatedTokens  Int?
+  optimizedEstimatedTokens Int?
+  createdAt                DateTime @default(now())
 
   @@index([day])
   @@index([day, task])
   @@index([day, provider, model])
   @@index([createdAt])
+  @@index([requestFingerprint])
+}
+
+/// Preflight outcomes, including work avoided before a provider call exists.
+model AiExecutionEvent {
+  id                       String   @id @default(cuid())
+  day                      String
+  task                     String
+  contentId                String?
+  requestFingerprint       String?
+  executionLevel           String
+  requiresLLM              Boolean
+  requiresDecision         Boolean  @default(false)
+  contextStrategy          String
+  cacheStatus              String
+  reasonCodes              String
+  savingsAttribution       String?
+  originalEstimatedTokens  Int      @default(0)
+  optimizedEstimatedTokens Int      @default(0)
+  actualInputTokens        Int?
+  createdAt                DateTime @default(now())
+
+  @@index([day])
+  @@index([day, task])
+  @@index([requestFingerprint])
+  @@index([createdAt])
+}
+
+/// Structured DecisionProvider usage. Kept separate from LlmCall because Jev makes
+/// typed decisions rather than generating text, and its cost/quality metrics differ.
+model DecisionCall {
+  id                 String   @id @default(cuid())
+  day                String
+  provider           String
+  model              String
+  decisionType       String
+  contentId          String?
+  classificationId   String?
+  requestFingerprint String?
+  inputBytes         Int      @default(0)
+  inputTokens        Int      @default(0)
+  outputTokens       Int      @default(0)
+  durationMs         Int      @default(0)
+  ok                 Boolean  @default(true)
+  confidence         Float?
+  selectedValue      String?
+  baselineValue      String?
+  shadowMode         Boolean  @default(true)
+  error              String?
+  createdAt          DateTime @default(now())
+
+  classification ContentClassification? @relation(fields: [classificationId], references: [id], onDelete: SetNull)
+
+  @@index([day])
+  @@index([day, provider, model])
+  @@index([decisionType, createdAt])
+  @@index([contentId])
+  @@index([classificationId])
+  @@index([requestFingerprint])
 }
 
 /// A spending ceiling for one scope, enforced automatically before each model call.

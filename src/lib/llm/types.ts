@@ -2,6 +2,20 @@ export interface CompletionInput {
   system: string;
   user: string;
   maxTokens?: number;
+  audit?: CompletionAudit;
+}
+
+export interface CompletionAudit {
+  contentId?: string;
+  requestFingerprint?: string;
+  promptVersion?: string;
+  executionLevel?: "LEVEL_0" | "LEVEL_1" | "LEVEL_2" | "LEVEL_3";
+  contextStrategy?: "STRUCTURED" | "SELECTIVE" | "EXPANDED" | "FULL";
+  cacheStatus?: "HIT" | "MISS" | "NOT_APPLICABLE";
+  reasonCodes?: string[];
+  savingsAttribution?: "DETERMINISTIC" | "CACHE" | "JEV_GATE" | "CONTEXT_REDUCTION" | "ARTIFACT_REUSE" | "DUPLICATE_SKIP";
+  originalEstimatedTokens?: number;
+  optimizedEstimatedTokens?: number;
 }
 
 /** Token counts as the provider itself reported them, when it reported them. */

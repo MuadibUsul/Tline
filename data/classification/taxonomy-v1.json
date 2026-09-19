@@ -1,0 +1,388 @@
+{
+  "version": "1.0.0",
+  "jurisdictions": [
+    {
+      "key": "us",
+      "slug": "us",
+      "code": "US",
+      "isoAlpha2": "US",
+      "nameEn": "United States",
+      "nameZh": "美国",
+      "kind": "COUNTRY",
+      "aliases": ["USA", "United States of America", "America", "美国"]
+    },
+    {
+      "key": "eurozone",
+      "slug": "eurozone",
+      "code": "EA",
+      "isoAlpha2": null,
+      "nameEn": "Eurozone",
+      "nameZh": "欧元区",
+      "kind": "CURRENCY_AREA",
+      "aliases": ["Euro Area", "EA", "Eurozone", "欧元区"]
+    },
+    {
+      "key": "uk",
+      "slug": "uk",
+      "code": "GB",
+      "isoAlpha2": "GB",
+      "nameEn": "United Kingdom",
+      "nameZh": "英国",
+      "kind": "COUNTRY",
+      "aliases": ["UK", "Britain", "Great Britain", "英国"]
+    },
+    {
+      "key": "japan",
+      "slug": "japan",
+      "code": "JP",
+      "isoAlpha2": "JP",
+      "nameEn": "Japan",
+      "nameZh": "日本",
+      "kind": "COUNTRY",
+      "aliases": ["JP", "日本"]
+    },
+    {
+      "key": "china",
+      "slug": "china",
+      "code": "CN",
+      "isoAlpha2": "CN",
+      "nameEn": "China",
+      "nameZh": "中国",
+      "kind": "COUNTRY",
+      "aliases": ["PRC", "Mainland China", "中国", "中国大陆"]
+    },
+    {
+      "key": "indonesia",
+      "slug": "indonesia",
+      "code": "ID",
+      "isoAlpha2": "ID",
+      "nameEn": "Indonesia",
+      "nameZh": "印度尼西亚",
+      "kind": "COUNTRY",
+      "aliases": ["ID", "Indonesia", "印尼", "印度尼西亚"]
+    },
+    {
+      "key": "australia",
+      "slug": "australia",
+      "code": "AU",
+      "isoAlpha2": "AU",
+      "nameEn": "Australia",
+      "nameZh": "澳大利亚",
+      "kind": "COUNTRY",
+      "aliases": ["AU", "Australia", "澳大利亚", "澳洲"]
+    },
+    {
+      "key": "new-zealand",
+      "slug": "new-zealand",
+      "code": "NZ",
+      "isoAlpha2": "NZ",
+      "nameEn": "New Zealand",
+      "nameZh": "新西兰",
+      "kind": "COUNTRY",
+      "aliases": ["NZ", "New Zealand", "新西兰"]
+    },
+    {
+      "key": "canada",
+      "slug": "canada",
+      "code": "CA",
+      "isoAlpha2": "CA",
+      "nameEn": "Canada",
+      "nameZh": "加拿大",
+      "kind": "COUNTRY",
+      "aliases": ["CA", "Canada", "加拿大"]
+    },
+    {
+      "key": "switzerland",
+      "slug": "switzerland",
+      "code": "CH",
+      "isoAlpha2": "CH",
+      "nameEn": "Switzerland",
+      "nameZh": "瑞士",
+      "kind": "COUNTRY",
+      "aliases": ["CH", "Swiss", "Switzerland", "瑞士"]
+    },
+    {
+      "key": "south-korea",
+      "slug": "south-korea",
+      "code": "KR",
+      "isoAlpha2": "KR",
+      "nameEn": "South Korea",
+      "nameZh": "韩国",
+      "kind": "COUNTRY",
+      "aliases": ["KR", "Korea", "Republic of Korea", "South Korea", "韩国"]
+    },
+    {
+      "key": "india",
+      "slug": "india",
+      "code": "IN",
+      "isoAlpha2": "IN",
+      "nameEn": "India",
+      "nameZh": "印度",
+      "kind": "COUNTRY",
+      "aliases": ["IN", "India", "印度"]
+    },
+    {
+      "key": "brazil",
+      "slug": "brazil",
+      "code": "BR",
+      "isoAlpha2": "BR",
+      "nameEn": "Brazil",
+      "nameZh": "巴西",
+      "kind": "COUNTRY",
+      "aliases": ["BR", "Brazil", "Brasil", "巴西"]
+    },
+    {
+      "key": "mexico",
+      "slug": "mexico",
+      "code": "MX",
+      "isoAlpha2": "MX",
+      "nameEn": "Mexico",
+      "nameZh": "墨西哥",
+      "kind": "COUNTRY",
+      "aliases": ["MX", "Mexico", "México", "墨西哥"]
+    }
+  ],
+  "institutions": [
+    {
+      "key": "federal-reserve",
+      "nameEn": "Federal Reserve",
+      "nameZh": "美联储",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "us",
+      "aliases": ["Fed", "Federal Reserve System", "FOMC", "美联储", "联邦储备系统"]
+    },
+    {
+      "key": "ecb",
+      "nameEn": "European Central Bank",
+      "nameZh": "欧洲中央银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "eurozone",
+      "aliases": ["ECB", "European Central Bank", "欧洲央行", "欧央行"]
+    },
+    {
+      "key": "bank-of-england",
+      "nameEn": "Bank of England",
+      "nameZh": "英格兰银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "uk",
+      "aliases": ["BoE", "Bank of England", "英国央行", "英格兰银行"]
+    },
+    {
+      "key": "bank-of-japan",
+      "nameEn": "Bank of Japan",
+      "nameZh": "日本银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "japan",
+      "aliases": ["BoJ", "Bank of Japan", "日本央行", "日本银行"]
+    },
+    {
+      "key": "pboc",
+      "nameEn": "People's Bank of China",
+      "nameZh": "中国人民银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "china",
+      "aliases": ["PBOC", "People's Bank of China", "Chinese central bank", "中国央行", "中国人民银行"]
+    },
+    {
+      "key": "bank-indonesia",
+      "nameEn": "Bank Indonesia",
+      "nameZh": "印度尼西亚银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "indonesia",
+      "aliases": ["BI", "Bank Indonesia", "Indonesian central bank", "印尼央行", "印度尼西亚银行"]
+    },
+    {
+      "key": "reserve-bank-of-australia",
+      "nameEn": "Reserve Bank of Australia",
+      "nameZh": "澳大利亚储备银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "australia",
+      "aliases": ["RBA", "Reserve Bank of Australia", "Australian central bank", "澳洲联储", "澳大利亚央行"]
+    },
+    {
+      "key": "reserve-bank-of-new-zealand",
+      "nameEn": "Reserve Bank of New Zealand",
+      "nameZh": "新西兰储备银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "new-zealand",
+      "aliases": ["RBNZ", "Reserve Bank of New Zealand", "New Zealand central bank", "新西兰联储", "新西兰央行"]
+    },
+    {
+      "key": "bank-of-canada",
+      "nameEn": "Bank of Canada",
+      "nameZh": "加拿大银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "canada",
+      "aliases": ["BoC", "Bank of Canada", "Canadian central bank", "加拿大央行", "加拿大银行"]
+    },
+    {
+      "key": "swiss-national-bank",
+      "nameEn": "Swiss National Bank",
+      "nameZh": "瑞士国家银行",
+      "kind": "CENTRAL_BANK",
+      "jurisdictionKey": "switzerland",
+      "aliases": ["SNB", "Swiss National Bank", "Swiss central bank", "瑞士央行", "瑞士国家银行"]
+    },
+    {
+      "key": "bls",
+      "nameEn": "Bureau of Labor Statistics",
+      "nameZh": "美国劳工统计局",
+      "kind": "STATISTICAL_AGENCY",
+      "jurisdictionKey": "us",
+      "aliases": ["BLS", "US Bureau of Labor Statistics", "U.S. Bureau of Labor Statistics", "美国劳工统计局"]
+    },
+    {
+      "key": "bea",
+      "nameEn": "Bureau of Economic Analysis",
+      "nameZh": "美国经济分析局",
+      "kind": "STATISTICAL_AGENCY",
+      "jurisdictionKey": "us",
+      "aliases": ["BEA", "US Bureau of Economic Analysis", "U.S. Bureau of Economic Analysis", "美国经济分析局"]
+    },
+    {
+      "key": "us-treasury",
+      "nameEn": "United States Department of the Treasury",
+      "nameZh": "美国财政部",
+      "kind": "TREASURY",
+      "jurisdictionKey": "us",
+      "aliases": ["US Treasury", "U.S. Treasury", "Treasury Department", "美国财政部"]
+    },
+    {
+      "key": "eurostat",
+      "nameEn": "Eurostat",
+      "nameZh": "欧盟统计局",
+      "kind": "STATISTICAL_AGENCY",
+      "jurisdictionKey": "eurozone",
+      "aliases": ["Eurostat", "EU statistics office", "欧盟统计局"]
+    },
+    {
+      "key": "ons",
+      "nameEn": "Office for National Statistics",
+      "nameZh": "英国国家统计局",
+      "kind": "STATISTICAL_AGENCY",
+      "jurisdictionKey": "uk",
+      "aliases": ["ONS", "UK Office for National Statistics", "英国国家统计局"]
+    },
+    {
+      "key": "eia",
+      "nameEn": "U.S. Energy Information Administration",
+      "nameZh": "美国能源信息署",
+      "kind": "GOVERNMENT_AGENCY",
+      "jurisdictionKey": "us",
+      "aliases": ["EIA", "US Energy Information Administration", "U.S. Energy Information Administration", "美国能源信息署"]
+    }
+  ],
+  "topics": [
+    { "key": "monetary-policy", "nameEn": "Monetary Policy", "nameZh": "货币政策", "aliases": ["central bank policy", "interest-rate policy", "货币政策"] },
+    { "key": "inflation", "nameEn": "Inflation", "nameZh": "通胀", "aliases": ["price pressures", "disinflation", "通货膨胀", "通胀"] },
+    { "key": "employment", "nameEn": "Employment", "nameZh": "就业", "aliases": ["labor market", "labour market", "jobs", "就业", "劳动力市场"] },
+    { "key": "economic-growth", "nameEn": "Economic Growth", "nameZh": "经济增长", "aliases": ["growth", "economic activity", "经济增长"] },
+    { "key": "energy", "nameEn": "Energy", "nameZh": "能源", "aliases": ["energy markets", "能源"] },
+    { "key": "fiscal-policy", "nameEn": "Fiscal Policy", "nameZh": "财政政策", "aliases": ["government spending", "tax policy", "财政政策"] },
+    { "key": "financial-conditions", "nameEn": "Financial Conditions", "nameZh": "金融条件", "aliases": ["financial conditions", "融资条件", "金融条件"] },
+    { "key": "manufacturing", "nameEn": "Manufacturing", "nameZh": "制造业", "aliases": ["factory activity", "industrial activity", "制造业"] },
+    { "key": "services", "nameEn": "Services", "nameZh": "服务业", "aliases": ["service sector", "服务业"] },
+    { "key": "consumer", "nameEn": "Consumer", "nameZh": "消费", "aliases": ["consumer spending", "household demand", "消费", "消费者"] },
+    { "key": "housing", "nameEn": "Housing", "nameZh": "住房", "aliases": ["real estate", "property market", "housing market", "房地产", "住房"] },
+    { "key": "trade", "nameEn": "Trade", "nameZh": "贸易", "aliases": ["international trade", "exports", "imports", "贸易"] },
+    { "key": "liquidity", "nameEn": "Liquidity", "nameZh": "流动性", "aliases": ["market liquidity", "money supply", "流动性"] },
+    { "key": "credit", "nameEn": "Credit", "nameZh": "信贷", "aliases": ["lending", "credit markets", "信贷", "信用市场"] },
+    { "key": "financial-stability", "nameEn": "Financial Stability", "nameZh": "金融稳定", "aliases": ["systemic risk", "financial stability", "系统性风险", "金融稳定"] },
+    { "key": "equities", "nameEn": "Equities", "nameZh": "股票市场", "aliases": ["equity market", "stock market", "stocks", "股市", "股票市场"] }
+  ],
+  "events": [
+    { "key": "cpi", "nameEn": "Consumer Price Index", "nameZh": "消费者价格指数", "aliases": ["CPI", "headline CPI", "消费者价格指数"], "defaultTopicKey": "inflation" },
+    { "key": "core-cpi", "nameEn": "Core Consumer Price Index", "nameZh": "核心消费者价格指数", "aliases": ["core CPI", "underlying CPI", "核心 CPI"], "defaultTopicKey": "inflation" },
+    { "key": "pce", "nameEn": "PCE Price Index", "nameZh": "个人消费支出价格指数", "aliases": ["PCE", "PCE inflation", "PCE price index"], "defaultTopicKey": "inflation", "optionalInstitutionKey": "bea" },
+    { "key": "core-pce", "nameEn": "Core PCE Price Index", "nameZh": "核心个人消费支出价格指数", "aliases": ["core PCE", "core PCE inflation"], "defaultTopicKey": "inflation", "optionalInstitutionKey": "bea" },
+    { "key": "ppi", "nameEn": "Producer Price Index", "nameZh": "生产者价格指数", "aliases": ["PPI", "producer prices", "生产者价格指数"], "defaultTopicKey": "inflation" },
+    { "key": "nfp", "nameEn": "Nonfarm Payrolls", "nameZh": "非农就业报告", "aliases": ["NFP", "non-farm payrolls", "payrolls", "非农"], "defaultTopicKey": "employment", "optionalInstitutionKey": "bls" },
+    { "key": "jolts", "nameEn": "Job Openings and Labor Turnover Survey", "nameZh": "职位空缺与劳动力流动调查", "aliases": ["JOLTS", "job openings", "职位空缺"], "defaultTopicKey": "employment", "optionalInstitutionKey": "bls" },
+    { "key": "initial-jobless-claims", "nameEn": "Initial Jobless Claims", "nameZh": "首次申请失业救济人数", "aliases": ["initial claims", "jobless claims", "初请失业金人数"], "defaultTopicKey": "employment" },
+    { "key": "adp", "nameEn": "ADP Employment Report", "nameZh": "ADP 就业报告", "aliases": ["ADP", "ADP payrolls", "小非农"], "defaultTopicKey": "employment" },
+    { "key": "unemployment-rate", "nameEn": "Unemployment Rate", "nameZh": "失业率", "aliases": ["jobless rate", "unemployment", "失业率"], "defaultTopicKey": "employment" },
+    { "key": "wages", "nameEn": "Wages", "nameZh": "工资", "aliases": ["wage growth", "average hourly earnings", "earnings", "薪资", "工资"] , "defaultTopicKey": "employment" },
+    { "key": "gdp", "nameEn": "Gross Domestic Product", "nameZh": "国内生产总值", "aliases": ["GDP", "gross domestic product", "国内生产总值"], "defaultTopicKey": "economic-growth" },
+    { "key": "retail-sales", "nameEn": "Retail Sales", "nameZh": "零售销售", "aliases": ["retail sales", "零售额", "零售销售"], "defaultTopicKey": "consumer" },
+    { "key": "pmi", "nameEn": "Purchasing Managers' Index", "nameZh": "采购经理指数", "aliases": ["PMI", "purchasing managers index", "采购经理指数"], "defaultTopicKey": "manufacturing" },
+    { "key": "ism", "nameEn": "ISM Report", "nameZh": "ISM 报告", "aliases": ["ISM", "ISM manufacturing", "ISM services"], "defaultTopicKey": "manufacturing" },
+    { "key": "consumer-confidence", "nameEn": "Consumer Confidence", "nameZh": "消费者信心", "aliases": ["consumer sentiment", "consumer confidence", "消费者信心"], "defaultTopicKey": "consumer" },
+    { "key": "fomc", "nameEn": "FOMC Meeting", "nameZh": "美联储议息会议", "aliases": ["FOMC", "Fed meeting", "Federal Reserve meeting", "美联储议息会议"], "defaultTopicKey": "monetary-policy", "optionalInstitutionKey": "federal-reserve" },
+    { "key": "fomc-minutes", "nameEn": "FOMC Minutes", "nameZh": "美联储会议纪要", "aliases": ["FOMC minutes", "Fed minutes", "美联储会议纪要"], "defaultTopicKey": "monetary-policy", "optionalInstitutionKey": "federal-reserve" },
+    { "key": "ecb-meeting", "nameEn": "ECB Meeting", "nameZh": "欧洲央行会议", "aliases": ["ECB meeting", "ECB decision", "欧洲央行会议"], "defaultTopicKey": "monetary-policy", "optionalInstitutionKey": "ecb" },
+    { "key": "boe-meeting", "nameEn": "Bank of England Meeting", "nameZh": "英格兰银行会议", "aliases": ["BoE meeting", "MPC meeting", "英国央行会议"], "defaultTopicKey": "monetary-policy", "optionalInstitutionKey": "bank-of-england" },
+    { "key": "boj-meeting", "nameEn": "Bank of Japan Meeting", "nameZh": "日本银行会议", "aliases": ["BoJ meeting", "Bank of Japan decision", "日本央行会议"], "defaultTopicKey": "monetary-policy", "optionalInstitutionKey": "bank-of-japan" },
+    { "key": "oil-inventory", "nameEn": "Oil Inventory Report", "nameZh": "原油库存报告", "aliases": ["oil inventories", "crude inventories", "EIA inventories", "原油库存"], "defaultTopicKey": "energy", "optionalInstitutionKey": "eia" },
+    { "key": "opec-meeting", "nameEn": "OPEC Meeting", "nameZh": "欧佩克会议", "aliases": ["OPEC meeting", "OPEC+ meeting", "欧佩克会议"], "defaultTopicKey": "energy" }
+  ],
+  "assetClasses": [
+    { "key": "equity", "nameEn": "Equity", "nameZh": "股票", "aliases": ["equities", "stocks", "股票"] },
+    { "key": "rate", "nameEn": "Rates", "nameZh": "利率", "aliases": ["rates", "fixed income", "bonds", "利率", "债券"] },
+    { "key": "fx", "nameEn": "Foreign Exchange", "nameZh": "外汇", "aliases": ["FX", "forex", "currencies", "外汇"] },
+    { "key": "commodity", "nameEn": "Commodity", "nameZh": "大宗商品", "aliases": ["commodities", "大宗商品"] },
+    { "key": "credit", "nameEn": "Credit", "nameZh": "信用", "aliases": ["credit markets", "corporate debt", "信用"] },
+    { "key": "crypto", "nameEn": "Cryptoasset", "nameZh": "加密资产", "aliases": ["crypto", "cryptocurrency", "digital assets", "加密资产"] },
+    { "key": "macro", "nameEn": "Macro", "nameZh": "宏观", "aliases": ["macroeconomic", "宏观"] },
+    { "key": "multi-asset", "nameEn": "Multi-Asset", "nameZh": "多资产", "aliases": ["multi asset", "cross-asset", "多资产", "跨资产"] }
+  ],
+  "contentTypes": [
+    { "key": "RESEARCH_ARTICLE", "nameEn": "Research Article", "nameZh": "研究文章" },
+    { "key": "MACRO_INDICATOR", "nameEn": "Macro Indicator", "nameZh": "宏观指标" },
+    { "key": "MACRO_RELEASE", "nameEn": "Macro Release", "nameZh": "宏观数据发布" },
+    { "key": "POLICY_DOCUMENT", "nameEn": "Policy Document", "nameZh": "政策文件" },
+    { "key": "MARKET_ANALYSIS", "nameEn": "Market Analysis", "nameZh": "市场分析" },
+    { "key": "DATA_ANALYSIS", "nameEn": "Data Analysis", "nameZh": "数据分析" },
+    { "key": "ECONOMIC_OUTLOOK", "nameEn": "Economic Outlook", "nameZh": "经济展望" },
+    { "key": "POLICY_PREVIEW", "nameEn": "Policy Preview", "nameZh": "政策前瞻" },
+    { "key": "POLICY_REVIEW", "nameEn": "Policy Review", "nameZh": "政策回顾" },
+    { "key": "MARKET_STRATEGY", "nameEn": "Market Strategy", "nameZh": "市场策略" },
+    { "key": "POSITIONING_ANALYSIS", "nameEn": "Positioning Analysis", "nameZh": "仓位分析" },
+    { "key": "NEWS", "nameEn": "News", "nameZh": "新闻" },
+    { "key": "OTHER", "nameEn": "Other", "nameZh": "其他" },
+    { "key": "UNKNOWN", "nameEn": "Unknown", "nameZh": "未知" }
+  ],
+  "structuredMappings": {
+    "macroIndicatorCategories": [
+      { "value": "INFLATION", "topicKeys": ["inflation"] },
+      { "value": "LABOR", "topicKeys": ["employment"] },
+      { "value": "GROWTH", "topicKeys": ["economic-growth"] },
+      { "value": "POLICY", "topicKeys": ["monetary-policy"] },
+      { "value": "LIQUIDITY", "topicKeys": ["liquidity"] },
+      { "value": "COMMODITY", "topicKeys": ["energy"] }
+    ],
+    "macroReleaseFamilies": [
+      { "value": "BLS_CPI", "eventKeys": ["cpi", "core-cpi"] },
+      { "value": "BLS_EMPLOYMENT_SITUATION", "eventKeys": ["nfp", "unemployment-rate", "wages"] },
+      { "value": "BLS_PPI", "eventKeys": ["ppi"] },
+      { "value": "BLS_JOLTS", "eventKeys": ["jolts"] },
+      { "value": "BEA_PERSONAL_INCOME_OUTLAYS", "eventKeys": ["pce", "core-pce"] },
+      { "value": "BEA_GDP", "eventKeys": ["gdp"] },
+      { "value": "FOMC_DECISION", "eventKeys": ["fomc"] },
+      { "value": "EIA_PETROLEUM_STATUS", "eventKeys": ["oil-inventory"] }
+    ]
+  },
+  "institutionMappings": [
+    { "institutionKey": "federal-reserve", "jurisdictionKey": "us" },
+    { "institutionKey": "ecb", "jurisdictionKey": "eurozone" },
+    { "institutionKey": "bank-of-england", "jurisdictionKey": "uk" },
+    { "institutionKey": "bank-of-japan", "jurisdictionKey": "japan" },
+    { "institutionKey": "pboc", "jurisdictionKey": "china" },
+    { "institutionKey": "bank-indonesia", "jurisdictionKey": "indonesia" },
+    { "institutionKey": "reserve-bank-of-australia", "jurisdictionKey": "australia" },
+    { "institutionKey": "reserve-bank-of-new-zealand", "jurisdictionKey": "new-zealand" },
+    { "institutionKey": "bank-of-canada", "jurisdictionKey": "canada" },
+    { "institutionKey": "swiss-national-bank", "jurisdictionKey": "switzerland" },
+    { "institutionKey": "bls", "jurisdictionKey": "us" },
+    { "institutionKey": "bea", "jurisdictionKey": "us" },
+    { "institutionKey": "us-treasury", "jurisdictionKey": "us" },
+    { "institutionKey": "eurostat", "jurisdictionKey": "eurozone" },
+    { "institutionKey": "ons", "jurisdictionKey": "uk" },
+    { "institutionKey": "eia", "jurisdictionKey": "us" }
+  ],
+  "aliases": {
+    "legacyNonAssets": [
+      { "alias": "FED", "replacementFacet": "institution", "replacementKey": "federal-reserve", "deprecated": true },
+      { "alias": "CPI", "replacementFacet": "event", "replacementKey": "cpi", "deprecated": true }
+    ]
+  }
+}

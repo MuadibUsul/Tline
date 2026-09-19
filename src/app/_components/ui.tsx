@@ -3,6 +3,7 @@ import { assetPath } from "@/lib/assetPath";
 import { directionLabel } from "@/lib/assets";
 import { articleTimestamp, assetName, institutionName, localizeChineseContent, relativeTime, tr, type Locale, localePath } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
+import { taxonomy } from "@/lib/classification/taxonomy";
 
 export const relTime = (d: Date, locale: Locale = "en") => relativeTime(d, locale);
 
@@ -36,7 +37,33 @@ type FeedArticle = {
   analysis: { summary: string; summaryZh?: string | null } | null;
   translations?: { title: string; text?: string }[];
   articleAssets: { direction: number; target: number | null; previousTarget: number | null; asset: { ticker: string; name: string } }[];
+  classification?: {
+    jurisdictionState: string;
+    jurisdictions: { jurisdictionKey: string; role: string }[];
+    topics: { topicKey: string }[];
+    institutions: { institutionKey: string; role: string }[];
+  } | null;
 };
+
+const jurisdictionByKey = new Map(taxonomy.jurisdictions.map((item) => [item.key, item]));
+const topicByKey = new Map(taxonomy.topics.map((item) => [item.key, item]));
+const subjectInstitutionByKey = new Map(taxonomy.institutions.map((item) => [item.key, item]));
+
+export function ClassificationChips({ classification, locale }: { classification: FeedArticle["classification"]; locale: Locale }) {
+  if (!classification) return null;
+  const primary = classification.jurisdictions.find((item) => item.role === "PRIMARY");
+  const stateLabel = !primary ? ({
+    GLOBAL: tr(locale, "Global", "全球"), MULTIPLE: tr(locale, "Multiple economies", "多经济体"), UNKNOWN: tr(locale, "Unknown economy", "经济体未知"),
+  } as Record<string, string>)[classification.jurisdictionState] : null;
+  return (
+    <div className="research-card-assets" aria-label={tr(locale, "Classification", "内容分类")}>
+      {primary && jurisdictionByKey.get(primary.jurisdictionKey) && <Link className="chip acc" href={localePath(locale, `/economies/${jurisdictionByKey.get(primary.jurisdictionKey)!.slug}`)}>{locale === "zh-CN" ? jurisdictionByKey.get(primary.jurisdictionKey)!.nameZh : jurisdictionByKey.get(primary.jurisdictionKey)!.nameEn}</Link>}
+      {stateLabel && <span className="chip acc">{stateLabel}</span>}
+      {classification.topics.slice(0, 2).map(({ topicKey }) => { const topic = topicByKey.get(topicKey); return topic ? <Link className="chip gray" href={localePath(locale, `/research?topic=${topic.key}`)} key={topicKey}>{locale === "zh-CN" ? topic.nameZh : topic.nameEn}</Link> : null; })}
+      {classification.institutions.filter((item) => item.role === "PRIMARY").slice(0, 1).map(({ institutionKey }) => { const institution = subjectInstitutionByKey.get(institutionKey); return institution ? <Link className="chip gray" href={localePath(locale, `/research?subjectInstitution=${institution.key}`)} key={institutionKey}>{locale === "zh-CN" ? institution.nameZh : institution.nameEn}</Link> : null; })}
+    </div>
+  );
+}
 
 export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale }) {
   const primary = a.articleAssets[0];
@@ -95,6 +122,7 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
       </div>
       <h2><Link href={localePath(locale, researchPath(a))}>{title}</Link></h2>
       {localizedPreview && <p>{localizedPreview}</p>}
+      <ClassificationChips classification={a.classification} locale={locale} />
       <div className="research-card-assets">
         {a.articleAssets.slice(0, 4).map((articleAsset) => {
           const direction = directionLabel(articleAsset.direction);

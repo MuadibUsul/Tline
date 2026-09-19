@@ -2,8 +2,10 @@ import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { resolveLLMProvider } from "../src/lib/llm/config";
 import type { LLMProvider } from "../src/lib/llm/provider";
-import { extractForecasts } from "../src/lib/macro/forecasts";
+import { extractForecasts, FORECAST_PROMPT_VERSION } from "../src/lib/macro/forecasts";
 import { generatePendingReleaseAnalyses } from "../src/lib/macro/releaseAnalysis";
+import { CONTEXT_BUILDER_VERSION } from "../src/lib/llm/context-builder";
+import { decideAiExecution, hasCompletedAiExecution, hasRecordedAiExecution, recordAiExecutionEvent } from "../src/lib/llm/execution-policy";
 
 // Expectations pipeline: mine institution forecasts from recent research previews, then
 // generate the release read-out for prints that have landed. Automated, source-agnostic.
@@ -20,17 +22,34 @@ async function extractPhase(limit: number, provider: LLMProvider) {
   const since = new Date(Date.now() - 21 * 864e5);
   const articles = await prisma.article.findMany({
     where: { publishedAt: { gte: since }, rawText: { not: null } },
-    select: { id: true, title: true, rawText: true, publishedAt: true, institutionId: true },
+    select: { id: true, title: true, contentHash: true, rawText: true, publishedAt: true, institutionId: true },
     orderBy: { publishedAt: "desc" },
     take: limit * 5,
   });
+  const existing = new Set((await prisma.macroForecast.findMany({
+    where: { articleId: { in: articles.map((article) => article.id) } },
+    select: { articleId: true },
+  })).flatMap((row) => row.articleId ? [row.articleId] : []));
   let scanned = 0, stored = 0;
   for (const article of articles) {
     if (scanned >= limit) break;
     if (!HINT.test(`${article.title} ${article.rawText?.slice(0, 2500) ?? ""}`)) continue;
+    const policy = decideAiExecution({
+      taskType: "forecast", contentId: article.id, contentHash: article.contentHash,
+      promptVersion: FORECAST_PROMPT_VERSION, contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+      requestedOutput: "forecast", route: { provider: provider.name, model: provider.model },
+      ...(existing.has(article.id) ? { existingArtifacts: { reusable: true } } : {}),
+    });
+    if (existing.has(article.id)) {
+      if (!(await hasRecordedAiExecution(policy.fingerprint, "HIT"))) {
+        await recordAiExecutionEvent({ task: "forecast", contentId: article.id, policy, cacheStatus: "HIT", attribution: "ARTIFACT_REUSE" });
+      }
+      continue;
+    }
+    if (await hasCompletedAiExecution(policy.fingerprint)) continue;
     scanned++;
     try {
-      const forecasts = await extractForecasts(article.title, article.rawText ?? "", provider);
+      const forecasts = await extractForecasts(article.title, article.rawText ?? "", provider, { contentId: article.id, contentHash: article.contentHash });
       for (const forecast of forecasts) {
         // Articles are processed newest-first, so the first row per (institution, indicator,
         // period) is the latest — keep it and no-op on older duplicates.

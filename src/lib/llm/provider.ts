@@ -279,6 +279,7 @@ class RecordingProvider implements LLMProvider {
         finishReason: result.finishReason,
         durationMs: Date.now() - startedAt,
         ok: true,
+        audit: input.audit,
       });
       return result;
     } catch (error) {
@@ -292,6 +293,7 @@ class RecordingProvider implements LLMProvider {
         durationMs: Date.now() - startedAt,
         ok: false,
         error: String(error),
+        audit: input.audit,
       });
       throw error;
     }

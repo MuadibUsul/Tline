@@ -9,6 +9,12 @@ const authSecret = process.env.AUTH_SECRET || "";
 const storageDriver = process.env.DOCUMENT_STORAGE_DRIVER || "local";
 const storageRoot = process.env.DOCUMENT_STORAGE_ROOT || "./storage";
 const authProvider = (process.env.AUTH_PROVIDER || "").toLowerCase();
+const jevEnabled = process.env.JEV_DECISION_ENABLED?.trim().toLowerCase() === "true";
+const jevShadowMode = process.env.JEV_SHADOW_MODE?.trim().toLowerCase() !== "false";
+const hardGate = process.env.LLM_HARD_GATE_ENABLED?.trim().toLowerCase() === "true";
+const gateApproved = process.env.JEV_GATE_EVAL_APPROVED?.trim().toLowerCase() === "true";
+const aiPreflight = process.env.AI_PREFLIGHT_ENABLED?.trim().toLowerCase() === "true";
+const classificationApply = process.env.JEV_CLASSIFICATION_APPLY_ENABLED?.trim().toLowerCase() === "true";
 const positiveNumber = (name, fallback) => {
   const value = Number(process.env[name] ?? fallback);
   if (!Number.isFinite(value) || value < 0) errors.push(`${name} must be a non-negative number.`);
@@ -32,6 +38,19 @@ if (authProvider === "email" && (!process.env.EMAIL_SERVER || !process.env.EMAIL
   errors.push("Email authentication requires EMAIL_SERVER and EMAIL_FROM.");
 }
 for (const [name, fallback] of [["MARKET_BUDGET_PER_MINUTE", 8], ["MARKET_BUDGET_PER_DAY", 800], ["MARKET_QUOTE_ENDPOINT_WEIGHT", 1], ["MARKET_TIME_SERIES_ENDPOINT_WEIGHT", 1], ["TWELVE_DATA_DECLARED_DELAY_SECONDS", 0]]) positiveNumber(name, fallback);
+positiveNumber("JEV_TIMEOUT_MS", 20000);
+for (const [name, fallback] of [["JEV_CLASSIFICATION_EXCERPT_CHARS", 6000], ["JEV_MIN_INTERVAL_MS", 1000], ["JEV_MAX_FAILURES", 3], ["JEV_RETRY_BASE_MS", 60000], ["JEV_RETRY_MAX_MS", 3600000]]) positiveNumber(name, fallback);
+if (jevEnabled && !(process.env.JEV_API_KEY || process.env.TYPESAFE_API_KEY)) {
+  errors.push("JEV_API_KEY (or TYPESAFE_API_KEY) is required when JEV_DECISION_ENABLED=true.");
+}
+if (jevEnabled && !jevShadowMode && !hardGate) errors.push("JEV_SHADOW_MODE may be false only for an explicitly enabled controlled hard gate.");
+if (hardGate && !gateApproved) errors.push("LLM_HARD_GATE_ENABLED requires JEV_GATE_EVAL_APPROVED=true after formal evaluation sign-off.");
+if (hardGate && (!jevEnabled || !aiPreflight)) errors.push("LLM_HARD_GATE_ENABLED requires JEV_DECISION_ENABLED=true and AI_PREFLIGHT_ENABLED=true.");
+const classificationReviewThreshold = Number(process.env.JEV_CLASSIFICATION_REVIEW_THRESHOLD ?? 0.65);
+const classificationAutoThreshold = Number(process.env.JEV_CLASSIFICATION_AUTO_THRESHOLD ?? 0.9);
+if (!Number.isFinite(classificationReviewThreshold) || classificationReviewThreshold < 0 || classificationReviewThreshold > 1) errors.push("JEV_CLASSIFICATION_REVIEW_THRESHOLD must be between 0 and 1.");
+if (!Number.isFinite(classificationAutoThreshold) || classificationAutoThreshold < classificationReviewThreshold || classificationAutoThreshold > 1) errors.push("JEV_CLASSIFICATION_AUTO_THRESHOLD must be between review threshold and 1.");
+if (classificationApply && !jevEnabled) errors.push("JEV_CLASSIFICATION_APPLY_ENABLED requires JEV_DECISION_ENABLED=true.");
 const themeCoverage = Number(process.env.THEME_MARKET_MIN_COVERAGE ?? 0.6);
 if (!Number.isFinite(themeCoverage) || themeCoverage < 0 || themeCoverage > 1) errors.push("THEME_MARKET_MIN_COVERAGE must be between 0 and 1.");
 try { new Intl.DateTimeFormat("en", { timeZone: process.env.MARKET_BUDGET_RESET_TIMEZONE || "UTC" }).format(); }
@@ -58,6 +77,8 @@ if (production) {
   if (alertWebhook && !/^https:\/\//.test(alertWebhook)) errors.push("ALERT_WEBHOOK_URL must use https.");
   const healthToken = process.env.HEALTH_DETAIL_TOKEN || "";
   if (healthToken && healthToken.length < 24) errors.push("HEALTH_DETAIL_TOKEN must be at least 24 characters.");
+  const jevBaseUrl = process.env.JEV_BASE_URL || "";
+  if (jevBaseUrl && !/^https:\/\//.test(jevBaseUrl)) errors.push("Production JEV_BASE_URL must use https.");
 }
 
 for (const warning of warnings) console.warn(`WARN: ${warning}`);

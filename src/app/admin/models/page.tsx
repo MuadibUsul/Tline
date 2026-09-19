@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { BarList, StatCard, TimeSeries } from "@/app/_components/charts";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { classificationDecisionReport } from "@/lib/decision/report";
 import { getAdminLocale, tr, type Locale } from "@/lib/i18n";
 import { budgetStatuses, GLOBAL_SCOPE } from "@/lib/llm/budget";
 import { apiKeyFor, isLlmDisabled, type ProviderRow } from "@/lib/llm/config";
-import { llmUsageReport, recentLlmFailures } from "@/lib/llm/report";
+import { aiEfficiencyReport, llmUsageReport, recentLlmFailures } from "@/lib/llm/report";
 import { envApiKey } from "@/lib/llm/provider";
 import { LLM_TASKS, PROVIDER_NAMES, type LlmTask, type ProviderName } from "@/lib/llm/types";
 import { can } from "@/lib/permissions";
@@ -69,13 +70,15 @@ export default async function ModelsPage() {
   if (!user || !can(user, "admin.models")) notFound();
   const locale = await getAdminLocale();
 
-  const [providerRows, routeRows, prices, usage, failures, budgets] = await Promise.all([
+  const [providerRows, routeRows, prices, usage, failures, budgets, decisions, efficiency] = await Promise.all([
     prisma.llmProvider.findMany(),
     prisma.llmTaskRoute.findMany(),
     prisma.llmModelPrice.findMany({ orderBy: [{ provider: "asc" }, { model: "asc" }] }),
     llmUsageReport(30),
     recentLlmFailures(8),
     budgetStatuses(),
+    classificationDecisionReport(30),
+    aiEfficiencyReport(30),
   ]);
   const pausedByBudget = budgets.filter((row) => row.over);
 
@@ -202,6 +205,159 @@ export default async function ModelsPage() {
           />
         </section>
       </div>
+
+      <section className="blk">
+        <div className="section-t">
+          <span>{tr(locale, "AI execution efficiency", "AI 执行效率")}</span>
+          <span className="chip gray">{efficiency.days}d · UTC</span>
+        </div>
+        <p className="sub">
+          {tr(
+            locale,
+            "Preflight, artifact reuse and context selection are measured separately from provider billing. Token reduction is an estimate and is shown only where a full-context baseline was recorded.",
+            "预检、产物复用和上下文选择与服务商计费分开统计。Token 降幅为估算值，并且只有记录了完整上下文基线时才显示。",
+          )}
+        </p>
+        <section className="admin-stats admin-stats-6" aria-label={tr(locale, "AI efficiency metrics", "AI 效率指标")}>
+          <StatCard label={tr(locale, "Calls avoided", "避免调用")} value={compact(efficiency.callsAvoided)} note={tr(locale, "artifact, cache, deterministic or approved gate", "产物、缓存、确定性规则或已批准门控")} />
+          <StatCard label={tr(locale, "Cache hits", "缓存命中")} value={compact(efficiency.cacheHits)} note={efficiency.cacheHitRate === null ? tr(locale, "no cache lookup recorded", "尚无缓存查询") : `${(efficiency.cacheHitRate * 100).toFixed(1)}%`} />
+          <StatCard label={tr(locale, "JEV gated", "JEV 门控")} value={compact(efficiency.decisionGated)} note={tr(locale, "zero until formal gate approval", "正式门控验收前应为零")} />
+          <StatCard label={tr(locale, "Deterministic", "确定性处理")} value={compact(efficiency.deterministicResolutions)} note={tr(locale, "resolved without generation", "无需生成模型即可处理")} />
+          <StatCard label={tr(locale, "Context escalations", "上下文升级")} value={compact(efficiency.contextEscalations)} note={tr(locale, "selective or expanded to full", "从选择性或扩展上下文升级至全文")} />
+          <StatCard label={tr(locale, "Estimated tokens avoided", "估算节省 token")} value={efficiency.measuredBaselineEvents ? tokens(efficiency.estimatedTokensAvoided) : "—"} note={efficiency.measuredBaselineEvents ? tr(locale, `${efficiency.measuredBaselineEvents} measured baselines`, `${efficiency.measuredBaselineEvents} 条有基线记录`) : tr(locale, "not enough baseline data", "基线数据不足")} />
+          <StatCard label={tr(locale, "Estimated reduction", "估算降幅")} value={efficiency.tokenReductionRate === null ? "—" : `${(efficiency.tokenReductionRate * 100).toFixed(1)}%`} note={tr(locale, "not provider-billed usage", "不是服务商实测计费量")} />
+        </section>
+        <div className="analytics-grid">
+          <section>
+            <div className="section-t">{tr(locale, "Savings attribution", "节省归因")}</div>
+            <BarList empty={tr(locale, "No savings event recorded yet.", "尚无节省事件记录。")} rows={efficiency.byAttribution.map((row) => ({ label: row.label, value: row.value, hint: row.estimatedTokensAvoided ? tr(locale, `~${tokens(row.estimatedTokensAvoided)} tokens`, `约 ${tokens(row.estimatedTokensAvoided)} token`) : undefined }))} />
+          </section>
+          <section>
+            <div className="section-t">{tr(locale, "Context strategy", "上下文策略")}</div>
+            <BarList empty={tr(locale, "No context decision recorded yet.", "尚无上下文决策记录。")} rows={efficiency.byContext} />
+          </section>
+        </div>
+      </section>
+
+      <section className="blk">
+        <div className="section-t">
+          <span>{tr(locale, "JEV decision layer", "JEV 决策层")}</span>
+          <span className="tag-row">
+            <span className={`chip ${decisions.enabled ? "acc" : "gray"}`}>
+              {decisions.enabled ? tr(locale, "Enabled", "已启用") : tr(locale, "Disabled", "未启用")}
+            </span>
+            <span className={`chip ${decisions.shadowMode ? "gray" : "bad"}`}>
+              {decisions.shadowMode ? tr(locale, "Shadow only", "仅影子模式") : tr(locale, "Shadow disabled", "影子模式已关闭")}
+            </span>
+            <span className="chip gray">{tr(locale, "No hard gate", "无硬门控")}</span>
+          </span>
+        </div>
+        <p className="sub">
+          {tr(
+            locale,
+            "JEV is a separate typed-decision layer. These results are recorded for comparison only: they do not route LLM calls, overwrite classifications, or block publishing. Evaluation labels are a small Codex manual-review sample, not formal human sign-off.",
+            "JEV 是独立的结构化决策层。这里的结果只用于记录和对比：不会参与 LLM 路由、覆盖现有分类或阻断发布。当前评估标签来自少量 Codex 人工复核样本，不代表正式人工验收。",
+          )}
+        </p>
+
+        <section className="admin-stats admin-stats-6" aria-label={tr(locale, "JEV shadow usage", "JEV 影子调用情况")}>
+          <StatCard
+            label={tr(locale, "All decisions", "全部决策")}
+            value={compact(decisions.all.calls)}
+            note={tr(locale, `${decisions.all.successful} successful across all decision types`, `所有决策类型共 ${decisions.all.successful} 次成功`)}
+          />
+          <StatCard
+            label={tr(locale, "Classification calls", "分类调用")}
+            value={compact(decisions.totals.calls)}
+            note={tr(locale, `${decisions.days}d · ${decisions.totals.uniqueRequests} unique requests`, `近 ${decisions.days} 天 · ${decisions.totals.uniqueRequests} 个唯一请求`)}
+          />
+          <StatCard
+            label={tr(locale, "Success rate", "成功率")}
+            value={decisions.totals.successRate === null ? "—" : `${(decisions.totals.successRate * 100).toFixed(1)}%`}
+            note={tr(locale, `${decisions.totals.failed} failed`, `${decisions.totals.failed} 次失败`)}
+          />
+          <StatCard
+            label={tr(locale, "Tokens", "Token")}
+            value={tokens(decisions.totals.inputTokens + decisions.totals.outputTokens)}
+            note={`${tokens(decisions.totals.inputTokens)} in · ${tokens(decisions.totals.outputTokens)} out`}
+          />
+          <StatCard
+            label={tr(locale, "Average latency", "平均耗时")}
+            value={decisions.totals.averageDurationMs === null ? "—" : `${Math.round(decisions.totals.averageDurationMs)} ms`}
+            note={decisions.totals.averageConfidence === null
+              ? tr(locale, "no confidence recorded", "尚无置信度记录")
+              : tr(locale, `${(decisions.totals.averageConfidence * 100).toFixed(1)}% average confidence`, `平均置信度 ${(decisions.totals.averageConfidence * 100).toFixed(1)}%`)}
+          />
+          <StatCard
+            label={tr(locale, "Eval coverage", "评估覆盖率")}
+            value={decisions.evaluation.labelCoverage === null ? "—" : `${(decisions.evaluation.labelCoverage * 100).toFixed(1)}%`}
+            note={tr(locale, `${decisions.evaluation.labeledCalls} labeled calls`, `${decisions.evaluation.labeledCalls} 条已标注调用`)}
+          />
+          <StatCard
+            label={tr(locale, "Eval accuracy", "评估准确率")}
+            value={decisions.evaluation.accuracy === null ? "—" : `${(decisions.evaluation.accuracy * 100).toFixed(1)}%`}
+            note={tr(locale, `${decisions.evaluation.decisions} reviewed decisions`, `${decisions.evaluation.decisions} 个已复核决策`)}
+          />
+        </section>
+
+        <section>
+          <div className="section-t">{tr(locale, "Decisions by type", "按决策类型")}</div>
+          <BarList empty={tr(locale, "No decision recorded yet.", "尚无决策记录。")} rows={decisions.all.byType} />
+        </section>
+
+        <div className="analytics-grid">
+          <section>
+            <div className="section-t">{tr(locale, "Shadow comparison", "影子结果对比")}</div>
+            <BarList
+              empty={tr(locale, "No comparable shadow result yet.", "尚无可对比的影子结果。")}
+              rows={[
+                { label: tr(locale, "Resolved from UNKNOWN", "补全 UNKNOWN"), value: decisions.comparisons.resolvedFromUnknown },
+                { label: tr(locale, "Agreed with baseline", "与基线一致"), value: decisions.comparisons.agreements },
+                { label: tr(locale, "Other differences", "其他差异"), value: Math.max(0, decisions.comparisons.disagreements - decisions.comparisons.resolvedFromUnknown) },
+              ]}
+            />
+          </section>
+          <section>
+            <div className="section-t">{tr(locale, "Manual-review outcomes", "人工复核结果")}</div>
+            <BarList
+              empty={tr(locale, "No labeled shadow result yet.", "尚无已标注的影子结果。")}
+              rows={[
+                { label: tr(locale, "Correct", "正确"), value: decisions.evaluation.correct },
+                { label: tr(locale, "False negative", "漏判"), value: decisions.evaluation.falseNegative },
+                { label: tr(locale, "False positive", "误判"), value: decisions.evaluation.falsePositive },
+                { label: tr(locale, "Wrong known value", "已知值判断错误"), value: decisions.evaluation.wrongKnown },
+              ]}
+            />
+          </section>
+        </div>
+
+        {decisions.recent.length > 0 && (
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>{tr(locale, "When", "时间")}</th>
+                <th>{tr(locale, "Model", "模型")}</th>
+                <th>{tr(locale, "Status", "状态")}</th>
+                <th>{tr(locale, "Confidence", "置信度")}</th>
+                <th>{tr(locale, "Latency", "耗时")}</th>
+                <th>{tr(locale, "Tokens", "Token")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {decisions.recent.map((row) => (
+                <tr key={row.id}>
+                  <td>{when(row.createdAt, locale)}</td>
+                  <td><code>{row.provider} · {row.model}</code></td>
+                  <td>{row.ok ? tr(locale, "Recorded", "已记录") : tr(locale, "Failed open", "失败放行")}</td>
+                  <td>{row.confidence === null ? "—" : `${(row.confidence * 100).toFixed(1)}%`}</td>
+                  <td className="tnum">{row.durationMs} ms</td>
+                  <td className="tnum">{row.inputTokens + row.outputTokens}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       <section className="blk">
         <div className="section-t">{tr(locale, "Task routing", "任务路由")}</div>

@@ -9,6 +9,7 @@ import marketEvents from "../../../data/market-events.json";
 import { publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
 import { assetPath } from "@/lib/assetPath";
+import { taxonomy } from "@/lib/classification/taxonomy";
 
 export const dynamic = "force-dynamic";
 
@@ -151,6 +152,13 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
           ))}
         </div>
       </section>}
+      <section className="blk" aria-label={tr(locale, "Subject institutions", "内容涉及机构")}>
+        <h2 className="section-t">{tr(locale, "Central banks and public institutions", "央行与公共机构")}</h2>
+        <p className="sub">{tr(locale, "These links group reports by the institution discussed in the content, not by who published the report.", "以下链接按内容讨论的机构聚合，与研报发布机构分开。")}</p>
+        <div className="tag-row">
+          {taxonomy.institutions.map((subject) => <Link key={subject.key} className="chip gray" href={localePath(locale, `/institution/${subject.key}`)}>{locale === "zh-CN" ? subject.nameZh : subject.nameEn}</Link>)}
+        </div>
+      </section>
     </main>
   );
 }

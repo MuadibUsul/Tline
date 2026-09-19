@@ -12,6 +12,7 @@ import { researchPath } from "@/lib/researchPath";
 import { contentQuality } from "@/lib/contentQuality";
 import { assetPath } from "@/lib/assetPath";
 import { getArticleTopics, getPeerReports, topicHref } from "@/lib/related";
+import { ClassificationChips } from "@/app/_components/ui";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -206,6 +207,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           {a.author ? ` · ${a.author}` : ""} · {date}
         </div>
         <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{heading}</h1>
+        <ClassificationChips classification={a.classification} locale={locale} />
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p" style={{ alignSelf: "flex-start" }}>{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
       </div>
 

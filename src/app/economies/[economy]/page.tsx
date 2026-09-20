@@ -28,11 +28,11 @@ const loadEconomy = cache(async (slug: string, locale: Locale) => {
   if (!economy) return null;
   const articleIds = await queryClassifiedArticleIds({ jurisdictions: [economy.key] }, 100);
   const bankCode = BANK_CODES[economy.key];
-  const [articles, indicators, releases, policies] = await Promise.all([
+  const [articleCandidates, indicators, releases, policies] = await Promise.all([
     articleIds.length ? prisma.article.findMany({
       where: publicationReadyWhere({ id: { in: articleIds } }, locale),
       orderBy: { publishedAt: "desc" },
-      take: 9,
+      take: 100,
       include: {
         institution: true,
         analysis: true,
@@ -55,6 +55,14 @@ const loadEconomy = cache(async (slug: string, locale: Locale) => {
     }),
     bankCode ? prisma.macroPolicyDocument.findMany({ where: { centralBank: bankCode }, orderBy: { publishedAt: "desc" }, take: 6 }) : [],
   ]);
+  const isPrimary = (article: typeof articleCandidates[number]) => article.classification?.jurisdictions.some(
+    (jurisdiction) => jurisdiction.jurisdictionKey === economy.key && jurisdiction.role === "PRIMARY",
+  ) ?? false;
+  const primaryArticles = articleCandidates.filter(isPrimary).slice(0, 6);
+  const articles = [
+    ...primaryArticles,
+    ...articleCandidates.filter((article) => !isPrimary(article)).slice(0, 9 - primaryArticles.length),
+  ];
   return { economy, articles, indicators, releases, policies };
 });
 

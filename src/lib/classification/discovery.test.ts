@@ -49,6 +49,11 @@ test("one incidental currency mention in body text does not assign an economy", 
   assert.equal(result.jurisdictionState, "UNKNOWN");
 });
 
+test("one incidental economy mention in body text does not assign an economy", () => {
+  const result = classify("Global allocation", "The Euro Area appears once in a regional comparison.");
+  assert.equal(result.jurisdictionState, "UNKNOWN");
+});
+
 test("lowercase fed as a verb is not the Federal Reserve", () => {
   const result = classify("Agriculture", "Livestock were fed grain throughout the winter.");
   assert.equal(result.jurisdictionState, "UNKNOWN");

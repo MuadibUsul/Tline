@@ -38,7 +38,7 @@ export function discoverArticleClassification(input: {
   for (const item of taxonomy.jurisdictions) {
     const terms = [item.nameEn, item.nameZh, ...item.aliases];
     if (terms.some((term) => mentionCount(input.title, term) > 0)) primary.add(item.key);
-    else if (terms.some((term) => mentionCount(input.text, term) > 0)) related.add(item.key);
+    else if (terms.some((term) => mentionCount(input.text, term) >= 2)) related.add(item.key);
   }
 
   for (const [key, terms] of Object.entries(CURRENCY_TERMS) as Array<[JurisdictionKey, string[]]>) {

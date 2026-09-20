@@ -24,7 +24,9 @@ test("founding membership clears every commercial gate", () => {
   const founding = { id: "u1", tier: "founding" };
   const free = { id: "u2", tier: "free" };
   assert.equal(can(founding, "api.use"), true);
+  assert.equal(can(founding, "dashboards.manage"), true);
   assert.equal(can(free, "api.use"), false);
+  assert.equal(can(free, "dashboards.manage"), false);
   // The content gates are open to everyone today; the membership must not be the reason
   // they close for anyone else.
   for (const action of ["article.read.original", "article.read.translation", "document.download.original"] as const) {

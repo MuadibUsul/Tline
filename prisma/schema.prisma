@@ -1019,6 +1019,7 @@ model User {
 
   watchlist WatchlistItem[]
   rules     AlertRule[]
+  dashboards Dashboard[]
   auditLogs AuditLog[]
   accounts  Account[]
   sessions  Session[]
@@ -1083,6 +1084,7 @@ model WatchlistItem {
 model AlertRule {
   id          String   @id @default(cuid())
   userId      String
+  dashboardId String?
   name        String
   type        String // consensus threshold/change | NEW_RESEARCH
   scopeKind   String   @default("asset") // asset | institution | theme | market
@@ -1092,11 +1094,31 @@ model AlertRule {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events AlertEvent[]
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dashboard Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  events    AlertEvent[]
 
   @@index([userId, active])
+  @@index([dashboardId, active])
   @@index([scopeKind, scopeRef])
+}
+
+model Dashboard {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  templateKey     String?
+  layoutJson      String   @default("[]")
+  wallpaper       String   @default("grid")
+  wallpaperUrl    String?
+  accent          String   @default("#9e7a42")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rules AlertRule[]
+
+  @@index([userId, updatedAt])
 }
 
 model AlertEvent {

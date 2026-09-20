@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 
-// No external origin is loaded: fonts are built into the bundle. Next's App Router injects
+// Fonts and application code are built into the bundle. User-selected dashboard wallpapers
+// may load from an HTTPS origin; everything else remains same-origin. Next's App Router injects
 // inline bootstrap/hydration scripts and React emits inline styles, so those two
 // directives keep 'unsafe-inline'; every other origin is closed.
 const csp = [
@@ -15,7 +16,7 @@ const csp = [
   // which materialises a PDF's embedded fonts as blob URLs to render it; without it the
   // font never loads and the render silently never finishes.
   "font-src 'self' data: blob:",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https:",
   "connect-src 'self'",
   "manifest-src 'self'",
   "upgrade-insecure-requests",

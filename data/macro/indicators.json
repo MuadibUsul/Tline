@@ -362,5 +362,31 @@
     "seasonalAdjustment": null,
     "importance": 4,
     "enabled": true
+  },
+  {
+    "canonicalKey": "US_2Y_TREASURY_YIELD",
+    "nameEn": "U.S. 2-Year Treasury Yield",
+    "nameZh": "美国2年期国债收益率",
+    "countryCode": "US",
+    "currency": "USD",
+    "category": "RATES",
+    "frequency": "DAILY",
+    "unit": "PERCENT",
+    "seasonalAdjustment": "NSA",
+    "importance": 5,
+    "enabled": true
+  },
+  {
+    "canonicalKey": "US_10Y_TREASURY_YIELD",
+    "nameEn": "U.S. 10-Year Treasury Yield",
+    "nameZh": "美国10年期国债收益率",
+    "countryCode": "US",
+    "currency": "USD",
+    "category": "RATES",
+    "frequency": "DAILY",
+    "unit": "PERCENT",
+    "seasonalAdjustment": "NSA",
+    "importance": 5,
+    "enabled": true
   }
 ]

@@ -4,6 +4,7 @@ export type PermissionAction =
   | "document.download.original"
   | "watchlist.manage"
   | "alerts.manage"
+  | "dashboards.manage"
   | "api.use"
   // Console actions. `admin.access` is the door; the rest are the rooms behind it.
   | "admin.access"
@@ -71,6 +72,8 @@ export function can(user: PermissionUser | null, action: PermissionAction): bool
     case "watchlist.manage":
     case "alerts.manage":
       return user !== null;
+    case "dashboards.manage":
+      return user?.tier === "professional" || user?.tier === "enterprise" || user?.tier === "founding";
     case "api.use":
       // Founding members hold the highest entitlement there is: the promise made to them is
       // that nothing on the site is ever charged for, so every commercial gate has to clear

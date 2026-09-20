@@ -61,6 +61,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     { href: "/institutions", label: tr(locale, "Views", "观点") },
     { href: "/research", label: tr(locale, "Research", "研报") },
     { href: "/watchlist", label: tr(locale, "Market Themes", "交易主线") },
+    { href: "/dashboards", label: tr(locale, "Dashboards", "看板") },
     ...(can(user, "admin.access") ? [{ href: "/admin", label: tr(locale, "Operations", "运营") }] : []),
   ] as MobileNavItem[]).map((item) => ({ ...item, href: localePath(locale, item.href) }));
 

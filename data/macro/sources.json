@@ -423,5 +423,21 @@
     "priority": 90,
     "sourceUrl": "https://fred.stlouisfed.org/series/DCOILWTICO",
     "enabled": true
+  },
+  {
+    "canonicalKey": "US_2Y_TREASURY_YIELD",
+    "provider": "fred",
+    "externalSeriesId": "DGS2",
+    "priority": 20,
+    "sourceUrl": "https://fred.stlouisfed.org/series/DGS2",
+    "enabled": true
+  },
+  {
+    "canonicalKey": "US_10Y_TREASURY_YIELD",
+    "provider": "fred",
+    "externalSeriesId": "DGS10",
+    "priority": 20,
+    "sourceUrl": "https://fred.stlouisfed.org/series/DGS10",
+    "enabled": true
   }
 ]

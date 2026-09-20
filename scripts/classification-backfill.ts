@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { classifyDeterministically } from "../src/lib/classification/classifier";
+import { discoverArticleClassification } from "../src/lib/classification/discovery";
 import { articleClassificationSourceFingerprint, persistDeterministicClassification, type ClassificationTarget } from "../src/lib/classification/store";
 
 const arg = (name: string) => process.argv.find((value) => value.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -29,7 +30,11 @@ async function articles() {
   });
   for (const row of rows) await store(
     { kind: "ARTICLE", id: row.id }, articleClassificationSourceFingerprint(row.contentHash, row.titleHash, row.articleAssets.map((item) => item.asset.ticker)),
-    classifyDeterministically({ assets: row.articleAssets.map((item) => item.asset.ticker), contentType: "RESEARCH_ARTICLE" }),
+    classifyDeterministically(discoverArticleClassification({
+      title: row.title,
+      text: row.rawText ?? "",
+      assetTickers: row.articleAssets.map((item) => item.asset.ticker),
+    })),
   );
 }
 

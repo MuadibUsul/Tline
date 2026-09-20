@@ -5,6 +5,7 @@ import { ASSETS } from "../assets";
 import { partitionArticleSegments } from "../articleText";
 import { buildResearchSlug } from "../researchPath";
 import { classifyDeterministically } from "../classification/classifier";
+import { discoverArticleClassification } from "../classification/discovery";
 import { articleClassificationSourceFingerprint, persistDeterministicClassification } from "../classification/store";
 
 export interface RawArticle {
@@ -33,13 +34,13 @@ export async function ensureAssets() {
 
 export type PersistResult = "created" | "updated" | "duplicate" | "empty";
 
-async function refreshClassification(articleId: string, cHash: string, tHash: string) {
+async function refreshClassification(articleId: string, cHash: string, tHash: string, title: string, text: string) {
   try {
     // Preserve human facets, but put them back in the review queue when their source changed.
     await prisma.contentClassification.updateMany({ where: { articleId, source: "MANUAL" }, data: { status: "REVIEW", fingerprint: null } });
     await persistDeterministicClassification({
       target: { kind: "ARTICLE", id: articleId },
-      result: classifyDeterministically({ contentType: "RESEARCH_ARTICLE" }),
+      result: classifyDeterministically(discoverArticleClassification({ title, text })),
       sourceFingerprint: articleClassificationSourceFingerprint(cHash, tHash, []),
       apply: true,
     });
@@ -94,7 +95,7 @@ export async function persistArticle(
             ...(layoutImproved ? { segments: { create: partitioned.body.map((segment, position) => ({ position, heading: segment.heading, text: segment.text })) } } : {}),
           } });
         });
-        if (titleChanged || layoutImproved) await refreshClassification(sameUrl.id, cHash, tHash);
+        if (titleChanged || layoutImproved) await refreshClassification(sameUrl.id, cHash, tHash, raw.title, text);
         return "updated";
       }
       return "duplicate";
@@ -123,7 +124,7 @@ export async function persistArticle(
         },
       });
     });
-    await refreshClassification(sameUrl.id, cHash, tHash);
+    await refreshClassification(sameUrl.id, cHash, tHash, raw.title, text);
     return "updated";
   }
 
@@ -173,6 +174,6 @@ export async function persistArticle(
       },
     },
   });
-  await refreshClassification(created.id, cHash, tHash);
+  await refreshClassification(created.id, cHash, tHash, raw.title, text);
   return "created";
 }

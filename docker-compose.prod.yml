@@ -58,6 +58,10 @@ services:
     build: !reset null
     mem_limit: 384m
     logging: *default-logging
+    environment:
+      # FRED series used by the committed registry have been reviewed; without this
+      # explicit switch the configured key is intentionally ignored by the provider.
+      FRED_DATA_USE_CONFIRMED: "true"
 
   backup:
     image: ghcr.io/muadibusul/tline:${TAG:-latest}

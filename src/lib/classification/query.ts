@@ -95,13 +95,11 @@ export async function queryClassifications(
 
 /** Article ids for public views; callers keep publication and locale rules at the Article layer. */
 export async function queryClassifiedArticleIds(filter: ContentFilter, take = 100): Promise<string[]> {
-  const where = classificationWhere(filter);
-  const existing = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
-  const rows = await prisma.contentClassification.findMany({
-    where: { AND: [...existing, { contentKind: "ARTICLE" }, { articleId: { not: null } }] },
-    orderBy: { updatedAt: "desc" },
+  const rows = await prisma.article.findMany({
+    where: { classification: { is: classificationWhere(filter) } },
+    orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
     take: Math.min(500, Math.max(1, take)),
-    select: { articleId: true },
+    select: { id: true },
   });
-  return rows.flatMap((row) => row.articleId ? [row.articleId] : []);
+  return rows.map((row) => row.id);
 }

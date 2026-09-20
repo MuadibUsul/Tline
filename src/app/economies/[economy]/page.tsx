@@ -26,7 +26,7 @@ const dec = (value: { toString(): string } | null | undefined) => value === null
 const loadEconomy = cache(async (slug: string, locale: Locale) => {
   const economy = economyDefinition(slug);
   if (!economy) return null;
-  const articleIds = await queryClassifiedArticleIds({ jurisdictions: [economy.key], primaryJurisdictionOnly: true }, 100);
+  const articleIds = await queryClassifiedArticleIds({ jurisdictions: [economy.key] }, 100);
   const bankCode = BANK_CODES[economy.key];
   const [articles, indicators, releases, policies] = await Promise.all([
     articleIds.length ? prisma.article.findMany({
@@ -90,7 +90,7 @@ export default async function EconomyPage(props: { params: Promise<Params> }) {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Economy", "经济体")} · {economy.code}</div>
         <h1>{name}</h1>
-        <p className="sub">{tr(locale, `Latest ${name} releases, policy documents, indicators and institution research. All modules are scoped to this jurisdiction.`, `${name}最新的宏观发布、政策文件、指标与机构研报。所有模块均限定在该经济辖区。`)}</p>
+        <p className="sub">{tr(locale, `Latest ${name} releases, policy documents, indicators and institution research. Research includes primary and explicitly related coverage.`, `${name}最新的宏观发布、政策文件、指标与机构研报。研报包含主要归属及明确涉及该经济辖区的内容。`)}</p>
         <div className="tag-row">
           {centralBank && <span className="chip acc">{locale === "zh-CN" ? centralBank.nameZh : centralBank.nameEn}</span>}
           <Link className="chip gray" href={localePath(locale, `/research?jurisdiction=${economy.key}`)}>{tr(locale, "Filtered research", "筛选研报")}</Link>

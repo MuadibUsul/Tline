@@ -369,6 +369,54 @@
     "enabled": true
   },
   {
+    "canonicalKey": "JP_GDP",
+    "provider": "fred",
+    "externalSeriesId": "JPNNGDP",
+    "priority": 20,
+    "sourceUrl": "https://fred.stlouisfed.org/series/JPNNGDP",
+    "enabled": true
+  },
+  {
+    "canonicalKey": "JP_UNEMPLOYMENT",
+    "provider": "fred",
+    "externalSeriesId": "LRHUTTTTJPM156S",
+    "priority": 20,
+    "sourceUrl": "https://fred.stlouisfed.org/series/LRHUTTTTJPM156S",
+    "enabled": true
+  },
+  {
+    "canonicalKey": "JP_CALL_RATE",
+    "provider": "fred",
+    "externalSeriesId": "IRSTCI01JPM156N",
+    "priority": 20,
+    "sourceUrl": "https://fred.stlouisfed.org/series/IRSTCI01JPM156N",
+    "enabled": true
+  },
+  {
+    "canonicalKey": "UK_GDP",
+    "provider": "fred",
+    "externalSeriesId": "UKNGDP",
+    "priority": 20,
+    "sourceUrl": "https://fred.stlouisfed.org/series/UKNGDP",
+    "enabled": true
+  },
+  {
+    "canonicalKey": "UK_UNEMPLOYMENT",
+    "provider": "fred",
+    "externalSeriesId": "LRHUTTTTGBM156S",
+    "priority": 20,
+    "sourceUrl": "https://fred.stlouisfed.org/series/LRHUTTTTGBM156S",
+    "enabled": true
+  },
+  {
+    "canonicalKey": "UK_CALL_RATE",
+    "provider": "fred",
+    "externalSeriesId": "IRSTCI01GBM156N",
+    "priority": 20,
+    "sourceUrl": "https://fred.stlouisfed.org/series/IRSTCI01GBM156N",
+    "enabled": true
+  },
+  {
     "canonicalKey": "US_WTI_SPOT",
     "provider": "fred",
     "externalSeriesId": "DCOILWTICO",

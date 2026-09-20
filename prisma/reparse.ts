@@ -7,6 +7,7 @@ import { clearFailures, dueFilter, recordFailure } from "../src/lib/articleBacko
 import { anyProviderConfigured } from "../src/lib/llm/config";
 import { queueRetry } from "../src/lib/contentRetry";
 import { classifyDeterministically } from "../src/lib/classification/classifier";
+import { discoverArticleClassification } from "../src/lib/classification/discovery";
 import { articleClassificationSourceFingerprint, persistDeterministicClassification } from "../src/lib/classification/store";
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
@@ -198,7 +199,11 @@ async function main() {
       }, { isolationLevel: "Serializable" });
       await persistDeterministicClassification({
         target: { kind: "ARTICLE", id: article.id },
-        result: classifyDeterministically({ assets: uniqueSignals.map((signal) => signal.ticker), contentType: "RESEARCH_ARTICLE" }),
+        result: classifyDeterministically(discoverArticleClassification({
+          title: article.title,
+          text: article.rawText!,
+          assetTickers: uniqueSignals.map((signal) => signal.ticker),
+        })),
         sourceFingerprint: articleClassificationSourceFingerprint(article.contentHash, article.titleHash, uniqueSignals.map((signal) => signal.ticker)),
         apply: true,
       }).catch((error) => console.error(JSON.stringify({ event: "classification.analysis.failed", articleId: article.id, error: String(error).slice(0, 300) })));

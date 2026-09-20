@@ -2,6 +2,7 @@ import { cache } from "react";
 import { prisma } from "./db";
 import { publicationReadyWhere } from "./publication";
 import { domainTerm, type Locale } from "./i18n";
+import { legacyTopicRedirectPath } from "./assetPath";
 
 /**
  * Topic hubs, derived from the topics the extraction already stored on each atomic view.
@@ -162,13 +163,14 @@ const toStat = (entry: IndexedTopic): TopicStat => ({
 export const listIndexableTopics = cache(async (): Promise<TopicStat[]> => {
   const index = await loadTopicIndex();
   return [...index.values()]
-    .filter((entry) => entry.articles >= TOPIC_MIN_ARTICLES && entry.institutions >= TOPIC_MIN_INSTITUTIONS)
+    .filter((entry) => !legacyTopicRedirectPath(entry.key) && entry.articles >= TOPIC_MIN_ARTICLES && entry.institutions >= TOPIC_MIN_INSTITUTIONS)
     .sort((a, b) => b.views - a.views || a.key.localeCompare(b.key))
     .map(toStat);
 });
 
 /** The stat for one key, or null when the corpus does not support a page for it. */
 export const getTopicStat = cache(async (key: string): Promise<TopicStat | null> => {
+  if (legacyTopicRedirectPath(key)) return null;
   const index = await loadTopicIndex();
   const entry = index.get(key);
   if (!entry || entry.articles < TOPIC_MIN_ARTICLES || entry.institutions < TOPIC_MIN_INSTITUTIONS) return null;

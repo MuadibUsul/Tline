@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
 import { assetName, domainTerm, getLocale, localePath, tr } from "@/lib/i18n";
 import { assetPath } from "@/lib/assetPath";
+import { isLegacyNonAssetAlias } from "@/lib/classification/taxonomy";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, itemListJsonLd, marketsSeoTitle, ogImage, localizedUrl } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export default async function MarketsPage() {
     reports: asset.articleAssets.length,
     institutions: new Set(asset.articleAssets.map((item) => item.article.institutionId)).size,
     updatedAt: asset.articleAssets.reduce<Date | null>((latest, item) => !latest || item.article.publishedAt > latest ? item.article.publishedAt : latest, null),
-  })).filter((asset) => asset.reports >= 2 && asset.institutions >= 2);
+  })).filter((asset) => !isLegacyNonAssetAlias(asset.ticker) && asset.reports >= 2 && asset.institutions >= 2);
   const assetClasses = [...new Set(qualified.map((asset) => asset.assetClass))];
   const institutionTotal = new Set(qualified.flatMap((asset) => asset.articleAssets.map((item) => item.article.institutionId))).size;
 

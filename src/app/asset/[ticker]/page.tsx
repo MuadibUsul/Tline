@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getAssetView, getAssetTimeline } from "@/lib/queries";
 import { FeedCard, DirChip, Delta, relTime } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
@@ -9,7 +9,7 @@ import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, loca
 import { assetSeoTitle, breadcrumbJsonLd, canonical, datasetJsonLd, itemListJsonLd, JsonLd, localizedUrl, ogImage, webPageJsonLd } from "@/lib/seo";
 import { getAssetIndicators, getAssetTopics } from "@/lib/related";
 import { topicHref } from "@/lib/related";
-import { assetPath, tickerFromAssetSlug } from "@/lib/assetPath";
+import { assetPath, legacyNonAssetRedirectPath, tickerFromAssetSlug } from "@/lib/assetPath";
 import { publicationReadyWhere } from "@/lib/publication";
 import { getAssetMarketSnapshot } from "@/lib/macro/market/read";
 
@@ -17,6 +17,8 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
   const { ticker } = await props.params;
   const locale = await getLocale();
+  const replacement = legacyNonAssetRedirectPath(tickerFromAssetSlug(ticker));
+  if (replacement) permanentRedirect(localePath(locale, replacement));
   const asset = await prisma.asset.findUnique({
     where: { ticker: tickerFromAssetSlug(ticker) },
     select: {
@@ -44,6 +46,8 @@ export async function generateMetadata(props: { params: Promise<{ ticker: string
 export default async function AssetPage(props: { params: Promise<{ ticker: string }> }) {
   const params = await props.params;
   const locale = await getLocale();
+  const replacement = legacyNonAssetRedirectPath(tickerFromAssetSlug(params.ticker));
+  if (replacement) permanentRedirect(localePath(locale, replacement));
   const data = await getAssetView(tickerFromAssetSlug(params.ticker), locale);
   if (!data) notFound();
   const { asset, consensus, d1, d7, d30, dist, articles } = data;

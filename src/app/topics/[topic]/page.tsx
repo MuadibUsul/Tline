@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
 import { assetName, getLocale, institutionName, localePath, relativeTime, tr, type Locale } from "@/lib/i18n";
-import { assetPath } from "@/lib/assetPath";
+import { assetPath, legacyTopicRedirectPath } from "@/lib/assetPath";
 import { ResearchCard } from "@/app/_components/ui";
 import { getTopicArticleIds, getTopicStat, getTopicViews, topicPath, TOPIC_MIN_ARTICLES } from "@/lib/topics";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, itemListJsonLd, localizedUrl, ogImage } from "@/lib/seo";
@@ -80,6 +80,8 @@ export async function generateMetadata(props: { params: Promise<TopicParams>; se
   const { topic } = await props.params;
   const search = await props.searchParams;
   const locale = await getLocale();
+  const replacement = legacyTopicRedirectPath(topic);
+  if (replacement) permanentRedirect(localePath(locale, replacement));
   const jurisdiction = search.jurisdiction ? resolveCanonicalKey("jurisdiction", search.jurisdiction) : null;
   const data = await loadTopic(topic, locale, jurisdiction);
   if (!data) return { title: tr(locale, "Topic not found", "主题未找到") };
@@ -113,6 +115,8 @@ export default async function TopicPage(props: { params: Promise<TopicParams>; s
   const { topic } = await props.params;
   const search = await props.searchParams;
   const locale = await getLocale();
+  const replacement = legacyTopicRedirectPath(topic);
+  if (replacement) permanentRedirect(localePath(locale, replacement));
   const jurisdiction = search.jurisdiction ? resolveCanonicalKey("jurisdiction", search.jurisdiction) : null;
   if (search.jurisdiction && !jurisdiction) notFound();
   const data = await loadTopic(topic, locale, jurisdiction);

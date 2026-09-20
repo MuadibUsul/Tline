@@ -1,4 +1,5 @@
 import type { Locale } from "./i18n";
+import { effectiveSummaryZh } from "./summary";
 
 export interface IndexableArticleInput {
   title: string;
@@ -69,8 +70,21 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
   const issues: string[] = [];
   const title = article.title.trim();
   const body = article.rawText?.trim() ?? "";
-  const summary = locale === "zh-CN" ? article.analysis?.summaryZh?.trim() : article.analysis?.summary.trim();
   const translation = article.translations?.[0];
+  /**
+   * The Chinese summary is the analysis' own where it wrote one, and the translation's
+   * opening where it did not.
+   *
+   * Reading `summaryZh` alone withheld complete Chinese pages: an article parsed without a
+   * model has a full Chinese translation and a null `summaryZh`, and the gate answered
+   * `noindex` to 2,600–17,500 characters of finished translation over one missing sentence.
+   * The translation is not a lower standard of proof here — it is the same report, in the
+   * language the page is in, and its quality is judged separately by the translation rules
+   * below, which still fail the page when the translation itself is poor.
+   */
+  const summary = locale === "zh-CN"
+    ? effectiveSummaryZh({ summaryZh: article.analysis?.summaryZh, translation })
+    : article.analysis?.summary.trim();
 
   if (title.length < 8 || title.length > 180 || isNoiseTitle(title)) issues.push("abnormal_title");
   if (MOJIBAKE.test(`${title}\n${body.slice(0, 5000)}`) || hasBrokenWord(`${title}\n${body.slice(0, 5000)}`)) issues.push("garbled_or_broken_words");

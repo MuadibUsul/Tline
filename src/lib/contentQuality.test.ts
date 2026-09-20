@@ -65,3 +65,36 @@ test("missing essential content is not generated as a public SEO page", () => {
   const result = contentQuality({ ...valid, rawText: null }, "en");
   assert.equal(result.eligibility, "NOT_GENERATED");
 });
+
+test("a landed Chinese translation is not withheld over an analysis that has no Chinese summary", () => {
+  // The analysis pass cannot always write `summaryZh`: parsed without a model it returns
+  // null and still reports `reviewStatus: "ok"`, and the translation pipeline fills the body
+  // without ever touching the field. A page whose translation had already landed was then
+  // withheld over one sentence the English page never had either — in production, half of the
+  // Chinese pages withheld for a missing summary carried a full translation.
+  const analysis = { ...valid.analysis, summaryZh: null };
+  const result = contentQuality({ ...valid, analysis }, "zh-CN");
+  assert.equal(result.issues.includes("empty_summary"), false, "the translation supplies the summary");
+  assert.equal(result.indexable, true);
+  // The English verdict for the same row does not move.
+  assert.equal(contentQuality({ ...valid, analysis }, "en").indexable, true);
+});
+
+test("a derived summary does not excuse a poor translation", () => {
+  // The derivation replaces only the missing-summary blocker. Every other reason to withhold
+  // the Chinese page still applies, which is what keeps this from being a way through the gate.
+  const result = contentQuality({
+    ...valid,
+    analysis: { ...valid.analysis, summaryZh: null },
+    translations: [{ ...valid.translations[0], qualityScore: 0.4 }],
+  }, "zh-CN");
+  assert.equal(result.issues.includes("empty_summary"), false);
+  assert.ok(result.issues.includes("translation_below_threshold"));
+  assert.equal(result.indexable, false);
+});
+
+test("with no summary and no translation the page is still withheld", () => {
+  const result = contentQuality({ ...valid, analysis: { ...valid.analysis, summaryZh: null }, translations: [] }, "zh-CN");
+  assert.ok(result.issues.includes("empty_summary"));
+  assert.equal(result.indexable, false);
+});

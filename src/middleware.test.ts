@@ -43,3 +43,32 @@ test("legacy asset URLs permanently redirect to the readable market canonical", 
   assert.equal(response.status, 308);
   assert.equal(response.headers.get("location"), "https://tlines.tech/zh/markets/gold");
 });
+
+test("a retired topic resolves to its replacement in one redirect, not two", () => {
+  // Both were live and both were two hops: the middleware added the language, then the route
+  // answered a second 308 to the facet that replaced the topic. A crawler working through the
+  // addresses the site had before it split by language paid a second fetch for every one.
+  const unprefixed = middleware(new NextRequest("https://tlines.tech/topics/us-10y-treasury", { headers: { "accept-language": "en" } }));
+  assert.equal(unprefixed.status, 308);
+  assert.equal(unprefixed.headers.get("location"), "https://tlines.tech/en/markets/us-10-year-treasury");
+
+  // A language already in the address keeps it, and an asset alias goes straight to the
+  // institution that owns the policy rather than through a market page that is not one.
+  assert.equal(
+    middleware(new NextRequest("https://tlines.tech/zh/topics/fed-policy")).headers.get("location"),
+    "https://tlines.tech/zh/institution/federal-reserve",
+  );
+  assert.equal(
+    middleware(new NextRequest("https://tlines.tech/asset/FED", { headers: { "accept-language": "en" } })).headers.get("location"),
+    "https://tlines.tech/en/institution/federal-reserve",
+  );
+});
+
+test("a topic that still stands is served, not redirected", () => {
+  const response = middleware(new NextRequest("https://tlines.tech/en/topics/inflation"));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-middleware-rewrite"), "https://tlines.tech/topics/inflation");
+  // The facet resolution must not swallow a topic whose key merely looks like an alias.
+  const other = middleware(new NextRequest("https://tlines.tech/en/topics/inflation-targets"));
+  assert.equal(other.status, 200);
+});

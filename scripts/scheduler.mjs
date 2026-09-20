@@ -13,6 +13,13 @@ const limit = Math.max(1, Number(process.env.INGEST_ARTICLE_LIMIT || 6));
 const processLimit = Math.max(1, Number(process.env.PROCESS_ARTICLE_LIMIT || 50));
 // Translation is the most expensive step, so it drains in smaller batches than the rest.
 const translateLimit = Math.max(1, Number(process.env.TRANSLATION_ARTICLE_LIMIT || 20));
+// Per-tick drain of the pre-cutoff translation backlog. 0 leaves it alone: the automatic
+// translate pass is deliberately scoped to newly ingested reports, and backfilling the older
+// ones is a bill an operator should choose rather than discover. Set it to a batch size to
+// drain the backlog over a few ticks, then set it back to 0 — the pass is idempotent, so
+// leaving it on costs nothing once there is nothing stale, but the switch is honest about
+// what it is for.
+const translationBacklogLimit = Math.max(0, Number(process.env.TRANSLATION_BACKLOG_LIMIT || 0));
 const retryLimit = Math.max(1, Number(process.env.JOB_RETRY_LIMIT || 3));
 const retryBatch = Math.max(1, Number(process.env.CONTENT_RETRY_BATCH || 5));
 const retryDelayMs = Math.max(10_000, Number(process.env.JOB_RETRY_DELAY_MS || 60_000));
@@ -110,12 +117,29 @@ async function processPending() {
     // Operator-requested reruns come first: someone looked at a specific report, judged its
     // AI output poor and asked for it again. Ahead of the routine backlog, not behind it.
     ["run", "retries", "--", `--batch=${retryBatch}`],
-    ["run", "reparse", "--", `--limit=${processLimit}`],
+    // `--retry-review` is what makes `needs_review` a state the pipeline returns to rather
+    // than one it dies in. Without it the pass selects only "no analysis yet": an analysis
+    // the model could not ground kept its row, left that set, and was never looked at again.
+    // Forty-seven articles sat that way for eleven days with a failure count of zero,
+    // invisible to the backoff that was meant to govern them. The rerun cost stays bounded
+    // because reparse now counts a still-ungrounded result as a failure, so an article
+    // climbs to MAX_FAILURES and is abandoned instead of being re-billed every minute.
+    ["run", "reparse", "--", `--limit=${processLimit}`, "--retry-review"],
     // The Chinese site is live again, so translation is back in the pass: without it a new
     // report reaches /zh with the publisher's English title and body. The command's own
     // automatic pass only translates reports ingested on or after the cutoff (no backfill),
     // and its backoff keeps an untranslatable one from being re-billed every minute.
     ["run", "translate", "--", `--limit=${translateLimit}`],
+    // The pre-cutoff backlog the pass above deliberately skips. Off unless an operator sets
+    // a limit. Until it is drained those reports answer `missing_translation` on /zh and stay
+    // out of the index while their English pages are listed — a Chinese page that renders the
+    // publisher's English is not a Chinese page.
+    //
+    // `--backlog`, not `--all`: it sweeps for rows whose prompt, glossary or source hash has
+    // moved on rather than rewriting whatever the query happens to return first. `--all`
+    // would hand back the same newest articles on every tick and force a rewrite of each,
+    // which is a standing charge rather than a drain. This one finds nothing once swept.
+    ...(translationBacklogLimit > 0 ? [["run", "translate", "--", "--backlog", `--limit=${translationBacklogLimit}`]] : []),
     ["run", "documents", "--", `--limit=${processLimit}`],
     // Last, so it judges the pass that has just finished. A non-zero exit here means the
     // pipeline is quiet rather than broken, which no other signal reports.

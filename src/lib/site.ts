@@ -19,5 +19,12 @@ export function siteUrl(): string {
  * Machine endpoints are listed, but not the whole `/api` tree: `/api/og` renders every
  * social card and `/api/figures` serves the images inside a report, so blocking `/api`
  * wholesale hid both from search along with the JSON.
+ *
+ * `/api/documents` is deliberately absent for the same reason. Every research page links its
+ * source PDF as the report itself, so the disallow turned a link on every one of them into a
+ * target the crawl was told not to fetch — Search Console reported them as blocked by
+ * robots.txt, and the inline preview a reader sees never rendered for a crawler at all. The
+ * route answers `X-Robots-Tag: noindex` instead, which keeps the PDFs out of the index while
+ * letting the crawl finish the page.
  */
-export const CRAWLER_DISALLOW = ["/api/auth", "/api/documents", "/api/feed", "/api/health", "/api/search", "/api/social", "/api/v1"];
+export const CRAWLER_DISALLOW = ["/api/auth", "/api/feed", "/api/health", "/api/search", "/api/social", "/api/v1"];

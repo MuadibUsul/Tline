@@ -237,7 +237,15 @@ Use tickers only from this list where applicable: ${ASSETS.map((a) => a.ticker).
 English analysis fields must contain professional English; _zh fields must contain institution-grade Simplified Chinese preserving every number, unit and modality. Summaries must be your own words, never a verbatim copy. If unsure about an asset, omit it.
 Keep the output compact: summaries and interpretations at most 90 English words / 160 Chinese characters each; at most 4 key arguments, 5 key numbers and 3 risks per language. Do not repeat the same point across fields.`;
 
-const ANALYSIS_PROMPT_VERSION = "analysis-evidence-v1";
+/**
+ * The version stamped on every analysis row.
+ *
+ * Exported because it is also the only way to find the rows an older prompt wrote: the
+ * column was written from the first release and read by nothing, so a prompt improvement
+ * reached only the articles ingested after it shipped. `seo_title_en` was asked for by this
+ * version and was present on none of the corpus while it ran.
+ */
+export const ANALYSIS_PROMPT_VERSION = "analysis-evidence-v1";
 const EVIDENCE_LIMIT = 8_000;
 const EVIDENCE_SIGNAL = /\b(?:expect|forecast|target|outlook|scenario|risk|unless|if|because|therefore|however|but|versus|vs\.?|increase|decrease|rise|fall|growth|inflation|rate|yield|price|demand|supply|earnings|revenue|margin|policy)\b/i;
 const EVIDENCE_NUMBER = /(?:[$€£¥]\s?)?\d[\d,]*(?:\.\d+)?\s?(?:%|bp|bps|bn|billion|million|trillion|tn|k)?/i;

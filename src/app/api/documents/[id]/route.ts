@@ -8,6 +8,19 @@ import { trackServerEvent } from "@/lib/analytics/serverEvent";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * The PDF is the report, and it is meant to be read on the page rather than found in a
+ * search result in place of it. `noindex` says exactly that without forbidding the fetch.
+ *
+ * robots.txt used to ask the crawler not to fetch these at all, which Search Console
+ * reported as blocked pages — one such link sits on every research page — and which also
+ * kept the inline preview from rendering for a crawler, so the page it was meant to complete
+ * arrived incomplete. The header is set on the redirect as well as on the streamed body: the
+ * download path hands off to object storage, and the instruction has to travel with the
+ * response the crawler first receives.
+ */
+const DOCUMENT_ROBOTS = { "x-robots-tag": "noindex, nofollow" };
+
 function safeFilename(title: string, locale: string) {
   const clean = title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);
   return (clean || "research") + "-" + locale + ".pdf";
@@ -50,7 +63,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     // A signed URL always attaches; previewing has to be served from here instead.
     const signedUrl = inline ? null : await privateDownloadUrl(document.storageKey, filename, document.mimeType);
     if (signedUrl) {
-      return Response.redirect(signedUrl, 307);
+      return new Response(null, { status: 307, headers: { location: signedUrl, ...DOCUMENT_ROBOTS } });
     }
     const file = await readPrivateFile(document.storageKey);
     return new Response(new Uint8Array(file), {
@@ -59,6 +72,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         "content-length": String(file.byteLength),
         "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(filename)}`,
         "cache-control": "private, no-store",
+        ...DOCUMENT_ROBOTS,
       },
     });
   } catch {

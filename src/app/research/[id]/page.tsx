@@ -10,6 +10,7 @@ import { JsonLd, breadcrumbJsonLd, canonical, clamp, displayTitle, localizedUrl,
 import { preferredEnglishDocuments, publicationReadyWhere, LOCALE_STRICT_ZH_SINCE } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
 import { contentQuality } from "@/lib/contentQuality";
+import { effectiveSummaryZh } from "@/lib/summary";
 import { assetPath } from "@/lib/assetPath";
 import { getArticleTopics, getPeerReports, topicHref } from "@/lib/related";
 import { ClassificationChips } from "@/app/_components/ui";
@@ -52,7 +53,9 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   // The description is the page's own summary where one exists. Where none does, the
   // institution name alone was a four-character description on Chinese pages; the fallback
   // now carries the publisher, the date and what the page is.
-  const summary = (zh ? article.analysis?.summaryZh : article.analysis?.summary)?.trim();
+  const summary = (zh
+    ? effectiveSummaryZh({ summaryZh: article.analysis?.summaryZh, translation: article.translations[0] })
+    : article.analysis?.summary)?.trim();
   // clamp rather than slice: a description cut at exactly 158 characters ends mid-word,
   // and every report page was doing that.
   const description = clamp(summary
@@ -66,7 +69,21 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
     // nine characters of it. Search results already show the site name separately.
     title: { absolute: searchTitle },
     description,
-    ...canonical(researchPath(article), locale, indexableLocales.length ? indexableLocales : ["en"]),
+    /**
+     * Declaring an alternate that answers `noindex` would tell a search engine the site has a
+     * page it does not have, so the language map carries only the languages that passed. With
+     * none, the page names only itself and adds no alternates.
+     *
+     * The canonical stays self-referential even when this locale is the one being withheld.
+     * Pointing it at the other language was tried and is wrong: a translation is not a
+     * duplicate of its source, and a canonical across languages contradicts the `hreflang`
+     * pair that says these two addresses are alternates of each other. `noindex` on a page
+     * that names itself canonical is one instruction, not two that disagree — the page is
+     * simply not in the index, and it stays that way until it passes the gate.
+     */
+    ...(indexableLocales.length
+      ? canonical(researchPath(article), locale, indexableLocales)
+      : { alternates: { canonical: localizedUrl(researchPath(article), locale) } }),
     ...(quality.eligibility === "INDEX" ? {} : { robots: { index: false, follow: true } }),
     openGraph: {
       type: "article",
@@ -171,7 +188,13 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const previewDocument = publisherPdf ?? a.documents.find((document) => document.kind === "original_pdf");
 
   const heading = displayTitle(locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title);
-  const summary = (locale === "zh-CN" ? an?.summaryZh : an?.summary) ?? institutionName(a.institution.name, locale);
+  // Same call the gate makes, so the conclusion the reader sees is the one that let the page
+  // into the index: an analysis summary where there is one, the translation's opening where
+  // there is not. Reading `summaryZh` alone showed the institution name on pages the gate had
+  // already accepted on the strength of their translation.
+  const summary = (locale === "zh-CN"
+    ? effectiveSummaryZh({ summaryZh: an?.summaryZh, translation })
+    : an?.summary) ?? institutionName(a.institution.name, locale);
   const relatedAssets = [...new Map(a.atomicViews.filter((view) => view.assetTicker).map((view) => [view.assetTicker!, view.asset])).entries()];
   // Both come from stored rows: the topics the extraction tagged, and other houses' reports
   // on the same asset. Nothing is inferred, and an absent relation renders nothing.

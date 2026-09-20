@@ -81,6 +81,12 @@ services:
       INGEST_SOURCE_SECONDS: ${INGEST_SOURCE_SECONDS:-90}
       REPARSE_CONCURRENCY: ${REPARSE_CONCURRENCY:-2}
       TRANSLATION_CONCURRENCY: ${TRANSLATION_CONCURRENCY:-2}
+      # Reports first ingested before the Chinese-completeness cutoff are not translated by
+      # the automatic pass, so their /zh address renders the publisher's English and stays
+      # out of the index. Set this to a batch size to sweep them, then back to 0. The sweep
+      # is idempotent — it selects rows whose prompt, glossary or source hash has moved on —
+      # so a tick with nothing stale spends nothing.
+      TRANSLATION_BACKLOG_LIMIT: ${TRANSLATION_BACKLOG_LIMIT:-0}
       INGEST_ARTICLE_LIMIT: ${INGEST_ARTICLE_LIMIT:-4}
       INGEST_WINDOW_HOURS: ${INGEST_WINDOW_HOURS:-168}
       INGEST_STALL_HOURS: ${INGEST_STALL_HOURS:-6}

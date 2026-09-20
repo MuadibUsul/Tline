@@ -10,6 +10,18 @@ import type { CompletionAudit } from "../llm/types";
 
 const PROMPT_VERSION = "finance-translation-v3";
 
+/**
+ * The inputs that decide whether a stored translation is still the current one.
+ *
+ * `translateAndPersist` already refuses to reuse a row whose prompt, glossary or source hash
+ * has moved on, but it decides that after the row has been claimed. A caller that wants to
+ * sweep the corpus for stale rows has to ask the same question first, or it pays to
+ * re-derive the answer for every row that was already current.
+ */
+export function translationInputs() {
+  return { promptVersion: PROMPT_VERSION, glossaryVersion: glossary.version };
+}
+
 interface SourceSegment {
   id: string;
   position: number;

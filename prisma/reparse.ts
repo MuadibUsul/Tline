@@ -1,9 +1,9 @@
 import "dotenv/config";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../src/lib/db";
-import { parseArticle } from "../src/lib/ingest/parseLLM";
+import { ANALYSIS_PROMPT_VERSION, parseArticle } from "../src/lib/ingest/parseLLM";
 import { syncForecastsForArticle } from "../src/lib/forecast";
-import { clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
+import { MAX_FAILURES, clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
 import { anyProviderConfigured } from "../src/lib/llm/config";
 import { queueRetry } from "../src/lib/contentRetry";
 import { classifyDeterministically } from "../src/lib/classification/classifier";
@@ -25,14 +25,29 @@ async function main() {
 
   const all = flag("all");
   const retryReview = flag("retry-review");
+  /**
+   * Whether the pass also reconsiders analyses an older prompt wrote.
+   *
+   * Off by default and never implied by another flag. Re-running the corpus is a model bill
+   * and it has to be a decision, not a side effect of a deployment — the same reason the
+   * translation backlog is behind its own switch.
+   *
+   * Without it, `promptVersion` is written and never read: the selection above asks only for
+   * "no analysis yet", so every article that already has a row is unreachable by any later
+   * improvement to the prompt. That is how `seo_title_en` — asked for by the current version,
+   * read back by the parser, written by this script — ended up populated on none of the
+   * corpus, leaving every page titled with the publisher's series name.
+   */
+  const stalePrompt = flag("stale-prompt") || /^(?:1|true|yes)$/i.test(process.env.REPARSE_STALE_PROMPT ?? "");
   // An operator who named ids, or asked for everything, gets what they asked for; backoff
   // only governs the automatic pass the scheduler runs every minute.
   const operatorSelected = articleIds.length > 0 || all;
   const selection: Prisma.ArticleWhereInput[] = [];
   if (!all) {
-    selection.push(retryReview
-      ? { OR: [{ analysis: { is: null } }, { analysis: { reviewStatus: "needs_review" } }] }
-      : { analysis: { is: null } });
+    const revisit: Prisma.ArticleWhereInput[] = [{ analysis: { is: null } }];
+    if (retryReview) revisit.push({ analysis: { reviewStatus: "needs_review" } });
+    if (stalePrompt) revisit.push({ analysis: { promptVersion: { not: ANALYSIS_PROMPT_VERSION } } });
+    selection.push(revisit.length === 1 ? revisit[0] : { OR: revisit });
   }
   if (!operatorSelected) selection.push(dueFilter("analysis"));
   // Selected in the database rather than loaded and filtered here: the previous version
@@ -207,13 +222,29 @@ async function main() {
         sourceFingerprint: articleClassificationSourceFingerprint(article.contentHash, article.titleHash, uniqueSignals.map((signal) => signal.ticker)),
         apply: true,
       }).catch((error) => console.error(JSON.stringify({ event: "classification.analysis.failed", articleId: article.id, error: String(error).slice(0, 300) })));
-      // One automatic second pass for low-quality model output. During that retry the
-      // queue row is already "running", so queueRetry is a no-op and cannot loop forever.
-      if (parsed.reviewStatus === "needs_review") await queueRetry(article.id, "analysis");
       await syncForecastsForArticle(article.id);
-      await clearFailures(article.id, "analysis");
-        updated++;
+      /**
+       * A pass that produced an analysis the model could not ground is not a success for the
+       * retry cadence, and treating it as one is what made `needs_review` a terminal state.
+       *
+       * The automatic candidate filter is "articles with no analysis", so an article that
+       * gets a `needs_review` row leaves that set for good — and because the success path
+       * cleared the backoff counter on every attempt, adding `--retry-review` to the
+       * scheduled pass on its own would have re-billed it once a minute, forever. Counting
+       * it as a failure puts it on the same exponential ladder as one that throws: a second
+       * look after thirty minutes, a third after an hour, and abandonment at MAX_FAILURES.
+       * Operator-requested reruns still bypass the cadence, because someone looked at the
+       * output and asked for it again.
+       */
+      if (parsed.reviewStatus === "needs_review") {
+        await queueRetry(article.id, "analysis");
+        const failures = await recordFailure(article.id, "analysis");
+        console.log(`  HOLD (${failures}/${MAX_FAILURES}) ${article.id} · ${article.title}`);
+      } else {
+        await clearFailures(article.id, "analysis");
         console.log(`  ${parsed.needsLLM ? "HOLD" : "OK  "} ${article.id} · ${article.title}`);
+      }
+      updated++;
       } catch (error) {
         failed++;
         // Counted so an article that can never be parsed leaves the candidate set instead

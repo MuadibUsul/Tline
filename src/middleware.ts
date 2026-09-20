@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { assetPath } from "@/lib/assetPath";
+import { assetPath, legacyNonAssetRedirectPath, legacyTopicRedirectPath, tickerFromAssetSlug } from "@/lib/assetPath";
 
 /**
  * Puts the language in the address.
@@ -36,6 +36,32 @@ function cacheHeaders(response: NextResponse, request: NextRequest, pathname: st
  */
 export const MACHINE_PATH = /^\/(?:api|_next|pdfjs|sitemap(?:\.xml)?|robots\.txt|llms(?:-full)?\.txt|(?:rss|feed)\.xml|favicon\.ico|icon|opengraph-image|apple-icon|manifest\.webmanifest)(?:\/|$|\.)/;
 
+/**
+ * The page an earlier shape of the site's address resolves to, or null if it still stands.
+ *
+ * The taxonomy was reorganised twice — a topic that turned out to be one asset became an
+ * asset page, an alias like `fed` became the institution that owns the policy — and each
+ * move left the old address answering two redirects: one from this middleware adding the
+ * language, and a second from the route resolving the retired facet. Two 308s for one move
+ * is a second fetch on a crawler that is already working through every address the site had
+ * before it split by language.
+ *
+ * Resolving the facet here, before the prefix goes on, makes it one redirect from any entry
+ * point. The route keeps its own check: this is an optimisation of the public address, not
+ * the only place the rule lives, and a path that reaches the route unconverted still lands
+ * in the same place.
+ */
+function resolvedLegacyPath(bare: string): string | null {
+  const topic = /^\/topics\/([^/]+)$/.exec(bare);
+  if (topic) return legacyTopicRedirectPath(decodeURIComponent(topic[1]));
+  const asset = /^\/asset\/([^/]+)$/.exec(bare);
+  if (asset) {
+    const key = decodeURIComponent(asset[1]);
+    return legacyNonAssetRedirectPath(tickerFromAssetSlug(key)) ?? assetPath(key);
+  }
+  return null;
+}
+
 function preferredSegment(request: NextRequest): string {
   const cookie = request.cookies.get(LOCALE_COOKIE)?.value;
   if (cookie === "zh-CN") return "zh";
@@ -68,15 +94,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  const legacyAsset = /^\/(en|zh)?\/?asset\/([^/]+)\/?$/i.exec(pathname);
-  if (legacyAsset) {
+  const [, first, ...rest] = pathname.split("/");
+  const prefixed = SEGMENTS.has(first ?? "");
+  const bare = (prefixed ? `/${rest.join("/")}` : pathname).replace(/\/$/, "") || "/";
+  const legacy = resolvedLegacyPath(bare);
+  if (legacy) {
     const url = request.nextUrl.clone();
-    const segment = legacyAsset[1] || preferredSegment(request);
-    url.pathname = `/${segment}${assetPath(decodeURIComponent(legacyAsset[2]))}`;
+    // The language the reader is already in wins over the one they would be sent to: an
+    // address that names a language names it for a reason, and the replacement page exists
+    // in both.
+    url.pathname = `/${prefixed ? first : preferredSegment(request)}${legacy}`;
+    // The query belonged to the page being left behind; a facet change starts clean.
+    url.search = "";
     return NextResponse.redirect(url, 308);
   }
-
-  const [, first, ...rest] = pathname.split("/");
 
   if (SEGMENTS.has(first ?? "")) {
     // Serve the existing route, while the pages below still see the address as asked for.

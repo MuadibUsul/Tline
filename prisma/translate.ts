@@ -2,7 +2,7 @@ import "dotenv/config";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../src/lib/db";
 import { resolveLLMProvider } from "../src/lib/llm/config";
-import { translateAndPersist } from "../src/lib/translation/translate";
+import { translateAndPersist, translationInputs } from "../src/lib/translation/translate";
 import { generateArticleDocuments } from "../src/lib/documents/pdf";
 import { clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
 import { queueRetry } from "../src/lib/contentRetry";
@@ -24,15 +24,28 @@ async function main() {
   const limit = Math.max(1, Number(arg("limit") || 20));
   const qualityBelow = Math.max(0, Math.min(1, Number(arg("quality-below") || 0.8)));
   const concurrency = Math.min(8, Math.max(1, Number(arg("concurrency") || process.env.TRANSLATION_CONCURRENCY || 3)));
+  /**
+   * Whether this pass lifts the new-article cutoff and sweeps the whole corpus.
+   *
+   * Separate from `--all` on purpose, and it does not imply it. `--all` means "take what I
+   * named, whether or not it looks like work" and forces a rewrite; on a schedule that is
+   * a standing charge — the query would hand back the same newest articles every tick and
+   * each one would be re-translated again. `--backlog` means "find the rows that are
+   * actually stale, all the way back", which is idempotent: once swept, the next pass finds
+   * nothing and costs nothing.
+   */
+  const backlog = flag("backlog") || /^(?:1|true|yes)$/i.test(process.env.TRANSLATION_BACKLOG ?? "");
   // An operator who named ids, or asked for everything, gets what they asked for; backoff
   // and the new-article cutoff only govern the automatic pass the scheduler runs every minute.
   const operatorSelected = articleIds.length > 0 || flag("all");
   const selection: Prisma.ArticleWhereInput[] = [];
   if (!operatorSelected) {
+    // Backoff governs the backlog too, so a report that cannot be translated leaves the
+    // candidate set instead of being re-billed on every pass.
     selection.push(dueFilter("translation"));
-    // No backfill: the automatic pass only translates reports first ingested on or after the
-    // cutoff. The existing backlog is left untouched (run `translate --all` to backfill by hand).
-    selection.push({ createdAt: { gte: LOCALE_STRICT_ZH_SINCE } });
+    // No backfill by default: the automatic pass only translates reports first ingested on
+    // or after the cutoff, so the pre-cutoff corpus is never a bill nobody chose.
+    if (!backlog) selection.push({ createdAt: { gte: LOCALE_STRICT_ZH_SINCE } });
   }
   const rows = await prisma.article.findMany({
     where: {
@@ -44,7 +57,12 @@ async function main() {
       id: true,
       title: true,
       contentHash: true,
-      translations: { where: { locale: "zh-CN" }, select: { status: true, qualityScore: true } },
+      // The staleness fields come back with the row so the decision below can be made
+      // before a model call, not inside `translateAndPersist` after one has been claimed.
+      translations: {
+        where: { locale: "zh-CN" },
+        select: { status: true, qualityScore: true, promptVersion: true, glossaryVersion: true, sourceContentHash: true },
+      },
     },
     orderBy: { publishedAt: "desc" },
     // The status/quality predicates below read the translation rows, so they cannot move
@@ -52,8 +70,22 @@ async function main() {
     // yields a full batch, rather than scanning the whole table as this once did.
     take: articleIds.length ? undefined : limit * 10,
   });
+  const { promptVersion: currentPrompt, glossaryVersion: currentGlossary } = translationInputs();
+  /** A row this pass would actually rewrite, judged by the same test the reuse check applies. */
+  const needsWork = (article: (typeof rows)[number]) => {
+    const existing = article.translations[0];
+    if (!existing) return true;
+    if (existing.promptVersion !== currentPrompt) return true;
+    if (existing.glossaryVersion !== currentGlossary) return true;
+    if (existing.sourceContentHash !== article.contentHash) return true;
+    if (flag("retry-review") && existing.status === "needs_review") return true;
+    if (flag("retry-low-quality") && (existing.qualityScore ?? 0) < qualityBelow) return true;
+    return false;
+  };
   const candidates = rows
-    .filter((article) => flag("all") || article.translations.length === 0 || (flag("retry-review") && article.translations[0].status === "needs_review") || (flag("retry-low-quality") && (article.translations[0].qualityScore ?? 0) < qualityBelow))
+    // An operator's selection is taken as asked. The automatic and backlog passes only take
+    // what is genuinely outstanding, which is what keeps either of them safe to schedule.
+    .filter((article) => operatorSelected || needsWork(article))
     .slice(0, limit);
 
   let translated = 0;

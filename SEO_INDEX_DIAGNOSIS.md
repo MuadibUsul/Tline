@@ -3,6 +3,10 @@
 诊断日期 2026-09-21。证据来自生产站点 `tlines.tech` 的实测抓取，以及本地 `prisma/dev.db`
 快照（436 篇，其中 404 篇 publication-ready）跑同一套 `contentQuality` 门禁的结果。
 
+> ⚠️ **读本文前先看文末「生产真实基线」。** 本地 `dev.db` 快照**不能代表生产**：它显示
+> 英文 78% 可索引、47 篇 `needs_review`；生产实际是英文 **97.7%** 可索引、
+> **`needs_review` 为 0**。本文中所有以本地快照为据的数字都已在那里更正。
+
 ---
 
 ## 结论先说
@@ -468,3 +472,91 @@ node tmp/seo-probe-live.mjs           # 生产抽样：noindex / 重定向实测
 node tmp/seo-attribute.mjs            # 生产抽样：noindex 中文页按规则归因
 node tmp/seo-chain-probe.mjs          # 重定向链与 robots 屏蔽链接
 ```
+
+---
+
+# 生产真实基线（2026-09-21 部署后实测）
+
+来源：生产容器内跑项目自带的 `npm run seo:status`，以及直接查生产 PostgreSQL。
+**这是权威数字，本文前面基于本地 `dev.db` 的推断在此更正。**
+
+```
+reports: 1087
+
+en:    1062/1087 可索引 (97.7%)   扣留 25
+       原因: abnormal_title=22  garbled_or_broken_words=2  thin_content=1
+
+zh-CN:  515/1087 可索引 (47.4%)   扣留 572
+       原因: missing_translation=316        ← 最大一项
+             translation_below_threshold=248  ← 0.7 罚分 vs 0.8 闸门
+             empty_summary=128
+             abnormal_title=22
+             translation_language_mismatch=5  translation_needs_review=3
+             translation_garbled=2  garbled_or_broken_words=2  thin_content=1
+
+pages: 50 institution · 20 asset · 59 topics 过阈值
+```
+
+## 本地快照在哪些地方误导了判断
+
+| 项 | 本地 dev.db | 生产实际 | 结论 |
+|---|---|---|---|
+| 英文可索引率 | 315/404 (78%) | **1062/1087 (97.7%)** | 本地严重低估。英文侧本来就健康 |
+| `reviewStatus = needs_review` | 47 篇 | **0 篇** | **R2 修复在生产上无事可做** |
+| 中文可索引率 | 240/404 (59%) | 515/1087 (47.4%) | 同量级 |
+| `seoTitle` 覆盖率 | 0/404 | **324/1087 (30%)** | 病灶确认，但已有 30% 被填过 |
+
+`reviewStatus` 全是 `ok`，所以调度器那次 `--retry-review` 跑出 `Reparse complete: 0 updated`。
+R2 的修复本身是对的（它让 `needs_review` 不再是终态），但它解决的是**本地快照里的**问题，
+不是生产的问题。这一点必须如实记录。
+
+## 生产上的 `seoTitle` 缺口（最大杠杆）
+
+```
+analysis-evidence-v1 (当前)  251 条  → 251 条有 seoTitle  (100%)
+atomic-views-v3              186 条  →  73 条有 seoTitle  ( 39%)
+atomic-views-v2              240 条  →   0 条有 seoTitle
+atomic-views-v1              223 条  →   0 条有 seoTitle
+v2                           187 条  →   0 条有 seoTitle
+                                              ─────────────
+合计                        1087 条  → 324 条 (30%)，缺 763 条
+```
+
+当前提示词**每次都产出搜索标题（251/251）**，机制是好的；缺的是把它跑过那 763 篇。
+`--stale-prompt` / `REPARSE_STALE_PROMPT` 已实现并试点验证（20 篇 0/20 → 20/20），
+**尚未在生产上执行**——763 次模型调用，需要你确认。
+
+## 生产翻译积压（比本地估计大）
+
+```
+ArticleTranslation (zh-CN) 合计 776 条 / 1087 篇
+  finance-translation-v3 (当前)  348
+  finance-translation-v1         233   ← 过期
+  finance-translation-v2         195   ← 过期
+完全没有译文的                   311
+                                  ─────
+待处理合计                       739
+```
+
+`TRANSLATION_BACKLOG_LIMIT` 默认 **0（关闭）**。739 次翻译 + 复核调用。
+按当前提示词产出的译文大多能过闸门（现有 348 篇 v3 译文中 280 篇通过），
+所以排空的回报是把中文可索引数从 515 抬向 ~750 —— 但 `translation_below_threshold`
+那 248 篇即使重译也上不去（见上文 0.7 罚分冲突）。
+
+## 本次部署实测到的变化
+
+```
+sitemap 中文 URL:  480 → 515   (+35，R1 的效果)
+robots.txt:        /api/documents 屏蔽已解除（0 处匹配）
+/topics/us-10y-treasury:  308 -> 308 -> 200  变成  308 -> 200（两跳压成一跳）
+容器: 全部 healthy 在新镜像 sha-f2fa0082dc90，tline-db-1 未被重建，迁移纯增量
+样本 40 篇英文已索引文章的 /zh 对应页: NOINDEX 27 → 26（其余受翻译门禁阻塞，非 empty_summary）
+```
+
+## 回滚
+
+```bash
+ssh deploy@104.207.82.85
+cd ~/tline && TAG=sha-1746d298be32 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+镜像 `sha-1746d298be32` 仍在服务器本地。

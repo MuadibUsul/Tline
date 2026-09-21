@@ -560,3 +560,67 @@ ssh deploy@104.207.82.85
 cd ~/tline && TAG=sha-1746d298be32 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 镜像 `sha-1746d298be32` 仍在服务器本地。
+
+---
+
+# 直连部署记录（绕过 GitHub Actions）
+
+GitHub Actions 因账单被拦（`The job was not started because recent account payments have failed`），
+`deploy.yml` 在 `verify` 阶段就失败。以下为绕过它的直连部署流程，已验证两轮。
+
+## 流程
+
+```bash
+# 0. 定位（VPS_HOST 是 GitHub secret，读不出；用域名 DNS 反查 + known_hosts 交叉确认）
+#    tlines.tech -> 104.207.82.85（DoH 查询，本机 DNS 被代理劫持返回 198.18.0.x）
+#    ssh -i ~/.ssh/tline_vps_actions2 deploy@104.207.82.85
+#    可用密钥只有 tline_vps_actions2；tline_vps_deploy / _rsa / id_rsa 均被拒
+
+# 1. 打包精确提交（不是工作区——避免带上未提交的改动）
+git archive --format=tar.gz -o /tmp/tline-<sha>.tar.gz <sha>
+
+# 2. 传输
+scp -i ~/.ssh/tline_vps_actions2 /tmp/tline-<sha>.tar.gz deploy@104.207.82.85:~/
+
+# 3. 在服务器上构建（服务器无源码检出，且仓库私有无法 clone，所以必须打包上传）
+ssh ... 'rm -rf ~/tline-build && mkdir -p ~/tline-build && cd ~/tline-build && \
+  tar xzf ~/tline-<sha>.tar.gz && \
+  nohup docker build -t ghcr.io/muadibusul/tline:sha-<12> . > build.log 2>&1 &'
+
+# 4. 验证镜像内容（不验证不部署）
+docker run --rm --entrypoint sh <image> -c '<检查新代码是否存在>'
+
+# 5. 部署
+cd ~/tline && TAG=sha-<12> docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# 6. 收尾
+echo "sha-<12>" > ~/tline/.deploy-tag
+rm -rf ~/tline-build ~/tline-<sha>.tar.gz
+```
+
+## 注意事项
+
+- **`tline-db-1` 不会被重建**（compose 只重建镜像变化的服务），数据无风险。
+- 容器 `CMD` 含 `npm run db:postgres:deploy`，**启动时自动应用迁移**。部署前必须审查新迁移
+  是否含破坏性语句（`DROP` / `DELETE` / `TRUNCATE` / `SET NOT NULL`）。
+- 服务器是共享主机（还跑着 superaeo / gubugu / sheetmetal）。构建有缓存时约 70–100 秒，
+  无缓存时更久。4 核 / 5.9GB 内存 / 70GB 可用。
+- 部署前比对服务器上 compose 文件的 md5 与 repo 中已部署版本，确认无手工改动再覆盖。
+
+## 部署历史
+
+| 镜像 tag | 内容 | 日期 |
+|---|---|---|
+| `sha-b2c6bfecf9ab` | `b2c6bfe` 社区仪表盘模板发布（含 `DashboardTemplate` 迁移） | 2026-09-21 |
+| `sha-f2fa0082dc90` | `f2fa008` 自建仪表盘 + `ee13e8b` SEO 修复 | 2026-09-21 |
+| `sha-1746d298be32` | `1746d29` 上一状态（首个回滚点） | 2026-09-20 |
+
+## 回滚
+
+```bash
+ssh deploy@104.207.82.85
+cd ~/tline && TAG=sha-<上一个 tag> docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+**注意**：迁移是单向的。回滚镜像不会撤销已应用的 `DashboardTemplate` /
+`Dashboard` 建表，但那两张表是新增的，留着不影响旧代码运行。

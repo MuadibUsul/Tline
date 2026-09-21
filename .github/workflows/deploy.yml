@@ -75,8 +75,18 @@ jobs:
 
           # The compose files come from the commit being released rather than from whatever
           # the host last received, so a change to either one ships with the image it belongs to.
-          cp "$GITHUB_WORKSPACE/docker-compose.yml" ./docker-compose.yml
-          cp "$GITHUB_WORKSPACE/docker-compose.prod.yml" ./docker-compose.prod.yml
+          #
+          # Written to a new name and renamed over the target, not copied onto it. The runner
+          # does not own these files, and `cp` onto an existing path needs write permission on
+          # the file itself — the first release from this runner died on exactly that. A rename
+          # needs write permission only on the directory, which the deploy group has, and
+          # `install` pins the mode afterwards so it does not drift between releases: the mode
+          # a copy inherits is the mode of whatever it was copied from, which is how these
+          # ended up 644 and unwritable in the first place.
+          for file in docker-compose.yml docker-compose.prod.yml; do
+            install -m 664 "$GITHUB_WORKSPACE/$file" "./$file.incoming"
+            mv -f "./$file.incoming" "./$file"
+          done
 
           NEW_TAG="$TAG"
           PREVIOUS_TAG=$(cat .deploy-tag 2>/dev/null || true)

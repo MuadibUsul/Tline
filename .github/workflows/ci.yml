@@ -10,9 +10,16 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Self-hosted: a private repository's Actions minutes are metered and shared with every
+    # other private repository on the account, and this project's own usage was around
+    # eleven billed minutes per push to main. Nothing here needs GitHub's machine — it is
+    # npm ci, a typecheck, a lint and the test suite — and running it on the host the
+    # release already runs on costs nothing. The timeout keeps a PR from hanging behind an
+    # offline runner.
+    runs-on: [self-hosted, tline]
+    timeout-minutes: 30
     env:
-      # Schema generation and the production build only need a syntactically valid URL.
+      # Schema generation only needs a syntactically valid URL.
       DATABASE_URL: file:./ci.db
       AUTH_SECRET: ci-secret-not-used-outside-ci
     steps:
@@ -31,5 +38,7 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
-      - name: Production build
-        run: npm run build
+      # There was a `npm run build` here as well. It was the same build the Dockerfile runs
+      # a few minutes later, on a machine that has to be paid for, and the release cannot
+      # proceed if either one fails — so it was a second bill for the same answer. The
+      # Docker build is the build gate now.

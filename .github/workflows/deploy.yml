@@ -1,5 +1,23 @@
 name: Deploy
 
+# Release runs on the production host itself, not on a GitHub-hosted machine.
+#
+# Every private repository on this account shares one metered pool of Actions minutes, and
+# this workflow was the largest single consumer of it: it built a 4.8 GB image on GitHub's
+# runner, pushed it to GHCR, then pulled it back down onto the host that was about to run
+# it. Measured over eighty-three runs, that was eight to eleven billed minutes per push to
+# main — and the account ran out, which does not slow deploys down so much as stop them, CI
+# included.
+#
+# The host already has Docker, four cores, and no metered minutes. Building here removes the
+# registry from the loop entirely: the image is built where it runs, there is nothing to
+# push and nothing to pull, and the whole release costs zero Actions minutes. The runner is
+# a dedicated unprivileged user in the docker and deploy groups — see DEPLOYMENT.md.
+#
+# What this costs: the image is no longer stored off-host. Rollback still works, because the
+# host keeps the three most recent tags, and GHCR still holds every image built before this
+# change. Push to GHCR again if an off-host artifact matters more than the egress.
+
 on:
   push:
     branches: [main]
@@ -9,187 +27,126 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+env:
+  APP_DIR: /home/deploy/tline
+  IMAGE: ghcr.io/muadibusul/tline
+
 jobs:
   verify:
     uses: ./.github/workflows/ci.yml
 
-  build:
+  release:
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, tline]
+    timeout-minutes: 60
     permissions:
       contents: read
-      packages: write
-    outputs:
-      tag: ${{ steps.meta.outputs.tag }}
-      image: ${{ steps.meta.outputs.image }}
     steps:
       - uses: actions/checkout@v4
-      - id: meta
-        shell: bash
+
+      - name: Build the image on the host that runs it
         run: |
-          echo "tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
-          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
-            ${{ steps.meta.outputs.image }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          set -eu
+          TAG="sha-${GITHUB_SHA::12}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Building $IMAGE:$TAG"
+          docker build -t "$IMAGE:$TAG" .
 
-  deploy:
-    needs: [verify, build]
-    runs-on: ubuntu-latest
-    environment: production
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure www redirect
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -eu
-            CADDY_CONTAINER=$(docker ps --filter ancestor=caddy:2-alpine --format '{{.ID}}' | head -n 1)
-            CADDYFILE=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' "$CADDY_CONTAINER")
-            if ! grep -q '^www\.tlines\.tech {' "$CADDYFILE"; then
-              cp "$CADDYFILE" "$CADDYFILE.bak"
-              trap 'mv "$CADDYFILE.bak" "$CADDYFILE"' EXIT
-              cat >> "$CADDYFILE" <<'EOF'
-
-            www.tlines.tech {
-                redir https://tlines.tech{uri} permanent
-            }
-            EOF
-              docker exec "$CADDY_CONTAINER" caddy validate --config /etc/caddy/Caddyfile
-              docker exec "$CADDY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile
-              rm "$CADDYFILE.bak"
-              trap - EXIT
-            fi
-      - name: Upload Compose configuration
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: docker-compose.yml,docker-compose.prod.yml
-          target: ~/tline
-      - name: Configure JEV credential
-        uses: appleboy/ssh-action@v1
+      - name: Write the deploy credential
         env:
           JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          envs: JEV_API_KEY
-          script: |
-            set -eu
-            umask 077
-            ENV_FILE="$HOME/tline/.env"
-            TMP_FILE=$(mktemp "$HOME/tline/.env.XXXXXX")
-            grep -v '^JEV_API_KEY=' "$ENV_FILE" > "$TMP_FILE" || true
-            printf 'JEV_API_KEY=%s\n' "$JEV_API_KEY" >> "$TMP_FILE"
-            mv "$TMP_FILE" "$ENV_FILE"
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
-        env:
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GHCR_USER,GHCR_TOKEN
-          script: |
-            set -eu
-            cd ~/tline
-            mkdir -p backups
-            IMAGE='${{ needs.build.outputs.image }}'
-            NEW_TAG='${{ needs.build.outputs.tag }}'
-            PREVIOUS_TAG=$(cat .deploy-tag 2>/dev/null || true)
-            export TAG="$NEW_TAG"
+        run: |
+          set -eu
+          ENV_FILE="$APP_DIR/.env"
+          # Rewritten in place rather than moved into position: the file is owned by the
+          # deploy user with group write, and replacing the inode would leave it owned by
+          # the runner with permissions the deployment user cannot read.
+          TMP_FILE=$(mktemp)
+          trap 'rm -f "$TMP_FILE"' EXIT
+          grep -v '^JEV_API_KEY=' "$ENV_FILE" > "$TMP_FILE" || true
+          printf 'JEV_API_KEY=%s\n' "$JEV_API_KEY" >> "$TMP_FILE"
+          cat "$TMP_FILE" > "$ENV_FILE"
 
-            echo "Disk usage before cleanup"
-            df -h /
-            docker system df
+      - name: Deploy
+        run: |
+          set -eu
+          cd "$APP_DIR"
+          mkdir -p backups
 
-            # Pulling a multi-gigabyte image on every release previously left every
-            # unrelated old tag on this shared host. Prune only unused images old enough
-            # to be outside an active deployment; Docker never removes an in-use image,
-            # so the currently running release remains available for rollback.
-            docker image prune -af --filter until=12h || true
-            docker builder prune -af --filter until=24h || true
+          # The compose files come from the commit being released rather than from whatever
+          # the host last received, so a change to either one ships with the image it belongs to.
+          cp "$GITHUB_WORKSPACE/docker-compose.yml" ./docker-compose.yml
+          cp "$GITHUB_WORKSPACE/docker-compose.prod.yml" ./docker-compose.prod.yml
 
-            # The image is private. This token dies with the workflow run, so the host
-            # never holds a lasting registry credential.
-            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
-            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          NEW_TAG="$TAG"
+          PREVIOUS_TAG=$(cat .deploy-tag 2>/dev/null || true)
+          export TAG="$NEW_TAG"
 
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            # A schema migration can outlive Compose's dependency wait. Keep the app
-            # running and let the explicit gate below decide, instead of aborting before
-            # diagnostics and rollback can run.
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d || true
+          echo "Disk usage before cleanup"
+          df -h /
+          docker system df
 
-            for i in $(seq 1 18); do
-              RESEARCH_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
-              MACRO_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q macro-scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
-              SOCIAL_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q social-scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
-              if [ "$RESEARCH_HEALTH" = healthy ] && [ "$MACRO_HEALTH" = healthy ] && [ "$SOCIAL_HEALTH" = healthy ] && docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
-                node -e "fetch('http://127.0.0.1:3000/api/health').then(async r=>{const b=await r.json();if(!r.ok||b.status!=='ok')process.exit(1)}).catch(()=>process.exit(1))"; then
-                docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
-                  npm run classification:backfill -- --apply --limit=1000
-                echo "$NEW_TAG" > .deploy-tag
+          # Every release adds layers, and this host runs four other projects. Prune only
+          # what is unused and old enough to be outside an active deployment; Docker never
+          # removes an in-use image, so the running release stays available for rollback.
+          docker image prune -af --filter until=12h || true
+          docker builder prune -af --filter until=24h || true
 
-                # Retain the three most recent images: the one now running, the rollback
-                # target, and one spare. Every deploy leaves behind a fully tagged image,
-                # and `docker image prune` only removes DANGLING ones, so nothing here is
-                # ever untagged and nothing was ever reclaimed. Measured cost of skipping
-                # this: 22 stale images, 31.8 GB.
-                #
-                # Not `prune -af`: other projects share this host and -a would delete their
-                # rollback images too. `prune` has no reference filter, so scoping to one
-                # repository requires listing and removing explicitly. Plain `docker rmi`
-                # (no -f) refuses an image that is in use, which is the safety net.
-                docker image ls --filter=reference="${IMAGE}:sha-*" --format '{{.ID}} {{.CreatedAt}}' \
-                  | sort -k2 -r \
-                  | tail -n +4 \
-                  | awk '{print $1}' \
-                  | xargs -r docker rmi || true
+          # No pull: the image was built in the step above. Compose uses the local tag.
+          # A schema migration can outlive Compose's dependency wait, so keep going and let
+          # the explicit gate below decide, instead of aborting before rollback can run.
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d || true
 
-                echo "Disk usage after deployment"
-                df -h /
-                docker system df
+          for i in $(seq 1 18); do
+            RESEARCH_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
+            MACRO_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q macro-scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
+            SOCIAL_HEALTH=$(docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q social-scheduler)" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
+            if [ "$RESEARCH_HEALTH" = healthy ] && [ "$MACRO_HEALTH" = healthy ] && [ "$SOCIAL_HEALTH" = healthy ] && docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
+              node -e "fetch('http://127.0.0.1:3000/api/health').then(async r=>{const b=await r.json();if(!r.ok||b.status!=='ok')process.exit(1)}).catch(()=>process.exit(1))"; then
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app \
+                npm run classification:backfill -- --apply --limit=1000
+              echo "$NEW_TAG" > .deploy-tag
 
-                echo "Deployment is healthy"
-                exit 0
-              fi
-              sleep 5
-            done
+              # Retain the three most recent images: the one now running, the rollback
+              # target, and one spare. Every deploy leaves behind a fully tagged image, and
+              # `docker image prune` only removes DANGLING ones, so nothing here is ever
+              # untagged and nothing was ever reclaimed. Measured cost of skipping this:
+              # 22 stale images, 31.8 GB.
+              #
+              # Not `prune -af`: other projects share this host and -a would delete their
+              # rollback images too. `prune` has no reference filter, so scoping to one
+              # repository requires listing and removing explicitly. Plain `docker rmi`
+              # (no -f) refuses an image that is in use, which is the safety net.
+              docker image ls --filter=reference="${IMAGE}:sha-*" --format '{{.ID}} {{.CreatedAt}}' \
+                | sort -k2 -r \
+                | tail -n +4 \
+                | awk '{print $1}' \
+                | xargs -r docker rmi || true
 
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 app || true
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 social-scheduler || true
+              echo "Disk usage after deployment"
+              df -h /
+              docker system df
 
-            if [ -n "$PREVIOUS_TAG" ]; then
-              echo "Deployment unhealthy; rolling back to $PREVIOUS_TAG"
-              export TAG="$PREVIOUS_TAG"
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-            else
-              echo "Deployment unhealthy; no previous successful tag is available"
+              echo "Deployment is healthy"
+              exit 0
             fi
-            exit 1
+            sleep 5
+          done
+
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 app || true
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 social-scheduler || true
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "Deployment unhealthy; rolling back to $PREVIOUS_TAG"
+            export TAG="$PREVIOUS_TAG"
+            # The previous image was built here and is retained locally, so there is
+            # normally nothing to fetch. The pull is a fallback for a tag this host no
+            # longer has — one built by the old GHCR-based pipeline, for instance.
+            docker image inspect "$IMAGE:$PREVIOUS_TAG" >/dev/null 2>&1 \
+              || docker compose -f docker-compose.yml -f docker-compose.prod.yml pull || true
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+          else
+            echo "Deployment unhealthy; no previous successful tag is available"
+          fi
+          exit 1

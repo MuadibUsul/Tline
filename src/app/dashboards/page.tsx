@@ -4,9 +4,10 @@ import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
-import { DASHBOARD_TEMPLATES } from "@/lib/dashboards";
+import { DASHBOARD_TEMPLATES, parseDashboardWidgets } from "@/lib/dashboards";
 import { getLocale, localePath, tr } from "@/lib/i18n";
 import { noIndex } from "@/lib/seo";
+import { generatedAvatar } from "@/lib/avatar";
 import { createDashboard, deleteDashboard } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -16,16 +17,23 @@ export default async function DashboardsPage() {
   const locale = await getLocale();
   const user = await getSessionUser();
   const entitled = can(user, "dashboards.manage");
+  const alertsEntitled = can(user, "dashboards.alerts");
   const dashboards = entitled && user ? await prisma.dashboard.findMany({
     where: { userId: user.id },
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { rules: true } } },
   }) : [];
+  const approved = await prisma.dashboardTemplate.findMany({ where: { status: "APPROVED" }, orderBy: [{ sortOrder: "asc" }, { reviewedAt: "desc" }], include: { author: { select: { name: true, email: true } } } });
+  const overrides = new Map(approved.filter((item) => item.builtinKey).map((item) => [item.builtinKey!, item]));
+  const templates = [
+    ...DASHBOARD_TEMPLATES.map((preset, index) => { const saved = overrides.get(preset.key); return { id: preset.key, builtinKey: preset.key, name: saved?.name ?? (locale === "zh-CN" ? preset.nameZh : preset.nameEn), description: saved?.description || (locale === "zh-CN" ? preset.descriptionZh : preset.descriptionEn), wallpaper: saved?.wallpaper ?? preset.wallpaper, accent: saved?.accent ?? preset.accent, coverUrl: saved?.coverUrl, widgets: preset.widgets, order: saved?.sortOrder ?? index * 10, author: null }; }),
+    ...approved.filter((item) => !item.builtinKey).map((item) => ({ id: item.id, builtinKey: null, name: item.name, description: item.description, wallpaper: item.wallpaper, accent: item.accent, coverUrl: item.coverUrl, widgets: parseDashboardWidgets(item.layoutJson), order: item.sortOrder, author: item.author })),
+  ].sort((a, b) => a.order - b.order);
 
   return (
     <main className="wrap dashboards-home">
       <header className="page-head dashboard-home-head">
-        <div className="eyebrow">{tr(locale, "Premium workspace", "专业版工作台")}</div>
+        <div className="eyebrow">{tr(locale, "Community workspace", "社区工作台")}</div>
         <h1>{tr(locale, "Monitoring dashboards", "自定义监控看板")}</h1>
         <p className="sub">{tr(locale, "Build a live desk for a central bank, macro theme or asset. Place data, research and alerts on one infinite canvas.", "围绕央行、宏观主题或具体品种搭建实时工作台，在一张无限画布上自由组合数据、研报与提醒。")}</p>
         <div className="dashboard-feature-row">
@@ -37,7 +45,7 @@ export default async function DashboardsPage() {
       </header>
 
       {!user && <section className="dashboard-upgrade"><div><b>{tr(locale, "Sign in to create a workspace", "登录后创建工作台")}</b><p>{tr(locale, "Dashboards are saved to your account and stay private.", "看板保存在你的账户中，并且仅你本人可见。")}</p></div><Link className="minibtn p" href={localePath(locale, "/signin?next=/dashboards")}>{tr(locale, "Sign in", "登录")} →</Link></section>}
-      {user && !entitled && <section className="dashboard-upgrade"><div><b>{tr(locale, "Included with Professional", "专业版功能")}</b><p>{tr(locale, "Professional, Enterprise and Founding accounts can create unlimited custom dashboards.", "专业版、企业版与创始会员可以创建不限数量的自定义看板。")}</p></div><span className="chip acc">{tr(locale, "Upgrade required", "需要升级")}</span></section>}
+      {user && !alertsEntitled && <section className="dashboard-upgrade"><div><b>{tr(locale, "Build and publish for free", "免费创建并发布模板")}</b><p>{tr(locale, "Every registered user can build and submit templates. Live alerts remain a Professional feature.", "所有注册用户都可以创建并投稿模板；实时提醒仍属于专业版功能。")}</p></div><span className="chip acc">{tr(locale, "Alerts · PRO", "提醒 · PRO")}</span></section>}
 
       {dashboards.length > 0 && <section className="dashboard-owned">
         <div className="dashboards-section-head"><h2>{tr(locale, "Your dashboards", "我的看板")}</h2><span>{dashboards.length}</span></div>
@@ -48,17 +56,17 @@ export default async function DashboardsPage() {
       </section>}
 
       <section>
-        <div className="dashboards-section-head"><h2>{tr(locale, "Start from a template", "从模板开始")}</h2><span>{DASHBOARD_TEMPLATES.length + 1}</span></div>
+        <div className="dashboards-section-head"><h2>{tr(locale, "Start from a template", "从模板开始")}</h2><span>{templates.length + 1}</span></div>
         <div className="dashboard-grid dashboard-template-grid">
-          {DASHBOARD_TEMPLATES.map((template) => <article className={`dashboard-template wallpaper-${template.wallpaper}`} key={template.key} style={{ "--dashboard-accent": template.accent } as CSSProperties}>
-            <div className="dashboard-template-preview">{template.widgets.slice(0, 5).map((item) => <i key={item.id} style={{ left: `${8 + (item.x % 500) / 8}%`, top: `${10 + (item.y % 300) / 5}%`, width: `${Math.min(34, item.w / 14)}%` }} />)}</div>
-            <div><span className="dashboard-tile-kicker">{template.key}</span><h3>{locale === "zh-CN" ? template.nameZh : template.nameEn}</h3><p>{locale === "zh-CN" ? template.descriptionZh : template.descriptionEn}</p></div>
-            {entitled ? <form action={createDashboard}><input type="hidden" name="template" value={template.key} /><button className="minibtn p" type="submit">{tr(locale, "Use template", "使用模板")}</button></form> : <span className="chip gray">PRO</span>}
-          </article>)}
+          {templates.map((template) => { const avatar = generatedAvatar(template.author?.name ?? "Tlines", template.author?.email); return <article className={`dashboard-template wallpaper-${template.wallpaper}`} key={template.id} style={{ "--dashboard-accent": template.accent } as CSSProperties}>
+            <div className="dashboard-template-preview" style={template.coverUrl ? { backgroundImage: `linear-gradient(rgba(8,11,17,.18),rgba(8,11,17,.42)),url(${JSON.stringify(template.coverUrl)})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>{!template.coverUrl && template.widgets.slice(0, 5).map((item) => <i key={item.id} style={{ left: `${8 + (item.x % 500) / 8}%`, top: `${10 + (item.y % 300) / 5}%`, width: `${Math.min(34, item.w / 14)}%` }} />)}</div>
+            <div><span className="dashboard-template-author"><i style={{ background: avatar.color }}>{avatar.initials}</i>{template.author?.name || (template.author ? tr(locale, "Community member", "社区用户") : "Tlines")}</span><h3>{template.name}</h3><p>{template.description}</p></div>
+            {entitled ? <form action={createDashboard}>{template.builtinKey ? <input type="hidden" name="template" value={template.builtinKey} /> : <input type="hidden" name="templateId" value={template.id} />}<button className="minibtn p" type="submit">{tr(locale, "Use template", "使用模板")}</button></form> : <Link className="minibtn p" href={localePath(locale, "/signin?next=/dashboards")}>{tr(locale, "Sign in to use", "登录后使用")}</Link>}
+          </article>; })}
           <article className="dashboard-template wallpaper-grid dashboard-custom-template">
             <div className="dashboard-template-preview"><b>＋</b></div>
             <div><span className="dashboard-tile-kicker">blank</span><h3>{tr(locale, "Blank canvas", "空白画布")}</h3><p>{tr(locale, "Start empty and add any supported data, research, note or source card.", "从空白开始，自由添加数据、研报、笔记或外部来源卡片。")}</p></div>
-            {entitled ? <form action={createDashboard} className="dashboard-blank-form"><input name="name" maxLength={80} placeholder={tr(locale, "Dashboard name", "看板名称")} required /><button className="minibtn p" type="submit">{tr(locale, "Create", "创建")}</button></form> : <span className="chip gray">PRO</span>}
+            {entitled ? <form action={createDashboard} className="dashboard-blank-form"><input name="name" maxLength={80} placeholder={tr(locale, "Dashboard name", "看板名称")} required /><button className="minibtn p" type="submit">{tr(locale, "Create", "创建")}</button></form> : <Link className="minibtn p" href={localePath(locale, "/signin?next=/dashboards")}>{tr(locale, "Sign in", "登录")}</Link>}
           </article>
         </div>
       </section>

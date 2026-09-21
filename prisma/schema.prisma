@@ -1020,6 +1020,7 @@ model User {
   watchlist WatchlistItem[]
   rules     AlertRule[]
   dashboards Dashboard[]
+  dashboardTemplates DashboardTemplate[]
   auditLogs AuditLog[]
   accounts  Account[]
   sessions  Session[]
@@ -1119,6 +1120,31 @@ model Dashboard {
   rules AlertRule[]
 
   @@index([userId, updatedAt])
+}
+
+model DashboardTemplate {
+  id                String   @id @default(cuid())
+  builtinKey        String?  @unique
+  sourceDashboardId String?  @unique
+  authorId          String?
+  name              String
+  description       String   @default("")
+  layoutJson        String   @default("[]")
+  wallpaper         String   @default("grid")
+  wallpaperUrl      String?
+  accent            String   @default("#9e7a42")
+  coverUrl          String?
+  status            String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  sortOrder         Int      @default(1000)
+  submittedAt       DateTime @default(now())
+  reviewedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([status, sortOrder])
+  @@index([authorId, updatedAt])
 }
 
 model AlertEvent {

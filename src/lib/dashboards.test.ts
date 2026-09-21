@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dashboardTemplate, parseDashboardWidgets, validAccent, validWallpaperUrl } from "./dashboards";
+import { dashboardTemplate, parseDashboardWidgets, snapDashboardPosition, validAccent, validWallpaperUrl } from "./dashboards";
 
 test("dashboard layouts keep supported cards and clamp unsafe geometry", () => {
   const widgets = parseDashboardWidgets(JSON.stringify([
@@ -30,4 +30,10 @@ test("gold template includes price, ETF flow source, yields, rates and inflation
 test("regional central-bank templates include Japan and the United Kingdom", () => {
   assert.deepEqual(dashboardTemplate("boj")?.widgets.map((widget) => widget.ref).filter(Boolean), ["JP_CALL_RATE", "USDJPY", "JP_GDP", "bank-of-japan"]);
   assert.deepEqual(dashboardTemplate("boe")?.widgets.map((widget) => widget.ref).filter(Boolean), ["UK_CALL_RATE", "GBPUSD", "UK_GDP", "UK_UNEMPLOYMENT", "bank-of-england"]);
+});
+
+test("cards snap to nearby edges and otherwise fall back to the grid", () => {
+  const other = { id: "a", type: "note" as const, title: "A", x: 100, y: 100, w: 300, h: 200 };
+  assert.deepEqual(snapDashboardPosition({ id: "b", x: 407, y: 103, w: 200, h: 180 }, [other]), { x: 400, y: 100, guideX: 400, guideY: 100 });
+  assert.deepEqual(snapDashboardPosition({ id: "b", x: 451, y: 361, w: 200, h: 180 }, [other]), { x: 456, y: 360, guideX: null, guideY: null });
 });

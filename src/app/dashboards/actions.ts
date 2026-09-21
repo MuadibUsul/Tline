@@ -6,32 +6,34 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { dashboardTemplate, DASHBOARD_WALLPAPERS, parseDashboardWidgets, validAccent, validWallpaperUrl } from "@/lib/dashboards";
-import { describeRule, evaluateRules } from "@/lib/alerts";
+import { describeRule } from "@/lib/alerts";
 import { writeAudit } from "@/lib/audit";
 import { getLocale, localePath } from "@/lib/i18n";
 
 const value = (form: FormData, key: string) => (form.get(key)?.toString() ?? "").trim();
 
-async function paidUser() {
+async function dashboardUser() {
   const locale = await getLocale();
   const user = await getSessionUser();
   if (!user) redirect(localePath(locale, "/signin?next=/dashboards"));
-  if (!can(user, "dashboards.manage")) redirect(localePath(locale, "/dashboards?upgrade=1"));
   return { user, locale };
 }
 
 export async function createDashboard(form: FormData) {
-  const { user, locale } = await paidUser();
+  const { user, locale } = await dashboardUser();
   const template = dashboardTemplate(value(form, "template"));
-  const name = (value(form, "name") || template?.nameZh || "自定义看板").slice(0, 80);
+  const shared = !template && value(form, "templateId") ? await prisma.dashboardTemplate.findFirst({ where: { id: value(form, "templateId"), status: "APPROVED" } }) : null;
+  const override = template ? await prisma.dashboardTemplate.findUnique({ where: { builtinKey: template.key } }) : null;
+  const name = (value(form, "name") || shared?.name || override?.name || template?.nameZh || "自定义看板").slice(0, 80);
   const dashboard = await prisma.dashboard.create({
     data: {
       userId: user.id,
       name,
-      templateKey: template?.key,
-      layoutJson: JSON.stringify(template?.widgets ?? []),
-      wallpaper: template?.wallpaper ?? "grid",
-      accent: template?.accent ?? "#9e7a42",
+      templateKey: template?.key ?? shared?.id,
+      layoutJson: shared?.layoutJson ?? JSON.stringify(template?.widgets ?? []),
+      wallpaper: shared?.wallpaper ?? override?.wallpaper ?? template?.wallpaper ?? "grid",
+      wallpaperUrl: shared?.wallpaperUrl ?? override?.wallpaperUrl,
+      accent: shared?.accent ?? override?.accent ?? template?.accent ?? "#9e7a42",
     },
   });
   await writeAudit({ actorId: user.id, action: "dashboard.create", targetType: "dashboard", targetId: dashboard.id, metadata: { template: template?.key ?? "custom" } });
@@ -68,11 +70,47 @@ export async function saveDashboard(input: {
 }
 
 export async function deleteDashboard(form: FormData) {
-  const { user, locale } = await paidUser();
+  const { user, locale } = await dashboardUser();
   const id = value(form, "id");
   const deleted = await prisma.dashboard.deleteMany({ where: { id, userId: user.id } });
   if (deleted.count) await writeAudit({ actorId: user.id, action: "dashboard.delete", targetType: "dashboard", targetId: id });
   redirect(localePath(locale, "/dashboards"));
+}
+
+export async function submitDashboardTemplate(input: {
+  dashboardId: string;
+  name: string;
+  description: string;
+  coverUrl: string;
+  layoutJson: string;
+  wallpaper: string;
+  wallpaperUrl: string;
+  accent: string;
+}) {
+  const user = await getSessionUser();
+  if (!user) return { error: "sign_in_required" } as const;
+  const dashboard = await prisma.dashboard.findFirst({ where: { id: input.dashboardId, userId: user.id }, select: { id: true } });
+  if (!dashboard) return { error: "not_found" } as const;
+  const widgets = parseDashboardWidgets(input.layoutJson);
+  if (!widgets.length) return { error: "empty_template" } as const;
+  const saved = await prisma.dashboardTemplate.upsert({
+    where: { sourceDashboardId: dashboard.id },
+    create: {
+      sourceDashboardId: dashboard.id, authorId: user.id, name: input.name.trim().slice(0, 80) || "Dashboard template",
+      description: input.description.trim().slice(0, 300), coverUrl: validWallpaperUrl(input.coverUrl), layoutJson: JSON.stringify(widgets),
+      wallpaper: (DASHBOARD_WALLPAPERS as readonly string[]).includes(input.wallpaper) ? input.wallpaper : "grid",
+      wallpaperUrl: validWallpaperUrl(input.wallpaperUrl), accent: validAccent(input.accent), status: "PENDING",
+    },
+    update: {
+      name: input.name.trim().slice(0, 80) || "Dashboard template", description: input.description.trim().slice(0, 300),
+      coverUrl: validWallpaperUrl(input.coverUrl), layoutJson: JSON.stringify(widgets), wallpaper: (DASHBOARD_WALLPAPERS as readonly string[]).includes(input.wallpaper) ? input.wallpaper : "grid",
+      wallpaperUrl: validWallpaperUrl(input.wallpaperUrl), accent: validAccent(input.accent), status: "PENDING", submittedAt: new Date(), reviewedAt: null,
+    },
+  });
+  await writeAudit({ actorId: user.id, action: "dashboard.template.submit", targetType: "dashboard_template", targetId: saved.id, metadata: { dashboardId: dashboard.id, widgets: widgets.length } });
+  revalidatePath(`/dashboards/${dashboard.id}`);
+  revalidatePath("/admin/dashboards");
+  return { ok: true, status: "PENDING" } as const;
 }
 
 export async function createDashboardAlert(input: {
@@ -83,7 +121,7 @@ export async function createDashboardAlert(input: {
   threshold: number;
 }) {
   const user = await getSessionUser();
-  if (!user || !can(user, "dashboards.manage")) return { error: "upgrade_required" } as const;
+  if (!user || !can(user, "dashboards.alerts")) return { error: "upgrade_required" } as const;
   const dashboard = await prisma.dashboard.findFirst({ where: { id: input.dashboardId, userId: user.id }, select: { id: true } });
   if (!dashboard) return { error: "not_found" } as const;
   const widgets = parseDashboardWidgets(input.layoutJson);
@@ -115,14 +153,13 @@ export async function createDashboardAlert(input: {
     return tx.alertRule.create({ data: { userId: user.id, dashboardId: dashboard.id, name: describeRule(shape), ...shape } });
   });
   await writeAudit({ actorId: user.id, action: "dashboard.alert.create", targetType: "alert_rule", targetId: rule.id, metadata: { dashboardId: dashboard.id, widgetId: widget.id } });
-  await evaluateRules();
   revalidatePath(`/dashboards/${dashboard.id}`);
   return { ok: true } as const;
 }
 
 export async function toggleDashboardAlert(dashboardId: string, ruleId: string) {
   const user = await getSessionUser();
-  if (!user || !can(user, "dashboards.manage")) return;
+  if (!user || !can(user, "dashboards.alerts")) return;
   const rule = await prisma.alertRule.findFirst({ where: { id: ruleId, dashboardId, userId: user.id }, select: { id: true, active: true } });
   if (!rule) return;
   await prisma.alertRule.update({ where: { id: rule.id }, data: { active: !rule.active } });
@@ -131,7 +168,7 @@ export async function toggleDashboardAlert(dashboardId: string, ruleId: string) 
 
 export async function deleteDashboardAlert(dashboardId: string, ruleId: string) {
   const user = await getSessionUser();
-  if (!user || !can(user, "dashboards.manage")) return;
+  if (!user || !can(user, "dashboards.alerts")) return;
   await prisma.alertRule.deleteMany({ where: { id: ruleId, dashboardId, userId: user.id } });
   revalidatePath(`/dashboards/${dashboardId}`);
 }

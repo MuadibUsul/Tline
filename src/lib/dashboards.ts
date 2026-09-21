@@ -204,3 +204,29 @@ export function validWallpaperUrl(value: string): string | null {
 export function validAccent(value: string): string {
   return /^#[0-9a-f]{6}$/i.test(value) ? value : "#9e7a42";
 }
+
+/** Grid snap first, then prefer nearby card edges/centres so layouts line up naturally. */
+export function snapDashboardPosition(moving: Pick<DashboardWidget, "id" | "x" | "y" | "w" | "h">, others: DashboardWidget[], threshold = 8) {
+  let x = Math.round(moving.x / 12) * 12;
+  let y = Math.round(moving.y / 12) * 12;
+  let guideX: number | null = null;
+  let guideY: number | null = null;
+  let bestX = threshold + 1;
+  let bestY = threshold + 1;
+  for (const other of others) {
+    if (other.id === moving.id) continue;
+    for (const target of [other.x, other.x + other.w / 2, other.x + other.w]) {
+      for (const offset of [0, moving.w / 2, moving.w]) {
+        const delta = target - (moving.x + offset);
+        if (Math.abs(delta) < bestX && Math.abs(delta) <= threshold) { bestX = Math.abs(delta); x = Math.round(moving.x + delta); guideX = target; }
+      }
+    }
+    for (const target of [other.y, other.y + other.h / 2, other.y + other.h]) {
+      for (const offset of [0, moving.h / 2, moving.h]) {
+        const delta = target - (moving.y + offset);
+        if (Math.abs(delta) < bestY && Math.abs(delta) <= threshold) { bestY = Math.abs(delta); y = Math.round(moving.y + delta); guideY = target; }
+      }
+    }
+  }
+  return { x, y, guideX, guideY };
+}

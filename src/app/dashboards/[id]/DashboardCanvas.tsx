@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardWidget, DashboardWidgetType } from "@/lib/dashboards";
-import { DASHBOARD_WALLPAPERS } from "@/lib/dashboards";
+import { DASHBOARD_WALLPAPERS, snapDashboardPosition } from "@/lib/dashboards";
 import type { DashboardWidgetData } from "@/lib/dashboardData";
-import { createDashboardAlert, deleteDashboardAlert, saveDashboard, toggleDashboardAlert } from "../actions";
+import { createDashboardAlert, deleteDashboardAlert, saveDashboard, submitDashboardTemplate, toggleDashboardAlert } from "../actions";
 
 type Choice = { key: string; label: string };
 type Rule = { id: string; name: string; active: boolean; lastFiredAt: string | null };
@@ -46,6 +46,8 @@ export default function DashboardCanvas(props: {
   institutions: Choice[];
   topics: Choice[];
   rules: Rule[];
+  canUseAlerts: boolean;
+  submission: { status: string; description: string; coverUrl: string | null } | null;
   locale: "en" | "zh-CN";
 }) {
   const zh = props.locale === "zh-CN";
@@ -63,6 +65,10 @@ export default function DashboardCanvas(props: {
   const [message, setMessage] = useState("");
   const [alertType, setAlertType] = useState("NEW_RESEARCH");
   const [threshold, setThreshold] = useState("0");
+  const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const [templateDescription, setTemplateDescription] = useState(props.submission?.description ?? "");
+  const [templateCover, setTemplateCover] = useState(props.submission?.coverUrl ?? "");
+  const [templateStatus, setTemplateStatus] = useState(props.submission?.status ?? "PRIVATE");
   const [pending, startTransition] = useTransition();
   const drag = useRef<Drag>(null);
   const selected = widgets.find((item) => item.id === selectedId) ?? null;
@@ -101,10 +107,15 @@ export default function DashboardCanvas(props: {
     const dx = (event.clientX - current.startX) / (current.mode === "pan" ? 1 : zoom);
     const dy = (event.clientY - current.startY) / (current.mode === "pan" ? 1 : zoom);
     if (current.mode === "pan") setOffset({ x: current.x + dx, y: current.y + dy });
-    else if (current.id && current.mode === "move") update(current.id, { x: Math.round(current.x + dx), y: Math.round(current.y + dy) });
-    else if (current.id) update(current.id, { w: Math.max(280, Math.round((current.w ?? 360) + dx)), h: Math.max(180, Math.round((current.h ?? 235) + dy)) });
+    else if (current.id && current.mode === "move") {
+      const item = widgets.find((widget) => widget.id === current.id);
+      if (!item) return;
+      const snapped = snapDashboardPosition({ ...item, x: current.x + dx, y: current.y + dy }, widgets);
+      setGuides({ x: snapped.guideX, y: snapped.guideY });
+      update(current.id, { x: snapped.x, y: snapped.y });
+    } else if (current.id) update(current.id, { w: Math.max(280, Math.round(((current.w ?? 360) + dx) / 12) * 12), h: Math.max(180, Math.round(((current.h ?? 235) + dy) / 12) * 12) });
   };
-  const endDrag = (event: ReactPointerEvent) => { drag.current = null; try { event.currentTarget.releasePointerCapture(event.pointerId); } catch {} };
+  const endDrag = (event: ReactPointerEvent) => { drag.current = null; setGuides({ x: null, y: null }); try { event.currentTarget.releasePointerCapture(event.pointerId); } catch {} };
 
   const save = () => startTransition(async () => {
     setMessage("");
@@ -119,10 +130,21 @@ export default function DashboardCanvas(props: {
     if ("ok" in result) router.refresh();
   });
 
-  const customBackground = wallpaperUrl.startsWith("https://") ? { backgroundImage: `linear-gradient(rgba(6,9,14,.72),rgba(6,9,14,.82)),url("${wallpaperUrl.replace(/["\\]/g, "")}")` } : {};
+  const publishTemplate = () => startTransition(async () => {
+    const result = await submitDashboardTemplate({ dashboardId: props.dashboard.id, name, description: templateDescription, coverUrl: templateCover, layoutJson: JSON.stringify(widgets), wallpaper, wallpaperUrl, accent });
+    if ("ok" in result) { setTemplateStatus(result.status ?? "PENDING"); setMessage(zh ? "已提交审核" : "Submitted for review"); }
+    else setMessage(String(result.error));
+  });
+
+  const customBackground = wallpaperUrl.startsWith("https://") ? {
+    backgroundImage: `linear-gradient(rgba(6,9,14,.72),rgba(6,9,14,.82)),url("${wallpaperUrl.replace(/["\\]/g, "")}")`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+  } : {};
 
   const startPan = (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.target !== event.currentTarget) return;
+    if (event.target !== event.currentTarget || drag.current) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = { mode: "pan", startX: event.clientX, startY: event.clientY, x: offset.x, y: offset.y };
     setSelectedId(null);
@@ -139,7 +161,8 @@ export default function DashboardCanvas(props: {
     <div className="dashboard-workspace">
       <div className={`dashboard-viewport wallpaper-${wallpaper}`} style={customBackground} onPointerDown={startPan} onPointerMove={move} onPointerUp={endDrag} onPointerCancel={endDrag}>
         <div className="dashboard-stage" style={{ transform: `translate3d(${offset.x}px,${offset.y}px,0) scale(${zoom})` }} onPointerDown={startPan}>
-          {widgets.map((widget) => <article className={`dashboard-card ${selectedId === widget.id ? "selected" : ""}`} key={widget.id} style={{ transform: `translate3d(${widget.x}px,${widget.y}px,0)`, width: widget.w, height: widget.h }} onPointerDown={(event) => { if ((event.target as HTMLElement).closest("a,button,input,select,textarea,.dashboard-resize")) return; event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { mode: "move", id: widget.id, startX: event.clientX, startY: event.clientY, x: widget.x, y: widget.y }; setSelectedId(widget.id); }} onPointerMove={move} onPointerUp={endDrag} onPointerCancel={endDrag} onClick={() => setSelectedId(widget.id)}>
+          {guides.x !== null && <i className="dashboard-guide vertical" style={{ left: guides.x }} />}{guides.y !== null && <i className="dashboard-guide horizontal" style={{ top: guides.y }} />}
+          {widgets.map((widget) => <article className={`dashboard-card ${selectedId === widget.id ? "selected" : ""}`} key={widget.id} style={{ transform: `translate3d(${widget.x}px,${widget.y}px,0)`, width: widget.w, height: widget.h }} onPointerDown={(event) => { if (drag.current || (event.target as HTMLElement).closest("a,button,input,select,textarea,.dashboard-resize")) return; event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { mode: "move", id: widget.id, startX: event.clientX, startY: event.clientY, x: widget.x, y: widget.y }; setSelectedId(widget.id); }} onPointerMove={move} onPointerUp={endDrag} onPointerCancel={endDrag} onClick={() => setSelectedId(widget.id)}>
             <div className="dashboard-card-head"><div><span>{widget.type}</span><h2>{widget.title}</h2></div><i title={l.live}>{widget.type === "note" || widget.type === "source" ? "" : l.live}</i></div>
             <div className="dashboard-card-body"><WidgetBody widget={widget} data={props.data[widget.id]} l={l} /></div>
             <button className="dashboard-resize" type="button" aria-label="Resize" onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { mode: "resize", id: widget.id, startX: event.clientX, startY: event.clientY, x: widget.x, y: widget.y, w: widget.w, h: widget.h }; setSelectedId(widget.id); }} onPointerMove={move} onPointerUp={endDrag}>⌟</button>
@@ -155,12 +178,14 @@ export default function DashboardCanvas(props: {
           {selected.type === "note" && <label><span>{l.text}</span><textarea value={selected.text ?? ""} maxLength={1000} onChange={(event) => update(selected.id, { text: event.target.value })} /></label>}
           {selected.type === "source" && <><label><span>URL</span><input value={selected.url ?? ""} onChange={(event) => update(selected.id, { url: event.target.value })} /></label><label><span>{l.text}</span><textarea value={selected.text ?? ""} onChange={(event) => update(selected.id, { text: event.target.value })} /></label></>}
           <button type="button" className="dashboard-remove" onClick={() => { setWidgets((current) => current.filter((item) => item.id !== selected.id)); setSelectedId(null); }}>{l.remove}</button>
-          {["market", "macro", "research"].includes(selected.type) && <div className="dashboard-alert-builder"><h3>{l.alert}</h3><select value={alertType} onChange={(event) => setAlertType(event.target.value)}>{selected.type === "market" && <><option value="NEW_RESEARCH">{zh ? "出现新研报" : "New research"}</option><option value="CONSENSUS_ABOVE">{zh ? "共识高于阈值" : "Consensus above"}</option><option value="CONSENSUS_BELOW">{zh ? "共识低于阈值" : "Consensus below"}</option></>}{selected.type === "macro" && <><option value="MACRO_RELEASE">{zh ? "数据发布" : "Data release"}</option><option value="MACRO_SURPRISE_ABOVE">{zh ? "高于预期" : "Positive surprise"}</option><option value="MACRO_SURPRISE_BELOW">{zh ? "低于预期" : "Negative surprise"}</option></>}{selected.type === "research" && <option value="NEW_RESEARCH">{zh ? "出现新研报" : "New research"}</option>}</select>{!["NEW_RESEARCH", "MACRO_RELEASE"].includes(alertType) && <label><span>{l.threshold}</span><input type="number" value={threshold} onChange={(event) => setThreshold(event.target.value)} /></label>}<button type="button" className="minibtn" onClick={createAlert} disabled={pending}>{l.createAlert}</button></div>}
+          {["market", "macro", "research"].includes(selected.type) && <div className="dashboard-alert-builder"><h3>{l.alert} {!props.canUseAlerts && <small>PRO</small>}</h3><select value={alertType} onChange={(event) => setAlertType(event.target.value)} disabled={!props.canUseAlerts}>{selected.type === "market" && <><option value="NEW_RESEARCH">{zh ? "出现新研报" : "New research"}</option><option value="CONSENSUS_ABOVE">{zh ? "共识高于阈值" : "Consensus above"}</option><option value="CONSENSUS_BELOW">{zh ? "共识低于阈值" : "Consensus below"}</option></>}{selected.type === "macro" && <><option value="MACRO_RELEASE">{zh ? "数据发布" : "Data release"}</option><option value="MACRO_SURPRISE_ABOVE">{zh ? "高于预期" : "Positive surprise"}</option><option value="MACRO_SURPRISE_BELOW">{zh ? "低于预期" : "Negative surprise"}</option></>}{selected.type === "research" && <option value="NEW_RESEARCH">{zh ? "出现新研报" : "New research"}</option>}</select>{!["NEW_RESEARCH", "MACRO_RELEASE"].includes(alertType) && <label><span>{l.threshold}</span><input type="number" value={threshold} onChange={(event) => setThreshold(event.target.value)} disabled={!props.canUseAlerts} /></label>}<button type="button" className="minibtn" onClick={createAlert} disabled={pending || !props.canUseAlerts}>{props.canUseAlerts ? l.createAlert : (zh ? "专业版提醒" : "Professional alerts")}</button></div>}
         </> : <p className="dashboard-inspector-empty">{zh ? "选择一张卡片进行编辑，拖动画布空白区域可平移。" : "Select a card to edit it. Drag empty canvas space to pan."}</p>}</section>
 
         <section><h2>{l.background}</h2><label><span>{zh ? "预设" : "Preset"}</span><select value={wallpaper} onChange={(event) => setWallpaper(event.target.value)}>{DASHBOARD_WALLPAPERS.map((item) => <option value={item} key={item}>{item}</option>)}</select></label><label><span>{l.customImage}</span><input type="url" value={wallpaperUrl} placeholder="https://…" onChange={(event) => setWallpaperUrl(event.target.value)} /></label><label><span>{zh ? "强调色" : "Accent"}</span><input type="color" value={accent} onChange={(event) => setAccent(event.target.value)} /></label></section>
 
-        <section><h2>{l.alerts} <small>{props.rules.length}</small></h2><div className="dashboard-rule-list">{props.rules.map((rule) => <div key={rule.id}><button type="button" className={rule.active ? "active" : ""} onClick={() => startTransition(async () => { await toggleDashboardAlert(props.dashboard.id, rule.id); router.refresh(); })}>{rule.active ? "●" : "○"}</button><p><b>{rule.name}</b><small>{rule.active ? l.active : l.inactive}{rule.lastFiredAt ? ` · ${rule.lastFiredAt.slice(0, 10)}` : ""}</small></p><button type="button" onClick={() => startTransition(async () => { await deleteDashboardAlert(props.dashboard.id, rule.id); router.refresh(); })}>×</button></div>)}</div></section>
+        <section><h2>{zh ? "发布模板" : "Publish template"}<small>{templateStatus === "PRIVATE" ? (zh ? "未投稿" : "Private") : templateStatus}</small></h2><label><span>{zh ? "模板介绍" : "Description"}</span><textarea value={templateDescription} maxLength={300} onChange={(event) => setTemplateDescription(event.target.value)} /></label><label><span>{zh ? "封面图片 URL（可选）" : "Cover image URL (optional)"}</span><input type="url" value={templateCover} placeholder="https://…" onChange={(event) => setTemplateCover(event.target.value)} /></label><button type="button" className="minibtn" onClick={publishTemplate} disabled={pending}>{templateStatus === "PENDING" ? (zh ? "更新并重新提交" : "Update submission") : (zh ? "提交运营审核" : "Submit for review")}</button></section>
+
+        {props.canUseAlerts && <section><h2>{l.alerts} <small>{props.rules.length}</small></h2><div className="dashboard-rule-list">{props.rules.map((rule) => <div key={rule.id}><button type="button" className={rule.active ? "active" : ""} onClick={() => startTransition(async () => { await toggleDashboardAlert(props.dashboard.id, rule.id); router.refresh(); })}>{rule.active ? "●" : "○"}</button><p><b>{rule.name}</b><small>{rule.active ? l.active : l.inactive}{rule.lastFiredAt ? ` · ${rule.lastFiredAt.slice(0, 10)}` : ""}</small></p><button type="button" onClick={() => startTransition(async () => { await deleteDashboardAlert(props.dashboard.id, rule.id); router.refresh(); })}>×</button></div>)}</div></section>}
       </aside>
     </div>
   </div>;

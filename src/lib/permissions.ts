@@ -5,6 +5,7 @@ export type PermissionAction =
   | "watchlist.manage"
   | "alerts.manage"
   | "dashboards.manage"
+  | "dashboards.alerts"
   | "api.use"
   // Console actions. `admin.access` is the door; the rest are the rooms behind it.
   | "admin.access"
@@ -73,6 +74,8 @@ export function can(user: PermissionUser | null, action: PermissionAction): bool
     case "alerts.manage":
       return user !== null;
     case "dashboards.manage":
+      return user !== null;
+    case "dashboards.alerts":
       return user?.tier === "professional" || user?.tier === "enterprise" || user?.tier === "founding";
     case "api.use":
       // Founding members hold the highest entitlement there is: the promise made to them is

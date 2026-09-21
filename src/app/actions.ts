@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { COOKIE, makeToken, getSessionUser, SESSION_COOKIE_OPTS } from "@/lib/auth";
-import { describeRule, evaluateRules } from "@/lib/alerts";
+import { describeRule } from "@/lib/alerts";
 import { writeAudit } from "@/lib/audit";
 import { trackServerEvent } from "@/lib/analytics/serverEvent";
 import { can } from "@/lib/permissions";
@@ -125,7 +125,6 @@ export async function createRule(fd: FormData) {
   }
   await writeAudit({ actorId: user!.id, action: "alert.create", targetType: "alert_rule", targetId: rule.id });
   trackServerEvent("alert.create", await headers(), { userId: user!.id, metadata: { type, scopeKind } });
-  await evaluateRules();
   revalidatePath("/watchlist");
 }
 

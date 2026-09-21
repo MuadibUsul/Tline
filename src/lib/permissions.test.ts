@@ -25,9 +25,10 @@ test("stateful user features still require a session", () => {
   assert.equal(can({ id: "u1", tier: "free" }, "watchlist.manage"), true);
   assert.equal(can({ id: "u1", tier: "free" }, "api.use"), false);
   assert.equal(can({ id: "u2", tier: "professional" }, "api.use"), true);
-  assert.equal(can({ id: "u1", tier: "free" }, "dashboards.manage"), false);
-  assert.equal(can({ id: "u2", tier: "professional" }, "dashboards.manage"), true);
-  assert.equal(can({ id: "u3", tier: "enterprise" }, "dashboards.manage"), true);
+  assert.equal(can({ id: "u1", tier: "free" }, "dashboards.manage"), true);
+  assert.equal(can({ id: "u1", tier: "free" }, "dashboards.alerts"), false);
+  assert.equal(can({ id: "u2", tier: "professional" }, "dashboards.alerts"), true);
+  assert.equal(can({ id: "u3", tier: "enterprise" }, "dashboards.alerts"), true);
 });
 
 test("a member never reaches the console", () => {

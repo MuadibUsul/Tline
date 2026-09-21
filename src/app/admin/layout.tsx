@@ -49,6 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         ...item("admin.sources", "/admin/sources", "Sources & crawler", "来源与采集"),
         ...item("admin.sources", "/admin/data", "Market & macro data", "行情与宏观数据"),
         ...item("admin.review", "/admin/review", "Editorial review", "内容审核"),
+        ...item("admin.review", "/admin/dashboards", "Dashboard templates", "看板模板"),
         ...item("admin.social", "/admin/social", "Publishing", "内容发布"),
         ...item("admin.review", "/admin/jobs", "Jobs & workers", "任务状态"),
       ],

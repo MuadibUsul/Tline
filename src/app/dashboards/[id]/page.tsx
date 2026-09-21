@@ -26,10 +26,11 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
   });
   if (!dashboard) notFound();
   const widgets = parseDashboardWidgets(dashboard.layoutJson);
-  const [data, assets, indicators] = await Promise.all([
+  const [data, assets, indicators, submission] = await Promise.all([
     loadDashboardWidgetData(widgets, locale),
     prisma.asset.findMany({ orderBy: { ticker: "asc" }, select: { ticker: true, name: true } }),
     prisma.macroIndicator.findMany({ where: { enabled: true }, orderBy: [{ countryCode: "asc" }, { nameEn: "asc" }], select: { canonicalKey: true, nameEn: true, nameZh: true } }),
+    prisma.dashboardTemplate.findUnique({ where: { sourceDashboardId: dashboard.id }, select: { status: true, description: true, coverUrl: true } }),
   ]);
 
   return (
@@ -44,6 +45,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
         institutions={taxonomy.institutions.map((item) => ({ key: item.key, label: locale === "zh-CN" ? item.nameZh : item.nameEn }))}
         topics={taxonomy.topics.map((item) => ({ key: item.key, label: locale === "zh-CN" ? item.nameZh : item.nameEn }))}
         rules={dashboard.rules.map((rule) => ({ id: rule.id, name: rule.name, active: rule.active, lastFiredAt: rule.events[0]?.firedAt.toISOString() ?? null }))}
+        canUseAlerts={can(user, "dashboards.alerts")}
+        submission={submission}
         locale={locale}
       />
     </main>

@@ -501,3 +501,10 @@
 .social-review-decision .admin-notice{flex-basis:100%;margin:0}
 
 .social-review-decision .admin-notice form{display:inline-block;margin:8px 0 0}
+.dashboard-template-admin{display:grid;gap:12px;margin-bottom:12px;padding:16px}
+.dashboard-template-admin .section-t{margin:0}
+.dashboard-template-admin label{display:grid;gap:5px}
+.dashboard-template-admin label>span{font:10px var(--mono);color:var(--muted)}
+.dashboard-template-admin input,.dashboard-template-admin select,.dashboard-template-admin textarea{box-sizing:border-box;width:100%;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--ink);padding:8px 9px}
+.dashboard-template-admin textarea{min-height:72px;resize:vertical}
+.dashboard-template-admin .minibtn{justify-self:start}

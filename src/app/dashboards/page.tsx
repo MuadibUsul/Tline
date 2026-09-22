@@ -28,10 +28,17 @@ export default async function DashboardsPage() {
 
   return (
     <main className="wrap dashboards-home">
-      <header className="page-head dashboard-home-head"><Link className="minibtn dashboard-plaza-link" href={localePath(locale, "/dashboards/explore")}>{tr(locale, "Dashboard plaza", "看板广场")} →</Link>
+      <header className="page-head dashboard-home-head">
         <div className="eyebrow">{tr(locale, "Community workspace", "社区工作台")}</div>
         <h1>{tr(locale, "Monitoring dashboards", "自定义监控看板")}</h1>
-        <p className="sub">{tr(locale, "Build a live desk for a central bank, macro theme or asset. Place data, research and alerts on one infinite canvas.", "围绕央行、宏观主题或具体品种搭建实时工作台，在一张无限画布上自由组合数据、研报与提醒。")}</p>
+        <div className="dashboard-home-intro">
+          <p className="sub">{tr(locale, "Build a live desk for a central bank, macro theme or asset. Place data, research and alerts on one infinite canvas.", "围绕央行、宏观主题或具体品种搭建实时工作台，在一张无限画布上自由组合数据、研报与提醒。")}</p>
+          <Link className="dashboard-plaza-cta" href={localePath(locale, "/dashboards/explore")}>
+            <span>{tr(locale, "Community", "社区精选")}</span>
+            <strong>{tr(locale, "Dashboard plaza", "看板广场")} <i>→</i></strong>
+            <small>{tr(locale, "Discover public dashboards", "发现并使用公开看板")}</small>
+          </Link>
+        </div>
         <div className="dashboard-feature-row">
           <span>{tr(locale, "Infinite canvas", "无限画布")}</span>
           <span>{tr(locale, "Live data cards", "实时数据卡片")}</span>

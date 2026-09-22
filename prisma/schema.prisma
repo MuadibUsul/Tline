@@ -1136,6 +1136,7 @@ model DashboardTemplate {
   coverUrl          String?
   status            String   @default("PENDING") // PENDING | APPROVED | REJECTED
   sortOrder         Int      @default(1000)
+  useCount          Int      @default(0)
   submittedAt       DateTime @default(now())
   reviewedAt        DateTime?
   createdAt         DateTime @default(now())
@@ -1145,6 +1146,18 @@ model DashboardTemplate {
 
   @@index([status, sortOrder])
   @@index([authorId, updatedAt])
+}
+
+model DashboardBackground {
+  id        String   @id @default(cuid())
+  name      String
+  imageUrl  String   @unique
+  enabled   Boolean  @default(true)
+  sortOrder Int      @default(1000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled, sortOrder])
 }
 
 model AlertEvent {

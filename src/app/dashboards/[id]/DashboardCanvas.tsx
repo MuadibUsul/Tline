@@ -6,15 +6,15 @@ import { useRouter } from "next/navigation";
 import type { DashboardWidget, DashboardWidgetType } from "@/lib/dashboards";
 import { DASHBOARD_WALLPAPERS, snapDashboardPosition } from "@/lib/dashboards";
 import type { DashboardWidgetData } from "@/lib/dashboardData";
-import { createDashboardAlert, deleteDashboardAlert, saveDashboard, submitDashboardTemplate, toggleDashboardAlert } from "../actions";
+import { createDashboardAlert, deleteDashboardAlert, generateDashboardLayout, saveDashboard, submitDashboardTemplate, toggleDashboardAlert } from "../actions";
 
 type Choice = { key: string; label: string };
 type Rule = { id: string; name: string; active: boolean; lastFiredAt: string | null };
 type Drag = { mode: "move" | "resize" | "pan"; id?: string; startX: number; startY: number; x: number; y: number; w?: number; h?: number } | null;
 
 const labels = {
-  en: { save: "Save", saved: "Saved", add: "Add card", market: "Market", macro: "Macro", research: "Research", note: "Note", source: "Source", settings: "Inspector", background: "Background", customImage: "Custom image URL", title: "Title", dataSource: "Data source", remove: "Remove card", alert: "Alert", createAlert: "Create alert", alerts: "Dashboard alerts", inactive: "Paused", empty: "No data yet", zoomReset: "Reset view", loading: "Saving…", live: "LIVE", open: "Open source", latest: "Latest", previous: "Previous", threshold: "Threshold", scope: "Research scope", text: "Content", active: "Active" },
-  zh: { save: "保存", saved: "已保存", add: "添加卡片", market: "行情", macro: "宏观指标", research: "研报", note: "笔记", source: "外部来源", settings: "卡片设置", background: "背景", customImage: "自定义图片 URL", title: "标题", dataSource: "数据源", remove: "删除卡片", alert: "提醒", createAlert: "创建提醒", alerts: "看板提醒", inactive: "已暂停", empty: "暂无数据", zoomReset: "复位画布", loading: "保存中…", live: "实时", open: "打开来源", latest: "最新", previous: "前值", threshold: "阈值", scope: "研报范围", text: "内容", active: "启用中" },
+  en: { save: "Save", saved: "Saved", add: "Add card", market: "Market", macro: "Macro", research: "Research", note: "Note", source: "Source", settings: "Inspector", background: "Background", backgroundLibrary: "Background library", customImage: "Custom image URL", title: "Title", dataSource: "Data source", remove: "Remove card", alert: "Alert", createAlert: "Create alert", alerts: "Dashboard alerts", inactive: "Paused", empty: "No data yet", zoomReset: "Reset view", loading: "Saving…", live: "LIVE", open: "Open source", latest: "Latest", previous: "Previous", threshold: "Threshold", scope: "Research scope", text: "Content", active: "Active", ai: "AI find & arrange", aiHint: "Describe what you want to monitor. AI will only use supported live data and research sources.", generate: "Build dashboard" },
+  zh: { save: "保存", saved: "已保存", add: "添加卡片", market: "行情", macro: "宏观指标", research: "研报", note: "笔记", source: "外部来源", settings: "卡片设置", background: "背景", backgroundLibrary: "通用背景库", customImage: "自定义图片 URL", title: "标题", dataSource: "数据源", remove: "删除卡片", alert: "提醒", createAlert: "创建提醒", alerts: "看板提醒", inactive: "已暂停", empty: "暂无数据", zoomReset: "复位画布", loading: "保存中…", live: "实时", open: "打开来源", latest: "最新", previous: "前值", threshold: "阈值", scope: "研报范围", text: "内容", active: "启用中", ai: "AI 帮你找", aiHint: "说出你想监控什么，AI 只会从系统已支持的实时数据和研报来源中选择并自动排布。", generate: "生成看板" },
 } as const;
 
 function Sparkline({ points }: { points?: Array<{ label: string; value: number }> }) {
@@ -46,6 +46,7 @@ export default function DashboardCanvas(props: {
   institutions: Choice[];
   topics: Choice[];
   rules: Rule[];
+  backgrounds: Array<{ id: string; name: string; imageUrl: string }>;
   canUseAlerts: boolean;
   submission: { status: string; description: string; coverUrl: string | null } | null;
   locale: "en" | "zh-CN";
@@ -69,6 +70,8 @@ export default function DashboardCanvas(props: {
   const [templateDescription, setTemplateDescription] = useState(props.submission?.description ?? "");
   const [templateCover, setTemplateCover] = useState(props.submission?.coverUrl ?? "");
   const [templateStatus, setTemplateStatus] = useState(props.submission?.status ?? "PRIVATE");
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
   const [pending, startTransition] = useTransition();
   const drag = useRef<Drag>(null);
   const selected = widgets.find((item) => item.id === selectedId) ?? null;
@@ -131,9 +134,22 @@ export default function DashboardCanvas(props: {
   });
 
   const publishTemplate = () => startTransition(async () => {
-    const result = await submitDashboardTemplate({ dashboardId: props.dashboard.id, name, description: templateDescription, coverUrl: templateCover, layoutJson: JSON.stringify(widgets), wallpaper, wallpaperUrl, accent });
+    const result = await submitDashboardTemplate({ dashboardId: props.dashboard.id, name, description: templateDescription, coverUrl: templateCover, layoutJson: JSON.stringify(widgets), accent });
     if ("ok" in result) { setTemplateStatus(result.status ?? "PENDING"); setMessage(zh ? "已提交审核" : "Submitted for review"); }
     else setMessage(String(result.error));
+  });
+
+  const generateWithAI = () => startTransition(async () => {
+    setMessage("");
+    const result = await generateDashboardLayout({ dashboardId: props.dashboard.id, prompt: aiPrompt, locale: props.locale });
+    if ("ok" in result && result.ok && result.widgets) {
+      setWidgets(result.widgets);
+      if (result.name) setName(result.name);
+      setSelectedId(result.widgets[0]?.id ?? null);
+      setMessage(result.usedAI ? (zh ? "AI 已生成并保存" : "AI layout generated and saved") : (zh ? "已按可用数据生成并保存" : "Built from supported data and saved"));
+      setAiOpen(false);
+      router.refresh();
+    } else setMessage(result.error === "ai_unavailable" ? (zh ? "AI 暂不可用，且未找到匹配数据" : "AI is unavailable and no matching data was found") : result.error === "no_supported_sources" ? (zh ? "没有找到可用的数据源，请换一种描述" : "No supported sources matched. Try another description.") : String(result.error));
   });
 
   const customBackground = wallpaperUrl.startsWith("https://") ? {
@@ -153,7 +169,7 @@ export default function DashboardCanvas(props: {
   return <div className="dashboard-shell" style={{ "--dashboard-accent": accent } as CSSProperties}>
     <header className="dashboard-toolbar">
       <input className="dashboard-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-label={l.title} />
-      <div className="dashboard-toolbar-group"><select value={addType} onChange={(event) => setAddType(event.target.value as DashboardWidgetType)} aria-label={l.add}>{(["market", "macro", "research", "note", "source"] as DashboardWidgetType[]).map((type) => <option value={type} key={type}>{l[type]}</option>)}</select><button type="button" className="minibtn" onClick={addWidget}>＋ {l.add}</button></div>
+      <div className="dashboard-toolbar-group"><select value={addType} onChange={(event) => setAddType(event.target.value as DashboardWidgetType)} aria-label={l.add}>{(["market", "macro", "research", "note", "source"] as DashboardWidgetType[]).map((type) => <option value={type} key={type}>{l[type]}</option>)}</select><button type="button" className="minibtn" onClick={addWidget}>＋ {l.add}</button><button type="button" className="minibtn dashboard-ai-button" onClick={() => setAiOpen((value) => !value)}>✦ {l.ai}</button></div>
       <div className="dashboard-toolbar-group dashboard-zoom"><button type="button" onClick={() => setZoom((value) => Math.max(.45, value - .1))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" onClick={() => setZoom((value) => Math.min(1.5, value + .1))}>＋</button><button type="button" onClick={() => { setOffset({ x: 24, y: 24 }); setZoom(.9); }}>{l.zoomReset}</button></div>
       <button type="button" className="minibtn p dashboard-save" onClick={save} disabled={pending}>{pending ? l.loading : l.save}</button>{message && <span className="dashboard-save-state" role="status">{message}</span>}
     </header>
@@ -171,6 +187,7 @@ export default function DashboardCanvas(props: {
       </div>
 
       <aside className="dashboard-inspector">
+        {aiOpen && <section className="dashboard-ai-panel"><h2>✦ {l.ai}</h2><p>{l.aiHint}</p><textarea value={aiPrompt} maxLength={600} autoFocus placeholder={zh ? "例如：帮我监控美联储降息、美国通胀、就业和黄金的联动" : "Example: Monitor Fed cuts, U.S. inflation, employment and gold"} onChange={(event) => setAiPrompt(event.target.value)} /><button type="button" className="minibtn p" onClick={generateWithAI} disabled={pending || aiPrompt.trim().length < 4}>{pending ? l.loading : l.generate}</button></section>}
         <section><h2>{l.settings}</h2>{selected ? <>
           <label><span>{l.title}</span><input value={selected.title} maxLength={100} onChange={(event) => update(selected.id, { title: event.target.value })} /></label>
           {selected.type === "research" && <label><span>{l.scope}</span><select value={selected.scopeKind ?? "asset"} onChange={(event) => { const scopeKind = event.target.value as "asset" | "institution" | "topic"; const choices = scopeKind === "institution" ? props.institutions : scopeKind === "topic" ? props.topics : props.assets.map((asset) => ({ key: asset.ticker, label: asset.name })); update(selected.id, { scopeKind, ref: choices[0]?.key }); }}><option value="asset">{zh ? "资产" : "Asset"}</option><option value="institution">{zh ? "机构" : "Institution"}</option><option value="topic">{zh ? "主题" : "Topic"}</option></select></label>}
@@ -181,7 +198,7 @@ export default function DashboardCanvas(props: {
           {["market", "macro", "research"].includes(selected.type) && <div className="dashboard-alert-builder"><h3>{l.alert} {!props.canUseAlerts && <small>PRO</small>}</h3><select value={alertType} onChange={(event) => setAlertType(event.target.value)} disabled={!props.canUseAlerts}>{selected.type === "market" && <><option value="NEW_RESEARCH">{zh ? "出现新研报" : "New research"}</option><option value="CONSENSUS_ABOVE">{zh ? "共识高于阈值" : "Consensus above"}</option><option value="CONSENSUS_BELOW">{zh ? "共识低于阈值" : "Consensus below"}</option></>}{selected.type === "macro" && <><option value="MACRO_RELEASE">{zh ? "数据发布" : "Data release"}</option><option value="MACRO_SURPRISE_ABOVE">{zh ? "高于预期" : "Positive surprise"}</option><option value="MACRO_SURPRISE_BELOW">{zh ? "低于预期" : "Negative surprise"}</option></>}{selected.type === "research" && <option value="NEW_RESEARCH">{zh ? "出现新研报" : "New research"}</option>}</select>{!["NEW_RESEARCH", "MACRO_RELEASE"].includes(alertType) && <label><span>{l.threshold}</span><input type="number" value={threshold} onChange={(event) => setThreshold(event.target.value)} disabled={!props.canUseAlerts} /></label>}<button type="button" className="minibtn" onClick={createAlert} disabled={pending || !props.canUseAlerts}>{props.canUseAlerts ? l.createAlert : (zh ? "专业版提醒" : "Professional alerts")}</button></div>}
         </> : <p className="dashboard-inspector-empty">{zh ? "选择一张卡片进行编辑，拖动画布空白区域可平移。" : "Select a card to edit it. Drag empty canvas space to pan."}</p>}</section>
 
-        <section><h2>{l.background}</h2><label><span>{zh ? "预设" : "Preset"}</span><select value={wallpaper} onChange={(event) => setWallpaper(event.target.value)}>{DASHBOARD_WALLPAPERS.map((item) => <option value={item} key={item}>{item}</option>)}</select></label><label><span>{l.customImage}</span><input type="url" value={wallpaperUrl} placeholder="https://…" onChange={(event) => setWallpaperUrl(event.target.value)} /></label><label><span>{zh ? "强调色" : "Accent"}</span><input type="color" value={accent} onChange={(event) => setAccent(event.target.value)} /></label></section>
+        <section><h2>{l.background}</h2><label><span>{zh ? "样式" : "Style"}</span><select value={wallpaper} onChange={(event) => setWallpaper(event.target.value)}>{DASHBOARD_WALLPAPERS.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>{props.backgrounds.length > 0 && <label><span>{l.backgroundLibrary}</span><select value={props.backgrounds.some((item) => item.imageUrl === wallpaperUrl) ? wallpaperUrl : ""} onChange={(event) => setWallpaperUrl(event.target.value)}><option value="">{zh ? "不使用图片" : "No image"}</option>{props.backgrounds.map((item) => <option value={item.imageUrl} key={item.id}>{item.name}</option>)}</select></label>}<label><span>{l.customImage}</span><input type="url" value={wallpaperUrl} placeholder="https://…" onChange={(event) => setWallpaperUrl(event.target.value)} /></label><label><span>{zh ? "强调色" : "Accent"}</span><input type="color" value={accent} onChange={(event) => setAccent(event.target.value)} /></label></section>
 
         <section><h2>{zh ? "发布模板" : "Publish template"}<small>{templateStatus === "PRIVATE" ? (zh ? "未投稿" : "Private") : templateStatus}</small></h2><label><span>{zh ? "模板介绍" : "Description"}</span><textarea value={templateDescription} maxLength={300} onChange={(event) => setTemplateDescription(event.target.value)} /></label><label><span>{zh ? "封面图片 URL（可选）" : "Cover image URL (optional)"}</span><input type="url" value={templateCover} placeholder="https://…" onChange={(event) => setTemplateCover(event.target.value)} /></label><button type="button" className="minibtn" onClick={publishTemplate} disabled={pending}>{templateStatus === "PENDING" ? (zh ? "更新并重新提交" : "Update submission") : (zh ? "提交运营审核" : "Submit for review")}</button></section>
 

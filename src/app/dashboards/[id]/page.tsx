@@ -26,16 +26,17 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
   });
   if (!dashboard) notFound();
   const widgets = parseDashboardWidgets(dashboard.layoutJson);
-  const [data, assets, indicators, submission] = await Promise.all([
+  const [data, assets, indicators, submission, backgrounds] = await Promise.all([
     loadDashboardWidgetData(widgets, locale),
     prisma.asset.findMany({ orderBy: { ticker: "asc" }, select: { ticker: true, name: true } }),
     prisma.macroIndicator.findMany({ where: { enabled: true }, orderBy: [{ countryCode: "asc" }, { nameEn: "asc" }], select: { canonicalKey: true, nameEn: true, nameZh: true } }),
     prisma.dashboardTemplate.findUnique({ where: { sourceDashboardId: dashboard.id }, select: { status: true, description: true, coverUrl: true } }),
+    prisma.dashboardBackground.findMany({ where: { enabled: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true, imageUrl: true } }),
   ]);
 
   return (
     <main className="dashboard-page">
-      <div className="dashboard-breadcrumb"><Link href={localePath(locale, "/dashboards")}>← {tr(locale, "All dashboards", "全部看板")}</Link><span>{dashboard.templateKey ?? tr(locale, "Custom", "自定义")}</span></div>
+      <div className="dashboard-breadcrumb"><Link href={localePath(locale, "/dashboards")}>← {tr(locale, "All dashboards", "全部看板")}</Link><span><Link href={localePath(locale, "/dashboards/explore")}>{tr(locale, "Dashboard plaza", "看板广场")}</Link> · {dashboard.templateKey ?? tr(locale, "Custom", "自定义")}</span></div>
       <DashboardCanvas
         dashboard={{ id: dashboard.id, name: dashboard.name, wallpaper: dashboard.wallpaper, wallpaperUrl: dashboard.wallpaperUrl ?? "", accent: dashboard.accent }}
         initialWidgets={widgets}
@@ -45,6 +46,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
         institutions={taxonomy.institutions.map((item) => ({ key: item.key, label: locale === "zh-CN" ? item.nameZh : item.nameEn }))}
         topics={taxonomy.topics.map((item) => ({ key: item.key, label: locale === "zh-CN" ? item.nameZh : item.nameEn }))}
         rules={dashboard.rules.map((rule) => ({ id: rule.id, name: rule.name, active: rule.active, lastFiredAt: rule.events[0]?.firedAt.toISOString() ?? null }))}
+        backgrounds={backgrounds}
         canUseAlerts={can(user, "dashboards.alerts")}
         submission={submission}
         locale={locale}

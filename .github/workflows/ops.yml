@@ -3,10 +3,13 @@
 # Enrolment and password recovery both go through email. When the mail service fails,
 # the only way back into an account is a command on the server — which is exactly what
 # an operator who is locked out may have no way to run. This exposes the two commands
-# that resolve that, using the SSH credentials the deployment already holds, so they can
-# be triggered from a browser. The same door also runs occasional data-maintenance
+# that resolve that from a browser. The same door also runs occasional data-maintenance
 # commands that need the production database (e.g. dedupe-regional), which are dry-run
 # unless their apply box is checked.
+#
+# Runs on the same self-hosted runner as the release, so it needs no SSH credential and
+# keeps working while the account's hosted Actions minutes are blocked on billing — the
+# exact situation a locked-out operator running set-password is likely to be in.
 #
 # Deliberately narrow: a fixed set of actions, no free-form command, manual trigger only.
 name: Operations
@@ -47,7 +50,7 @@ concurrency:
 
 jobs:
   run:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, tline]
     # Inherits whatever protection rules the production environment carries, so this is
     # never a weaker door into the host than a deployment is.
     environment: production
@@ -67,19 +70,15 @@ jobs:
           echo "Address accepted."
 
       - name: Run on the production host
-        uses: appleboy/ssh-action@v1
         env:
           ACTION: ${{ inputs.action }}
           EMAIL: ${{ inputs.email }}
           APPLY: ${{ inputs.apply }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          envs: ACTION,EMAIL,APPLY
-          script: |
+        run: |
             set -eu
-            cd ~/tline
+            # The runner runs on the host, in the docker and deploy groups, so it reaches the
+            # running stack directly — no SSH. APP_DIR holds the compose files and .env.
+            cd /home/deploy/tline
             COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 
             case "$ACTION" in

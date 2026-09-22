@@ -43,6 +43,56 @@ Health: `GET /api/health` returns `200` only when the database responds and the 
 
 **The detailed body is gated.** Anonymous callers — including the container healthcheck and any uptime probe — receive `{ "status": "ok" | "degraded" }` and nothing else, because job errors, provider names and sync states describe internal infrastructure. Crawlable-source status, latest ingest metadata, Macro job freshness and provider/release-watcher sync states are returned only to an admin session, or to a caller presenting `Authorization: Bearer $HEALTH_DETAIL_TOKEN`. The gate also keeps the anonymous path down to three cheap queries instead of ten.
 
+## Release runner (self-hosted)
+
+CI and release run on a self-hosted GitHub Actions runner on the production host, not on
+GitHub's machines. Every private repository on the account shares one metered pool of Actions
+minutes and this project was the largest consumer of it — it built a 4.8 GB image on a hosted
+runner, pushed it to GHCR, then pulled it back onto the host — so the pool ran out and, with
+it, deploys stopped. A self-hosted runner's minutes are neither metered nor charged, so moving
+the pipeline onto the host both removes the registry from the loop and keeps releases working
+even while the account's hosted minutes are blocked on billing. `.github/workflows/ci.yml`
+(`verify`) and `.github/workflows/deploy.yml` (`release`) both target `runs-on: [self-hosted,
+tline]`; only `ops.yml`, triggered by hand, still uses a hosted runner.
+
+The runner is a dedicated, otherwise-unprivileged user that needs exactly two group
+memberships, both of which the workflows depend on:
+
+- `docker` — `release` runs `docker build`, `docker compose` and `docker image` directly on
+  the host. Membership in `docker` is root-equivalent (the socket), so this user does nothing
+  else.
+- `deploy` — the group that owns `APP_DIR` (`/home/deploy/tline`). `release` writes the
+  release `.env` there and installs the two compose files from the commit by renaming into the
+  directory, which needs group write on the directory (not the files). Keep the directory
+  `chmod 775` and `chgrp deploy`; the workflow pins the compose files to mode `664` itself.
+
+Register it once from the repository (**Settings → Actions → Runners → New self-hosted
+runner** issues the token, which only an admin can read):
+
+```bash
+sudo -u gha-runner -H bash -lc '
+  cd ~ && mkdir -p actions-runner && cd actions-runner
+  curl -fsSL -o runner.tar.gz https://github.com/actions/runner/releases/latest/download/actions-runner-linux-x64.tar.gz
+  tar xzf runner.tar.gz
+  ./config.sh --url https://github.com/MuadibUsul/Tline --token <RUNNER_TOKEN> --labels tline --name tline-vps --unattended
+'
+sudo ./actions-runner/svc.sh install gha-runner   # run as the runner user, start on boot
+sudo ./actions-runner/svc.sh start
+```
+
+Node 22 is provided per-job by `actions/setup-node`, so the host needs only `git`, `docker`,
+`curl` and `tar`. Confirm health with `gh api repos/MuadibUsul/Tline/actions/runners` — the row
+should read `online` with labels including `tline`. If the runner is offline, `push` to `main`
+and every pull request queue against it until its `timeout-minutes` elapses rather than
+failing fast, so treat an offline runner as a release outage.
+
+**Security boundary.** `ci.yml` also runs on `pull_request`, so a pull request executes branch
+code (including `npm ci` lifecycle scripts) on the production host as the runner user. This is
+acceptable only because the repository is private and every account that can open a pull
+request already has write access; do not add a less-trusted collaborator without first moving
+`pull_request` CI off this runner. GitHub's own guidance is to never attach a self-hosted
+runner to a public repository.
+
 ## Alert delivery
 
 Fired alerts are POSTed as JSON to the rule owner's webhook (`/watchlist` → Alert delivery),

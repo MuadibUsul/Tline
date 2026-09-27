@@ -7,10 +7,14 @@ import { can } from "@/lib/permissions";
 import { generatedAvatar } from "@/lib/avatar";
 import { parseDashboardWidgets } from "@/lib/dashboards";
 import { getLocale, localePath, tr } from "@/lib/i18n";
+import { noIndex } from "@/lib/seo";
 import { createDashboard } from "../actions";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Dashboard plaza" };
+// The plaza itself is public, but every dashboard behind it is a private workspace and the
+// parent `/dashboards` is already `noIndex`; a community listing that changes with each
+// publication has nothing stable to rank, so it stays out of the index too.
+export const metadata: Metadata = { title: "Dashboard plaza", ...noIndex };
 
 export default async function DashboardExplorePage() {
   const locale = await getLocale();

@@ -32,6 +32,27 @@ const UNIT_LABELS: Record<string, { en: string; zh: string }> = {
 };
 
 /** Human-readable unit label, e.g. "THOUSANDS_OF_PERSONS" → "千人" / "K persons". */
+/**
+ * A release cadence in the reader's language.
+ *
+ * The stored value is an enum key. It reached a Chinese description as "按MONTHLY发布", and
+ * the same key is printed in the page's own metadata line.
+ */
+const FREQUENCY_LABELS: Record<string, { en: string; zh: string }> = {
+  DAILY: { en: "daily", zh: "每日" },
+  WEEKLY: { en: "weekly", zh: "每周" },
+  MONTHLY: { en: "monthly", zh: "每月" },
+  QUARTERLY: { en: "quarterly", zh: "每季度" },
+  ANNUAL: { en: "annual", zh: "每年" },
+  EVENT: { en: "as scheduled", zh: "不定期" },
+};
+
+export function frequencyLabel(frequency: string, locale: Locale) {
+  const mapped = FREQUENCY_LABELS[frequency.toUpperCase()];
+  if (mapped) return locale === "zh-CN" ? mapped.zh : mapped.en;
+  return frequency.replace(/_/g, " ").toLowerCase();
+}
+
 export function unitLabel(unit: string, locale: Locale) {
   const mapped = UNIT_LABELS[unit.toUpperCase()];
   if (mapped) return locale === "zh-CN" ? mapped.zh : mapped.en;

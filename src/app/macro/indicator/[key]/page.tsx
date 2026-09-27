@@ -2,29 +2,49 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { formatDate, getLocale, tr, localePath } from "@/lib/i18n";
-import { beijingDateTime, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
+import { formatDate, getLocale, tr, localePath, type Locale } from "@/lib/i18n";
+import { beijingDateTime, frequencyLabel, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
 import IndicatorChart from "./IndicatorChart";
-import { canonical } from "@/lib/seo";
+import { JsonLd, breadcrumbJsonLd, canonical, datasetJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+interface IndicatorFacts { nameEn: string; nameZh: string | null; unit: string; frequency: string; countryCode: string }
+
+/**
+ * The sentence a result shows under the title, and the one the page's Dataset carries.
+ *
+ * The cadence and the unit are what distinguishes one indicator page from another; without
+ * them every page in the family carried the same sentence with a substituted name. The
+ * Chinese side also used half-width ":" and "," between Chinese characters, which is a
+ * different glyph from the full-width one a Chinese page sets.
+ */
+function indicatorDescription(locale: Locale, indicator: IndicatorFacts) {
+  const name = locale === "zh-CN" ? indicator.nameZh ?? indicator.nameEn : indicator.nameEn;
+  // `frequency` and `unit` are stored as enum keys. Printing them raw put "按MONTHLY发布，单位为
+  // THOUSANDS_OF_PERSONS" in a Chinese description, so both go through the same localizers the
+  // page body uses.
+  const frequency = frequencyLabel(indicator.frequency, locale);
+  const unit = unitLabel(indicator.unit, locale);
+  return tr(
+    locale,
+    `${name} (${indicator.countryCode}): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported ${frequency}, in ${unit}.`,
+    `${name}（${indicator.countryCode}）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按${frequency}发布，单位为${unit}。`,
+  );
+}
 
 export async function generateMetadata(props: { params: Promise<{ key: string }> }): Promise<Metadata> {
   const { key } = await props.params;
   const locale = await getLocale();
   const indicator = await prisma.macroIndicator.findUnique({
     where: { canonicalKey: key },
-    select: { nameEn: true, nameZh: true },
+    select: { nameEn: true, nameZh: true, unit: true, frequency: true, countryCode: true },
   });
   if (!indicator) return { title: tr(locale, "Indicator not found", "指标未找到") };
   const name = locale === "zh-CN" ? indicator.nameZh ?? indicator.nameEn : indicator.nameEn;
   return {
     title: name,
-    description: tr(
-      locale,
-      `${name}: the released series, each revision, and what institutions forecast before it landed.`,
-      `${name}:历史发布序列、每次修订,以及发布前各机构的预测。`,
-    ),
+    description: indicatorDescription(locale, indicator),
     ...canonical(`/macro/indicator/${key}`, locale),
   };
 }
@@ -93,6 +113,26 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
 
   return (
     <main className="wrap">
+      {/*
+        The page is a data series with a release history, and it carried no structured data at
+        all: a crawler saw the numbers but nothing that said what they were, who published them
+        or how often they change. The Dataset names the series and dates its last revision; the
+        breadcrumb is the trail back to the hub that lists it.
+      */}
+      <JsonLd data={breadcrumbJsonLd(locale, [
+        { name: tr(locale, "Economic data", "经济数据"), path: "/macro" },
+        { name: nm(indicator.nameEn, indicator.nameZh), path: `/macro/indicator/${indicator.canonicalKey}` },
+      ])} />
+      <JsonLd data={datasetJsonLd(
+        locale,
+        `/macro/indicator/${indicator.canonicalKey}`,
+        nm(indicator.nameEn, indicator.nameZh),
+        indicatorDescription(locale, indicator),
+        latest?.period,
+      )} />
+      <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")}>
+        <Link href={localePath(locale, "/macro")}>{tr(locale, "Economic data", "经济数据")}</Link><span>›</span><span>{nm(indicator.nameEn, indicator.nameZh)}</span>
+      </nav>
       <div className="page-head">
         <div className="eyebrow">{indicator.countryCode} · {indicator.category}</div>
         <h1>{nm(indicator.nameEn, indicator.nameZh)}</h1>
@@ -102,7 +142,7 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
           {change !== null && <span className={`macro-change ${up ? "up" : "down"}`}>{change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}</span>}
         </div>
         <div className="deltas">
-          <span>{tr(locale, "Frequency", "频率")}: {indicator.frequency}</span>
+          <span>{tr(locale, "Frequency", "频率")}: {frequencyLabel(indicator.frequency, locale)}</span>
           <span>{tr(locale, "Seasonal adjustment", "季节调整")}: {indicator.seasonalAdjustment ?? "N/A"}</span>
           <span>{tr(locale, "Updated", "更新")}: {latest ? formatDate(latest.period, locale) : "N/A"}</span>
           {nextRelease && <span>{tr(locale, "Next release", "下次发布")}: {beijingDateTime(nextRelease.scheduledAt, locale)} ({tr(locale, "Beijing", "北京时间")})</span>}
@@ -120,7 +160,7 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
             <Stat label={tr(locale, "12-period high", "近12期高")} value={high !== null ? `${high}` : "—"} />
             <Stat label={tr(locale, "12-period low", "近12期低")} value={low !== null ? `${low}` : "—"} />
             <Stat label={tr(locale, "Unit", "单位")} value={unitLabel(indicator.unit, locale)} />
-            <Stat label={tr(locale, "Frequency", "频率")} value={indicator.frequency} />
+            <Stat label={tr(locale, "Frequency", "频率")} value={frequencyLabel(indicator.frequency, locale)} />
           </div>
         </section>
       )}

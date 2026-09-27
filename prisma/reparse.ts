@@ -5,7 +5,6 @@ import { ANALYSIS_PROMPT_VERSION, parseArticle } from "../src/lib/ingest/parseLL
 import { syncForecastsForArticle } from "../src/lib/forecast";
 import { MAX_FAILURES, clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
 import { anyProviderConfigured } from "../src/lib/llm/config";
-import { queueRetry } from "../src/lib/contentRetry";
 import { classifyDeterministically } from "../src/lib/classification/classifier";
 import { discoverArticleClassification } from "../src/lib/classification/discovery";
 import { articleClassificationSourceFingerprint, persistDeterministicClassification } from "../src/lib/classification/store";
@@ -55,6 +54,10 @@ async function main() {
   const candidates = await prisma.article.findMany({
     where: {
       rawText: { not: null },
+      // A withdrawn report is not public, so spending a model call on it buys nothing.
+      // Operator-named ids are still honoured: restoring a report usually means working on
+      // it, and silently refusing the id that was asked for is worse than the token.
+      ...(articleIds.length ? {} : { withdrawnAt: null }),
       ...(articleIds.length ? { id: { in: articleIds } } : {}),
       ...(selection.length ? { AND: selection } : {}),
     },
@@ -237,7 +240,9 @@ async function main() {
        * output and asked for it again.
        */
       if (parsed.reviewStatus === "needs_review") {
-        await queueRetry(article.id, "analysis");
+        // The ladder below is the automatic retry path, and it ends in abandonment. The
+        // operator queue is not fed from here: a pipeline that re-queues its own failures
+        // re-runs them as fast as the queue drains, which is not a retry but a loop.
         const failures = await recordFailure(article.id, "analysis");
         console.log(`  HOLD (${failures}/${MAX_FAILURES}) ${article.id} · ${article.title}`);
       } else {

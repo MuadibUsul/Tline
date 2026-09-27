@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
+import { macroProviderFactories } from "./providers";
 import { macroIndicators, macroSources } from "./registry";
 
 export type AuditSeverity = "info" | "warning" | "severe";
@@ -20,7 +21,18 @@ export function valuesMateriallyDisagree(values: Prisma.Decimal[], tolerance = n
 }
 
 const staleDays: Record<string, number> = { DAILY: 10, WEEKLY: 28, MONTHLY: 75, QUARTERLY: 180, ANNUAL: 550, EVENT: 550 };
-const knownProviders = new Set(["bls", "bea", "fred", "eia", "eurostat", "ecb"]);
+/**
+ * The provider registry is the only list of names that exist, so the audit reads it instead
+ * of keeping its own copy.
+ *
+ * It kept its own copy, and the copy fell behind: `eia-wpsr` and `fomc-statement` were added
+ * to the registry and to `sources.json` without a matching edit here, so a healthy database
+ * reported three `UNKNOWN_PROVIDER` issues at `severe` severity on every run. `macro:audit`
+ * exits non-zero when it sees a severe issue, which turned the command into one that always
+ * fails — and an always-failing check is one nobody reads, so the integrity problems it
+ * exists to surface would arrive silently.
+ */
+const knownProviders = new Set(Object.keys(macroProviderFactories));
 
 export async function auditMacroData(now = new Date()): Promise<MacroAuditReport> {
   const [sources, observations, releases, releaseValues] = await Promise.all([
@@ -68,8 +80,20 @@ export async function auditMacroData(now = new Date()): Promise<MacroAuditReport
 
   for (const value of releaseValues) {
     const primaryIds = value.indicator.seriesSources.map((source) => source.id);
-    const initial = observations.find((item) => primaryIds.includes(item.seriesSourceId) && item.period.getTime() === value.observationPeriod.getTime() && item.isInitial);
-    if (value.actualInitial !== null && initial && value.actualInitial.comparedTo(initial.value) !== 0) add("RELEASE_ACTUAL_MISMATCH", "severe", "Release actual differs from the stored initial observation.", "release_value", value.id, { observationId: initial.id });
+    const samePeriod = observations.filter((item) => primaryIds.includes(item.seriesSourceId) && item.period.getTime() === value.observationPeriod.getTime() && item.isInitial);
+    /**
+     * A captured actual is supported when *any* of the indicator's sources holds that initial
+     * observation for that period — the same reading the look-ahead check below uses.
+     *
+     * It compared against one arbitrary source instead, and for the two FOMC target-range
+     * bounds that source could be FRED: `fomc.ts` exists precisely because FRED's daily
+     * series still carries the previous range on the day of a decision, so the two providers
+     * hold different values for that date *by design*. The audit called the correct capture a
+     * mismatch, at `severe`, on every run — so after the provider allowlist was fixed the
+     * command still exited non-zero, which is the failure mode that kept real problems unread.
+     */
+    const actual = value.actualInitial;
+    if (actual !== null && samePeriod.length > 0 && !samePeriod.some((item) => actual.comparedTo(item.value) === 0)) add("RELEASE_ACTUAL_MISMATCH", "severe", "Release actual differs from every stored initial observation for its period.", "release_value", value.id, { observations: samePeriod.map((item) => ({ id: item.id, value: item.value.toString() })) });
     if (value.previousAtRelease !== null) {
       const eligible = observations.some((item) => primaryIds.includes(item.seriesSourceId) && item.period < value.observationPeriod && item.value.comparedTo(value.previousAtRelease!) === 0 && item.fetchedAt <= value.release.scheduledAt && item.vintageAt <= value.release.scheduledAt);
       if (!eligible) add("PREVIOUS_LOOKAHEAD", "severe", "previousAtRelease cannot be supported by a vintage available at release time.", "release_value", value.id);

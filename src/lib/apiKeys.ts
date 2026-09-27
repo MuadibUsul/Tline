@@ -13,6 +13,16 @@ import { prisma } from "./db";
 export const API_KEY_PREFIX = "tli";
 const PREFIX_LENGTH = 8;
 
+/**
+ * `research:read` is the scope every endpoint that exists asks for.
+ *
+ * `consensus:read` is issued but unused: the three `/api/v1` routes all declare
+ * `research:read`, and `/api/v1/consensus` is an empty directory where that endpoint was
+ * planned. It stays in the list because a scope an operator has already issued must keep
+ * parsing — dropping it here would silently strip the scope off existing keys and the
+ * reason would not be visible anywhere. Wire it up when the endpoint ships, or delete both
+ * lines then; until one of those happens this comment is the answer to "is it dead?".
+ */
 export type ApiScope = "research:read" | "consensus:read";
 export const API_SCOPES: ApiScope[] = ["research:read", "consensus:read"];
 

@@ -97,6 +97,18 @@ export function middleware(request: NextRequest) {
   const [, first, ...rest] = pathname.split("/");
   const prefixed = SEGMENTS.has(first ?? "");
   const bare = (prefixed ? `/${rest.join("/")}` : pathname).replace(/\/$/, "") || "/";
+
+  // A machine endpoint has no language, so a prefixed one is a second address for the same
+  // bytes. `/en/rss.xml` was served as a *page* — same feed, but under the page cache policy
+  // and counted as a separate address from the `/rss.xml` that the site actually advertises.
+  // One redirect gives the feed one address, which is the rule the rest of the site follows.
+  if (prefixed && MACHINE_PATH.test(bare)) {
+    const url = request.nextUrl.clone();
+    url.pathname = bare;
+    url.search = "";
+    return NextResponse.redirect(url, 308);
+  }
+
   const legacy = resolvedLegacyPath(bare);
   if (legacy) {
     const url = request.nextUrl.clone();

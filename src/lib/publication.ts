@@ -23,10 +23,16 @@ export const LOCALE_STRICT_ZH_SINCE = new Date(process.env.LOCALE_STRICT_ZH_SINC
  * also carry a Chinese translation, so a freshly ingested report never surfaces on /zh in
  * the publisher's English while its translation is still catching up. English is
  * unaffected, and so is anything published before the cutoff.
+ *
+ * A withdrawn report is excluded here rather than at each call site. Everything public —
+ * the report page, the sitemap, RSS, the read API, every hub that lists reports, consensus
+ * and alerts — asks this one function, so one clause takes it down in all of them at once
+ * and no listing can be missed.
  */
 export function publicationReadyWhere(extra?: Prisma.ArticleWhereInput, locale?: Locale): Prisma.ArticleWhereInput {
   const ready: Prisma.ArticleWhereInput = {
     rawText: { not: null },
+    withdrawnAt: null,
     OR: [
       { documents: { some: { kind: "source_native", locale: "en", status: "ready" } } },
       { documents: { some: { kind: "original_pdf", locale: "en", status: "ready" } } },

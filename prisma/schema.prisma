@@ -59,6 +59,16 @@ model Article {
   contentHash    String
   rawText        String? // canonical cleaned English body; access is permission-controlled
   disclaimerText String? // publisher legal disclosure, excluded from analysis/translation
+  // An operator withdrawal: the report stops being public everywhere the site publishes —
+  // page, sitemap, RSS, API, listings — and setting this back to null restores it. A
+  // timestamp rather than a flag, so the record says when it was taken down.
+  //
+  // This is the answer for a page the gate will never admit and that cannot be repaired. A
+  // report whose extracted title is a document label, whose recovered title is shared with
+  // nineteen others, and whose body is mostly the publisher's boilerplate has no subject a
+  // searcher could have been looking for; leaving it up as a permanent `noindex` buys a
+  // crawl of it forever and never produces a page.
+  withdrawnAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
 

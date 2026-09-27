@@ -1,6 +1,6 @@
 # Deployment
 
-The production baseline is a Node.js application, PostgreSQL 16, a private persistent document volume, one research scheduler, and one Macro Intelligence scheduler. SQLite and the local `storage/` directory remain the zero-infrastructure development path.
+The production baseline is a Node.js application, PostgreSQL 16, a private persistent document volume, a research scheduler, a Macro Intelligence scheduler, a social publishing scheduler, and a daily backup job — six containers in total, plus Caddy in its own Compose project as the only host-facing listener. SQLite and the local `storage/` directory remain the zero-infrastructure development path.
 
 ## Local development
 
@@ -51,9 +51,9 @@ minutes and this project was the largest consumer of it — it built a 4.8 GB im
 runner, pushed it to GHCR, then pulled it back onto the host — so the pool ran out and, with
 it, deploys stopped. A self-hosted runner's minutes are neither metered nor charged, so moving
 the pipeline onto the host both removes the registry from the loop and keeps releases working
-even while the account's hosted minutes are blocked on billing. `.github/workflows/ci.yml`
-(`verify`) and `.github/workflows/deploy.yml` (`release`) both target `runs-on: [self-hosted,
-tline]`; only `ops.yml`, triggered by hand, still uses a hosted runner.
+even while the account's hosted minutes are blocked on billing. All three workflows —
+`.github/workflows/ci.yml` (`verify`), `deploy.yml` (`release`) and `ops.yml` (manual
+operations) — target `runs-on: [self-hosted, tline]`; no workflow uses a hosted runner.
 
 The runner is a dedicated, otherwise-unprivileged user that needs exactly two group
 memberships, both of which the workflows depend on:

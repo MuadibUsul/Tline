@@ -1,8 +1,43 @@
 import { prisma } from "./db";
+import type { Prisma } from "@prisma/client";
 import { computeConsensus, consensusDeltas, type ConsensusResult } from "./consensus";
 import { directionLabel } from "./assets";
 import { publicationReadyWhere } from "./publication";
 import { articleTimestamp, type Locale } from "./i18n";
+
+/**
+ * Exactly the fields a research card reads. Every listing uses this instead of `include`.
+ *
+ * `include` on the root model returns *every* Article column, which quietly means the whole
+ * report: the feed was carrying twenty complete English bodies — and the complete Chinese
+ * translation of each — to render a 260-character preview, 490 KB fetched for 47 KB shown.
+ * `rawText` sits on the same row as the title, so nothing about the query looked wrong.
+ *
+ * It is one shared object so this cannot drift back: a listing that wants a card says
+ * `select: cardArticleSelect`, and a field the card does not read has no way to get in. The
+ * body is the one exception and it is not here — `withPreviewBodies` fetches it afterwards,
+ * only for the cards whose locale summary is empty.
+ */
+export const cardArticleSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  publishedAt: true,
+  createdAt: true,
+  sourceUrl: true,
+  institution: { select: { name: true, slug: true } },
+  analysis: { select: { summary: true, summaryZh: true } },
+  translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
+  articleAssets: { select: { direction: true, target: true, previousTarget: true, asset: { select: { ticker: true, name: true } } } },
+  classification: {
+    select: {
+      jurisdictionState: true,
+      jurisdictions: { select: { jurisdictionKey: true, role: true } },
+      topics: { select: { topicKey: true } },
+      institutions: { select: { institutionKey: true, role: true } },
+    },
+  },
+} satisfies Prisma.ArticleSelect;
 
 export interface FeedPulse {
   latestId: string | null;
@@ -41,6 +76,44 @@ export function byDisplayRecency<T extends { publishedAt: Date; createdAt: Date 
 }
 
 /**
+ * Attach the body opening to the cards whose preview has to fall back to it.
+ *
+ * A card shows at most 260 characters of a report, and the listing pages selected the whole
+ * body to get them: twenty cards fetched 490 KB to render 47 KB, of which 292 KB was complete
+ * English reports — on the page a crawler reads one page at a time, and with no cache in
+ * front repeating the work on every request.
+ *
+ * Most cards never look at the body at all, because `Analysis.summary` is what they show. So
+ * the body is not part of the listing query: the rows are fetched first, and only the cards
+ * whose locale-appropriate summary is empty go back for it. On a typical page that is a
+ * handful of rows rather than twenty, and none at all when every report carries a summary.
+ *
+ * The chain served is the card's own — English shows `summary ?? rawText`, Chinese shows
+ * `summaryZh ?? translation ?? rawText` — so both fields come back and the card decides.
+ */
+export async function withPreviewBodies<
+  T extends { id: string; analysis: { summary?: string | null; summaryZh?: string | null } | null; translations: Array<{ title: string }> },
+>(rows: T[], locale: Locale | undefined) {
+  const needsBody = (row: T) => !(locale === "zh-CN" ? row.analysis?.summaryZh?.trim() : row.analysis?.summary?.trim());
+  const ids = rows.filter(needsBody).map((row) => row.id);
+  const bodies = ids.length
+    ? await prisma.article.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, rawText: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { text: true } } },
+      })
+    : [];
+  const fallback = new Map(bodies.map((body) => [body.id, { rawText: body.rawText, translationText: body.translations[0]?.text ?? null }]));
+  return rows.map((row) => {
+    const body = fallback.get(row.id);
+    return {
+      ...row,
+      rawText: body?.rawText ?? null,
+      translations: row.translations.map((translation) => ({ ...translation, text: body?.translationText ?? undefined })),
+    };
+  });
+}
+
+/**
  * The home feed answers "what is new here", so it is ordered by when a report arrived,
  * not by when its publisher dated it.
  *
@@ -50,17 +123,12 @@ export function byDisplayRecency<T extends { publishedAt: Date; createdAt: Date 
  * anything visibly changing.
  */
 export async function latestFeed(limit = 8, locale?: Locale) {
-  return prisma.article.findMany({
+  return withPreviewBodies(await prisma.article.findMany({
     where: publicationReadyWhere(undefined, locale),
     orderBy: [{ createdAt: "desc" }, { publishedAt: "desc" }],
     take: limit,
-    include: {
-      institution: true,
-      analysis: true,
-      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
-      articleAssets: { include: { asset: true } },
-    },
-  });
+    select: cardArticleSelect,
+  }), locale);
 }
 
 export async function mostActive(days = 7, limit = 6) {
@@ -95,12 +163,12 @@ export async function getAssetView(ticker: string, locale?: Locale) {
         avg: Math.round(targets.reduce((s, t) => s + t, 0) / targets.length),
       }
     : null;
-  const articles = await prisma.article.findMany({
+  const articles = await withPreviewBodies(await prisma.article.findMany({
     where: publicationReadyWhere({ articleAssets: { some: { assetId: asset.id } } }, locale),
     orderBy: { publishedAt: "desc" },
     take: 8,
-    include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } }, articleAssets: { include: { asset: true } } },
-  });
+    select: cardArticleSelect,
+  }), locale);
   return { asset, consensus: c, d1, d7, d30, dist, articles };
 }
 
@@ -119,7 +187,8 @@ export interface InstTimeline {
 export async function getAssetTimeline(assetId: string): Promise<InstTimeline[]> {
   const rows = await prisma.articleAsset.findMany({
     where: { assetId, article: publicationReadyWhere() },
-    include: { article: { include: { institution: true } } },
+    // The chain needs a direction, a target and a date per view — not the body behind them.
+    include: { article: { select: { publishedAt: true, institutionId: true, institution: { select: { name: true, slug: true } } } } },
     orderBy: { article: { publishedAt: "asc" } },
   });
   const byInst = new Map<string, typeof rows>();
@@ -161,11 +230,11 @@ export async function getInstitutionView(slug: string, locale?: Locale) {
   const inst = await prisma.institution.findUnique({ where: { slug } });
   if (!inst) return null;
   const since = new Date(Date.now() - 90 * 864e5);
-  const articles = await prisma.article.findMany({
+  const articles = await withPreviewBodies(await prisma.article.findMany({
     where: publicationReadyWhere({ institutionId: inst.id, publishedAt: { gte: since } }, locale),
     orderBy: { publishedAt: "desc" },
-    include: { analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } }, articleAssets: { include: { asset: true } } },
-  });
+    select: { ...cardArticleSelect, articleAssets: { select: { direction: true, target: true, previousTarget: true, asset: { select: { ticker: true, name: true, assetClass: true } } } } },
+  }), locale);
   // Current views = latest direction per asset.
   const views = new Map<string, { ticker: string; name: string; direction: number; target: number | null; when: Date }>();
   for (const art of articles) {

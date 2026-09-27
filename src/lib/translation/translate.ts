@@ -8,6 +8,21 @@ import { CONTEXT_BUILDER_VERSION, estimateTokens } from "../llm/context-builder"
 import { decideAiExecution, hasRecordedAiExecution, recordAiExecutionEvent } from "../llm/execution-policy";
 import type { CompletionAudit } from "../llm/types";
 
+/**
+ * The corpus re-translation this version was bumped to trigger has been called off.
+ *
+ * v4 existed for one reason: the verbatim-passthrough correction changed what a translation
+ * *is*, so every stored row was stale and `translate --backlog` could rewrite them. The
+ * owner weighed that rewrite — roughly nine hundred further translations — against simply
+ * withdrawing the pages that fail the gate, and chose to withdraw. With the sweep cancelled
+ * the bump has no work left to describe, and it is not free: the automatic pass treats a
+ * moved version as staleness, so the scheduler was re-translating every post-cutoff report
+ * twenty at a time, every minute, for as long as the corpus took.
+ *
+ * So the label goes back, and the correction to the pipeline stays. Reports translated from
+ * here on go through the fixed predicate; the rows that already carry the defect are dealt
+ * with by the gate, which is where "this page is not good enough to index" belongs.
+ */
 const PROMPT_VERSION = "finance-translation-v3";
 
 /**
@@ -200,12 +215,37 @@ function translationParts(segments: SourceSegment[]): TranslationPart[] {
   })));
 }
 
+/**
+ * Text that is kept in the source language rather than translated.
+ *
+ * Publisher tables lose their shape when a model rewrites them and contact details gain
+ * nothing from translation, so both are passed through as they are. The predicate has to
+ * identify a *fragment*; it is asked about a part that may be a whole page of narrative,
+ * because that is what `splitText` hands it.
+ *
+ * It did not, and the cost was the Chinese corpus. Measured over the 7,905 parts the last
+ * production sweep would have translated, it held back 1,930 of them — median 222 words,
+ * largest 6,000 characters and 68 sentences. Reports went out with their closing sections,
+ * and in 51 cases their entire body, still in English on a page addressed /zh: the trigger
+ * was the author's e-mail address, and `contactBlock && numbers > 0` is true of any report
+ * that signs off with a contact. Both tests now require the shape they are named for.
+ */
+/** A table is dense in figures: about one word per figure, and never eight. */
+const VERBATIM_TABLE_WORDS_PER_NUMBER = 3;
+/** A signature block is a fragment. Past this length it is prose that mentions a contact. */
+const VERBATIM_CONTACT_MAX_CHARS = 800;
+
 function shouldPreserveVerbatim(text: string): boolean {
   const numbers = text.match(/(?:[$€£¥]\s*)?[+-]?\d[\d,]*(?:\.\d+)?(?:\s?%|\s?(?:bp|bps|basis points?))?/gi)?.length ?? 0;
   const contactBlock = /(?:\b(?:tel|phone|fax|email)\b|@)/i.test(text);
   const sentences = text.match(/[.!?](?:\s|$)/g)?.length ?? 0;
-  return (numbers >= 8 && sentences < Math.ceil(numbers / 3))
-    || (contactBlock && numbers > 0);
+  if (contactBlock && numbers > 0 && text.length <= VERBATIM_CONTACT_MAX_CHARS && sentences <= 1) return true;
+  // Counting sentences alone let prose through: a narrative page carrying thirty figures and
+  // eight sentences satisfied `sentences < ⌈numbers / 3⌉`. Density is what separates them.
+  const words = (text.match(/[A-Za-z][A-Za-z'-]*/g) ?? []).length;
+  return numbers >= 8
+    && sentences < Math.ceil(numbers / 3)
+    && words <= numbers * VERBATIM_TABLE_WORDS_PER_NUMBER;
 }
 
 function preservedHeading(heading: string | null) {
@@ -263,9 +303,24 @@ Return ONLY JSON: {"pass":boolean,"score":number,"issues":string[]}.`,
   const value = result.value as Partial<ReviewResult>;
   return {
     pass: value.pass === true,
-    score: Math.max(0, Math.min(1, Number(value.score) || 0)),
+    score: normalizeReviewScore(value.score),
     issues: Array.isArray(value.issues) ? value.issues.filter((issue): issue is string => typeof issue === "string").slice(0, 20) : [],
   };
+}
+
+/**
+ * The reviewer's score on a 0–1 scale, whichever scale it answered on.
+ *
+ * The prompt asks for 0–1 and the model sometimes answers out of 100 — production reviews
+ * came back with `score: 75`. Clamping alone read those as a perfect 1.0, so a review that
+ * meant "75 out of 100" scored the translation as flawless and pulled the blended score up
+ * instead of down.
+ */
+export function normalizeReviewScore(value: unknown) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return 0;
+  const scaled = score > 1 ? score / 100 : score;
+  return Math.max(0, Math.min(1, scaled));
 }
 
 /**

@@ -34,6 +34,8 @@ const securityHeaders = [
     : []),
 ];
 
+const ROBOTS_NOINDEX = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+
 const nextConfig = {
   reactStrictMode: true,
   // Prisma client is a server-only dependency. This option is stable in Next 15.
@@ -45,7 +47,23 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
-      { source: "/api/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      // The endpoints a crawler has no business indexing, named one by one.
+      //
+      // `/api/og` and `/api/figures` are deliberately absent. Those two URLs are content:
+      // every social card is one, and so is every chart inside a report. `site.ts` lists
+      // `/api` in robots.txt without disallowing it for exactly that reason. A blanket
+      // `/api/:path*` rule replaced the intent with a default, so an image a reader can see
+      // on a report page was marked unfit to index — the same page's text was allowed to
+      // rank while its own figures were not. `/api/documents` is absent here too; its route
+      // handler sets this header itself, because it also has to set it on the 307 it answers
+      // with a signed URL.
+      { source: "/api/auth/:path*", headers: ROBOTS_NOINDEX },
+      { source: "/api/analytics", headers: ROBOTS_NOINDEX },
+      { source: "/api/feed/:path*", headers: ROBOTS_NOINDEX },
+      { source: "/api/health", headers: ROBOTS_NOINDEX },
+      { source: "/api/search", headers: ROBOTS_NOINDEX },
+      { source: "/api/social/:path*", headers: ROBOTS_NOINDEX },
+      { source: "/api/v1/:path*", headers: ROBOTS_NOINDEX },
     ];
   },
 };

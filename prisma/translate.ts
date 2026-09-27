@@ -4,8 +4,7 @@ import { prisma } from "../src/lib/db";
 import { resolveLLMProvider } from "../src/lib/llm/config";
 import { translateAndPersist, translationInputs } from "../src/lib/translation/translate";
 import { generateArticleDocuments } from "../src/lib/documents/pdf";
-import { clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
-import { queueRetry } from "../src/lib/contentRetry";
+import { MAX_FAILURES, clearFailures, dueFilter, recordFailure } from "../src/lib/articleBackoff";
 import { LOCALE_STRICT_ZH_SINCE } from "../src/lib/publication";
 
 function arg(name: string): string | undefined {
@@ -50,6 +49,10 @@ async function main() {
   const rows = await prisma.article.findMany({
     where: {
       rawText: { not: null },
+      // A withdrawn report is not public, so spending a model call on it buys nothing.
+      // Operator-named ids are still honoured: restoring a report usually means working on
+      // it, and silently refusing the id that was asked for is worse than the token.
+      ...(articleIds.length ? {} : { withdrawnAt: null }),
       ...(articleIds.length ? { id: { in: articleIds } } : {}),
       ...(selection.length ? { AND: selection } : {}),
     },
@@ -96,11 +99,29 @@ async function main() {
       try {
         const result = await translateAndPersist(article.id, provider, article.contentHash, { force: operatorSelected });
         await generateArticleDocuments(article.id);
-        await clearFailures(article.id, "translation");
-        if (result.translation.status === "needs_review") await queueRetry(article.id, "translation");
-        if (result.translation.status === "reviewed") translated++;
-        else needsReview++;
-        console.log(`  ${result.translation.status === "reviewed" ? "OK  " : "HOLD"} ${article.id} · ${article.title}`);
+        if (result.translation.status === "needs_review") {
+          /**
+           * A draft the reviewer rejected is not a success, and must not reset the ladder.
+           *
+           * `clearFailures` used to run unconditionally, so an article whose translation kept
+           * being rejected had its failure count zeroed on every attempt and never reached
+           * `MAX_FAILURES`. That is the "fifty-odd model calls an hour, forever" this backoff
+           * module exists to stop, and it was happening: the scheduler re-translated the same
+           * reports on every pass, one of them seventy-four calls inside twelve minutes.
+           *
+           * The retry queue is no longer fed from here either. Its own contract is
+           * "operator-driven" — a rerun a person asked for after reading the output — and a
+           * pipeline that re-queues its own failures is a loop with extra steps. The
+           * automatic path is this ladder, and it ends in abandonment.
+           */
+          const failures = await recordFailure(article.id, "translation");
+          needsReview++;
+          console.log(`  HOLD (${failures}/${MAX_FAILURES}) ${article.id} · ${article.title}`);
+        } else {
+          await clearFailures(article.id, "translation");
+          translated++;
+          console.log(`  OK   ${article.id} · ${article.title}`);
+        }
       } catch (error) {
         failed++;
         // Counted so an article that can never be translated leaves the candidate set

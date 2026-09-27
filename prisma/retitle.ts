@@ -2,7 +2,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { readPrivateFile } from "../src/lib/documents/storage";
 import { extractPdf } from "../src/lib/documents/extractPdf";
-import { isCallToActionOnly, resolveDocumentTitle } from "../src/lib/ingest/documentTitle";
+import { isCallToActionOnly, resolveDocumentTitle, unwrapCallToActionTitle } from "../src/lib/ingest/documentTitle";
 import { isNoiseTitle } from "../src/lib/contentQuality";
 import { resolveLLMProvider } from "../src/lib/llm/config";
 import { completeJSON } from "../src/lib/llm/provider";
@@ -115,46 +115,79 @@ async function main() {
   const limit = Math.max(1, Number(arg("limit") || 100));
   const dryRun = flag("dry-run");
 
+  /**
+   * Every report whose stored title is a label, not only those with a stored PDF.
+   *
+   * The document used to be the only source a title could be recovered from, so the query
+   * asked for one. The analysis is a second source: it writes `seoTitle`, the headline the
+   * report page already shows a search engine, and for twelve Westpac and BNP reports that
+   * were headed "Pdf File Morning Report PDF" it holds a distinct, accurate subject —
+   * "Brent Crude at $108.5 as Saudi Pipeline Shutdown Lifts Oil", "WTI Falls 4.9% to $95 as
+   * Saudi Exports Rise". Requiring a PDF left those twelve withheld for no reason, because
+   * three of the reports have no stored native PDF at all.
+   */
   const candidates = await prisma.article.findMany({
-    where: { documents: { some: { kind: "source_native", status: "ready" } } },
     include: {
       documents: { where: { kind: "source_native", status: "ready" }, take: 1 },
+      analysis: { select: { seoTitle: true } },
       translations: { where: { locale: "zh-CN" }, take: 1, select: { id: true, title: true } },
     },
     orderBy: { publishedAt: "desc" },
-    take: 1000,
+    take: 2000,
   });
 
-  // Pass one: read the documents and collect proposals. Nothing is written yet, because a
-  // recovered title is only trustworthy once it can be compared with the other proposals.
-  const proposals: Array<{ id: string; before: string; recovered: string; translation?: { id: string; title: string } }> = [];
+  // Pass one: recover what can be recovered and collect proposals. Nothing is written yet,
+  // because a recovered title is only trustworthy once it can be compared with the others.
+  //
+  // Two sources are offered per report rather than one, because the choice between them is
+  // not knowable until the claims are counted. The document's running head is the better
+  // wording, but a recurring daily publication reads the same head off every issue — which
+  // is exactly what happens to nineteen Westpac morning reports — and only then is the
+  // analysis' article-specific headline the one to use. Deciding that here, before the
+  // count, meant the fallback was never reached for the reports that needed it most.
+  const proposals: Array<{ id: string; before: string; recovered?: string; source?: "document" | "analysis"; options: Array<{ value: string; source: "document" | "analysis" }>; translation?: { id: string; title: string } }> = [];
   let skipped = 0;
   for (const article of candidates) {
     if (proposals.length >= limit) break;
     if (!unusable(article.title)) continue;
+
+    const viable = (value: string | null | undefined) =>
+      Boolean(value && value.trim() && value.trim() !== article.title.trim() && !unusable(value.trim()));
+
+    const options: Array<{ value: string; source: "document" | "analysis" }> = [];
     const document = article.documents[0];
-    if (!document) continue;
-
-    let recovered = "";
-    try {
-      const extracted = await extractPdf(await readPrivateFile(document.storageKey));
-      const filename = decodeURIComponent(new URL(document.sourceUrl ?? "https://x/y.pdf").pathname.split("/").pop() || "")
-        .replace(/\.pdf$/i, "")
-        .replace(/[-_]+/g, " ")
-        .trim();
-      // The stored title is what is being replaced, so it is not offered as a source.
-      recovered = resolveDocumentTitle({ blocks: extracted.blocks, filename });
-    } catch (error) {
-      console.warn(`  SKIP ${article.id} · ${String(error).slice(0, 80)}`);
+    if (document) {
+      try {
+        const extracted = await extractPdf(await readPrivateFile(document.storageKey));
+        const filename = decodeURIComponent(new URL(document.sourceUrl ?? "https://x/y.pdf").pathname.split("/").pop() || "")
+          .replace(/\.pdf$/i, "")
+          .replace(/[-_]+/g, " ")
+          .trim();
+        // The stored title is what is being replaced, so it is not offered as a source.
+        const recovered = resolveDocumentTitle({ blocks: extracted.blocks, filename });
+        if (viable(recovered)) options.push({ value: recovered.trim(), source: "document" });
+      } catch (error) {
+        console.warn(`  SKIP-PDF ${article.id} · ${String(error).slice(0, 80)}`);
+      }
+    }
+    // The publisher's own words, where the instruction they were wrapped in is still on the
+    // front: `Download the PDF “Fueling Resilience”` is a real headline behind a button.
+    //
+    // The instruction has to be the whole of what precedes the quote. A headline is allowed
+    // to quote a term — “Will bond market concerns about “responsible proactive fiscal
+    // policy” fade over time?” — and reading the quoted words out of that replaced a
+    // finished headline with the phrase it was about, which is the opposite of a repair.
+    const wrapped = unwrapCallToActionTitle(article.title);
+    if (wrapped && viable(wrapped)) options.push({ value: wrapped, source: "document" });
+    // What the analysis read out of the report. It is already what the page shows a search
+    // engine, so promoting it to the page's own title is what makes the two agree.
+    const fromAnalysis = article.analysis?.seoTitle;
+    if (viable(fromAnalysis)) options.push({ value: fromAnalysis!.trim(), source: "analysis" });
+    if (!options.length) {
       skipped++;
       continue;
     }
-
-    if (!recovered || recovered === article.title || unusable(recovered)) {
-      skipped++;
-      continue;
-    }
-    proposals.push({ id: article.id, before: article.title, recovered, translation: article.translations[0] });
+    proposals.push({ id: article.id, before: article.title, options, translation: article.translations[0] });
   }
 
   /**
@@ -164,33 +197,38 @@ async function main() {
    * read their heading off the page as the same string. Writing it would give thirteen pages
    * the identical title, which is the duplicate-title problem this command exists downstream
    * of, and would put a generic label in the index where there had been nothing. A recovery
-   * unique to one report is trusted; a shared one is left for a person.
+   * unique to one report is trusted; a shared one falls through to the next source.
    */
   const claims = new Map<string, number>();
-  for (const proposal of proposals) claims.set(proposal.recovered, (claims.get(proposal.recovered) ?? 0) + 1);
+  for (const proposal of proposals) for (const option of proposal.options) claims.set(option.value, (claims.get(option.value) ?? 0) + 1);
   const existing = new Set((await prisma.article.findMany({ select: { title: true } })).map((row) => row.title.trim().toLowerCase()));
 
   let repaired = 0;
   for (const proposal of proposals) {
-    const shared = (claims.get(proposal.recovered) ?? 0) > 1;
-    const collides = existing.has(proposal.recovered.trim().toLowerCase());
-    if (shared || collides) {
-      console.log(`  KEEP ${proposal.id} · recovered title is ${shared ? `shared by ${claims.get(proposal.recovered)} reports` : "already another report's title"}: "${proposal.recovered}"`);
+    const chosen: { value: string; source: "document" | "analysis" } | undefined = proposal.options.find((option) =>
+      (claims.get(option.value) ?? 0) <= 1 && !existing.has(option.value.toLowerCase()));
+    if (!chosen) {
+      const best = proposal.options[0];
+      const shared = (claims.get(best.value) ?? 0) > 1;
+      console.log(`  KEEP ${proposal.id} · recovered title is ${shared ? `shared by ${claims.get(best.value)} reports` : "already another report's title"}: "${best.value}"`);
       skipped++;
       continue;
     }
+    proposal.recovered = chosen.value;
+    proposal.source = chosen.source;
 
+    const recovered = proposal.recovered!;
     const article = candidates.find((candidate) => candidate.id === proposal.id);
     const translated = dryRun || !proposal.translation || !article
       ? { title: null, gated: false }
-      : await translateTitle(proposal.recovered, proposal.id, article.contentHash);
+      : await translateTitle(recovered, proposal.id, article.contentHash);
     const zh = translated.title;
-    console.log(`  ${dryRun ? "WOULD" : "FIX  "} ${proposal.id}`);
-    console.log(`        ${proposal.before}  ->  ${proposal.recovered}`);
+    console.log(`  ${dryRun ? "WOULD" : "FIX  "} ${proposal.id} · recovered from the ${proposal.source}`);
+    console.log(`        ${proposal.before}  ->  ${recovered}`);
     if (proposal.translation) console.log(`        ${proposal.translation.title}  ->  ${zh ?? "(译文未变更)"}`);
 
     if (!dryRun) {
-      await prisma.article.update({ where: { id: proposal.id }, data: { title: proposal.recovered } });
+      await prisma.article.update({ where: { id: proposal.id }, data: { title: recovered } });
       if (proposal.translation && zh) {
         await prisma.articleTranslation.update({ where: { id: proposal.translation.id }, data: { title: zh } });
       } else if (proposal.translation) {

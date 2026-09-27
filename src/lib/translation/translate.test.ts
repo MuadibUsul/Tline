@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { CompletionInput, CompletionResult, LLMProvider } from "../llm/provider";
 import { assessTranslationRisk } from "./quality";
-import { translateArticle } from "./translate";
+import { normalizeReviewScore, translateArticle } from "./translate";
 
 class FakeProvider implements LLMProvider {
   readonly name = "fake";
@@ -181,7 +181,12 @@ test("an unsampled review is not a failed one: the article still reads as review
 test("a structurally misshapen translation is reviewed even at a zero sample rate", async () => {
   // Long English source, near-empty Chinese output: charsPerWord collapses far below the
   // band measured on the corpus, which is what "the model dropped content" looks like.
-  const source = Array.from({ length: 120 }, (_, index) => `sentence ${index} about the market outlook`).join(" ");
+  //
+  // The prose carries no figures, so the deterministic checks pass and the paid review is
+  // the only thing that can catch this. It used to carry figures, and the test passed for
+  // the wrong reason: the source was being passed through untranslated, which kept every
+  // number and made `quality.passed` true without the model ever seeing the text.
+  const source = Array.from({ length: 120 }, () => "sentence number xxx about the market outlook").join(" ");
   class DroppingProvider extends FakeProvider {
     reviews = 0;
     async complete(input: CompletionInput): Promise<CompletionResult> {
@@ -211,4 +216,58 @@ test("ordinary output is never flagged risky by the cheap signals", () => {
   const translated = "关于市场前景的第若干句话。".repeat(96);
   const risk = assessTranslationRisk(source, translated);
   assert.equal(risk.risky, false, risk.reasons.join(" "));
+});
+
+test("a reviewer score out of 100 is read as a percentage, not as a perfect 1", () => {
+  // Production reviews came back with `score: 75`. The old clamp read that as 1.0, so a
+  // review meaning "75 out of 100" scored the translation flawless.
+  assert.equal(normalizeReviewScore(75), 0.75);
+  assert.equal(normalizeReviewScore(100), 1);
+  assert.equal(normalizeReviewScore(0.75), 0.75);
+  assert.equal(normalizeReviewScore(1), 1);
+  assert.equal(normalizeReviewScore(0), 0);
+  assert.equal(normalizeReviewScore(undefined), 0);
+  assert.equal(normalizeReviewScore("40"), 0.4);
+  assert.equal(normalizeReviewScore(250), 1);
+});
+
+test("prose that merely signs off with a contact is translated, not passed through", async () => {
+  // Production served pages whose entire closing section, and in 51 cases whose entire body,
+  // stayed in English on a /zh address. The trigger was the author's e-mail at the end.
+  const seen: string[] = [];
+  const provider: LLMProvider = {
+    name: "contact-test",
+    model: "contact-test-v1",
+    async complete(input) {
+      if (input.system.includes("independent bilingual quality reviewer")) {
+        return { provider: this.name, model: this.model, text: JSON.stringify({ pass: true, score: 1, issues: [] }) };
+      }
+      const payload = JSON.parse(input.user) as { segments: Array<{ position: number; heading: string | null; text: string }> };
+      for (const segment of payload.segments) seen.push(segment.text);
+      return { provider: this.name, model: this.model, text: JSON.stringify({ title: "欧元区贷款", segments: payload.segments }) };
+    },
+  };
+  const closing = "The third pillar\n\nAs Christine Lagarde has repeatedly stressed, the ECB's reaction function rests on three pillars. Today's figures provide some information on the third pillar. Overall, today's data does not suggest that the expansion is about to slow sharply.\n\nAuthor\n\nPeter Vanden Houte Chief Economist peter.vandenhoute@ing.com";
+  await translateArticle("ING THINK", "Sustained loan growth", [
+    { id: "summary", position: 0, heading: "Summary", text: "Broad money growth picked up slightly in August." },
+    { id: "closing", position: 1, heading: "Page 2", text: closing },
+  ], provider);
+  assert.ok(seen.some((text) => text.includes("The third pillar")), "the closing prose must reach the translator");
+
+  // A signature block on its own still stays verbatim, which is what the rule is for.
+  const shortSeen: string[] = [];
+  const shortProvider: LLMProvider = {
+    ...provider,
+    async complete(input) {
+      if (!input.system.includes("independent bilingual quality reviewer")) {
+        const payload = JSON.parse(input.user) as { segments: Array<{ text: string }> };
+        for (const segment of payload.segments) shortSeen.push(segment.text);
+      }
+      return provider.complete(input);
+    },
+  };
+  await translateArticle("ING THINK", "Sustained loan growth", [
+    { id: "sig", position: 0, heading: "Author", text: "Author\n\nPeter Vanden Houte, Chief Economist\nTel: +32 2 547 6109\npeter.vandenhoute@ing.com" },
+  ], shortProvider);
+  assert.equal(shortSeen.length, 0, "a short signature block is not sent to the model");
 });

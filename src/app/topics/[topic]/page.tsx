@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
+import { cardArticleSelect, withPreviewBodies } from "@/lib/queries";
 import { assetName, getLocale, institutionName, localePath, relativeTime, tr, type Locale } from "@/lib/i18n";
 import { assetPath, legacyTopicRedirectPath } from "@/lib/assetPath";
 import { ResearchCard } from "@/app/_components/ui";
@@ -40,19 +41,12 @@ const loadTopic = cache(async (key: string, locale: Locale, jurisdiction: Jurisd
   const articleIds = [...new Set([...classifiedArticleIds, ...legacyArticleIds])];
   const usableViews = locale === "zh-CN" ? views.filter((view) => view.view?.trim()) : views;
   const articles = articleIds.length
-    ? await prisma.article.findMany({
+    ? await withPreviewBodies(await prisma.article.findMany({
         where: publicationReadyWhere({ id: { in: articleIds } }),
         orderBy: { publishedAt: "desc" },
         take: 9,
-        select: {
-          id: true, slug: true, title: true, publishedAt: true, createdAt: true, sourceUrl: true,
-          institution: { select: { name: true, slug: true } },
-          analysis: { select: { summary: true, summaryZh: true } },
-          translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } },
-          articleAssets: { select: { direction: true, target: true, previousTarget: true, asset: { select: { ticker: true, name: true } } } },
-          classification: { include: { jurisdictions: true, topics: true, institutions: true } },
-        },
-      })
+        select: cardArticleSelect,
+      }), locale)
     : [];
   const institutions = new Set(articles.map((article) => article.institution.slug));
   const stat = legacyStat ?? {

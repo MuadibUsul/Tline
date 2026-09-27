@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { PdfSourceBlock } from "../documents/extractPdf";
-import { cleanLinkTitle, isOpaqueFilename, resolveDocumentTitle, titleFromPdfBlocks } from "./documentTitle";
+import { cleanLinkTitle, isOpaqueFilename, resolveDocumentTitle, titleFromPdfBlocks, unwrapCallToActionTitle } from "./documentTitle";
 
 const block = (text: string, y: number, fontSize: number, x = 0): PdfSourceBlock =>
   ({ id: `${y}-${x}`, page: 0, x, y, width: 100, height: fontSize, fontSize, text: "", sourceText: text });
@@ -99,4 +99,15 @@ test("a paragraph sharing the heading's size is not mistaken for the title", () 
   ];
   const title = titleFromPdfBlocks(blocks);
   assert.ok(!title.includes("strong correlation"), `body text leaked into the title: ${title}`);
+});
+
+test("a call-to-action wrapper yields its headline, a quoted term does not", () => {
+  // The wrapper case: the subject is in the quotes and the report should carry it.
+  assert.equal(unwrapCallToActionTitle('Download the PDF "Fueling Resilience"'), "Fueling Resilience");
+  assert.equal(unwrapCallToActionTitle('Download the PDF " Navigating the Global Liquidity Maze"'), "Navigating the Global Liquidity Maze");
+  // The case that broke: a finished headline that quotes a term. Unwrapping it replaced the
+  // headline with the phrase it was about, which shipped to production once.
+  assert.equal(unwrapCallToActionTitle("Will bond market concerns about “responsible proactive fiscal policy” fade over time? · 【 Fixed Income Commentary 】"), null);
+  assert.equal(unwrapCallToActionTitle('“A rate cut in December” is now the base case'), null);
+  assert.equal(unwrapCallToActionTitle("Gold target raised to $4,900"), null);
 });

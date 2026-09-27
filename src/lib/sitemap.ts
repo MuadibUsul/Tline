@@ -6,6 +6,7 @@ import { researchPath } from "@/lib/researchPath";
 import { assetPath } from "@/lib/assetPath";
 import { contentQuality } from "@/lib/contentQuality";
 import { listIndexableTopics, topicPath } from "@/lib/topics";
+import { taxonomy } from "@/lib/classification/taxonomy";
 import { loadPublicThemes } from "@/lib/marketThemesPublic";
 
 export interface SitemapAlternate { hreflang: string; href: string }
@@ -62,9 +63,13 @@ const ARTICLE_SELECT = {
   createdAt: true,
   updatedAt: true,
   analysis: {
+    // Summary, summaryZh and reviewStatus are what `contentQuality` reads. The four long
+    // fields beside them — keyArguments, keyNumbers, risks, interpretation — were selected
+    // for a gate rule that no longer exists (see the note in `contentQuality`), and their
+    // text was carried for every article in every shard to be discarded unread: 8% of a
+    // shard request.
     select: {
       summary: true, summaryZh: true, reviewStatus: true,
-      keyArguments: true, keyNumbers: true, risks: true, interpretation: true,
     },
   },
   translations: {
@@ -86,6 +91,15 @@ const STATIC_ROUTES: Array<[string, SitemapEntry["changeFrequency"], number]> = 
   ["/macro", "hourly", 0.8],
   ["/macro/calendar", "daily", 0.6],
   ["/topics", "daily", 0.7],
+  /**
+   * The economy dashboards were missing from here while answering `index, follow`.
+   *
+   * The hub is linked from nowhere and the fourteen dashboards only from the jurisdiction
+   * chip on a report, so the section was indexable on its own say-so and discoverable only
+   * by chance. All fourteen carry three or four populated sections, so they are pages the
+   * site wants found rather than pages it should withhold.
+   */
+  ["/economies", "daily", 0.7],
   ["/about", "monthly", 0.5],
   ["/methodology", "monthly", 0.6],
   ["/editorial-policy", "monthly", 0.5],
@@ -164,6 +178,12 @@ export async function buildPagesShard(): Promise<SitemapEntry[]> {
     // Topic hubs are listed only when the corpus clears the threshold for one: the same gate
     // the page itself applies, so the sitemap never advertises a subject with no page behind it.
     ...(liveThemes ? [{ url: `${base}/market-themes`, lastModified: STATIC_UPDATED_AT, changeFrequency: "daily" as const, priority: 0.7 }] : []),
+    ...taxonomy.jurisdictions.map((jurisdiction) => ({
+      url: `${base}/economies/${jurisdiction.slug}`,
+      lastModified: STATIC_UPDATED_AT,
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    })),
     ...(await listIndexableTopics()).map((topic) => ({
       url: `${base}${topicPath(topic.key)}`,
       lastModified: topic.lastAt,

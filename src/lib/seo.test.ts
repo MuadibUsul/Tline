@@ -63,6 +63,22 @@ test("home, asset and institution metadata use localized entity templates", () =
   assert.ok(assetSeoTitle("Philadelphia Semiconductor Index", "en", "SOX").length <= TITLE_MAX);
 });
 
+test("an institution named for research is not told it twice", () => {
+  // Production shipped "ANZ Research Research, Market Views & Forecasts" for every house whose
+  // registered name already ends in Research, and 大华银行研究研报 for the Chinese equivalent.
+  assert.equal(institutionSeoTitle("ANZ Research", "en"), "ANZ Research — Market Views & Forecasts");
+  assert.equal(institutionSeoTitle("ABN AMRO Research", "en"), "ABN AMRO Research — Market Views & Forecasts");
+  assert.equal(institutionSeoTitle("大华银行研究", "zh-CN"), "大华银行研究、市场观点与预测");
+  assert.equal(institutionSeoTitle("加拿大皇家银行经济研究", "zh-CN"), "加拿大皇家银行经济研究、市场观点与预测");
+  // A name that does not carry the noun still gets the full template.
+  assert.equal(institutionSeoTitle("HSBC", "en"), "HSBC Research, Market Views & Forecasts");
+  assert.equal(institutionSeoTitle("品浩", "zh-CN"), "品浩研报、市场观点与预测");
+  for (const [name, locale] of [["ANZ Research", "en"], ["大华银行研究", "zh-CN"]] as const) {
+    const title = institutionSeoTitle(name, locale);
+    assert.ok(!/Research Research|研究研报|研报研报/.test(title), `doubled noun in: ${title}`);
+  }
+});
+
 test("a composed title has room for the layout suffix, and an absolute one does not need it", () => {
   // This is the check whose absence let three templates ship at 62-64 characters: clamping a
   // builder to 60 and then letting the layout append a 9-character suffix yields 69.

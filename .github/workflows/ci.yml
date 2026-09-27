@@ -32,6 +32,14 @@ jobs:
       - run: npx prisma generate
       - name: Prepare CI database
         run: npx prisma db push --accept-data-loss
+      # The PostgreSQL schema is a build artifact: `prisma/postgresql/schema.prisma` is
+      # generated from the canonical schema and is gitignored, so a clean checkout does not
+      # have it. The Dockerfile generates it for the image; the test that asserts the file
+      # matches the documented transform needs it here too. Without this step that test fails
+      # with ENOENT on every clean checkout — and since `release` needs `verify`, the result
+      # was not a red test but a blocked deploy.
+      - name: Generate the PostgreSQL schema
+        run: npm run db:postgres:schema
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Lint

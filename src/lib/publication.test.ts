@@ -13,6 +13,7 @@ test("public research accepts either the publisher PDF or a generated English PD
     AND: [
       {
         rawText: { not: null },
+        withdrawnAt: null,
         OR: [
           { documents: { some: { kind: "source_native", locale: "en", status: "ready" } } },
           { documents: { some: { kind: "original_pdf", locale: "en", status: "ready" } } },
@@ -35,4 +36,17 @@ test("Chinese lists a post-cutoff report only once it has a Chinese translation,
       { translations: { some: { locale: "zh-CN" } } },
     ],
   });
+});
+
+test("a withdrawn report is not published anywhere", () => {
+  // One clause, read by every public surface — so a takedown cannot be half-applied by a
+  // listing that forgot to filter. The alternative was nulling `rawText`, which destroys
+  // the body the corrections and audit surfaces are kept for.
+  const where = publicationReadyWhere() as Record<string, unknown>;
+  assert.equal(where.withdrawnAt, null);
+  assert.deepEqual(where.rawText, { not: null });
+  // The clause survives being combined with a caller's own filter, which is how every
+  // listing that narrows the set reaches it.
+  const combined = publicationReadyWhere({ id: "article-1" }) as { AND: Array<Record<string, unknown>> };
+  assert.equal(combined.AND[0].withdrawnAt, null);
 });

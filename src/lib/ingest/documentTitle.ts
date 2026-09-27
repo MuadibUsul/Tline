@@ -156,3 +156,26 @@ export function resolveDocumentTitle(sources: {
   // dropping the report over its title would lose content that is otherwise sound.
   return (sources.filename ?? "").trim();
 }
+
+/**
+ * The headline a call-to-action wrapped, or null when there is none to recover.
+ *
+ * A publisher that put its own headline inside the button label — `Download the PDF
+ * "Fueling Resilience"` — leaves the subject in the quotes, and that is the title the report
+ * should have carried. The instruction has to be the *whole* of what precedes the quote: a
+ * headline may quote a term for its own reasons, and reading the quoted words out of
+ * "Will bond market concerns about “responsible proactive fiscal policy” fade over time?"
+ * replaces a finished headline with the phrase it was about. Which is why this lives next to
+ * `isCallToActionOnly` rather than being a bare search for quotation marks.
+ */
+export function unwrapCallToActionTitle(value: string): string | null {
+  const title = (value ?? "").replace(/\s+/g, " ").trim();
+  const quoted = /["“”「『]\s*([^"“”「」『』]{6,180}?)\s*["”」』]/.exec(title);
+  if (!quoted) return null;
+  // There has to be an instruction before the quote. An empty prefix means the title *opens*
+  // with the quoted words, which is a headline whose subject is quoted — not a wrapper.
+  const instruction = title.slice(0, quoted.index);
+  if (!instruction.trim() || !isCallToActionOnly(instruction)) return null;
+  const inner = quoted[1].trim();
+  return inner.length >= 3 ? inner : null;
+}

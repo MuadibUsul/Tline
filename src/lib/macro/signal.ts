@@ -1,6 +1,16 @@
 import { prisma } from "../db";
 import { stableStringify } from "./normalize";
 
+/**
+ * A cross-axis snapshot of the macro picture, written to `MacroSignalSnapshot`.
+ *
+ * Nothing calls `storeMacroSignalSnapshot` today: the only references to this module are its
+ * own test and the schema. It is kept rather than deleted because removing the model needs a
+ * destructive migration, and because the release read-out composes its context from live
+ * queries instead (`analysis/context.ts`) — so this is an alternative shape for the same
+ * data, not a half-finished feature. Decide before the next schema change: wire it to the
+ * context builder, or take the table out.
+ */
 export const MACRO_CONTEXT_METHODOLOGY = "macro-context-v1";
 export type MacroAxis = "GROWTH" | "INFLATION" | "POLICY" | "LIQUIDITY";
 

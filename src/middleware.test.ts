@@ -9,6 +9,30 @@ test("machine-readable endpoints bypass locale middleware", () => {
   assert.equal(MACHINE_PATH.test("/sitemaps-of-the-world"), false);
 });
 
+test("a machine endpoint under a language prefix collapses to its one address", () => {
+  // The feed answered at /rss.xml, /en/rss.xml and /zh/rss.xml — three addresses for the same
+  // bytes, and the prefixed two were served as pages, under the page cache policy that does not
+  // know a feed never changes between requests. A machine endpoint has no language, so the
+  // prefixed form redirects to the one address the site advertises.
+  const cases: Array<[string, string]> = [
+    ["/en/rss.xml", "/rss.xml"],
+    ["/zh/rss.xml", "/rss.xml"],
+    ["/en/feed.xml", "/feed.xml"],
+    ["/en/sitemap.xml", "/sitemap.xml"],
+    ["/zh/sitemap/1.xml", "/sitemap/1.xml"],
+    ["/en/llms.txt", "/llms.txt"],
+    ["/zh/robots.txt", "/robots.txt"],
+  ];
+  for (const [path, target] of cases) {
+    const response = middleware(new NextRequest(`https://tlines.tech${path}`));
+    assert.equal(response.status, 308, path);
+    assert.equal(response.headers.get("location"), `https://tlines.tech${target}`, path);
+  }
+  // The canonical addresses are untouched: still served, not redirected.
+  assert.equal(middleware(new NextRequest("https://tlines.tech/rss.xml")).status, 200);
+  assert.equal(middleware(new NextRequest("https://tlines.tech/sitemap.xml")).status, 200);
+});
+
 test("unprefixed public pages permanently redirect to a canonical locale", () => {
   const response = middleware(new NextRequest("https://tlines.tech/research", { headers: { "accept-language": "en" } }));
   assert.equal(response.status, 308);

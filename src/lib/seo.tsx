@@ -92,9 +92,21 @@ export const assetSeoTitle = (name: string, locale: Locale, ticker?: string | nu
   ? clamp(`${name}机构展望、目标价与共识`, 60)
   : clamp(`${name}${ticker && ticker.toUpperCase() !== name.toUpperCase() ? ` (${ticker.toUpperCase()})` : ""} Institutional Outlook & Bank Forecasts`, 60);
 
-export const institutionSeoTitle = (name: string, locale: Locale) => locale === "zh-CN"
-  ? clamp(`${name}研报、市场观点与预测`, 60)
-  : clamp(`${name} Research, Market Views & Forecasts`, 60);
+/**
+ * Several of the houses the site carries are named for research already, and the template
+ * said it a second time: production served "ANZ Research Research, Market Views & Forecasts"
+ * and "UOB Research Research, Market Views & Forecasts", with the same fault in Chinese,
+ * where 大华银行研究 plus 研报 reads as "research research report". The noun is the name's,
+ * so it is not added again when the name ends in it.
+ */
+const NAME_CARRIES_RESEARCH = /(?:\bresearch|研究|研报)\s*$/i;
+export const institutionSeoTitle = (name: string, locale: Locale) => {
+  const named = name.trim();
+  const carries = NAME_CARRIES_RESEARCH.test(named);
+  return locale === "zh-CN"
+    ? clamp(carries ? `${named}、市场观点与预测` : `${named}研报、市场观点与预测`, 60)
+    : clamp(carries ? `${named} — Market Views & Forecasts` : `${named} Research, Market Views & Forecasts`, 60);
+};
 
 export const marketsSeoTitle = (locale: Locale) => locale === "zh-CN"
   ? "资产机构展望：各资产机构观点与共识"

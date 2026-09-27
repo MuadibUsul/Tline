@@ -15,7 +15,7 @@ export function GET() {
 - [Research](${base}/en/research)
 - [Institutions](${base}/en/institutions)
 - [Economic data](${base}/en/macro)
-- [Market themes](${base}/en/watchlist)
+- [Market themes](${base}/en/market-themes)
 - [Methodology](${base}/en/methodology)
 - [Editorial policy](${base}/en/editorial-policy)
 - [AI usage](${base}/en/ai-usage)

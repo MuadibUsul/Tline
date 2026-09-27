@@ -9,7 +9,23 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { ...canonical("/macro/calendar", locale), title: tr(locale, "Economic Calendar", "经济日历"), description: tr(locale, "Scheduled macro releases with consensus and prior values.", "已排期的宏观发布，含共识值与前值。") };
+  const releases = await prisma.macroRelease.findMany({
+    where: { scheduledAt: { gte: new Date(Date.now() - 30 * 86_400_000) } },
+    select: { countryCode: true },
+  });
+  const countries = new Set(releases.map((release) => release.countryCode)).size;
+  return {
+    ...canonical("/macro/calendar", locale),
+    title: tr(locale, "Economic Calendar", "经济日历"),
+    // "Scheduled macro releases with consensus and prior values" was 57 characters on the
+    // English side and 17 on the Chinese, and repeated what the title already said. What the
+    // page holds that the title does not is its size and its coverage.
+    description: tr(
+      locale,
+      `What is scheduled and what has landed: ${releases.length >= 200 ? "hundreds of" : releases.length} releases across ${countries} economies, each with the consensus institutions expected, the previous value and every revision.`,
+      `已排期与已公布的宏观数据：${releases.length} 项发布，覆盖 ${countries} 个经济体，每项含机构预期共识、前值以及后续修订。`,
+    ),
+  };
 }
 
 export default async function MacroCalendarPage() {

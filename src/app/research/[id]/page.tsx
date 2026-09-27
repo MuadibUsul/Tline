@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, permanentRedirect, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getResearchView } from "@/lib/queries";
 import { assetName, formatDate, getLocale, institutionName, localizeChineseContent, tr, LOCALES, type Locale, localePath } from "@/lib/i18n";
 import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments } from "@/lib/articleText";
 import { prisma } from "@/lib/db";
 import PdfPreview from "@/app/_components/PdfPreview";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, displayTitle, localizedUrl, ogImage, reportJsonLd, stripPublisherPrefix } from "@/lib/seo";
-import { preferredEnglishDocuments, publicationReadyWhere, LOCALE_STRICT_ZH_SINCE } from "@/lib/publication";
+import { preferredEnglishDocuments, publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
 import { contentQuality } from "@/lib/contentQuality";
 import { effectiveSummaryZh } from "@/lib/summary";
@@ -166,11 +166,31 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const a = await getResearchView(params.id);
   if (!a) notFound();
   if (params.id !== a.slug) permanentRedirect(localePath(locale, researchPath(a)));
-  // A report first seen after the cutoff with no Chinese translation yet must not render a
-  // half-English page in Chinese: send the reader to the English report instead, until the
-  // translation lands. Older reports are grandfathered and shown as before.
-  if (locale === "zh-CN" && !a.translations[0] && a.createdAt >= LOCALE_STRICT_ZH_SINCE) {
-    redirect(localePath("en", researchPath(a)));
+  /**
+   * A language's address exists only while that language has a page the site would index.
+   *
+   * The page used to stay up under `noindex` when the gate withheld it, which kept 600-odd
+   * Chinese addresses in front of a crawler: pages carrying a publisher's English at a /zh
+   * address, or a translation whose reviewer found whole sections still untranslated. A
+   * `noindex` says "do not index this"; it does not stop the crawl, and it leaves the reader
+   * on a page the site itself has judged not good enough.
+   *
+   * The rule is the gate's, read per request. A language that fails it is retired and the
+   * reader is sent to the language that passes. `permanentRedirect`, not `redirect`: a
+   * temporary redirect asks a search engine to keep the old address and keep asking after
+   * it, and this address is not a second copy waiting to be judged again. Measured live,
+   * `redirect` was answering 307.
+   *
+   * English is the fallback rather than a special case — it is the site's `x-default`, so a
+   * language with no usable page falls back to it. A report with no usable page in any
+   * language has no page at all and answers 404: leaving it up as `noindex` is the thing the
+   * owner asked to stop, and it buys a crawl of it forever that never produces a page.
+   * Nothing is written down, so a report that later passes comes back by itself.
+   */
+  const indexable = LOCALES.filter((candidate) => contentQuality(a, candidate).eligibility === "INDEX");
+  if (!indexable.includes(locale)) {
+    if (locale !== "en" && indexable.includes("en")) permanentRedirect(localePath("en", researchPath(a)));
+    notFound();
   }
   const an = a.analysis;
   const keyArgs = parseJson<string[]>(locale === "zh-CN" ? an?.keyArgumentsZh : an?.keyArguments, []);

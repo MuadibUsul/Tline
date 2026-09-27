@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getInstitutionView } from "@/lib/queries";
+import { cardArticleSelect, getInstitutionView, withPreviewBodies } from "@/lib/queries";
 import { FeedCard, DirChip, relTime, ResearchCard } from "@/app/_components/ui";
 import { addWatch } from "@/app/actions";
 import { assetName, domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
@@ -28,7 +28,14 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
     return {
       ...canonical(`/institution/${slug}`, locale),
       title: tr(locale, `${name} policy and related research`, `${name}政策与相关研报`),
-      description: tr(locale, `Policy documents and research whose subject is ${name}, distinct from the report publisher.`, `以${name}为内容主体的政策文件与研报，与研报发布机构明确区分。`),
+      // Full-width punctuation between Chinese characters, and a sentence that says what the
+      // page distinguishes rather than only what it is: this address covers a *subject*
+      // institution, and the same name can also be a report's publisher.
+      description: tr(
+        locale,
+        `Policy documents and research whose subject is ${name}, distinct from the report publisher: what the institution decided, when, and which reports cover it.`,
+        `以${name}为内容主体的政策文件与研报，与研报发布机构明确区分：该机构作出了什么决定、何时作出，以及有哪些研报在讨论。`,
+      ),
     };
   }
   const name = institutionName(institution.name, locale);
@@ -57,18 +64,12 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
     const subject = taxonomy.institutions.find((item) => item.key === params.slug);
     if (!subject) notFound();
     const articleIds = await queryClassifiedArticleIds({ institutions: [subject.key] }, 100);
-    const articles = articleIds.length ? await prisma.article.findMany({
+    const articles = articleIds.length ? await withPreviewBodies(await prisma.article.findMany({
       where: publicationReadyWhere({ id: { in: articleIds } }, locale),
       orderBy: { publishedAt: "desc" },
       take: 12,
-      include: {
-        institution: true,
-        analysis: true,
-        translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } },
-        articleAssets: { include: { asset: true } },
-        classification: { include: { jurisdictions: true, topics: true, institutions: true } },
-      },
-    }) : [];
+      select: cardArticleSelect,
+    }), locale) : [];
     const name = locale === "zh-CN" ? subject.nameZh : subject.nameEn;
     return (
       <main className="wrap">

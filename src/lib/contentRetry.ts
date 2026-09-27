@@ -36,6 +36,25 @@ export async function currentScore(articleId: string, kind: RetryKind): Promise<
 }
 
 /**
+ * How many times an article's output is re-run before the queue stops asking.
+ *
+ * Without a ceiling this queue is an infinite loop, and it ran as one. A pipeline that
+ * cannot reach its threshold re-queues itself every time it finishes — `translate` calls
+ * `queueRetry` whenever a draft lands in `needs_review`, and `reparse` whenever a report
+ * does not ground — and a retry that fails writes the same failing output back, which
+ * queues it again. Production held 191 analysis retries averaging twelve attempts and one
+ * that had reached **2,153**, and 158 translation retries up to 155. Every attempt is a
+ * model call, so the queue was a standing bill for work that had already been proved
+ * impossible: a translation scoring 0.70 cannot reach the 0.80 threshold by being asked
+ * again, because the score is capped by a policy the rerun does not change.
+ *
+ * The cap governs automatic re-queueing only. An operator who asks for a retry from the
+ * console has a reason the queue does not know about — a prompt fix, a glossary change —
+ * and is not refused because the article has been tried before.
+ */
+export const MAX_AUTOMATIC_RETRY_ATTEMPTS = 3;
+
+/**
  * Queue a retry, or re-queue one that already finished. A retry still queued or running is
  * left alone rather than duplicated — the unique key is (articleId, kind).
  */
@@ -44,6 +63,9 @@ export async function queueRetry(articleId: string, kind: RetryKind, requestedBy
     where: { articleId_kind: { articleId, kind } },
   });
   if (existing && (existing.status === "queued" || existing.status === "running")) return existing;
+  // Exhausted, and nobody asked for it by hand: leave the record as it is. It keeps its
+  // attempt count and its error, which is what makes "this one was given up on" auditable.
+  if (!requestedById && existing && existing.attempt >= MAX_AUTOMATIC_RETRY_ATTEMPTS) return existing;
 
   const scoreBefore = await currentScore(articleId, kind);
   return prisma.contentRetry.upsert({
@@ -64,6 +86,17 @@ export async function queueRetry(articleId: string, kind: RetryKind, requestedBy
 
 /** Claim the oldest queued retries of one kind, marking them running so a second pass skips them. */
 export async function claimQueuedRetries(kind: RetryKind, limit: number) {
+  // Rows already past the ceiling are closed first, so the backlog left by the unbounded
+  // era is retired instead of being drained once more.
+  await prisma.contentRetry.updateMany({
+    where: { kind, status: { in: ["queued", "running"] }, attempt: { gte: MAX_AUTOMATIC_RETRY_ATTEMPTS } },
+    data: {
+      status: "failed",
+      startedAt: null,
+      finishedAt: new Date(),
+      error: `stopped after ${MAX_AUTOMATIC_RETRY_ATTEMPTS} attempts: the rerun does not change what the pipeline produces`,
+    },
+  });
   const queued = await prisma.contentRetry.findMany({
     where: { kind, status: "queued" },
     orderBy: { requestedAt: "asc" },

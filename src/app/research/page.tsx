@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { assetName, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
-import { byDisplayRecency, feedPulse } from "@/lib/queries";
+import { byDisplayRecency, feedPulse, withPreviewBodies } from "@/lib/queries";
 import { paginationWindow } from "@/lib/pagination";
 import { classificationWhere } from "@/lib/classification/query";
 import { resolveCanonicalKey, taxonomy } from "@/lib/classification/taxonomy";
@@ -127,10 +127,39 @@ export default async function ResearchIndex(
   ]);
   const total = articles.length;
   const pageIds = articles.sort(byDisplayRecency).slice((page - 1) * take, page * take).map(({ id }) => id);
-  const feed = (await prisma.article.findMany({
+  /**
+   * `select`, never `include`, on a listing query.
+   *
+   * `include` on the root model returns every Article column, `rawText` among them, so the
+   * feed carried twenty complete English reports — and the complete Chinese translation of
+   * each — to render a 260-character preview. Measured at 490 KB fetched for 47 KB shown.
+   * The card reads a fixed set of fields; this lists exactly those. The one field it may also
+   * read is the body, when a report has no summary to preview, and `withPreviewBodies` fetches
+   * that afterwards for the few rows that need it.
+   */
+  const feed = await withPreviewBodies(await prisma.article.findMany({
     where: { ...where, id: { in: pageIds } },
-    include: { institution: true, analysis: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } }, articleAssets: { include: { asset: true } }, classification: { include: { jurisdictions: true, topics: true, institutions: true } } },
-  })).sort(byDisplayRecency);
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      publishedAt: true,
+      createdAt: true,
+      sourceUrl: true,
+      institution: { select: { name: true, slug: true } },
+      analysis: { select: { summary: true, summaryZh: true } },
+      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
+      articleAssets: { select: { direction: true, target: true, previousTarget: true, asset: { select: { ticker: true, name: true } } } },
+      classification: {
+        select: {
+          jurisdictionState: true,
+          jurisdictions: { select: { jurisdictionKey: true, role: true } },
+          topics: { select: { topicKey: true } },
+          institutions: { select: { institutionKey: true, role: true } },
+        },
+      },
+    },
+  }), locale).then((rows) => rows.sort(byDisplayRecency));
   const pages = Math.max(1, Math.ceil(total / take));
   const query = new URLSearchParams();
   if (searchParams.institution) query.set("institution", searchParams.institution);

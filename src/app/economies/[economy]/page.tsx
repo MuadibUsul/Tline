@@ -9,6 +9,7 @@ import type { JurisdictionKey } from "@/lib/classification/types";
 import { prisma } from "@/lib/db";
 import { formatDate, getLocale, localePath, tr, type Locale } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
+import { cardArticleSelect, withPreviewBodies } from "@/lib/queries";
 import { JsonLd, breadcrumbJsonLd, canonical, collectionPageJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -32,14 +33,11 @@ const loadEconomy = cache(async (slug: string, locale: Locale) => {
     articleIds.length ? prisma.article.findMany({
       where: publicationReadyWhere({ id: { in: articleIds } }, locale),
       orderBy: { publishedAt: "desc" },
+      // A hundred rows are read to choose nine (six primary, then the rest), so this is a
+      // light select rather than `include`. `include` returned every column of all hundred —
+      // the complete report body among them — and ninety-one were discarded unread.
       take: 100,
-      include: {
-        institution: true,
-        analysis: true,
-        translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true } },
-        articleAssets: { include: { asset: true } },
-        classification: { include: { jurisdictions: true, topics: true, institutions: true } },
-      },
+      select: cardArticleSelect,
     }) : [],
     prisma.macroIndicator.findMany({
       where: { countryCode: economy.code, enabled: true },
@@ -55,13 +53,16 @@ const loadEconomy = cache(async (slug: string, locale: Locale) => {
     }),
     bankCode ? prisma.macroPolicyDocument.findMany({ where: { centralBank: bankCode }, orderBy: { publishedAt: "desc" }, take: 6 }) : [],
   ]);
-  const isPrimary = (article: typeof articleCandidates[number]) => article.classification?.jurisdictions.some(
+  // Candidates are chosen on classification alone, then nine are rendered; the body a card may
+  // need for its preview is fetched for those nine and nothing else.
+  const candidates = await withPreviewBodies(articleCandidates, locale);
+  const isPrimary = (article: typeof candidates[number]) => article.classification?.jurisdictions.some(
     (jurisdiction) => jurisdiction.jurisdictionKey === economy.key && jurisdiction.role === "PRIMARY",
   ) ?? false;
-  const primaryArticles = articleCandidates.filter(isPrimary).slice(0, 6);
+  const primaryArticles = candidates.filter(isPrimary).slice(0, 6);
   const articles = [
     ...primaryArticles,
-    ...articleCandidates.filter((article) => !isPrimary(article)).slice(0, 9 - primaryArticles.length),
+    ...candidates.filter((article) => !isPrimary(article)).slice(0, 9 - primaryArticles.length),
   ];
   return { economy, articles, indicators, releases, policies };
 });

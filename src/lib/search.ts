@@ -289,7 +289,20 @@ export function matchingSnippet(values: Array<string | null | undefined> | undef
 // Beyond this the oldest articles fall out of search rather than the process falling over.
 const INDEX_MAX_ARTICLES = Math.max(100, Number(process.env.SEARCH_INDEX_MAX_ARTICLES || 1000));
 
-const loadSearchData = async () => Promise.all([
+/**
+ * The cap is deliberate; hitting it in silence was not.
+ *
+ * Production indexes the newest 1,000 articles against a corpus of 1,291, so 291 reports are
+ * unsearchable — and nothing said so, because a `take` that stops early looks exactly like a
+ * corpus that ends. The remedy is a schema decision (the in-process index is a deliberate
+ * shortcut until database full-text search is worth adding), so this reports the condition
+ * rather than fixing it. Once per process: a rebuild follows every ingest, and one line per
+ * minute would be the same as no line at all.
+ */
+let truncationWarned = false;
+
+const loadSearchData = async () => {
+  const [institutions, assets, articles] = await Promise.all([
     prisma.institution.findMany({
       select: { id: true, slug: true, name: true, country: true, _count: { select: { articles: { where: publicationReadyWhere() } } } },
     }),
@@ -299,7 +312,9 @@ const loadSearchData = async () => Promise.all([
     prisma.article.findMany({
       where: publicationReadyWhere(),
       orderBy: { publishedAt: "desc" },
-      take: INDEX_MAX_ARTICLES,
+      // One over the cap: if that row exists the index is not the whole corpus, and no count
+      // query is needed to know it.
+      take: INDEX_MAX_ARTICLES + 1,
       select: {
         id: true,
         slug: true,
@@ -315,6 +330,20 @@ const loadSearchData = async () => Promise.all([
       },
     }),
   ]);
+  if (articles.length > INDEX_MAX_ARTICLES) {
+    articles.pop();
+    if (!truncationWarned) {
+      truncationWarned = true;
+      console.warn(JSON.stringify({
+        event: "search.index.truncated",
+        indexed: INDEX_MAX_ARTICLES,
+        oldestIndexed: articles[articles.length - 1]?.publishedAt?.toISOString() ?? null,
+        hint: "SEARCH_INDEX_MAX_ARTICLES is below the published corpus, so the oldest reports are not searchable.",
+      }));
+    }
+  }
+  return [institutions, assets, articles] as const;
+};
 
 // ponytail: an in-process index fits the current corpus; use database full-text search at tens of thousands of articles.
 const candidateCache = new Map<Locale, { version: string; candidates: SearchCandidate[] }>();

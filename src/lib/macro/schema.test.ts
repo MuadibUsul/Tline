@@ -3,7 +3,24 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-const read = (file: string) => readFileSync(path.resolve(file), "utf8").replace(/\r\n/g, "\n");
+/**
+ * Reads a file, and explains the one that is generated rather than committed.
+ *
+ * `prisma/postgresql/schema.prisma` is produced from the canonical schema at build time and
+ * is gitignored, so it is absent on a fresh checkout. Failing that with a bare ENOENT reads
+ * as a broken test rather than a missing build step — and because the deploy's `verify` job
+ * depends on this suite, the confusion costs a release every time. Name the command instead.
+ */
+const read = (file: string) => {
+  try {
+    return readFileSync(path.resolve(file), "utf8").replace(/\r\n/g, "\n");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT" && file.startsWith("prisma/postgresql/")) {
+      throw new Error(`${file} has not been generated. Run \`npm run db:postgres:schema\` before the tests (CI does this for you).`);
+    }
+    throw error;
+  }
+};
 const sqlite = read("prisma/schema.prisma");
 
 function model(name: string) {

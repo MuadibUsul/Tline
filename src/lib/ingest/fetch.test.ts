@@ -5,6 +5,16 @@ import { assertPublicHttpUrl, fetchPdf, fetchResource } from "./fetch";
 test("outbound fetches reject private network destinations", async () => {
   await assert.rejects(() => assertPublicHttpUrl("http://127.0.0.1/private"), /non-public/);
   await assert.rejects(() => assertPublicHttpUrl("http://[::1]/private"), /non-public/);
+  // The rest of the IPv6 ranges a literal can name, none of which needs a resolver to judge.
+  // The bracketed loopback above is the case that broke: `url.hostname` keeps the brackets, so
+  // `isIP` said "not an address" and the check asked DNS about a literal — which on a host
+  // without IPv6 resolution fails with ENOTFOUND instead of refusing the address.
+  await assert.rejects(() => assertPublicHttpUrl("http://[fc00::1]/private"), /non-public/);
+  await assert.rejects(() => assertPublicHttpUrl("http://[fe80::1]/private"), /non-public/);
+  await assert.rejects(() => assertPublicHttpUrl("http://[2001:db8::1]/private"), /non-public/);
+  await assert.rejects(() => assertPublicHttpUrl("http://169.254.169.254/latest/meta-data/"), /non-public/);
+  // A public literal is still allowed, so the guard is a range check and not a blanket ban.
+  assert.equal((await assertPublicHttpUrl("https://8.8.8.8/report.pdf")).hostname, "8.8.8.8");
 });
 
 test("fetchResource stops before buffering an oversized response", async () => {

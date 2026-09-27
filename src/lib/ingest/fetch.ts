@@ -54,7 +54,19 @@ export async function assertPublicHttpUrl(raw: string): Promise<URL> {
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || BLOCKED_HOSTS.has(url.hostname.toLowerCase())) {
     throw new Error("blocked outbound URL");
   }
-  const records = isIP(url.hostname) ? [{ address: url.hostname }] : await lookup(url.hostname, { all: true });
+  /**
+   * A literal address is classified as an address, never resolved.
+   *
+   * `url.hostname` keeps the brackets on an IPv6 literal, so `isIP("[::1]")` is 0 and every
+   * IPv6 literal fell through to the resolver instead — pointless, since there is nothing to
+   * resolve, and wrong in the one place it matters: whether a literal private address is
+   * refused must not depend on the host having IPv6 name resolution. On the Linux runner it
+   * does not, so `http://[::1]/` answered `ENOTFOUND` instead of "non-public"; on Windows the
+   * resolver accepts the bracketed form and the check ran, which is why the test passed for
+   * as long as it never ran anywhere else.
+   */
+  const hostname = url.hostname.replace(/^\[|\]$/g, "");
+  const records = isIP(hostname) ? [{ address: hostname }] : await lookup(hostname, { all: true });
   if (!records.length || records.some(({ address }) => privateAddress(address))) throw new Error("outbound URL resolves to a non-public address");
   return url;
 }

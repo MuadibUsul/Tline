@@ -13,8 +13,18 @@ test("outbound fetches reject private network destinations", async () => {
   await assert.rejects(() => assertPublicHttpUrl("http://[fe80::1]/private"), /non-public/);
   await assert.rejects(() => assertPublicHttpUrl("http://[2001:db8::1]/private"), /non-public/);
   await assert.rejects(() => assertPublicHttpUrl("http://169.254.169.254/latest/meta-data/"), /non-public/);
+  // The IPv4-mapped spellings. The URL parser normalises `[::ffff:127.0.0.1]` to the hex
+  // `[::ffff:7f00:1]`, so a check that only knew the dotted spelling let the mapped form of
+  // every private address through — including the cloud metadata address.
+  await assert.rejects(() => assertPublicHttpUrl("http://[::ffff:127.0.0.1]/private"), /non-public/);
+  await assert.rejects(() => assertPublicHttpUrl("http://[::ffff:169.254.169.254]/latest/meta-data/"), /non-public/);
+  await assert.rejects(() => assertPublicHttpUrl("http://[0:0:0:0:0:ffff:10.0.0.1]/private"), /non-public/);
+  await assert.rejects(() => assertPublicHttpUrl("http://[::ffff:7f00:1]/private"), /non-public/);
+  await assert.rejects(() => assertPublicHttpUrl("http://[::ffff:a9fe:a9fe]/latest/meta-data/"), /non-public/);
   // A public literal is still allowed, so the guard is a range check and not a blanket ban.
   assert.equal((await assertPublicHttpUrl("https://8.8.8.8/report.pdf")).hostname, "8.8.8.8");
+  // …and a mapped address that embeds a public IPv4 address is still reachable.
+  assert.equal((await assertPublicHttpUrl("https://[::ffff:8.8.8.8]/report.pdf")).hostname, "[::ffff:808:808]");
 });
 
 test("fetchResource stops before buffering an oversized response", async () => {

@@ -28,6 +28,20 @@ async function pruneTextCache() {
   await Promise.all(ordered.filter((row, index) => index >= 2_000 || row.mtimeMs < cutoff).map((row) => unlink(row.file).catch(() => undefined)));
 }
 
+/** The eight hextets of an IPv6 address, or null when it is not one this can read. */
+function hextets(address: string): number[] | null {
+  if (address.includes(".") || address.split("::").length > 2) return null;
+  const [head, tail] = address.split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail === undefined ? [] : tail ? tail.split(":") : [];
+  const fill = 8 - left.length - right.length;
+  if (fill < 0) return null;
+  const groups = [...left, ...Array(address.includes("::") ? fill : 0).fill("0"), ...right];
+  if (groups.length !== 8) return null;
+  const values = groups.map((group) => (/^[0-9a-f]{1,4}$/.test(group) ? Number.parseInt(group, 16) : Number.NaN));
+  return values.some((value) => Number.isNaN(value)) ? null : values;
+}
+
 function privateAddress(address: string): boolean {
   const version = isIP(address);
   if (version === 4) {
@@ -41,10 +55,26 @@ function privateAddress(address: string): boolean {
   }
   if (version === 6) {
     const value = address.toLowerCase();
+    const groups = hextets(value);
+    /**
+     * An address that embeds an IPv4 address is that IPv4 address, and is judged as one.
+     *
+     * `::ffff:127.0.0.1` and `::ffff:7f00:1` are the same address, and the URL parser returns
+     * the *hex* one: `new URL("http://[::ffff:127.0.0.1]/")` normalises its host to
+     * `[::ffff:7f00:1]`. The dotted-spelling match below therefore cannot fire on a hostname
+     * that came from a URL at all, so `http://[::ffff:169.254.169.254]/latest/meta-data/` was
+     * classified as public while the comment above it claimed the mapped form was handled.
+     * Reading the last two hextets covers both spellings, and requiring the leading hextets to
+     * be zero covers the deprecated `::a.b.c.d` form with the same rule.
+     */
+    const embedded = groups && groups.slice(0, 5).every((group) => group === 0) && (groups[5] === 0 || groups[5] === 0xffff)
+      ? `${groups[6] >> 8}.${groups[6] & 0xff}.${groups[7] >> 8}.${groups[7] & 0xff}`
+      : null;
     const mapped = value.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
     return value === "::" || value === "::1" || /^f[cd]/.test(value)
       || /^fe[89ab]/.test(value) || value.startsWith("ff") || value.startsWith("2001:db8")
-      || Boolean(mapped && privateAddress(mapped[1]));
+      || Boolean(mapped && privateAddress(mapped[1]))
+      || Boolean(embedded && privateAddress(embedded));
   }
   return true;
 }

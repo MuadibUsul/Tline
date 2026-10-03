@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const base = siteUrl();
   const articles = await prisma.article.findMany({
-    where: publicationReadyWhere(),
+    where: publicationReadyWhere(undefined, "en"),
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }], take: 500,
     select: {
       id: true, slug: true, title: true, sourceUrl: true, publishedAt: true,

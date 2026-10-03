@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { refreshGate } from "../src/lib/gate";
 import { prisma } from "../src/lib/db";
 import { readPrivateFile } from "../src/lib/documents/storage";
 import { extractPdf } from "../src/lib/documents/extractPdf";
@@ -229,6 +230,9 @@ async function main() {
 
     if (!dryRun) {
       await prisma.article.update({ where: { id: proposal.id }, data: { title: recovered } });
+      // The title is what `abnormal_title` reads, in both languages, and repairing it is the
+      // one thing that can bring a withheld report back without a re-parse.
+      await refreshGate(proposal.id);
       if (proposal.translation && zh) {
         await prisma.articleTranslation.update({ where: { id: proposal.translation.id }, data: { title: zh } });
       } else if (proposal.translation) {

@@ -42,7 +42,7 @@ const loadTopic = cache(async (key: string, locale: Locale, jurisdiction: Jurisd
   const usableViews = locale === "zh-CN" ? views.filter((view) => view.view?.trim()) : views;
   const articles = articleIds.length
     ? await withPreviewBodies(await prisma.article.findMany({
-        where: publicationReadyWhere({ id: { in: articleIds } }),
+        where: publicationReadyWhere({ id: { in: articleIds } }, locale),
         orderBy: { publishedAt: "desc" },
         take: 9,
         select: cardArticleSelect,

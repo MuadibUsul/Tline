@@ -105,6 +105,7 @@ function parseJson<T>(s: string | undefined, fallback: T): T {
 }
 
 type Figure = { id: string; afterSegmentPosition: number; alt: string | null; caption: string | null; width: number | null; height: number | null };
+type Table = { id: string; afterSegmentPosition: number; caption: string | null; headerRow: boolean; dataJson: string };
 
 function Figures({ items }: { items: Figure[] }) {
   if (!items.length) return null;
@@ -121,24 +122,74 @@ function Figures({ items }: { items: Figure[] }) {
   );
 }
 
-function ArticleBody({ segments, fallback, locale, translated = false, figures = [] }: {
+/**
+ * A publisher's table, rendered as a table.
+ *
+ * These used to arrive as a run of loose sentences — the cells' paragraphs lifted into the
+ * body on their own — which is what a page of quarterly figures looks like when it loses its
+ * rows and columns. The numbers are not translated: they are the figures the report is about,
+ * and the column headings beside them are short enough that a translated table would be a
+ * different table. A heading row and a scroll container are the whole treatment; the styling
+ * is the site's, so a wide table scrolls rather than shrinking the reading column.
+ */
+function Tables({ items }: { items: Table[] }) {
+  if (!items.length) return null;
+  return (
+    <>
+      {items.map((table) => {
+        const rows = parseJson<{ rows?: string[][] }>(table.dataJson, {}).rows ?? [];
+        if (rows.length === 0) return null;
+        const [head, ...body] = table.headerRow ? rows : [[], ...rows];
+        return (
+          <figure className="article-table" key={table.id}>
+            <div className="tbl-wrap">
+              <table>
+                {table.headerRow && head.length > 0 && (
+                  <thead>
+                    <tr>{head.map((cell, index) => <th key={index} scope="col">{cell}</th>)}</tr>
+                  </thead>
+                )}
+                <tbody>
+                  {body.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {row.map((cell, cellIndex) => <td key={cellIndex} className={/^[\d.,%()\-−–+\s]*$/.test(cell) && /\d/.test(cell) ? "tnum" : undefined}>{cell}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {table.caption && <figcaption>{table.caption}</figcaption>}
+          </figure>
+        );
+      })}
+    </>
+  );
+}
+
+function ArticleBody({ segments, fallback, locale, translated = false, figures = [], tables = [] }: {
   segments: { id: string; heading: string | null; text: string }[];
   fallback: string;
   locale: Locale;
   translated?: boolean;
   figures?: Figure[];
+  tables?: Table[];
 }) {
   const cleanSegments = stripTrailingDisclaimerSegments(segments);
   const cleanFallback = stripTrailingDisclaimer(fallback);
   const sections = cleanSegments.length ? cleanSegments : [{ id: "fallback", heading: null, text: cleanFallback }];
   const display = (value: string) => translated && locale === "zh-CN" ? localizeChineseContent(value) : value;
-  // Figures anchor by body-segment index — identical for the English and Chinese renders.
+  // Figures and tables anchor by body-segment index — identical for the English and Chinese
+  // renders, which is what lets one table row serve both.
   const lead = figures.filter((figure) => figure.afterSegmentPosition < 0);
+  const leadTables = tables.filter((table) => table.afterSegmentPosition < 0);
   const at = (index: number) => figures.filter((figure) => figure.afterSegmentPosition === index);
+  const tablesAt = (index: number) => tables.filter((table) => table.afterSegmentPosition === index);
   const tail = figures.filter((figure) => figure.afterSegmentPosition >= sections.length);
+  const tailTables = tables.filter((table) => table.afterSegmentPosition >= sections.length);
   return (
     <div className="prose article-sections">
       <Figures items={lead} />
+      <Tables items={leadTables} />
       {sections.map((segment, index) => (
         <section className="article-section" key={segment.id}>
           {segment.heading && <h3>{display(segment.heading)}</h3>}
@@ -154,6 +205,7 @@ function ArticleBody({ segments, fallback, locale, translated = false, figures =
             )}
           </div>
           <Figures items={index === sections.length - 1 ? [...at(index), ...tail] : at(index)} />
+          <Tables items={index === sections.length - 1 ? [...tablesAt(index), ...tailTables] : tablesAt(index)} />
         </section>
       ))}
     </div>
@@ -221,7 +273,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const primaryTicker = a.atomicViews.find((view) => view.assetTicker)?.assetTicker ?? null;
   const [articleTopics, peerReports] = await Promise.all([
     getArticleTopics(a.id, locale),
-    primaryTicker ? getPeerReports({ articleId: a.id, ticker: primaryTicker, institutionId: a.institution.id }) : Promise.resolve([]),
+    primaryTicker ? getPeerReports({ articleId: a.id, ticker: primaryTicker, institutionId: a.institution.id, locale }) : Promise.resolve([]),
   ]);
 
   return (
@@ -311,13 +363,13 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           // a reading aid beside it.
           <details className="article-original" style={{ marginTop: 18 }}>
             <summary>完整中文译文</summary>
-            <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} />
+            <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} tables={a.tables} />
           </details>
         )}
         {!publisherPdf && locale === "en" && a.rawText && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
-            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
+            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
         )}
         {!publisherPdf && locale === "zh-CN" && usableTranslation && (
@@ -326,19 +378,19 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
               完整中文译文
             </div>
             <h2 style={{ fontSize: 20, marginBottom: 8 }}>{localizeChineseContent(usableTranslation.title)}</h2>
-            <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} />
+            <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} tables={a.tables} />
           </div>
         )}
         {!publisherPdf && locale === "zh-CN" && !usableTranslation && a.rawText && (
           <div style={{ marginBottom: 22 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>完整英文原文</div>
-            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
+            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
         )}
         {!publisherPdf && locale === "zh-CN" && usableTranslation && a.rawText && (
           <details className="article-original">
             <summary>完整英文原文</summary>
-            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} />
+            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </details>
         )}
         {a.disclaimerText && (

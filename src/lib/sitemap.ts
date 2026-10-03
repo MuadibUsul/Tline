@@ -4,7 +4,6 @@ import { siteUrl } from "@/lib/site";
 import { LOCALES, localePath } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
 import { assetPath } from "@/lib/assetPath";
-import { contentQuality } from "@/lib/contentQuality";
 import { listIndexableTopics, topicPath } from "@/lib/topics";
 import { taxonomy } from "@/lib/classification/taxonomy";
 import { loadPublicThemes } from "@/lib/marketThemesPublic";
@@ -53,34 +52,29 @@ const ARTICLE_ORDER = [{ publishedAt: "asc" as const }, { id: "asc" as const }];
  * Newest-first would renumber every shard each time an article arrived, and a crawler
  * would have to refetch all of them to discover that nothing but the newest had changed.
  */
+/**
+ * The fields a shard needs, and no more.
+ *
+ * It used to carry `rawText` and the translation's `text` because the shard ran `contentQuality`
+ * on every article in it — 18 KB per report, about 34 MB for a full shard, to produce a 1.39 MB
+ * document. The gate's answer is a column now (`Article.indexableEn` / `indexableZh`, written by
+ * `refreshGate`), so the shard reads two booleans instead, and the bodies stay in the database.
+ */
 const ARTICLE_SELECT = {
-  id: true,
   slug: true,
-  title: true,
-  rawText: true,
-  sourceUrl: true,
-  language: true,
-  createdAt: true,
   updatedAt: true,
-  analysis: {
-    // Summary, summaryZh and reviewStatus are what `contentQuality` reads. The four long
-    // fields beside them — keyArguments, keyNumbers, risks, interpretation — were selected
-    // for a gate rule that no longer exists (see the note in `contentQuality`), and their
-    // text was carried for every article in every shard to be discarded unread: 8% of a
-    // shard request.
-    select: {
-      summary: true, summaryZh: true, reviewStatus: true,
-    },
-  },
+  indexableEn: true,
+  indexableZh: true,
   translations: {
     where: { locale: "zh-CN" },
     take: 1,
-    select: { title: true, text: true, qualityScore: true, status: true, updatedAt: true },
+    select: { updatedAt: true },
   },
 } as const;
 
-export function indexableSitemapLocales(article: Parameters<typeof contentQuality>[0]) {
-  return LOCALES.filter((locale) => contentQuality(article, locale).eligibility === "INDEX");
+/** The languages the stored verdict admits for this report. */
+export function indexableSitemapLocales(article: { indexableEn: boolean; indexableZh: boolean }) {
+  return LOCALES.filter((locale) => (locale === "zh-CN" ? article.indexableZh : article.indexableEn));
 }
 
 const STATIC_ROUTES: Array<[string, SitemapEntry["changeFrequency"], number]> = [

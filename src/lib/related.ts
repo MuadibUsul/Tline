@@ -67,8 +67,13 @@ export const getArticleTopics = cache(async (articleId: string, locale: Locale, 
  *
  * Same-asset reports from the same publisher are excluded: the value of the block is seeing
  * where a second house stands, and a publisher's own follow-up note is not that.
+ *
+ * The title is the one the reader's language would show on that report's own page, and the
+ * listing asks the gate for that language, so the block cannot offer a headline the page it
+ * links to will not show — it was rendering the English column on Chinese pages, which is how
+ * a Chinese page came to carry a rail of English headlines.
  */
-export const getPeerReports = cache(async (input: { articleId: string; ticker: string; institutionId: string; take?: number }): Promise<PeerReport[]> => {
+export const getPeerReports = cache(async (input: { articleId: string; ticker: string; institutionId: string; locale: Locale; take?: number }): Promise<PeerReport[]> => {
   const take = input.take ?? 3;
   const asset = await prisma.asset.findUnique({ where: { ticker: input.ticker }, select: { id: true } });
   if (!asset) return [];
@@ -77,12 +82,23 @@ export const getPeerReports = cache(async (input: { articleId: string; ticker: s
       id: { not: input.articleId },
       institutionId: { not: input.institutionId },
       articleAssets: { some: { assetId: asset.id } },
-    }),
+    }, input.locale),
     orderBy: { publishedAt: "desc" },
     take,
-    select: { slug: true, title: true, publishedAt: true, institution: { select: { name: true, slug: true } } },
+    select: {
+      slug: true,
+      title: true,
+      publishedAt: true,
+      institution: { select: { name: true, slug: true } },
+      translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
+    },
   });
-  return rows;
+  return rows.map((row) => ({
+    slug: row.slug,
+    title: input.locale === "zh-CN" ? (row.translations[0]?.title?.trim() || row.title) : row.title,
+    publishedAt: row.publishedAt,
+    institution: row.institution,
+  }));
 });
 
 /** Tickers a report touches, from its extracted asset views. */

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { refreshGate } from "../src/lib/gate";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../src/lib/db";
 import { ANALYSIS_PROMPT_VERSION, parseArticle } from "../src/lib/ingest/parseLLM";
@@ -215,6 +216,11 @@ async function main() {
         })),
         ]);
       }, { isolationLevel: "Serializable" });
+
+      // The analysis is one of the gate's inputs: its summary and its review status decide
+      // whether the report has a page at all. Recompute now so a listing reflects the page the
+      // reader would get, and so the reason is written down where an operator can read it.
+      await refreshGate(article.id);
       await persistDeterministicClassification({
         target: { kind: "ARTICLE", id: article.id },
         result: classifyDeterministically(discoverArticleClassification({

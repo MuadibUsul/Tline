@@ -1,5 +1,6 @@
 import glossary from "../../../data/financial_glossary.zh-CN.json";
 import { prisma } from "../db";
+import { refreshGate } from "../gate";
 import { resolveLLMProvider } from "../llm/config";
 import { completeJSON, type LLMProvider } from "../llm/provider";
 import { assessTranslationRisk, validateTranslation, type TranslationQuality, type TranslationRisk } from "./quality";
@@ -585,6 +586,10 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
     }
     return { translation, quality: result.quality, review: result.review };
   }, { isolationLevel: "Serializable" });
+
+  // A translation is the Chinese half of the gate: its status and its score decide whether the
+  // report has a /zh page. Recompute so the /zh listing offers exactly what /zh will answer.
+  await refreshGate(articleId);
 
   // The atomic views are extracted from the English source by rule, which copies the
   // English sentence into the zh fields (they carried no text when the site was English

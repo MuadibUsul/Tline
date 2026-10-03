@@ -3,7 +3,7 @@ import Parser from "rss-parser";
 import { prisma } from "../db";
 import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
 import { extractLinks, extractArticle, extractFeedLinks, extractFullArticleLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
-import { ensureAssets, persistArticle, type RawArticle } from "./store";
+import { ensureAssets, evidenceText, persistArticle, type RawArticle } from "./store";
 import { resolveDocumentTitle } from "./documentTitle";
 import { snapshotAll } from "../consensus";
 import { fetchRobots, robotsAllows, robotsCrawlDelay, robotsSitemaps } from "./robots";
@@ -179,11 +179,14 @@ async function ingestInstitution(
     if (raw.publishedAt < since) { outOfWindow++; return false; }
     // A consent banner can be long enough to satisfy the generic article heuristic.
     // Never persist it as research; another discovery path may still recover the PDF.
-    if (isAccessGateText(raw.text)) { empty++; return false; }
-    if (!articleAllowed(inst.slug, raw.title, raw.text)) { empty++; return false; }
+    // Judged on the prose plus the tables' cells — the union these gates saw before tables
+    // were separated out of the body. See `evidenceText`.
+    const evidence = evidenceText(raw);
+    if (isAccessGateText(evidence)) { empty++; return false; }
+    if (!articleAllowed(inst.slug, raw.title, evidence)) { empty++; return false; }
     // Webinars / podcasts / video / live-event invitations are not written research.
-    if (isBroadcastOrEvent(raw.title, raw.text)) { empty++; return false; }
-    if (raw.strict && (!looksLikeArticle(raw.title, raw.text) || !looksLikeResearchTopic(raw.title, raw.text))) { empty++; return false; }
+    if (isBroadcastOrEvent(raw.title, evidence)) { empty++; return false; }
+    if (raw.strict && (!looksLikeArticle(raw.title, evidence) || !looksLikeResearchTopic(raw.title, evidence))) { empty++; return false; }
     raws.push(raw);
     return true;
   };
@@ -432,6 +435,7 @@ async function ingestInstitution(
           author: article.author || item.creator || null,
           publishedAt,
           segments: article.segments,
+          tables: article.tables,
           disclaimerText: article.disclaimerText,
           strict: true,
           preferReplacement: replacesKnownArticle(item.link),
@@ -516,6 +520,7 @@ async function ingestInstitution(
           author: article.author,
           publishedAt,
           segments: article.segments,
+          tables: article.tables,
           disclaimerText: article.disclaimerText,
           strict: true,
           preferReplacement: replacesKnownArticle(candidate.url),

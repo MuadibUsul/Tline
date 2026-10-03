@@ -41,7 +41,7 @@ export async function generateMetadata(props: { searchParams: Promise<ResearchSe
   const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
   const filtered = Object.entries(searchParams).some(([key, value]) => key !== "page" && Boolean(value));
-  const emptyPage = !filtered && page > 1 && (page - 1) * 20 >= await prisma.article.count({ where: publicationReadyWhere() });
+  const emptyPage = !filtered && page > 1 && (page - 1) * 20 >= await prisma.article.count({ where: publicationReadyWhere(undefined, locale) });
   const title = researchSeoTitle(locale);
   const description = tr(
     locale,

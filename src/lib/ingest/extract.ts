@@ -318,11 +318,20 @@ export interface ExtractedFigure {
   caption: string | null;
 }
 
+export interface ExtractedTable {
+  afterSegmentPosition: number;
+  ordinal: number; // order among tables sharing the same anchor
+  caption: string | null;
+  headerRow: boolean;
+  rows: string[][];
+}
+
 export interface ExtractedArticle {
   title: string;
   text: string;
   segments: Segment[];
   figures: ExtractedFigure[];
+  tables: ExtractedTable[];
   author: string | null;
   publishedAt: Date | null;
   publicationDateText: string | null;
@@ -463,9 +472,64 @@ function parsePublicationDate(value: string): Date | null {
   return parsed;
 }
 
+/**
+ * One `<table>` read as rows and cells, or null when it is not carrying data.
+ *
+ * A page uses tables to lay two things out: figures, and the page itself. The second kind is
+ * scaffolding — one cell holding the masthead, or a stack of one-cell rows — and rendering it
+ * would drop the page's furniture into the middle of the report. A table has to describe a
+ * real grid to be kept: at least two rows, at least two columns, and more than a couple of
+ * cells with something in them.
+ *
+ * `colspan` is resolved by repeating the cell rather than by tracking a grid cursor. A merged
+ * heading then lines up with the columns it covers, where skipping cells is how a table ends
+ * up one column adrift after every merge — and a repeated label reads better than a hole.
+ */
+function readTable($: cheerio.CheerioAPI, table: Element): { caption: string | null; headerRow: boolean; rows: string[][] } | null {
+  const rows: string[][] = [];
+  let width = 0;
+  let headerRow = false;
+  $(table).find("tr").each((_, tr) => {
+    const $tr = $(tr);
+    if ($tr.closest("table").get(0) !== table) return; // a row of a nested table
+    const cells: string[] = [];
+    $tr.children("th,td").each((__, cell) => {
+      if (cell.name === "th") headerRow = true;
+      const text = $(cell).text().replace(/\s+/g, " ").trim();
+      const span = Math.min(8, Math.max(1, Number($(cell).attr("colspan")) || 1));
+      for (let i = 0; i < span; i++) cells.push(text);
+    });
+    if (!cells.some(Boolean)) return; // a spacer row
+    width = Math.max(width, cells.length);
+    rows.push(cells);
+  });
+  if (rows.length < 2 || width < 2) return null;
+  if (rows.flat().filter(Boolean).length < 3) return null;
+  for (const row of rows) while (row.length < width) row.push("");
+  /**
+   * Is the first row a heading?
+   *
+   * Most publishers mark it: a `<th>` cell, or a row inside `<thead>`. Some mark nothing —
+   * MUFG's calendar and SSGA's exhibits are plain `<td>` throughout — and then the only
+   * evidence left is what the row contains: a heading row is all labels, so it carries no
+   * digits while the data under it does. Read that way the first row keeps its column names
+   * instead of arriving as the first data row.
+   */
+  const markedHeader = headerRow || $(table).find("thead tr").length > 0;
+  const first = rows[0];
+  const looksLikeHeader = first.every(Boolean) && !first.some((cell) => /\d/.test(cell)) && rows.slice(1).some((row) => row.some((cell) => /\d/.test(cell)));
+  const caption = $(table).find("caption").first().text().replace(/\s+/g, " ").trim();
+  return {
+    caption: caption ? caption.slice(0, 300) : null,
+    headerRow: markedHeader || looksLikeHeader,
+    // Ceilings, not judgement: a publisher's appendix can be thousands of rows, and a report
+    // page is not the place to reproduce it in full.
+    rows: rows.slice(0, 80).map((row) => row.slice(0, 14).map((cell) => cell.slice(0, 400))),
+  };
+}
+
 /** Extract a clean title + body text (+ heading-delimited segments) from an article page. */
-export function extractArticle(html: string, baseUrl?: string): ExtractedArticle {
-  const $ = cheerio.load(html);
+export function extractArticle(html: string, baseUrl?: string): ExtractedArticle {  const $ = cheerio.load(html);
   const sourceHost = baseUrl && URL.canParse(baseUrl) ? new URL(baseUrl).hostname : "";
   let structuredTitle = "";
   let structuredBody = "";
@@ -571,11 +635,33 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
   const segments: Segment[] = [];
   const figures: ExtractedFigure[] = [];
   const seenFigureUrls = new Set<string>();
+  const tables: ExtractedTable[] = [];
+  const tablesAtAnchor = new Map<number, number>();
+  // Only the tables that were kept own their cells. A table refused above is layout — the two
+  // cells holding the article and its sidebar — and its paragraphs still belong in the prose,
+  // so they must not be discarded along with it.
+  const claimedTables = new Set<Element>();
   if (bestEl && bestScore >= 300) {
     let cur: { heading: string | null; buf: string[] } = { heading: null, buf: [] };
     const flush = () => { if (cur.buf.length) segments.push({ heading: cur.heading, text: cur.buf.join("\n\n") }); };
-    $(bestEl).find("h2,h3,h4,p,li,figure,img").each((_, node) => {
+    $(bestEl).find("h2,h3,h4,p,li,figure,img,table").each((_, node) => {
       const tag = node.name;
+      if (tag === "table") {
+        const parsed = readTable($, node);
+        if (!parsed) return;
+        claimedTables.add(node);
+        // The same anchor rule the figures use: into the section being built when it has
+        // content, otherwise after the previous one.
+        const anchor = cur.buf.length ? segments.length : Math.max(-1, segments.length - 1);
+        const ordinal = tablesAtAnchor.get(anchor) ?? 0;
+        tablesAtAnchor.set(anchor, ordinal + 1);
+        tables.push({ afterSegmentPosition: anchor, ordinal, ...parsed });
+        return;
+      }
+      // A cell's own paragraph belongs to the table that holds it. Without this the cells came
+      // through as body paragraphs — the numbers with no rows and no columns this change is
+      // for — and the table would then render them a second time.
+      if (claimedTables.has($(node).closest("table").get(0) as Element)) return;
       if (tag === "figure" || tag === "img") {
         if (tag === "img" && $(node).parents("figure").length) return; // the enclosing <figure> handles it
         const imgNode = tag === "img" ? node : $(node).find("img").get(0);
@@ -635,11 +721,26 @@ export function extractArticle(html: string, baseUrl?: string): ExtractedArticle
     afterSegmentPosition: Math.min(cleanSegments.length - 1, Math.max(-1, figure.afterSegmentPosition)),
   }));
 
+  // Same clamp for tables, and the ordinals are renumbered on the way out: two tables that
+  // sat either side of a segment the partitioner then dropped would otherwise collapse onto
+  // one anchor and collide on the (article, anchor, ordinal) key.
+  const cleanTables: ExtractedTable[] = [];
+  if (cleanSegments.length) {
+    const takenAnchors = new Map<number, number>();
+    for (const table of tables) {
+      const anchor = Math.min(cleanSegments.length - 1, Math.max(-1, table.afterSegmentPosition));
+      const ordinal = takenAnchors.get(anchor) ?? 0;
+      takenAnchors.set(anchor, ordinal + 1);
+      cleanTables.push({ ...table, afterSegmentPosition: anchor, ordinal });
+    }
+  }
+
   return {
     title,
     text,
     segments: cleanSegments,
     figures: cleanFigures,
+    tables: cleanTables,
     author: author?.slice(0, 120) || null,
     publishedAt,
     // A date read out of the visible page is a fallback for pages that declare none.

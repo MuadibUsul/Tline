@@ -12,7 +12,7 @@ export async function GET() {
   // carried fifty complete English bodies — `rawText` and `disclaimerText` — to render five
   // fields per item and throw the rest away. A feed reader polls this on its own schedule.
   const articles = await prisma.article.findMany({
-    where: publicationReadyWhere(),
+    where: publicationReadyWhere(undefined, "en"),
     orderBy: { publishedAt: "desc" },
     take: 50,
     select: {

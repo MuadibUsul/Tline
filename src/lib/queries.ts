@@ -268,6 +268,9 @@ export async function getResearchView(identifier: string) {
       analysis: true,
       segments: { orderBy: { position: "asc" } },
       figures: { orderBy: [{ afterSegmentPosition: "asc" }, { ordinal: "asc" }] },
+      // Anchored to body segments like the figures, so the English and Chinese renders place
+      // them identically and one stored table serves both.
+      tables: { orderBy: [{ afterSegmentPosition: "asc" }, { ordinal: "asc" }] },
       // Only the kinds still produced. A Chinese PDF left from before must not be
       // offered, least of all under the English label.
       documents: {

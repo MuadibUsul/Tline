@@ -1,12 +1,13 @@
 import { prisma } from "../db";
 import { urlHash, titleHash, contentHash } from "../hash";
-import { isJunk, looksLikeArticle, type Segment } from "./extract";
+import { isJunk, looksLikeArticle, type ExtractedTable, type Segment } from "./extract";
 import { ASSETS } from "../assets";
 import { partitionArticleSegments } from "../articleText";
 import { buildResearchSlug } from "../researchPath";
 import { classifyDeterministically } from "../classification/classifier";
 import { discoverArticleClassification } from "../classification/discovery";
 import { articleClassificationSourceFingerprint, persistDeterministicClassification } from "../classification/store";
+import { refreshGate } from "../gate";
 
 export interface RawArticle {
   title: string;
@@ -16,6 +17,7 @@ export interface RawArticle {
   publishedAt: Date;
   language?: string;
   segments?: Segment[];
+  tables?: ExtractedTable[];
   disclaimerText?: string | null;
   strict?: boolean; // true for HTML-extracted pages → enforce the full article check
   preferReplacement?: boolean; // publisher PDF supersedes an already stored HTML teaser
@@ -51,17 +53,59 @@ async function refreshClassification(articleId: string, cHash: string, tHash: st
   }
 }
 
+/**
+ * Do the stored tables still match the ones just extracted?
+ *
+ * Compared as a set, because the ordinal is the renderer's order within an anchor and two
+ * extractions of the same page may number them differently after a segment is dropped.
+ */
+function sameTables(
+  stored: Array<{ afterSegmentPosition: number; ordinal: number; caption: string | null; headerRow: boolean; dataJson: string }>,
+  next: Array<{ afterSegmentPosition: number; ordinal: number; caption: string | null; headerRow: boolean; dataJson: string }>,
+) {
+  if (stored.length !== next.length) return false;
+  const key = (table: { afterSegmentPosition: number; ordinal: number; caption: string | null; headerRow: boolean; dataJson: string }) =>
+    `${table.afterSegmentPosition}:${table.ordinal}:${table.headerRow}:${table.caption ?? ""}:${table.dataJson}`;
+  const before = stored.map(key).sort();
+  const after = next.map(key).sort();
+  return before.every((value, index) => value === after[index]);
+}
+
+/**
+ * The text the cleaning gates read: the prose, plus whatever the tables say.
+ *
+ * A table's cells used to be lifted into the body, so they were part of what `isJunk`,
+ * `looksLikeArticle` and the rest measured. Now that the cells are stored as a table instead,
+ * a report that is largely one exhibit — an economic calendar, a league table — would be
+ * judged on its prose alone and could fail a 700-character floor it had been clearing, which
+ * would drop the report rather than improve it. The gates read the union; the page stores the
+ * prose; neither has to know the other's shape.
+ */
+export function evidenceText(raw: Pick<RawArticle, "text" | "tables">): string {
+  const cells = (raw.tables ?? []).flatMap((table) => table.rows.flat()).filter(Boolean);
+  return cells.length ? `${raw.text}\n\n${cells.join(" ")}` : raw.text;
+}
+
 export async function persistArticle(
   institutionId: string,
   raw: RawArticle,
 ): Promise<PersistResult> {
   const partitioned = partitionArticleSegments(raw.segments?.length ? raw.segments : [{ heading: null, text: raw.text }]);
   const text = partitioned.body.map((segment) => segment.text).join("\n\n").trim();
-  if (!raw.title || text.length < 120) return "empty";
+  const tableRows = (raw.tables ?? []).map((table) => ({
+    afterSegmentPosition: table.afterSegmentPosition,
+    ordinal: table.ordinal,
+    caption: table.caption,
+    headerRow: table.headerRow,
+    dataJson: JSON.stringify({ rows: table.rows }),
+  }));
+  // What the gates judge, before the tables are separated from the prose they used to be part of.
+  const evidence = evidenceText(raw);
+  if (!raw.title || evidence.length < 120) return "empty";
   // Cleaning gate: reject nav/menu dumps always; enforce the full article
   // check for extracted HTML pages.
-  if (isJunk(text)) return "empty";
-  if (raw.strict && !looksLikeArticle(raw.title, text)) return "empty";
+  if (isJunk(evidence)) return "empty";
+  if (raw.strict && !looksLikeArticle(raw.title, evidence)) return "empty";
 
   const uHash = urlHash(raw.sourceUrl);
   const tHash = titleHash(raw.title);
@@ -69,14 +113,23 @@ export async function persistArticle(
 
   const sameUrl = await prisma.article.findUnique({
     where: { urlHash: uHash },
-    select: { id: true, title: true, rawText: true, contentHash: true, disclaimerText: true, _count: { select: { segments: true } } },
+    select: {
+      id: true,
+      title: true,
+      rawText: true,
+      contentHash: true,
+      disclaimerText: true,
+      _count: { select: { segments: true } },
+      tables: { select: { afterSegmentPosition: true, ordinal: true, caption: true, headerRow: true, dataJson: true } },
+    },
   });
   if (sameUrl) {
     if (sameUrl.rawText === text) {
       const titleChanged = raw.title !== sameUrl.title;
       const disclaimerChanged = (raw.disclaimerText ?? partitioned.disclaimer) !== sameUrl.disclaimerText;
       const layoutImproved = partitioned.body.length > sameUrl._count.segments;
-      if (titleChanged || disclaimerChanged || layoutImproved) {
+      const tablesChanged = !sameTables(sameUrl.tables, tableRows);
+      if (titleChanged || disclaimerChanged || layoutImproved || tablesChanged) {
         await prisma.$transaction(async (tx) => {
           if (titleChanged || layoutImproved) {
             await tx.articleTranslation.deleteMany({ where: { articleId: sameUrl.id } });
@@ -94,8 +147,24 @@ export async function persistArticle(
             disclaimerText: raw.disclaimerText ?? partitioned.disclaimer,
             ...(layoutImproved ? { segments: { create: partitioned.body.map((segment, position) => ({ position, heading: segment.heading, text: segment.text })) } } : {}),
           } });
+          /**
+           * Tables are refreshed on their own path, and that path deliberately touches
+           * nothing else.
+           *
+           * They live beside the segments rather than in them, so replacing them leaves the
+           * segments, the analysis and the translation exactly as they were. That is the
+           * whole reason a report which is already translated can be given its tables — the
+           * operation cannot invalidate a translation, so it cannot re-bill one.
+           */
+          if (tablesChanged || titleChanged || layoutImproved) {
+            await tx.articleTable.deleteMany({ where: { articleId: sameUrl.id } });
+            if (tableRows.length) await tx.articleTable.createMany({ data: tableRows.map((table) => ({ ...table, articleId: sameUrl.id })) });
+          }
         });
         if (titleChanged || layoutImproved) await refreshClassification(sameUrl.id, cHash, tHash, raw.title, text);
+        // A corrected title, a new disclaimer or a re-segmented body all move the gate: the
+        // first decides `abnormal_title`, the others decide thin or garbled content.
+        await refreshGate(sameUrl.id);
         return "updated";
       }
       return "duplicate";
@@ -110,6 +179,7 @@ export async function persistArticle(
       await tx.articleAsset.deleteMany({ where: { articleId: sameUrl.id } });
       await tx.atomicView.deleteMany({ where: { articleId: sameUrl.id } });
       await tx.articleSegment.deleteMany({ where: { articleId: sameUrl.id } });
+      await tx.articleTable.deleteMany({ where: { articleId: sameUrl.id } });
       await tx.article.update({
         where: { id: sameUrl.id },
         data: {
@@ -121,10 +191,12 @@ export async function persistArticle(
           rawText: text,
           disclaimerText: raw.disclaimerText ?? partitioned.disclaimer,
           segments: { create: partitioned.body.map((segment, position) => ({ position, heading: segment.heading, text: segment.text })) },
+          ...(tableRows.length ? { tables: { create: tableRows } } : {}),
         },
       });
     });
     await refreshClassification(sameUrl.id, cHash, tHash, raw.title, text);
+    await refreshGate(sameUrl.id);
     return "updated";
   }
 
@@ -172,8 +244,13 @@ export async function persistArticle(
           text: segment.text,
         })),
       },
+      ...(tableRows.length ? { tables: { create: tableRows } } : {}),
     },
   });
   await refreshClassification(created.id, cHash, tHash, raw.title, text);
+  // The verdict is written even though it is "no" at this point: the report has no analysis and
+  // no translation yet, so its page would answer 404 and no listing should offer it. The
+  // analysis pass and the translation pass each recompute it when they land.
+  await refreshGate(created.id);
   return "created";
 }

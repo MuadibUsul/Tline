@@ -22,6 +22,28 @@ export interface ArticlePdfInput {
   /** English only: the Chinese rendering of a report lives on the page, not in a PDF. */
   locale: "en";
   segments: DocumentSegment[];
+  /** Anchored to body segments exactly as on the page, so the PDF and the page agree. */
+  tables?: PdfTable[];
+}
+
+export interface PdfTable {
+  afterSegmentPosition: number;
+  caption: string | null;
+  headerRow: boolean;
+  rows: string[][];
+}
+
+/** The stored table payload, or an empty grid when a row was written by an older shape. */
+function parseTableRows(dataJson: string): string[][] {
+  try {
+    const parsed = JSON.parse(dataJson) as { rows?: unknown };
+    if (!Array.isArray(parsed.rows)) return [];
+    return parsed.rows
+      .filter((row): row is unknown[] => Array.isArray(row))
+      .map((row) => row.map((cell) => String(cell ?? "")));
+  } catch {
+    return [];
+  }
 }
 
 function fontCandidates(bold: boolean) {
@@ -41,6 +63,66 @@ function configureFonts(doc: PDFKit.PDFDocument) {
     regular: regular ? "TlineRegular" : "Helvetica",
     bold: bold || regular ? "TlineBold" : "Helvetica-Bold",
   };
+}
+
+/**
+ * Draw one table, typeset rather than flattened.
+ *
+ * A generated PDF is the only English document for a report whose publisher offered none, so
+ * it has to carry the exhibits — and the cells are no longer in the body text they used to be
+ * lifted into. Columns take widths proportional to their content (clamped, so one wordy column
+ * cannot squeeze the others to nothing), rows are ruled underneath, and a row that will not fit
+ * moves the whole table on rather than splitting a figure from its heading.
+ */
+function drawTable(doc: PDFKit.PDFDocument, table: PdfTable, fonts: { regular: string; bold: string }, contentWidth: number) {
+  const columns = Math.max(...table.rows.map((row) => row.length));
+  if (columns === 0) return;
+  const CELL = 8.5;
+  const padX = 5;
+  const padY = 3.5;
+  const left = doc.page.margins.left;
+  const weights = Array.from({ length: columns }, (_, column) =>
+    Math.min(60, Math.max(8, ...table.rows.map((row) => (row[column] ?? "").length))));
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  const widths = weights.map((weight) => (weight / totalWeight) * contentWidth);
+
+  const heightOf = (row: string[], bold: boolean) => {
+    doc.font(bold ? fonts.bold : fonts.regular).fontSize(CELL);
+    return Math.max(...Array.from({ length: columns }, (_, column) =>
+      doc.heightOfString(row[column] || " ", { width: widths[column] - padX * 2, lineGap: 1.5 }))) + padY * 2;
+  };
+  const drawRow = (row: string[], bold: boolean) => {
+    const top = doc.y;
+    const height = heightOf(row, bold);
+    doc.font(bold ? fonts.bold : fonts.regular).fontSize(CELL);
+    let x = left;
+    for (let column = 0; column < columns; column++) {
+      const cell = row[column] ?? "";
+      if (cell) doc.fillColor(bold ? "#14161b" : "#3d424d").text(cell, x + padX, top + padY, { width: widths[column] - padX * 2, lineGap: 1.5 });
+      x += widths[column];
+    }
+    doc.strokeColor("#e4e7ec").lineWidth(0.5).moveTo(left, top + height).lineTo(left + contentWidth, top + height).stroke();
+    doc.y = top + height;
+  };
+
+  if (table.caption) {
+    doc.font(fonts.regular).fontSize(8.5).fillColor("#6a7180").text(table.caption, { lineGap: 2 });
+    doc.moveDown(0.3);
+  }
+  doc.moveDown(0.3);
+  const bottom = doc.page.height - doc.page.margins.bottom;
+  // A table begun at the foot of a page reads as a fragment; start it on the next one instead.
+  if (doc.y > bottom - 120) doc.addPage();
+  const header = table.headerRow ? table.rows[0] : null;
+  if (header) drawRow(header, true);
+  for (const row of table.headerRow ? table.rows.slice(1) : table.rows) {
+    if (doc.y > bottom - 36) {
+      doc.addPage();
+      if (header) drawRow(header, true);
+    }
+    drawRow(row, false);
+  }
+  doc.moveDown(0.9);
 }
 
 export async function createArticlePdf(input: ArticlePdfInput) {
@@ -79,7 +161,10 @@ export async function createArticlePdf(input: ArticlePdfInput) {
   doc.strokeColor("#2f55d4").lineWidth(1.2).moveTo(doc.x, doc.y).lineTo(doc.x + contentWidth, doc.y).stroke();
   doc.moveDown(1.4);
 
-  for (const segment of input.segments) {
+  const tables = input.tables ?? [];
+  const tablesAt = (index: number) => tables.filter((table) => table.afterSegmentPosition === index);
+  for (const table of tables.filter((entry) => entry.afterSegmentPosition < 0)) drawTable(doc, table, fonts, contentWidth);
+  for (const [position, segment] of input.segments.entries()) {
     if (segment.heading) {
       if (doc.y > doc.page.height - 145) doc.addPage();
       doc.font(fonts.bold).fontSize(13).fillColor("#14161b").text(segment.heading, { lineGap: 2 });
@@ -92,7 +177,9 @@ export async function createArticlePdf(input: ArticlePdfInput) {
       });
       doc.moveDown(0.75);
     }
+    for (const table of tablesAt(position)) drawTable(doc, table, fonts, contentWidth);
   }
+  for (const table of tables.filter((entry) => entry.afterSegmentPosition >= input.segments.length)) drawTable(doc, table, fonts, contentWidth);
 
   doc.moveDown(0.8);
   doc.strokeColor("#e4e7ec").lineWidth(0.7).moveTo(doc.x, doc.y).lineTo(doc.x + contentWidth, doc.y).stroke();
@@ -180,6 +267,7 @@ export async function generateArticleDocuments(articleId: string) {
     include: {
       institution: true,
       segments: { orderBy: { position: "asc" } },
+      tables: { orderBy: [{ afterSegmentPosition: "asc" }, { ordinal: "asc" }] },
       documents: {
         where: { kind: "source_native", locale: "en", status: "ready" },
         select: { kind: true },
@@ -202,6 +290,12 @@ export async function generateArticleDocuments(articleId: string) {
     sourceUrl: article.sourceUrl,
     locale: "en",
     segments: sourceSegments,
+    tables: article.tables.map((table) => ({
+      afterSegmentPosition: table.afterSegmentPosition,
+      caption: table.caption,
+      headerRow: table.headerRow,
+      rows: parseTableRows(table.dataJson),
+    })),
   });
 
   // English only. The Chinese rendering of a report lives on the page, where it can be

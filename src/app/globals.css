@@ -294,6 +294,17 @@ td.inst{color:var(--ink);font-weight:600}
 
 .mono-cell{font-family:var(--mono)}
 
+/* A table inside a report's body: the publisher's own rows, set in the site's table language.
+   The scroll container is the point — a wide exhibit scrolls sideways instead of shrinking the
+   reading column to nothing, and the reading column keeps its 70ch measure. */
+.article-table{margin:2px 0 18px}
+.article-table figcaption{margin-top:8px;font-size:12.5px;line-height:1.5;color:var(--muted)}
+/* The measure is the reading column's, not the admin panel's: a two-column exhibit should not
+   reserve 520px of scroll for itself. */
+.article-table table{min-width:0}
+.article-table th{font-size:12px}
+.article-table td{font-size:13px;vertical-align:top}
+
 
 /* layout helpers */
 .grid-main{display:grid;grid-template-columns:1.5fr 1fr;gap:22px;margin-top:20px}

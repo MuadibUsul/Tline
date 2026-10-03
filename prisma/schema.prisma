@@ -82,6 +82,22 @@ model Article {
   translationFailCount     Int       @default(0)
   translationNextAttemptAt DateTime?
 
+  /// The publication gate's verdict, written down.
+  ///
+  /// `contentQuality` is a function of the row's own fields — title, body, summary, translation
+  /// status and score — and the page still computes it per request, which is why a report that
+  /// gets fixed comes back by itself. What could not be computed per request is the *listing*:
+  /// deciding which cards belong means loading every candidate's body, so the listings asked
+  /// only `publicationReadyWhere`, and advertised cards whose own page answers 404 — and, on
+  /// /zh, cards whose page 308s to the English one. One indexed boolean per language gives the
+  /// listings the same answer the page will give; it gives the sitemap that answer without
+  /// reading a body (one shard fetched 34 MB of them); and it gives an operator the reason.
+  indexableEn    Boolean   @default(false)
+  indexableZh    Boolean   @default(false)
+  gateIssuesEn   String? // JSON array of contentQuality issue codes
+  gateIssuesZh   String?
+  gateCheckedAt  DateTime?
+
   institution    Institution            @relation(fields: [institutionId], references: [id])
   analysis       Analysis?
   articleAssets  ArticleAsset[]
@@ -90,6 +106,7 @@ model Article {
   documents      ArticleDocument[]
   atomicViews    AtomicView[]
   figures        ArticleFigure[]
+  tables         ArticleTable[]
   macroForecasts MacroForecast[]
   contentRetries ContentRetry[]
   classification ContentClassification?
@@ -97,6 +114,10 @@ model Article {
   @@index([institutionId, publishedAt])
   // The home feed and /research order globally by recency; without this the planner sorts the whole table.
   @@index([publishedAt])
+  // Listings filter on the gate's verdict and then order; the boolean first so the index is
+  // usable for the filter, the date second so the order comes from the same scan.
+  @@index([indexableEn, publishedAt])
+  @@index([indexableZh, publishedAt])
   @@index([titleHash])
   @@index([contentHash])
   // The processing CLIs select "not yet done and due for another attempt", newest first.
@@ -199,6 +220,38 @@ model ArticleFigure {
   width                Int?
   height               Int?
   byteSize             Int?
+  createdAt            DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, afterSegmentPosition, ordinal])
+  @@index([articleId])
+}
+
+/// A table from the publisher's page, kept as a table instead of flattened into the prose.
+///
+/// The body walker visited `h2,h3,h4,p,li` and nothing else, so a `<table>` was never a node
+/// it could place: a cell holding a `<p>` had that paragraph lifted into the body on its own,
+/// which is how a page of figures arrived as a run of sentences with no rows and no columns,
+/// while a cell holding only `1,234` was dropped outright. `plan20260827.md` §07 has always
+/// required tables to survive extraction ("保留标题层级、段落、列表、表格、图片、脚注"), so this
+/// is the gap between that contract and the extractor, not a change of mind.
+///
+/// Anchored like a figure rather than stored as a segment, and that is the point of the shape:
+/// an anchor leaves `ArticleSegment` untouched, so adding a table to a report that already has
+/// a translation neither renumbers segments nor invalidates the translation — and a change
+/// that does not invalidate a translation cannot re-bill one.
+///
+/// `dataJson` holds `{"rows":[["",""],...]}`. The table is not duplicated into the sibling
+/// segments: `text` stays the reader's prose.
+model ArticleTable {
+  id                   String   @id @default(cuid())
+  articleId            String
+  afterSegmentPosition Int // render after the body segment at this position; identical in EN and ZH
+  ordinal              Int // order among tables sharing the same anchor
+  caption              String?
+  headerRow            Boolean  @default(true)
+  dataJson             String
   createdAt            DateTime @default(now())
 
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)

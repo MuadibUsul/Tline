@@ -57,7 +57,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
   // container's heap and took the process down (the page 502s while everything else briefly
   // does too). None of those large columns are needed here.
   const allViews = await prisma.atomicView.findMany({
-    where: { article: publicationReadyWhere({ publishedAt: { gte: windowStart } }) },
+    where: { article: publicationReadyWhere({ publishedAt: { gte: windowStart } }, locale) },
     select: {
       id: true, articleId: true, viewEn: true, viewZh: true, type: true, asset: true,
       assetTicker: true, topic: true, direction: true, timeHorizon: true, value: true,

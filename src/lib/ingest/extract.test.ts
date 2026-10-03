@@ -4,6 +4,56 @@ import { extractArticle, extractFeedLinks, extractFullArticleLinks, extractLinks
 import { articleAllowed, candidateAllowed, documentOrigins, embeddedPdfLimit, listingUrls, minimumArticleLimit, minimumLookbackHours, prefersNativePdf, printsToPdf, refreshKnownCandidate, sitemapEnabled, sitemapUrls } from "./sourceRules";
 import { stripTrailingDisclaimerSegments } from "../articleText";
 
+test("keeps a publisher's table as a table, and its cells out of the prose", () => {
+  // The shape that used to arrive as loose sentences: a calendar whose cells hold figures.
+  const lead = "The week ahead is dominated by the September payroll report and two central bank meetings. ".repeat(6);
+  const article = extractArticle(
+    `<html><head><title>FX Daily | Bank</title></head><body><main><article><h1>FX Daily</h1>` +
+      `<p>${lead}</p>` +
+      `<table><thead><tr><th>Country</th><th>Consensus</th><th>Previous</th></tr></thead>` +
+      `<tbody><tr><td>US</td><td>145k</td><td>142k</td></tr><tr><td>CA</td><td>22k</td><td>20k</td></tr></tbody></table>` +
+      `</article></main></body></html>`,
+    "https://www.bank.com/fx/fx-daily",
+  );
+  assert.equal(article.tables.length, 1);
+  const table = article.tables[0];
+  assert.equal(table.headerRow, true);
+  assert.deepEqual(table.rows, [["Country", "Consensus", "Previous"], ["US", "145k", "142k"], ["CA", "22k", "20k"]]);
+  // The cells belong to the table now. This is the defect being fixed: they used to be lifted
+  // into the body as separate paragraphs, which is how a page of figures lost its rows and
+  // columns and arrived as a run of sentences.
+  assert.doesNotMatch(article.text, /145k/);
+  assert.doesNotMatch(article.text, /Consensus/);
+  assert.equal(table.afterSegmentPosition, 0);
+});
+
+test("repeats a merged cell so the columns below it stay aligned", () => {
+  const lead = "Regional allocations shifted again this month as the rate path repriced across markets. ".repeat(6);
+  const article = extractArticle(
+    `<html><head><title>Allocation | Bank</title></head><body><main><article><h1>Allocation</h1><p>${lead}</p>` +
+      `<table><tr><th colspan="2">Fixed income</th><th>Equity</th></tr>` +
+      `<tr><td>US</td><td>EU</td><td>JP</td></tr></table>` +
+      `</article></main></body></html>`,
+    "https://www.bank.com/insights/allocation",
+  );
+  assert.equal(article.tables.length, 1);
+  assert.deepEqual(article.tables[0].rows[0], ["Fixed income", "Fixed income", "Equity"]);
+});
+
+test("refuses a layout table and leaves its text in the body", () => {
+  // Two cells holding the article and its rail: furniture, not an exhibit. The text inside it
+  // is still the article, so refusing the table must not discard the paragraph with it.
+  const body = "We expect the front end of the curve to outperform as the policy path is repriced. ".repeat(6);
+  const article = extractArticle(
+    `<html><head><title>Rates | Bank</title></head><body><main><article><h1>Rates</h1>` +
+      `<table><tr><td><p>${body}</p></td><td>Sign up for our newsletter</td></tr></table>` +
+      `</article></main></body></html>`,
+    "https://www.bank.com/insights/rates",
+  );
+  assert.equal(article.tables.length, 0);
+  assert.match(article.text, /front end of the curve/);
+});
+
 test("captures inline figures in document order and anchors them to body segments", () => {
   const lead = "Our tactical allocation framework blends quantitative signals with fundamental overlays. ".repeat(6);
   const tail = "We reduced the long-duration Treasury overweight and rotated into credit exposure this quarter. ".repeat(6);

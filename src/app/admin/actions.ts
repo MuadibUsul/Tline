@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSessionUser } from "@/lib/auth";
+import { refreshGate } from "@/lib/gate";
 import { writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { can, type PermissionAction } from "@/lib/permissions";
@@ -79,6 +80,10 @@ export async function resolveContentReview(formData: FormData) {
   } else {
     await prisma.articleTranslation.updateMany({ where: { articleId, status: "needs_review" }, data: { status: "reviewed" } });
   }
+  // Review status is a gate input in both languages: an operator approving a review is
+  // releasing the report, so the verdict has to be recomputed here or the listing would keep
+  // hiding a page that now exists.
+  await refreshGate(articleId);
   await writeAudit({ actorId: user.id, action: "content.review.resolve", targetType: "article", targetId: articleId, metadata: { kind, title: article.title } });
   revalidatePath(`/research/${articleId}`);
   revalidatePath("/admin/review");

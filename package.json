@@ -34,6 +34,7 @@
     "reparse": "tsx prisma/reparse.ts",
     "retitle": "tsx prisma/retitle.ts",
     "withdraw": "tsx prisma/withdraw.ts",
+    "gate:recompute": "tsx scripts/gate-recompute.ts",
     "dedupe:regional": "tsx prisma/dedupe-regional.ts",
     "watchdog": "tsx scripts/watchdog.ts",
     "translate": "tsx prisma/translate.ts",

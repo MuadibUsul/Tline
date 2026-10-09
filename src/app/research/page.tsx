@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { JsonLd, canonical, clamp, itemListJsonLd, localizedUrl, ogImage, researchSeoTitle } from "@/lib/seo";
+import { JsonLd, breadcrumbJsonLd, canonical, clamp, itemListJsonLd, localizedUrl, ogImage, researchSeoTitle } from "@/lib/seo";
 import Link from "next/link";
 import { ResearchCard } from "@/app/_components/ui";
 import LiveFeed from "@/app/_components/LiveFeed";
@@ -41,12 +41,13 @@ export async function generateMetadata(props: { searchParams: Promise<ResearchSe
   const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
   const filtered = Object.entries(searchParams).some(([key, value]) => key !== "page" && Boolean(value));
-  const emptyPage = !filtered && page > 1 && (page - 1) * 20 >= await prisma.article.count({ where: publicationReadyWhere(undefined, locale) });
+  const reportCount = await prisma.article.count({ where: publicationReadyWhere(undefined, locale) });
+  const emptyPage = !filtered && page > 1 && (page - 1) * 20 >= reportCount;
   const title = researchSeoTitle(locale);
   const description = tr(
     locale,
-    "Bank and asset-manager research, each report reduced to its conclusion, asset views, targets, horizons and risks, with a link to the original.",
-    "银行与资管机构的公开研报：每篇提炼为结论、资产观点、目标价、期限与风险，并保留原始来源链接。",
+    `${reportCount} source-linked bank and asset-manager reports, structured into conclusions, asset views, stated targets, horizons and risks.`,
+    `${reportCount}篇可溯源的银行与资管机构公开研报，按结论、资产观点、明确目标、期限与风险进行结构化整理。`,
   );
   return {
     ...canonical(!filtered && page > 1 ? `/research?page=${page}` : "/research", locale),
@@ -180,12 +181,14 @@ export default async function ResearchIndex(
 
   return (
     <main className="wrap">
+      <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Research", "研报"), path: "/research" }])} />
+      <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")}><Link href={localePath(locale, "/")}>{tr(locale, "Home", "首页")}</Link><span>›</span><span>{tr(locale, "Research", "研报")}</span></nav>
       <LiveFeed
         initial={pulse}
         label={tr(locale, "New research", "有新研报")}
         ariaLabel={tr(locale, "Load newly published research", "载入新发布的研报")}
       />
-      <div className="page-head"><div className="eyebrow">{tr(locale, "Feed", "研报流")}</div><h1>{tr(locale, "Latest Research", "最新研报")}</h1>
+      <div className="page-head"><div className="eyebrow">{tr(locale, "Feed", "研报流")}</div><h1>{filtered ? tr(locale, `${total} matching institutional reports`, `${total}篇匹配的机构研报`) : tr(locale, `${total} source-linked institutional research reports`, `${total}篇可溯源机构研报`)}</h1>
         <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, `${total} structured institutional reports.`, `共 ${total} 篇结构化机构研报。`)}</p>
       </div>
       {/* The list itself is an ItemList: the items are exactly the cards rendered below, so

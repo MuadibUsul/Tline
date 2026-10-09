@@ -55,3 +55,6 @@ export function legacyNonAssetRedirectPath(value: string) {
   const topic = taxonomy.events.find((event) => event.key === alias.replacementKey)?.defaultTopicKey;
   return topic ? `/topics/${topic}` : null;
 }
+
+/** A sitemap entry must resolve as an asset page, not redirect to a different facet. */
+export const isPublicAssetTicker = (ticker: string) => legacyNonAssetRedirectPath(ticker) === null;

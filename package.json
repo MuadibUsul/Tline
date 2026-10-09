@@ -69,6 +69,8 @@
     "analytics:rollup": "tsx scripts/analytics-rollup.ts",
     "seo:status": "tsx scripts/seo-status.ts",
     "seo:baseline": "node scripts/seo-baseline.mjs",
+    "seo:keywords": "tsx scripts/seo-keyword-coverage.ts",
+    "seo:keyword-pages": "node scripts/seo-keyword-pages.mjs",
     "classification:shadow": "tsx scripts/classification-shadow.ts",
     "classification:eval": "tsx scripts/classification-eval.ts",
     "classification:backfill": "tsx scripts/classification-backfill.ts",

@@ -3,7 +3,7 @@ import { publicationReadyWhere } from "@/lib/publication";
 import { siteUrl } from "@/lib/site";
 import { LOCALES, localePath, type Locale } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
-import { assetPath } from "@/lib/assetPath";
+import { assetPath, isPublicAssetTicker } from "@/lib/assetPath";
 import { listIndexableTopics, topicPath } from "@/lib/topics";
 import { taxonomy } from "@/lib/classification/taxonomy";
 import { loadPublicThemes } from "@/lib/marketThemesPublic";
@@ -153,6 +153,7 @@ export async function buildAssetsSitemap(locale: Locale): Promise<SitemapEntry[]
     },
   });
   return localizedEntries(locale, assets.flatMap((asset) => {
+    if (!isPublicAssetTicker(asset.ticker)) return [];
     if (new Set(asset.articleAssets.map((item) => item.article.institutionId)).size < 2) return [];
     const articleChanged = asset.articleAssets.reduce<Date | undefined>((latest, item) => !latest || item.article.updatedAt > latest ? item.article.updatedAt : latest, undefined);
     return [{

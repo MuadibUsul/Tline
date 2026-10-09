@@ -4,6 +4,7 @@ import { computeConsensus, consensusDeltas, type ConsensusResult } from "./conse
 import { directionLabel } from "./assets";
 import { publicationReadyWhere } from "./publication";
 import { articleTimestamp, type Locale } from "./i18n";
+import { researchLookupWhere } from "./researchPath";
 
 /**
  * Exactly the fields a research card reads. Every listing uses this instead of `include`.
@@ -262,7 +263,7 @@ export async function getInstitutionView(slug: string, locale?: Locale) {
 
 export async function getResearchView(identifier: string) {
   return prisma.article.findFirst({
-    where: publicationReadyWhere({ OR: [{ id: identifier }, { slug: identifier }] }),
+    where: publicationReadyWhere(researchLookupWhere(identifier)),
     include: {
       institution: true,
       analysis: true,

@@ -67,6 +67,7 @@
     "themes:snapshot": "tsx scripts/trading-theme-snapshot.ts",
     "analytics:rollup": "tsx scripts/analytics-rollup.ts",
     "seo:status": "tsx scripts/seo-status.ts",
+    "seo:baseline": "node scripts/seo-baseline.mjs",
     "classification:shadow": "tsx scripts/classification-shadow.ts",
     "classification:eval": "tsx scripts/classification-eval.ts",
     "classification:backfill": "tsx scripts/classification-backfill.ts",

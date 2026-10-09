@@ -26,3 +26,13 @@ function slugPart(value: string) {
 export function researchPath(article: { slug: string }) {
   return `/research/${article.slug}`;
 }
+
+/** Accept the immutable public slug and the pre-slug database ID. */
+export function researchLookupWhere(identifier: string) {
+  return { OR: [{ id: identifier }, { slug: identifier }] };
+}
+
+/** Historical IDs redirect once; the stored slug is already the final public address. */
+export function researchRedirectPath(identifier: string, article: { slug: string }) {
+  return identifier === article.slug ? null : researchPath(article);
+}

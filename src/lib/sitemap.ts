@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
 import { siteUrl } from "@/lib/site";
-import { LOCALES, localePath } from "@/lib/i18n";
+import { LOCALES, localePath, type Locale } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
 import { assetPath } from "@/lib/assetPath";
 import { listIndexableTopics, topicPath } from "@/lib/topics";
@@ -14,254 +14,234 @@ export interface SitemapEntry {
   lastModified: Date;
   changeFrequency?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
   priority?: number;
-  /**
-   * The same page in its other language.
-   *
-   * Declared here as well as in the page head because the two disagree by construction: a
-   * page can be listed only in the language that passed the quality gate, and the sitemap is
-   * where a crawler reads which languages exist for a URL without rendering it.
-   */
   alternates?: SitemapAlternate[];
 }
 
-/** Every entry is listed in both languages, so both are declared, with English as default. */
-const PAGE_ALTERNATES: Array<{ hreflang: string; locale: (typeof LOCALES)[number] }> = [
+export type SitemapKind = "pages" | "institutions" | "assets" | "topics" | "research";
+export interface SitemapRequest { kind: SitemapKind; locale: Locale; index: number }
+export interface SitemapIndexEntry { url: string; lastModified?: Date }
+
+const PAGE_ALTERNATES: Array<{ hreflang: string; locale: Locale }> = [
   { hreflang: "en", locale: "en" },
   { hreflang: "zh-CN", locale: "zh-CN" },
   { hreflang: "x-default", locale: "en" },
 ];
 
-/**
- * Articles per research shard. Each article contributes up to one URL per locale, so this
- * leaves a wide margin under the 50,000 URL / 50MB ceiling a single sitemap file may hold.
- */
-export const SHARD_SIZE = Math.max(100, Number(process.env.SITEMAP_SHARD_SIZE || 2000));
-
-/**
- * Articles read from the database at a time while a shard is assembled.
- *
- * Reading in chunks keeps peak memory flat no matter how large the corpus grows.
- */
-const SCAN_CHUNK = 250;
+export const SITEMAP_MAX_URLS = 50_000;
+export const SITEMAP_MAX_BYTES = 50 * 1024 * 1024;
+/** One report contributes one URL to a language shard, with ample protocol headroom. */
+export const SHARD_SIZE = Math.min(20_000, Math.max(100, Number(process.env.SITEMAP_SHARD_SIZE || 2000)));
 
 const ARTICLE_ORDER = [{ publishedAt: "asc" as const }, { id: "asc" as const }];
-
-/**
- * Oldest first, so an article keeps the shard it was born in.
- *
- * Newest-first would renumber every shard each time an article arrived, and a crawler
- * would have to refetch all of them to discover that nothing but the newest had changed.
- */
-/**
- * The fields a shard needs, and no more.
- *
- * It used to carry `rawText` and the translation's `text` because the shard ran `contentQuality`
- * on every article in it — 18 KB per report, about 34 MB for a full shard, to produce a 1.39 MB
- * document. The gate's answer is a column now (`Article.indexableEn` / `indexableZh`, written by
- * `refreshGate`), so the shard reads two booleans instead, and the bodies stay in the database.
- */
 const ARTICLE_SELECT = {
   slug: true,
   updatedAt: true,
   indexableEn: true,
   indexableZh: true,
-  translations: {
-    where: { locale: "zh-CN" },
-    take: 1,
-    select: { updatedAt: true },
-  },
+  translations: { where: { locale: "zh-CN" }, take: 1, select: { updatedAt: true } },
 } as const;
+
+const changed = (date: string) => new Date(`${date}T00:00:00.000Z`);
+const STATIC_ROUTES: Array<{ path: string; changedAt: Date; changeFrequency: SitemapEntry["changeFrequency"]; priority: number }> = [
+  { path: "/", changedAt: changed("2026-09-23"), changeFrequency: "hourly", priority: 1 },
+  { path: "/research", changedAt: changed("2026-10-04"), changeFrequency: "hourly", priority: 0.9 },
+  { path: "/markets", changedAt: changed("2026-09-20"), changeFrequency: "daily", priority: 0.8 },
+  { path: "/institutions", changedAt: changed("2026-10-04"), changeFrequency: "daily", priority: 0.8 },
+  { path: "/macro", changedAt: changed("2026-09-27"), changeFrequency: "hourly", priority: 0.8 },
+  { path: "/macro/calendar", changedAt: changed("2026-09-27"), changeFrequency: "daily", priority: 0.6 },
+  { path: "/topics", changedAt: changed("2026-09-20"), changeFrequency: "daily", priority: 0.7 },
+  { path: "/economies", changedAt: changed("2026-09-27"), changeFrequency: "daily", priority: 0.7 },
+  { path: "/about", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.5 },
+  { path: "/methodology", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.6 },
+  { path: "/editorial-policy", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.5 },
+  { path: "/ai-usage", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.5 },
+  { path: "/sources", changedAt: changed("2026-09-13"), changeFrequency: "weekly", priority: 0.6 },
+  { path: "/privacy", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.5 },
+  { path: "/corrections", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.5 },
+  { path: "/financial-disclaimer", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.4 },
+];
+
+const later = (fallback: Date, ...values: Array<Date | null | undefined>) => values.reduce<Date>((latest, value) => value && value > latest ? value : latest, fallback);
 
 /** The languages the stored verdict admits for this report. */
 export function indexableSitemapLocales(article: { indexableEn: boolean; indexableZh: boolean }) {
-  return LOCALES.filter((locale) => (locale === "zh-CN" ? article.indexableZh : article.indexableEn));
+  return LOCALES.filter((locale) => locale === "zh-CN" ? article.indexableZh : article.indexableEn);
 }
 
-const STATIC_ROUTES: Array<[string, SitemapEntry["changeFrequency"], number]> = [
-  ["/", "hourly", 1],
-  ["/research", "hourly", 0.9],
-  ["/markets", "daily", 0.8],
-  ["/institutions", "daily", 0.8],
-  ["/macro", "hourly", 0.8],
-  ["/macro/calendar", "daily", 0.6],
-  ["/topics", "daily", 0.7],
-  /**
-   * The economy dashboards were missing from here while answering `index, follow`.
-   *
-   * The hub is linked from nowhere and the fourteen dashboards only from the jurisdiction
-   * chip on a report, so the section was indexable on its own say-so and discoverable only
-   * by chance. All fourteen carry three or four populated sections, so they are pages the
-   * site wants found rather than pages it should withhold.
-   */
-  ["/economies", "daily", 0.7],
-  ["/about", "monthly", 0.5],
-  ["/methodology", "monthly", 0.6],
-  ["/editorial-policy", "monthly", 0.5],
-  ["/ai-usage", "monthly", 0.5],
-  ["/sources", "weekly", 0.6],
-  ["/privacy", "monthly", 0.5],
-  ["/corrections", "monthly", 0.5],
-  ["/financial-disclaimer", "monthly", 0.4],
-];
-
-const STATIC_UPDATED_AT = new Date("2026-09-13T00:00:00.000Z");
-
-export async function researchArticleCount(): Promise<number> {
-  return prisma.article.count({ where: publicationReadyWhere() });
-}
-
-/** Shard 0 carries the site's own pages; 1..N carry research. Always at least one of each. */
-export async function researchShardCount(): Promise<number> {
-  return Math.max(1, Math.ceil((await researchArticleCount()) / SHARD_SIZE));
-}
-
-/** Every page that is not an article, in both languages. */
-export async function buildPagesShard(): Promise<SitemapEntry[]> {
+function localizedEntries(locale: Locale, entries: Array<Omit<SitemapEntry, "url" | "alternates"> & { path: string }>): SitemapEntry[] {
   const base = siteUrl();
-  const [institutions, assets, indicators, consensusUpdates, settledInstitutions] = await Promise.all([
-    prisma.institution.findMany({ where: { articles: { some: publicationReadyWhere() } }, select: { id: true, slug: true, lastDiscoveredAt: true } }),
-    prisma.asset.findMany({
-      where: { articleAssets: { some: { article: publicationReadyWhere() } } },
-      select: { id: true, ticker: true, articleAssets: { where: { article: publicationReadyWhere() }, select: { article: { select: { institutionId: true } } } } },
-    }),
+  return entries.map(({ path, ...entry }) => ({
+    ...entry,
+    url: base + localePath(locale, path),
+    alternates: PAGE_ALTERNATES.map((alternate) => ({ hreflang: alternate.hreflang, href: base + localePath(alternate.locale, path) })),
+  }));
+}
+
+export async function buildPagesSitemap(locale: Locale): Promise<SitemapEntry[]> {
+  const [latestArticle, latestConsensus, latestIndicator, latestRelease, indicators, liveThemes] = await Promise.all([
+    prisma.article.findFirst({ where: publicationReadyWhere(), orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
+    prisma.consensusHistory.findFirst({ orderBy: { timestamp: "desc" }, select: { timestamp: true } }),
+    prisma.macroIndicator.findFirst({ where: { enabled: true }, orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
+    prisma.macroRelease.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
     prisma.macroIndicator.findMany({ where: { enabled: true }, select: { canonicalKey: true, updatedAt: true } }),
-    prisma.consensusHistory.findMany({ orderBy: { timestamp: "desc" }, distinct: ["assetId"], select: { assetId: true, timestamp: true } }),
-    prisma.forecast.findMany({ where: { status: "settled" }, distinct: ["institutionId"], select: { institutionId: true } }),
+    loadPublicThemes(),
   ]);
-  const consensusUpdatedAt = new Map(consensusUpdates.map((row) => [row.assetId, row.timestamp]));
-  // An accuracy page with nothing settled is the same sentence on every institution's page.
-  // Offering fifty of those is how a map spends its crawl budget on pages that will be read
-  // once and never indexed; they stay reachable, just not advertised.
-  const hasSettledForecasts = new Set(settledInstitutions.map((row) => row.institutionId));
-
-  // Listed only when the public summary has something to summarise, by the same call the page
-  // makes — otherwise the sitemap would advertise a URL that answers noindex.
-  const liveThemes = (await loadPublicThemes()).length > 0;
-
-  const pages: SitemapEntry[] = [
-    ...STATIC_ROUTES.map(([path, changeFrequency, priority]) => ({
-      url: `${base}${path}`,
-      lastModified: STATIC_UPDATED_AT,
-      changeFrequency,
-      priority,
-    })),
-    ...institutions.map((institution) => ({
-      url: `${base}/institution/${institution.slug}`,
-      lastModified: institution.lastDiscoveredAt ?? STATIC_UPDATED_AT,
-      changeFrequency: "daily" as const,
-      priority: 0.6,
-    })),
-    ...assets.filter((asset) => new Set(asset.articleAssets.map((item) => item.article.institutionId)).size >= 2).map((asset) => ({
-      url: `${base}${assetPath(asset.ticker)}`,
-      lastModified: consensusUpdatedAt.get(asset.id) ?? STATIC_UPDATED_AT,
-      changeFrequency: "daily" as const,
-      priority: 0.6,
-    })),
-    ...institutions.filter((institution) => hasSettledForecasts.has(institution.id)).map((institution) => ({
-      url: `${base}/institution/${institution.slug}/accuracy`,
-      lastModified: institution.lastDiscoveredAt ?? STATIC_UPDATED_AT,
-      changeFrequency: "weekly" as const,
-      priority: 0.5,
-    })),
-    ...indicators.map((indicator) => ({
-      url: `${base}/macro/indicator/${indicator.canonicalKey}`,
-      lastModified: indicator.updatedAt,
-      changeFrequency: "daily" as const,
-      priority: 0.5,
-    })),
-    // Topic hubs are listed only when the corpus clears the threshold for one: the same gate
-    // the page itself applies, so the sitemap never advertises a subject with no page behind it.
-    ...(liveThemes ? [{ url: `${base}/market-themes`, lastModified: STATIC_UPDATED_AT, changeFrequency: "daily" as const, priority: 0.7 }] : []),
-    ...taxonomy.jurisdictions.map((jurisdiction) => ({
-      url: `${base}/economies/${jurisdiction.slug}`,
-      lastModified: STATIC_UPDATED_AT,
-      changeFrequency: "daily" as const,
-      priority: 0.6,
-    })),
-    ...(await listIndexableTopics()).map((topic) => ({
-      url: `${base}${topicPath(topic.key)}`,
-      lastModified: topic.lastAt,
-      changeFrequency: "daily" as const,
-      priority: 0.6,
-    })),
-  ];
-
-  /**
-   * Each language has its own address, so listing only one would leave the other
-   * undiscoverable — which is the whole reason the addresses were split.
-   */
-  return pages.flatMap((page) => {
-    const path = page.url.startsWith(base) ? page.url.slice(base.length) || "/" : page.url;
-    const alternates = PAGE_ALTERNATES.map(({ hreflang, locale }) => ({ hreflang, href: base + localePath(locale, path) }));
-    return LOCALES.map((locale) => ({ ...page, url: base + localePath(locale, path), alternates }));
+  const articleChanged = latestArticle?.updatedAt;
+  const macroChanged = later(changed("2026-09-27"), latestIndicator?.updatedAt, latestRelease?.updatedAt);
+  const dynamicDates: Record<string, Date | undefined> = {
+    "/": later(changed("2026-09-23"), articleChanged, macroChanged),
+    "/research": articleChanged,
+    "/markets": later(changed("2026-09-20"), articleChanged, latestConsensus?.timestamp),
+    "/institutions": articleChanged,
+    "/macro": macroChanged,
+    "/macro/calendar": latestRelease?.updatedAt,
+    "/topics": articleChanged,
+    "/economies": articleChanged,
+  };
+  const pages = STATIC_ROUTES.map((route) => ({
+    path: route.path,
+    lastModified: later(route.changedAt, dynamicDates[route.path]),
+    changeFrequency: route.changeFrequency,
+    priority: route.priority,
+  }));
+  pages.push(...indicators.map((indicator) => ({
+    path: `/macro/indicator/${indicator.canonicalKey}`,
+    lastModified: indicator.updatedAt,
+    changeFrequency: "daily" as const,
+    priority: 0.5,
+  })));
+  pages.push(...taxonomy.jurisdictions.map((jurisdiction) => ({
+    path: `/economies/${jurisdiction.slug}`,
+    lastModified: articleChanged ?? changed("2026-09-27"),
+    changeFrequency: "daily" as const,
+    priority: 0.6,
+  })));
+  if (liveThemes.length) pages.push({
+    path: "/market-themes",
+    lastModified: articleChanged ?? changed("2026-09-13"),
+    changeFrequency: "daily",
+    priority: 0.7,
   });
+  return localizedEntries(locale, pages);
 }
 
-/** Research shard `index`, counting from 1. Out-of-range shards are empty, not an error. */
-export async function buildResearchShard(index: number): Promise<SitemapEntry[]> {
+export async function buildInstitutionsSitemap(locale: Locale): Promise<SitemapEntry[]> {
+  const institutions = await prisma.institution.findMany({
+    where: { articles: { some: publicationReadyWhere() } },
+    select: {
+      slug: true,
+      articles: { where: publicationReadyWhere(), orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
+      forecasts: { where: { status: "settled" }, orderBy: { settledAt: "desc" }, take: 1, select: { settledAt: true } },
+    },
+  });
+  return localizedEntries(locale, institutions.flatMap((institution) => {
+    const lastModified = institution.articles[0]?.updatedAt ?? changed("2026-09-17");
+    return [
+      { path: `/institution/${institution.slug}`, lastModified, changeFrequency: "daily" as const, priority: 0.6 },
+      ...(institution.forecasts.length ? [{ path: `/institution/${institution.slug}/accuracy`, lastModified: institution.forecasts[0].settledAt ?? lastModified, changeFrequency: "weekly" as const, priority: 0.5 }] : []),
+    ];
+  }));
+}
+
+export async function buildAssetsSitemap(locale: Locale): Promise<SitemapEntry[]> {
+  const assets = await prisma.asset.findMany({
+    where: { articleAssets: { some: { article: publicationReadyWhere() } } },
+    select: {
+      ticker: true,
+      articleAssets: { where: { article: publicationReadyWhere() }, select: { article: { select: { institutionId: true, updatedAt: true } } } },
+      consensusHistory: { orderBy: { timestamp: "desc" }, take: 1, select: { timestamp: true } },
+    },
+  });
+  return localizedEntries(locale, assets.flatMap((asset) => {
+    if (new Set(asset.articleAssets.map((item) => item.article.institutionId)).size < 2) return [];
+    const articleChanged = asset.articleAssets.reduce<Date | undefined>((latest, item) => !latest || item.article.updatedAt > latest ? item.article.updatedAt : latest, undefined);
+    return [{
+      path: assetPath(asset.ticker),
+      lastModified: later(changed("2026-09-20"), articleChanged, asset.consensusHistory[0]?.timestamp),
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    }];
+  }));
+}
+
+export async function buildTopicsSitemap(locale: Locale): Promise<SitemapEntry[]> {
+  const topics = await listIndexableTopics();
+  return localizedEntries(locale, topics.map((topic) => ({
+    path: topicPath(topic.key),
+    lastModified: topic.lastAt,
+    changeFrequency: "daily" as const,
+    priority: 0.6,
+  })));
+}
+
+export async function researchShardCount(locale: Locale): Promise<number> {
+  return Math.max(1, Math.ceil(await prisma.article.count({ where: publicationReadyWhere(undefined, locale) }) / SHARD_SIZE));
+}
+
+export async function buildResearchSitemap(locale: Locale, index: number): Promise<SitemapEntry[]> {
   const base = siteUrl();
-  const where = publicationReadyWhere();
-  const start = (index - 1) * SHARD_SIZE;
-  const entries: SitemapEntry[] = [];
-
-  for (let offset = 0; offset < SHARD_SIZE; offset += SCAN_CHUNK) {
-    const articles = await prisma.article.findMany({
-      where,
-      orderBy: ARTICLE_ORDER,
-      skip: start + offset,
-      take: Math.min(SCAN_CHUNK, SHARD_SIZE - offset),
-      select: ARTICLE_SELECT,
-    });
-    for (const article of articles) {
-      const locales = indexableSitemapLocales(article);
-      if (!locales.length) continue;
-      // Only the languages that actually have an indexable page are declared as alternates.
-      // Pointing an alternate at a URL that answers noindex would be a contradiction.
-      const alternates: SitemapAlternate[] = locales.map((locale) => ({ hreflang: locale, href: base + localePath(locale, researchPath(article)) }));
-      if (locales.includes("en")) alternates.push({ hreflang: "x-default", href: base + localePath("en", researchPath(article)) });
-      for (const locale of locales) {
-        entries.push({
-          url: base + localePath(locale, researchPath(article)),
-          lastModified: locale === "zh-CN" ? article.translations[0]?.updatedAt ?? article.updatedAt : article.updatedAt,
-          changeFrequency: "monthly",
-          priority: 0.7,
-          alternates,
-        });
-      }
-    }
-    if (articles.length < SCAN_CHUNK) break;
-  }
-  return entries;
+  const articles = await prisma.article.findMany({
+    where: publicationReadyWhere(undefined, locale),
+    orderBy: ARTICLE_ORDER,
+    skip: (index - 1) * SHARD_SIZE,
+    take: SHARD_SIZE,
+    select: ARTICLE_SELECT,
+  });
+  return articles.map((article) => {
+    const locales = indexableSitemapLocales(article);
+    const alternates: SitemapAlternate[] = locales.map((alternate) => ({ hreflang: alternate, href: base + localePath(alternate, researchPath(article)) }));
+    if (locales.includes("en")) alternates.push({ hreflang: "x-default", href: base + localePath("en", researchPath(article)) });
+    return {
+      url: base + localePath(locale, researchPath(article)),
+      lastModified: locale === "zh-CN" ? article.translations[0]?.updatedAt ?? article.updatedAt : article.updatedAt,
+      changeFrequency: "monthly",
+      priority: 0.7,
+      alternates,
+    };
+  });
 }
 
-/**
- * When each shard last changed, for the index.
- *
- * Reads the same articles in the same order as the shards do, but only the two timestamps
- * that decide `lastmod` — no bodies, no translations text.
- */
-export async function researchShardLastModified(): Promise<Date[]> {
-  const rows = await prisma.article.findMany({
-    where: publicationReadyWhere(),
-    orderBy: ARTICLE_ORDER,
-    select: { updatedAt: true, translations: { where: { locale: "zh-CN" }, take: 1, select: { updatedAt: true } } },
-  });
-  const shards: Date[] = [];
-  rows.forEach((row, position) => {
-    const shard = Math.floor(position / SHARD_SIZE);
-    const changed = row.translations[0]?.updatedAt ?? row.updatedAt;
-    if (!shards[shard] || changed > shards[shard]) shards[shard] = changed;
-  });
-  return shards;
+const GROUPS: Exclude<SitemapKind, "research">[] = ["pages", "institutions", "assets", "topics"];
+const segment = (locale: Locale) => locale === "zh-CN" ? "zh" : "en";
+export function sitemapPath(request: SitemapRequest) {
+  return `/sitemap/${request.kind}-${segment(request.locale)}${request.kind === "research" ? `-${request.index}` : ""}.xml`;
+}
+
+export function parseSitemapShard(value: string): SitemapRequest | null {
+  const research = /^research-(en|zh)-(\d+)\.xml$/.exec(value);
+  if (research) {
+    const index = Number(research[2]);
+    return index >= 1 ? { kind: "research", locale: research[1] === "zh" ? "zh-CN" : "en", index } : null;
+  }
+  const group = /^(pages|institutions|assets|topics)-(en|zh)\.xml$/.exec(value);
+  return group ? { kind: group[1] as Exclude<SitemapKind, "research">, locale: group[2] === "zh" ? "zh-CN" : "en", index: 1 } : null;
+}
+
+export async function buildSitemapIndex(): Promise<SitemapIndexEntry[]> {
+  const base = siteUrl();
+  const [enCount, zhCount] = await Promise.all([researchShardCount("en"), researchShardCount("zh-CN")]);
+  const requests: SitemapRequest[] = LOCALES.flatMap((locale) => [
+    ...GROUPS.map((kind) => ({ kind, locale, index: 1 })),
+    ...Array.from({ length: locale === "en" ? enCount : zhCount }, (_, index) => ({ kind: "research" as const, locale, index: index + 1 })),
+  ]);
+  return requests.map((request) => ({ url: base + sitemapPath(request) }));
+}
+
+export async function buildSitemap(request: SitemapRequest): Promise<SitemapEntry[]> {
+  if (request.kind === "pages") return buildPagesSitemap(request.locale);
+  if (request.kind === "institutions") return buildInstitutionsSitemap(request.locale);
+  if (request.kind === "assets") return buildAssetsSitemap(request.locale);
+  if (request.kind === "topics") return buildTopicsSitemap(request.locale);
+  return buildResearchSitemap(request.locale, request.index);
 }
 
 const XML_ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" };
-
 export function escapeXml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => XML_ESCAPES[character]);
 }
 
 export function renderUrlset(entries: SitemapEntry[]): string {
+  if (entries.length > SITEMAP_MAX_URLS) throw new Error(`Sitemap has ${entries.length} URLs; maximum is ${SITEMAP_MAX_URLS}.`);
   const urls = entries.map((entry) => [
     "  <url>",
     `    <loc>${escapeXml(entry.url)}</loc>`,
@@ -271,16 +251,19 @@ export function renderUrlset(entries: SitemapEntry[]): string {
     entry.priority === undefined ? null : `    <priority>${entry.priority}</priority>`,
     "  </url>",
   ].filter((line) => line !== null).join("\n")).join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`;
+  const bytes = new TextEncoder().encode(xml).byteLength;
+  if (bytes > SITEMAP_MAX_BYTES) throw new Error(`Sitemap is ${bytes} bytes; maximum is ${SITEMAP_MAX_BYTES}.`);
+  return xml;
 }
 
-export function renderSitemapIndex(shards: Array<{ url: string; lastModified: Date }>): string {
+export function renderSitemapIndex(shards: SitemapIndexEntry[]): string {
   const items = shards.map((shard) => [
     "  <sitemap>",
     `    <loc>${escapeXml(shard.url)}</loc>`,
-    `    <lastmod>${shard.lastModified.toISOString()}</lastmod>`,
+    shard.lastModified ? `    <lastmod>${shard.lastModified.toISOString()}</lastmod>` : null,
     "  </sitemap>",
-  ].join("\n")).join("\n");
+  ].filter((line) => line !== null).join("\n")).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${items}\n</sitemapindex>\n`;
 }
 

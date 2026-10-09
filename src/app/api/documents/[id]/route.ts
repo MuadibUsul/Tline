@@ -4,6 +4,7 @@ import { privateDownloadUrl, readPrivateFile } from "@/lib/documents/storage";
 import { can } from "@/lib/permissions";
 import { writeAudit } from "@/lib/audit";
 import { trackServerEvent } from "@/lib/analytics/serverEvent";
+import { DOCUMENT_ROBOTS } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,8 +20,6 @@ export const dynamic = "force-dynamic";
  * download path hands off to object storage, and the instruction has to travel with the
  * response the crawler first receives.
  */
-const DOCUMENT_ROBOTS = { "x-robots-tag": "noindex, nofollow" };
-
 function safeFilename(title: string, locale: string) {
   const clean = title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);
   return (clean || "research") + "-" + locale + ".pdf";
@@ -33,10 +32,10 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     include: { article: { select: { title: true } } },
   });
   if (!document || document.status !== "ready") {
-    return new Response("Document not found.", { status: 404 });
+    return new Response("Document not found.", { status: 404, headers: DOCUMENT_ROBOTS });
   }
   const user = await getSessionUser();
-  if (!can(user, "document.download.original")) return new Response("Forbidden.", { status: 403 });
+  if (!can(user, "document.download.original")) return new Response("Forbidden.", { status: 403, headers: DOCUMENT_ROBOTS });
 
   // Previewing asks for the same bytes shown in place rather than saved, so the only
   // difference is the disposition.
@@ -76,6 +75,6 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       },
     });
   } catch {
-    return new Response("Document file is unavailable.", { status: 404 });
+    return new Response("Document file is unavailable.", { status: 404, headers: DOCUMENT_ROBOTS });
   }
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assetPath, legacyNonAssetRedirectPath, legacyTopicRedirectPath, tickerFromAssetSlug } from "./assetPath";
+import { assetPath, canonicalAssetRedirectPath, legacyNonAssetRedirectPath, legacyTopicRedirectPath, tickerFromAssetSlug } from "./assetPath";
 
 test("high-value assets use readable stable paths and resolve back to tickers", () => {
   assert.equal(assetPath("XAUUSD"), "/markets/gold");
@@ -21,4 +21,12 @@ test("legacy pseudo-assets resolve to their replacement facet", () => {
   assert.equal(legacyNonAssetRedirectPath("FED"), "/institution/federal-reserve");
   assert.equal(legacyNonAssetRedirectPath("CPI"), "/topics/inflation");
   assert.equal(legacyNonAssetRedirectPath("SPX"), null);
+});
+
+test("ticker and case aliases redirect once to the readable asset URL", () => {
+  assert.equal(canonicalAssetRedirectPath("SPX", "SPX"), "/markets/sp-500");
+  assert.equal(canonicalAssetRedirectPath("spx", "SPX"), "/markets/sp-500");
+  assert.equal(canonicalAssetRedirectPath("sp-500", "SPX"), null);
+  assert.equal(canonicalAssetRedirectPath("AAPL", "AAPL"), "/markets/aapl");
+  assert.equal(canonicalAssetRedirectPath("aapl", "AAPL"), null);
 });

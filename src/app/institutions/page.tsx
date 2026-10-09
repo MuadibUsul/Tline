@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, localizedUrl, ogImage, viewsSeoTitle } from "@/lib/seo";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -12,11 +13,17 @@ import { assetPath } from "@/lib/assetPath";
 import { taxonomy } from "@/lib/classification/taxonomy";
 
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 50;
+
+function activeViewWhere(locale: Locale) {
+  return { article: publicationReadyWhere({ publishedAt: { gte: new Date(Date.now() - VIEW_WINDOW_DAYS * 864e5) } }, locale) };
+}
 
 export async function generateMetadata(props: { searchParams: Promise<{ page?: string }> }): Promise<Metadata> {
   const searchParams = await props.searchParams;
   const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
+  const emptyPage = page > 1 && (page - 1) * PAGE_SIZE >= await prisma.atomicView.count({ where: activeViewWhere(locale) });
   const title = viewsSeoTitle(locale);
   const description = tr(
     locale,
@@ -29,6 +36,7 @@ export async function generateMetadata(props: { searchParams: Promise<{ page?: s
     description: clamp(description, 158),
     openGraph: { type: "website", title, description, url: localizedUrl("/institutions", locale), locale, images: [{ url: ogImage("Views", title, tr(locale, "Ranked by heat, authority and freshness", "按热度、机构权威与新鲜度排序")), width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description },
+    ...(emptyPage ? { robots: { index: false, follow: true } } : {}),
   };
 }
 
@@ -46,10 +54,11 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
   const searchParams = await props.searchParams;
   const locale = await getLocale();
   const page = Math.max(1, Number(searchParams.page) || 1);
-  const take = 50;
+  const take = PAGE_SIZE;
   // Only the last VIEW_WINDOW_DAYS are rankable, so bound the fetch to that window instead
   // of loading the whole corpus; ranking still happens in memory while the set is small.
-  const windowStart = new Date(Date.now() - VIEW_WINDOW_DAYS * 864e5);
+  const where = activeViewWhere(locale);
+  if (page > 1 && (page - 1) * take >= await prisma.atomicView.count({ where })) notFound();
   // Select only the columns ranking and this list actually read. `include: { article }`
   // pulled the whole article row — `rawText` is the entire cleaned body, tens of KB each —
   // once per view, so an article with N views loaded its body N times. Across a week of the
@@ -57,7 +66,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
   // container's heap and took the process down (the page 502s while everything else briefly
   // does too). None of those large columns are needed here.
   const allViews = await prisma.atomicView.findMany({
-    where: { article: publicationReadyWhere({ publishedAt: { gte: windowStart } }, locale) },
+    where,
     select: {
       id: true, articleId: true, viewEn: true, viewZh: true, type: true, asset: true,
       assetTicker: true, topic: true, direction: true, timeHorizon: true, value: true,

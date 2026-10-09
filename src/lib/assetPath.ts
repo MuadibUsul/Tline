@@ -30,6 +30,12 @@ export function tickerFromAssetSlug(value: string) {
   return TICKERS.get(clean) ?? value.toUpperCase();
 }
 
+/** Return the one-hop replacement when a resolved asset was requested by an alias or ticker. */
+export function canonicalAssetRedirectPath(requested: string, ticker: string) {
+  const canonical = assetPath(ticker);
+  return requested === canonical.slice("/markets/".length) ? null : canonical;
+}
+
 /** Old model-generated topics that are actually one concrete covered asset. */
 export function legacyTopicRedirectPath(value: string) {
   const key = value.toLowerCase();

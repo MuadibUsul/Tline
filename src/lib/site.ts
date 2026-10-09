@@ -28,3 +28,6 @@ export function siteUrl(): string {
  * letting the crawl finish the page.
  */
 export const CRAWLER_DISALLOW = ["/api/auth", "/api/feed", "/api/health", "/api/search", "/api/social", "/api/v1"];
+
+/** Non-HTML downloads stay fetchable so crawlers can read this indexing instruction. */
+export const DOCUMENT_ROBOTS = { "x-robots-tag": "noindex, nofollow" };

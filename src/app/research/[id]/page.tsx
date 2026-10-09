@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import PdfPreview from "@/app/_components/PdfPreview";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, displayTitle, localizedUrl, ogImage, reportJsonLd, stripPublisherPrefix } from "@/lib/seo";
 import { preferredEnglishDocuments, publicationReadyWhere } from "@/lib/publication";
-import { researchPath } from "@/lib/researchPath";
+import { researchLookupWhere, researchPath, researchRedirectPath } from "@/lib/researchPath";
 import { contentQuality } from "@/lib/contentQuality";
 import { effectiveSummaryZh } from "@/lib/summary";
 import { assetPath } from "@/lib/assetPath";
@@ -20,7 +20,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   const { id } = await props.params;
   const locale = await getLocale();
   const article = await prisma.article.findFirst({
-    where: publicationReadyWhere({ OR: [{ id }, { slug: id }] }),
+    where: publicationReadyWhere(researchLookupWhere(id)),
     select: {
       slug: true,
       title: true,
@@ -217,7 +217,8 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const locale = await getLocale();
   const a = await getResearchView(params.id);
   if (!a) notFound();
-  if (params.id !== a.slug) permanentRedirect(localePath(locale, researchPath(a)));
+  const canonicalRedirect = researchRedirectPath(params.id, a);
+  if (canonicalRedirect) permanentRedirect(localePath(locale, canonicalRedirect));
   /**
    * A language's address exists only while that language has a page the site would index.
    *

@@ -9,7 +9,7 @@ import { assetName, domainTerm, formatDate, getLocale, institutionName, tr, loca
 import { assetSeoTitle, breadcrumbJsonLd, canonical, datasetJsonLd, itemListJsonLd, JsonLd, localizedUrl, ogImage, webPageJsonLd } from "@/lib/seo";
 import { getAssetIndicators, getAssetTopics } from "@/lib/related";
 import { topicHref } from "@/lib/related";
-import { assetPath, legacyNonAssetRedirectPath, tickerFromAssetSlug } from "@/lib/assetPath";
+import { assetPath, canonicalAssetRedirectPath, legacyNonAssetRedirectPath, tickerFromAssetSlug } from "@/lib/assetPath";
 import { publicationReadyWhere } from "@/lib/publication";
 import { getAssetMarketSnapshot } from "@/lib/macro/market/read";
 
@@ -27,6 +27,8 @@ export async function generateMetadata(props: { params: Promise<{ ticker: string
     },
   });
   if (!asset) return { title: tr(locale, "Asset not found", "资产未找到") };
+  const canonicalRedirect = canonicalAssetRedirectPath(ticker, asset.ticker);
+  if (canonicalRedirect) permanentRedirect(localePath(locale, canonicalRedirect));
   const name = assetName(asset.name, locale, asset.ticker);
   const institutionCount = new Set(asset.articleAssets.map((item) => item.article.institutionId)).size;
   return {
@@ -51,6 +53,8 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
   const data = await getAssetView(tickerFromAssetSlug(params.ticker), locale);
   if (!data) notFound();
   const { asset, consensus, d1, d7, d30, dist, articles } = data;
+  const canonicalRedirect = canonicalAssetRedirectPath(params.ticker, asset.ticker);
+  if (canonicalRedirect) permanentRedirect(localePath(locale, canonicalRedirect));
   const [timelineRows, market] = await Promise.all([getAssetTimeline(asset.id), getAssetMarketSnapshot(asset.ticker)]);
   // Topics and indicators come from the reports that mention this asset, so both blocks are
   // evidence about this asset rather than a hand-written list of plausible associations.

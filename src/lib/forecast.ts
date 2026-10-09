@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { licensePermits } from "./macro/market/quality";
 import { horizonTargetDate } from "./forecastHorizon";
+import { validateStructuredResearch } from "./ingest/researchQuality";
 
 /**
  * The extractor stores the institution's own wording ("short_term", "3-6 months",
@@ -45,18 +46,31 @@ export function wilsonInterval(successes: number, total: number, z = 1.96) {
 export async function syncForecastsForArticle(articleId: string) {
   const article = await prisma.article.findUnique({
     where: { id: articleId },
-    include: { articleAssets: true },
+    include: { articleAssets: { include: { asset: { select: { ticker: true } } } } },
   });
   if (!article) return 0;
   let synced = 0;
   for (const signal of article.articleAssets) {
-    const targetDate = targetDateForHorizon(article.publishedAt, signal.timeHorizon);
+    const quality = validateStructuredResearch({}, article.rawText ?? "", [{
+      ticker: signal.asset.ticker, target: signal.target, previousTarget: signal.previousTarget, timeHorizon: signal.timeHorizon,
+    }]);
+    const safe = quality.forecasts[0];
+    const targetDate = targetDateForHorizon(article.publishedAt, safe.timeHorizon ?? null);
     const existing = await prisma.forecast.findUnique({ where: { articleAssetId: signal.id }, select: { status: true } });
     if (existing?.status === "settled") continue;
+    if (!quality.passed) {
+      await prisma.forecast.upsert({
+        where: { articleAssetId: signal.id },
+        create: { articleAssetId: signal.id, institutionId: article.institutionId, assetId: signal.assetId, forecastDate: article.publishedAt, targetValue: null, direction: signal.direction, metric: "price", forecastType: "UNVERIFIED_SOURCE_CLAIM", status: "excluded", settlementReason: "unverified_source_claim" },
+        update: { targetValue: null, forecastType: "UNVERIFIED_SOURCE_CLAIM", status: "excluded", settlementReason: "unverified_source_claim" },
+      });
+      synced++;
+      continue;
+    }
     if (!targetDate) {
       await prisma.forecast.upsert({
         where: { articleAssetId: signal.id },
-        create: { articleAssetId: signal.id, institutionId: article.institutionId, assetId: signal.assetId, forecastDate: article.publishedAt, targetValue: signal.target, direction: signal.direction, metric: "price", forecastType: "UNRESOLVED_HORIZON", status: "excluded", settlementReason: "ambiguous_or_unsupported_horizon" },
+        create: { articleAssetId: signal.id, institutionId: article.institutionId, assetId: signal.assetId, forecastDate: article.publishedAt, targetValue: safe.target ?? null, direction: signal.direction, metric: "price", forecastType: "UNRESOLVED_HORIZON", status: "excluded", settlementReason: "ambiguous_or_unsupported_horizon" },
         update: { forecastType: "UNRESOLVED_HORIZON", status: "excluded", settlementReason: "ambiguous_or_unsupported_horizon" },
       });
       synced++;
@@ -70,19 +84,19 @@ export async function syncForecastsForArticle(articleId: string) {
         assetId: signal.assetId,
         forecastDate: article.publishedAt,
         targetDate,
-        targetValue: signal.target,
+        targetValue: safe.target ?? null,
         direction: signal.direction,
         metric: "price",
-        forecastType: signal.target === null ? "DIRECTION" : "TARGET_AT_HORIZON",
+        forecastType: safe.target == null ? "DIRECTION" : "TARGET_AT_HORIZON",
       },
       update: {
         institutionId: article.institutionId,
         assetId: signal.assetId,
         forecastDate: article.publishedAt,
         targetDate,
-        targetValue: signal.target,
+        targetValue: safe.target ?? null,
         direction: signal.direction,
-        forecastType: signal.target === null ? "DIRECTION" : "TARGET_AT_HORIZON",
+        forecastType: safe.target == null ? "DIRECTION" : "TARGET_AT_HORIZON",
         status: "pending",
         baseValue: null,
         actualValue: null,

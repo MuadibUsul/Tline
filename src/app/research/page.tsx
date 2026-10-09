@@ -134,8 +134,8 @@ export default async function ResearchIndex(
    * feed carried twenty complete English reports — and the complete Chinese translation of
    * each — to render a 260-character preview. Measured at 490 KB fetched for 47 KB shown.
    * The card reads a fixed set of fields; this lists exactly those. The one field it may also
-   * read is the body, when a report has no summary to preview, and `withPreviewBodies` fetches
-   * that afterwards for the few rows that need it.
+   * read is the body, when a report has no summary to preview or a stored target needs source
+   * verification; `withPreviewBodies` fetches it afterwards only for those rows.
    */
   const feed = await withPreviewBodies(await prisma.article.findMany({
     where: { ...where, id: { in: pageIds } },
@@ -149,7 +149,7 @@ export default async function ResearchIndex(
       institution: { select: { name: true, slug: true } },
       analysis: { select: { summary: true, summaryZh: true } },
       translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
-      articleAssets: { select: { direction: true, target: true, previousTarget: true, asset: { select: { ticker: true, name: true } } } },
+      articleAssets: { select: { direction: true, target: true, previousTarget: true, timeHorizon: true, asset: { select: { ticker: true, name: true } } } },
       classification: {
         select: {
           jurisdictionState: true,

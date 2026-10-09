@@ -14,6 +14,8 @@ import { effectiveSummaryZh } from "@/lib/summary";
 import { assetPath } from "@/lib/assetPath";
 import { getArticleTopics, getPeerReports, topicHref } from "@/lib/related";
 import { ClassificationChips } from "@/app/_components/ui";
+import { directionLabel } from "@/lib/assets";
+import { validateStructuredResearch } from "@/lib/ingest/researchQuality";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -102,6 +104,17 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
 function parseJson<T>(s: string | undefined, fallback: T): T {
   if (!s) return fallback;
   try { return JSON.parse(s) as T; } catch { return fallback; }
+}
+
+function localizedDirection(value: number, locale: Locale) {
+  const key = directionLabel(value).key;
+  return ({
+    strong_bull: tr(locale, "Strong bullish", "强烈看多"),
+    bull: tr(locale, "Bullish", "看多"),
+    neutral: tr(locale, "Neutral", "中性"),
+    bear: tr(locale, "Bearish", "看空"),
+    strong_bear: tr(locale, "Strong bearish", "强烈看空"),
+  } as const)[key];
 }
 
 type Figure = { id: string; afterSegmentPosition: number; alt: string | null; caption: string | null; width: number | null; height: number | null };
@@ -268,10 +281,20 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const summary = (locale === "zh-CN"
     ? effectiveSummaryZh({ summaryZh: an?.summaryZh, translation })
     : an?.summary) ?? institutionName(a.institution.name, locale);
+  const summaryProvenance = locale === "zh-CN" && !an?.summaryZh?.trim()
+    ? "translation_excerpt"
+    : an?.provider === "local" ? "publisher_excerpt" : "tlines_extraction";
+  const timeHorizons = [...new Set(a.atomicViews.map((view) => view.timeHorizon).filter((value) => value && value !== "unspecified"))];
+  const researchTopics = [...new Set(a.atomicViews.flatMap((view) => [view.topic, view.asset]).filter((value) => value && !/^(?:general|market|other|unspecified)$/i.test(value)))];
+  const sourceEvidence = a.atomicViews.filter((view) => view.sourceQuote.trim()).slice(0, 3);
   const relatedAssets = [...new Map(a.atomicViews.filter((view) => view.assetTicker).map((view) => [view.assetTicker!, view.asset])).entries()];
   // Both come from stored rows: the topics the extraction tagged, and other houses' reports
   // on the same asset. Nothing is inferred, and an absent relation renders nothing.
   const primaryTicker = a.atomicViews.find((view) => view.assetTicker)?.assetTicker ?? null;
+  const primaryAssetView = primaryTicker ? a.articleAssets.find((view) => view.asset.ticker === primaryTicker) ?? null : null;
+  const primarySafeForecast = primaryAssetView
+    ? validateStructuredResearch({}, a.rawText ?? "", [{ ticker: primaryAssetView.asset.ticker, target: primaryAssetView.target, previousTarget: primaryAssetView.previousTarget, timeHorizon: primaryAssetView.timeHorizon }]).forecasts[0]
+    : null;
   const [articleTopics, peerReports] = await Promise.all([
     getArticleTopics(a.id, locale),
     primaryTicker ? getPeerReports({ articleId: a.id, ticker: primaryTicker, institutionId: a.institution.id, locale }) : Promise.resolve([]),
@@ -309,38 +332,53 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
 
       <section className="citation-card" aria-labelledby="citation-summary">
         <div className="section-t">{tr(locale, "Citable research brief", "可引用研究简报")}</div>
-        <h2 id="citation-summary">{tr(locale, "One-sentence conclusion", "一句话结论")}</h2>
-        <p>{summary}</p>
+        <h2 id="citation-summary">{summaryProvenance === "publisher_excerpt"
+          ? tr(locale, "Publisher evidence excerpt", "机构原文证据摘录")
+          : summaryProvenance === "translation_excerpt"
+            ? tr(locale, "Translated report excerpt", "研报译文摘录")
+            : tr(locale, "Core conclusion · Tlines extraction", "核心结论 · Tlines 提取")}</h2>
+        {summaryProvenance === "tlines_extraction" ? <p>{summary}</p> : <blockquote><p>{summary}</p></blockquote>}
         <dl className="citation-facts">
           <div><dt>{tr(locale, "Institution", "机构")}</dt><dd>{institutionName(a.institution.name, locale)}</dd></div>
           <div><dt>{tr(locale, "Published", "发布时间")}</dt><dd>{date}</dd></div>
-          <div><dt>{tr(locale, "Time horizon", "时间范围")}</dt><dd>{[...new Set(a.atomicViews.map((view) => view.timeHorizon))].join(" · ") || tr(locale, "Not explicitly stated", "原文未明确说明")}</dd></div>
+          <div><dt>{tr(locale, "Research topic", "研究主题")}</dt><dd>{researchTopics.slice(0, 3).join(" · ") || tr(locale, "Not explicitly stated", "原文未明确说明")}</dd></div>
+          <div><dt>{tr(locale, "Time horizon", "时间范围")}</dt><dd>{timeHorizons.join(" · ") || tr(locale, "Not explicitly stated", "原文未明确说明")}</dd></div>
         </dl>
         {relatedAssets.length > 0 && <div className="tag-row" aria-label={tr(locale, "Related assets", "相关资产")}>{relatedAssets.map(([ticker, name]) => <Link className="chip acc" href={localePath(locale, assetPath(ticker))} key={ticker}>{assetName(name, locale, ticker)} · {ticker}</Link>)}</div>}
         {keyArgs.length > 0 && <section className="citation-arguments" aria-labelledby="key-arguments-heading">
           <h2 id="key-arguments-heading">{tr(locale, "Key arguments", "关键论点")}</h2>
           <ul className="citation-list">{keyArgs.map((item, index) => <li key={`${item}-${index}`}>{locale === "zh-CN" ? localizeChineseContent(item) : item}</li>)}</ul>
         </section>}
-        {(keyNumbers.length > 0 || risks.length > 0) && <div className="citation-evidence">
-          {keyNumbers.length > 0 && <section aria-labelledby="key-numbers-heading">
+        <div className="citation-evidence">
+          <section aria-labelledby="key-numbers-heading">
             <h2 id="key-numbers-heading">{tr(locale, "Key numbers", "关键数字")}</h2>
-            <dl className="key-number-grid">
+            {keyNumbers.length > 0 ? <dl className="key-number-grid">
               {keyNumbers.map((item, index) => <div key={`${item.label}-${item.value}-${index}`}>
                 <dt>{item.label || tr(locale, "Value", "数值")}</dt>
                 <dd>{item.value}</dd>
               </div>)}
-            </dl>
-          </section>}
-          {risks.length > 0 && <section aria-labelledby="main-risks-heading">
+            </dl> : <p>{tr(locale, "No source-backed key figure was extracted.", "未提取到可由原文核验的关键数字。")}</p>}
+          </section>
+          <section aria-labelledby="main-risks-heading">
             <h2 id="main-risks-heading">{tr(locale, "Main risks", "主要风险")}</h2>
-            <ul className="citation-list">{risks.map((risk, index) => <li key={`${risk}-${index}`}>{risk}</li>)}</ul>
-          </section>}
-        </div>}
+            {risks.length > 0 ? <ul className="citation-list">{risks.map((risk, index) => <li key={`${risk}-${index}`}>{risk}</li>)}</ul> : <p>{tr(locale, "Not explicitly stated in the extracted material.", "提取材料中未明确给出。")}</p>}
+          </section>
+        </div>
+        <section className="citation-arguments" aria-labelledby="source-evidence-heading">
+          <h2 id="source-evidence-heading">{tr(locale, "Corresponding source evidence", "对应原文证据")}</h2>
+          {sourceEvidence.length > 0 ? <ol className="citation-list">{sourceEvidence.map((view) => (
+            <li key={view.id}><q>{view.sourceQuote}</q>{view.timeHorizon !== "unspecified" ? ` · ${view.timeHorizon}` : ""}</li>
+          ))}</ol> : <p>{tr(locale, "No sentence-level evidence was extracted; verify the report directly.", "未提取到句级证据，请直接核验原文。")}</p>}
+        </section>
         {a.atomicViews.some((view) => view.conditionEn || view.conditionZh) && <section className="citation-conditions">
           <h2>{tr(locale, "Conditions / invalidation", "条件 / 失效条件")}</h2>
           <ul className="citation-list">{a.atomicViews.map((view) => locale === "zh-CN" ? view.conditionZh : view.conditionEn).filter(Boolean).map((condition, index) => <li key={`${condition}-${index}`}>{condition}</li>)}</ul>
         </section>}
-        <p className="citation-source">{tr(locale, "Context: this is Tlines' automated structure of a public institutional report, not the institution's wording. Scope and date above travel with the conclusion.", "上下文：这是 Tlines 对公开机构研报的自动结构化结果，并非机构原话；引用结论时须同时保留上述机构与日期范围。")}</p>
+        <p className="citation-source">{summaryProvenance === "publisher_excerpt"
+          ? tr(locale, "Context: the quoted core view and evidence are publisher wording selected by deterministic rules. Other fields are Tlines structures; verify them at the source.", "上下文：带引号的核心观点与证据为规则选出的机构原话；其余字段为 Tlines 结构化结果，请回到原始来源核验。")
+          : summaryProvenance === "translation_excerpt"
+            ? tr(locale, "Context: this is an automated translation excerpt, not a publisher quotation or a Tlines conclusion. Verify against the original report.", "上下文：此处为自动译文摘录，并非机构原话，也不是 Tlines 结论；请对照原始研报核验。")
+            : tr(locale, "Context: the conclusion is Tlines' automated extraction, not the institution's wording. Quoted evidence is publisher wording. Scope and date must travel with the conclusion.", "上下文：结论为 Tlines 自动提取，并非机构原话；带引号的证据为机构原文。引用时须同时保留机构、日期与时间范围。")}</p>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Verify at the original source ↗", "在原始来源核验 ↗")}</a>
       </section>
 
@@ -440,8 +478,10 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         </div>
       </section>}
 
-      {(articleTopics.length > 0 || peerReports.length > 0) && <section className="blk">
-        <h2 className="section-t">{tr(locale, "Related institutional views", "相关机构观点")}</h2>
+      {(articleTopics.length > 0 || primaryAssetView) && <section className="blk">
+        <h2 className="section-t">{peerReports.length > 0
+          ? tr(locale, `Cross-institution comparison · ${primaryTicker}`, `多机构观点对比 · ${primaryTicker}`)
+          : tr(locale, `Single-institution view · ${primaryTicker ?? ""}`, `单机构观点 · ${primaryTicker ?? ""}`)}</h2>
         {articleTopics.length > 0 && <div className="tag-row" style={{ marginBottom: peerReports.length ? 14 : 0 }}>
           {articleTopics.map((topic) => (
             <Link className="chip gray" href={localePath(locale, topicHref(topic.key))} key={topic.key}>
@@ -449,19 +489,32 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             </Link>
           ))}
         </div>}
-        {peerReports.length > 0 && <>
-          <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 6 }}>
-            {tr(locale, `Other institutions on ${primaryTicker}`, `其他机构对 ${primaryTicker} 的观点`)}
-          </div>
-          <ul style={{ margin: 0, paddingLeft: 18, color: "var(--ink-2)", fontSize: 13 }}>
-            {peerReports.map((peer) => (
-              <li key={peer.slug} style={{ marginBottom: 5 }}>
-                <Link href={localePath(locale, `/research/${peer.slug}`)}>{peer.title}</Link>
-                <span className="mono" style={{ color: "var(--faint)" }}> — {institutionName(peer.institution.name, locale)}</span>
-              </li>
-            ))}
-          </ul>
-        </>}
+        {primaryAssetView && <div className="tbl-wrap"><table>
+          <thead><tr>
+            <th>{tr(locale, "Institution / report", "机构 / 研报")}</th>
+            <th>{tr(locale, "Published", "发布日期")}</th>
+            <th>{tr(locale, "Direction", "方向")}</th>
+            <th>{tr(locale, "Source-checked target", "原文已核目标价")}</th>
+            <th>{tr(locale, "Horizon", "时间范围")}</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><b>{institutionName(a.institution.name, locale)}</b><small>{heading}</small></td>
+              <td>{date}</td>
+              <td>{localizedDirection(primaryAssetView.direction, locale)}</td>
+              <td className="mono-cell">{primarySafeForecast?.target != null && primarySafeForecast.timeHorizon ? `$${primarySafeForecast.target.toLocaleString()}` : "—"}</td>
+              <td>{primarySafeForecast?.timeHorizon || tr(locale, "Not stated", "未明确")}</td>
+            </tr>
+            {peerReports.map((peer) => <tr key={peer.slug}>
+              <td><Link href={localePath(locale, `/research/${peer.slug}`)}><b>{institutionName(peer.institution.name, locale)}</b></Link><small>{peer.title}</small></td>
+              <td>{formatDate(peer.publishedAt, locale)}</td>
+              <td>{localizedDirection(peer.direction, locale)}</td>
+              <td className="mono-cell">{peer.target != null && peer.timeHorizon ? `$${peer.target.toLocaleString()}` : "—"}</td>
+              <td>{peer.timeHorizon || tr(locale, "Not stated", "未明确")}</td>
+            </tr>)}
+          </tbody>
+        </table></div>}
+        {primaryAssetView && peerReports.length === 0 && <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{tr(locale, "Only one institution is available, so Tlines does not label this as market consensus.", "目前仅有一家机构数据，因此 Tlines 不将其称为市场共识。")}</p>}
       </section>}
 
       <section className="blk">

@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import { publicationReadyWhere } from "./publication";
 import { listIndexableTopics, topicKey, topicLabel, topicPath } from "./topics";
 import type { Locale } from "./i18n";
+import { validateStructuredResearch } from "./ingest/researchQuality";
 
 /**
  * Contextual links, read from the relations the ingestion already stored.
@@ -35,6 +36,9 @@ export interface RelatedIndicator { canonicalKey: string; name: string }
 export interface PeerReport {
   slug: string; title: string; publishedAt: Date;
   institution: { name: string; slug: string };
+  direction: number;
+  target: number | null;
+  timeHorizon: string | null;
 }
 
 /**
@@ -88,17 +92,27 @@ export const getPeerReports = cache(async (input: { articleId: string; ticker: s
     select: {
       slug: true,
       title: true,
+      rawText: true,
       publishedAt: true,
       institution: { select: { name: true, slug: true } },
       translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
+      articleAssets: { where: { assetId: asset.id }, take: 1, select: { direction: true, target: true, timeHorizon: true } },
     },
   });
-  return rows.map((row) => ({
-    slug: row.slug,
-    title: input.locale === "zh-CN" ? (row.translations[0]?.title?.trim() || row.title) : row.title,
-    publishedAt: row.publishedAt,
-    institution: row.institution,
-  }));
+  return rows.flatMap((row) => {
+    const view = row.articleAssets[0];
+    if (!view) return [];
+    const safe = validateStructuredResearch({}, row.rawText ?? "", [{ ticker: input.ticker, target: view.target, timeHorizon: view.timeHorizon }]).forecasts[0];
+    return [{
+      slug: row.slug,
+      title: input.locale === "zh-CN" ? (row.translations[0]?.title?.trim() || row.title) : row.title,
+      publishedAt: row.publishedAt,
+      institution: row.institution,
+      direction: view.direction,
+      target: safe.target ?? null,
+      timeHorizon: safe.timeHorizon ?? null,
+    }];
+  });
 });
 
 /** Tickers a report touches, from its extracted asset views. */

@@ -3,8 +3,8 @@ import { resolveLLMProvider } from "../llm/config";
 import { completeJSON, type LLMProvider } from "../llm/provider";
 import type { Segment } from "./extract";
 import type { ParsedAtomicView } from "./atomicViews";
-import { validateAnalysisGrounding } from "./analysisGrounding";
 import { extractAtomicViewsByRule, splitSentences } from "./atomicViewsRules";
+import { validateStructuredResearch } from "./researchQuality";
 import { buildTaskContext, CONTEXT_BUILDER_VERSION, estimateTokens } from "../llm/context-builder";
 import { decideAiExecution, recordAiExecutionEvent } from "../llm/execution-policy";
 import { createHash } from "node:crypto";
@@ -156,6 +156,7 @@ function parsedAsset(candidate: Candidate, text: string, direction: ReturnType<t
 // -------- Segment-aware deterministic parser (no API key required) --------
 export function heuristicParse(input: ParseInput, segments: Segment[] = []): ParsedArticle {
   const hay = `${input.title}\n${input.text}`;
+  const evidenceViews = extractAtomicViewsByRule(input.text);
   const kept = candidatesFor(input);
   const hasHeadings = segments.some((s) => Boolean(s.heading));
   const assets: ParsedAsset[] = [];
@@ -183,10 +184,14 @@ export function heuristicParse(input: ParseInput, segments: Segment[] = []): Par
     unresolvedTickers.push(...kept.slice(1).map(({ a }) => a.ticker));
   }
 
-  const words = input.text.split(/\s+/);
-  const summary = (words.slice(0, 42).join(" ") + (words.length > 42 ? "…" : "")).trim() || input.title;
+  // A local parse may select an exact, source-backed view; it must never turn the body's
+  // opening words into a synthetic "conclusion". With no qualifying evidence sentence the
+  // conclusion stays empty and the row waits for analysis/review.
+  const summary = evidenceViews[0]?.sourceQuote ?? "";
   const importance = clamp(0.35 + Math.min(input.text.length, 4000) / 8000 + assets.length * 0.05, 0, 1);
-  const needsLLM = unresolvedTickers.length > 0 || assets.length === 0;
+  const quality = validateStructuredResearch({}, input.text, assets);
+  const safeAssets = assets.map((asset, index) => ({ ...asset, ...quality.forecasts[index] }));
+  const needsLLM = unresolvedTickers.length > 0 || assets.length === 0 || !summary || !quality.passed;
   return {
     seoTitle: null,
     summary,
@@ -201,7 +206,7 @@ export function heuristicParse(input: ParseInput, segments: Segment[] = []): Par
     interpretationZh: null,
     importanceScore: Number(importance.toFixed(2)),
     confidence: assets.length ? Math.max(...assets.map((s) => s.confidence)) : 0.5,
-    assets,
+    assets: safeAssets,
     atomicViews: [],
     unresolvedTickers,
     needsLLM,
@@ -234,6 +239,12 @@ Return ONLY valid JSON matching this shape:
 "interpretation_en":string,"interpretation_zh":string,"importance_score":number(0..1),"confidence":number(0..1),
 "assets":[{"ticker":string,"direction":"strong_bull"|"bull"|"neutral"|"bear"|"strong_bear","target":number|null,"previous_target":number|null,"time_horizon":string|null,"confidence":number(0..1)}]}
 Use tickers only from this list where applicable: ${ASSETS.map((a) => a.ticker).join(", ")}.
+For an asset target, return target/previous_target only when the article explicitly gives the
+number in USD and the target period. The current target schema cannot preserve other units,
+so return null for EUR, JPY, index points, rates and commodity-unit targets rather than
+converting them. If the USD value or horizon is absent, return null. Never infer a year from
+the publication date. Return time_horizon for a direction-only view only when that period is
+explicitly stated in the article; otherwise return null.
 English analysis fields must contain professional English; _zh fields must contain institution-grade Simplified Chinese preserving every number, unit and modality. Summaries must be your own words, never a verbatim copy. If unsure about an asset, omit it.
 Keep the output compact: summaries and interpretations at most 90 English words / 160 Chinese characters each; at most 4 key arguments, 5 key numbers and 3 risks per language. Do not repeat the same point across fields.`;
 
@@ -245,7 +256,7 @@ Keep the output compact: summaries and interpretations at most 90 English words 
  * reached only the articles ingested after it shipped. `seo_title_en` was asked for by this
  * version and was present on none of the corpus while it ran.
  */
-export const ANALYSIS_PROMPT_VERSION = "analysis-evidence-v1";
+export const ANALYSIS_PROMPT_VERSION = "analysis-evidence-v2";
 const EVIDENCE_LIMIT = 8_000;
 const EVIDENCE_SIGNAL = /\b(?:expect|forecast|target|outlook|scenario|risk|unless|if|because|therefore|however|but|versus|vs\.?|increase|decrease|rise|fall|growth|inflation|rate|yield|price|demand|supply|earnings|revenue|margin|policy)\b/i;
 const EVIDENCE_NUMBER = /(?:[$€£¥]\s?)?\d[\d,]*(?:\.\d+)?\s?(?:%|bp|bps|bn|billion|million|trillion|tn|k)?/i;
@@ -293,7 +304,7 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
     strong_bull: 2, bull: 1, neutral: 0, bear: -1, strong_bear: -2,
   };
   const tickers = new Set(ASSETS.map((a) => a.ticker));
-  const assets: ParsedAsset[] = Array.isArray(json.assets)
+  const proposedAssets: ParsedAsset[] = Array.isArray(json.assets)
     ? (json.assets as RawAssetCall[])
         .filter((a) => typeof a?.ticker === "string" && tickers.has(a.ticker)
           && typeof a?.direction === "string" && a.direction in dirMap)
@@ -331,11 +342,12 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
     interpretationZh: typeof json.interpretation_zh === "string" ? json.interpretation_zh : null,
   };
 
-  // Atomic views prove themselves against their own quote. The free-text fields have no
-  // quote, so they are checked against the article body: an analysis that asserts a figure,
-  // an institution or a certainty the article never contains is marked for review. This
-  // flags, it does not withhold — publication still turns on source text and PDF readiness.
-  const grounding = validateAnalysisGrounding(fields, sourceText);
+  // Free text and forecast fields are both source-checked. Invalid target values are
+  // discarded rather than guessed: no unit or no time range means "not stated". The
+  // review status then keeps the newly proposed analysis out of public publication until
+  // a human or a later parse resolves the discrepancy.
+  const quality = validateStructuredResearch(fields, sourceText, proposedAssets);
+  const assets = proposedAssets.map((asset, index) => ({ ...asset, ...quality.forecasts[index] }));
 
   return {
     ...fields,
@@ -348,7 +360,7 @@ export function coerceModelResponse(input: unknown, provider: string, model: str
     provider,
     model,
     promptVersion: ANALYSIS_PROMPT_VERSION,
-    reviewStatus: grounding.passed ? "ok" : "needs_review",
+    reviewStatus: quality.passed ? "ok" : "needs_review",
   };
 }
 
@@ -376,7 +388,6 @@ async function realParse(input: ParseInput, provider: LLMProvider, segments: Seg
     structuredMetadata: { institution: input.institution, publishedAt: input.publishedAt },
     policy,
   });
-  let best: ParsedArticle | null = null;
   for (const context of contexts) {
     try {
       const result = await completeJSON<unknown>(provider, {
@@ -412,15 +423,17 @@ async function realParse(input: ParseInput, provider: LLMProvider, segments: Seg
         actualInputTokens: result.meta.usage?.inputTokens,
       });
       const parsed = coerceModelResponse(result.value, result.meta.provider, result.meta.model, sourceText);
-      if (parsed?.reviewStatus === "ok") return parsed;
-      if (parsed) best = parsed;
+      // A complete response that fails deterministic quality rules is a review item, not a
+      // reason to buy another full-context answer. Only malformed/incomplete output (null)
+      // escalates; source discrepancies are held with their safe fields already cleared.
+      if (parsed) return parsed;
     } catch (error) {
       // A larger context can repair incomplete JSON/content, but never an auth, balance,
       // rate-limit or network failure. Let article backoff handle provider failures.
       if (!String(error).includes("did not return a valid JSON object")) throw error;
     }
   }
-  return best;
+  return null;
 }
 
 /** Use the configured model to finish the code-selected brief; fall back safely to heuristics. */

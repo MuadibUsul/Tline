@@ -61,6 +61,7 @@
     "backup:verify": "node scripts/backup.mjs --verify",
     "retries": "tsx scripts/content-retries.ts",
     "analysis:grounding": "tsx scripts/analysis-grounding.ts",
+    "content:audit": "tsx scripts/content-quality-audit.ts",
     "translate:rescore": "tsx scripts/translation-quality.ts",
     "macro:market": "tsx scripts/market-sync.ts",
     "macro:expectation": "tsx scripts/macro-expectation.ts",

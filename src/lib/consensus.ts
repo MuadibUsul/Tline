@@ -14,6 +14,7 @@ export function decayFor(ageDays: number): number {
 }
 
 export interface Contributor {
+  articleId: string;
   institutionId: string;
   institutionName: string;
   slug: string;
@@ -42,6 +43,7 @@ export interface ConsensusResult {
 }
 
 type ConsensusRow = {
+  articleId: string;
   assetId: string;
   direction: number;
   target: number | null;
@@ -67,6 +69,7 @@ function buildConsensus(rows: ConsensusRow[], windowStart: Date, windowEnd: Date
     den += w * d;
     if (r.direction > 0) bull++; else if (r.direction < 0) bear++; else neu++;
     contributors.push({
+      articleId: r.articleId,
       institutionId: r.article.institutionId,
       institutionName: r.article.institution.name,
       slug: r.article.institution.slug,

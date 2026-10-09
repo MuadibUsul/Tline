@@ -38,14 +38,21 @@ test("without headings only assigns the main asset", () => {
   assert.deepEqual(parsed.unresolvedTickers, ["WTI"]);
 });
 
-test("single-asset articles keep a deterministic signal", () => {
+test("single-asset articles keep direction but withhold targets that lack a horizon", () => {
   const text = "We raise our gold target from $4,700 to $4,900. A bullish setup persists as demand for bullion stays strong.";
   const parsed = heuristicParse(input("Gold: lifting target to $4,900", text));
   assert.equal(parsed.assets[0]?.ticker, "XAUUSD");
   assert.equal(parsed.assets[0]?.direction, 1);
-  assert.equal(parsed.assets[0]?.previousTarget, 4700);
-  assert.equal(parsed.assets[0]?.target, 4900);
-  assert.equal(parsed.reviewStatus, "ok");
+  assert.equal(parsed.assets[0]?.previousTarget, null);
+  assert.equal(parsed.assets[0]?.target, null);
+  assert.equal(parsed.reviewStatus, "needs_review");
+});
+
+test("local summaries are evidence sentences, never the first body fragment", () => {
+  const text = "Daily publication header and navigation text without a research conclusion. We expect gold to reach $5,000 by year-end 2027 as demand remains firm.";
+  const parsed = heuristicParse(input("Gold outlook", text));
+  assert.equal(parsed.summary, "We expect gold to reach $5,000 by year-end 2027 as demand remains firm.");
+  assert.notEqual(parsed.summary, text.split(".")[0]);
 });
 
 test("a mention without directional evidence is not neutral", () => {

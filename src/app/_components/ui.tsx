@@ -36,7 +36,7 @@ type FeedArticle = {
   institution: { name: string; slug: string };
   analysis: { summary: string; summaryZh?: string | null } | null;
   translations?: { title: string; text?: string }[];
-  articleAssets: { direction: number; target: number | null; previousTarget: number | null; asset: { ticker: string; name: string } }[];
+  articleAssets: { direction: number; target: number | null; previousTarget: number | null; timeHorizon: string | null; asset: { ticker: string; name: string } }[];
   classification?: {
     jurisdictionState: string;
     jurisdictions: { jurisdictionKey: string; role: string }[];
@@ -80,7 +80,7 @@ export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale
           return <Link key={aa.asset.ticker} href={localePath(locale, assetPath(aa.asset.ticker))} className={`chip ${direction.tone}`}>{aa.asset.ticker} {arrow}</Link>;
         })}
       </div>
-      {(primary?.target || primary?.previousTarget) && (
+      {primary?.timeHorizon && (primary.target || primary.previousTarget) && (
         <div className="kv">
           {primary.previousTarget && primary.target && (
             <div><span>{tr(locale, "Target", "目标价")}</span><b>${primary.previousTarget.toLocaleString()} → ${primary.target.toLocaleString()}</b></div>
@@ -88,6 +88,7 @@ export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale
           {primary.target && !primary.previousTarget && (
             <div><span>{tr(locale, "Target", "目标价")}</span><b>${primary.target.toLocaleString()}</b></div>
           )}
+          <div><span>{tr(locale, "Horizon", "时间范围")}</span><b>{primary.timeHorizon}</b></div>
         </div>
       )}
       <div className="act">

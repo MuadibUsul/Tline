@@ -5,6 +5,8 @@ import { directionLabel } from "./assets";
 import { publicationReadyWhere } from "./publication";
 import { articleTimestamp, type Locale } from "./i18n";
 import { researchLookupWhere } from "./researchPath";
+import { buildTargetDistribution } from "./targetDistribution";
+import { validateStructuredResearch } from "./ingest/researchQuality";
 
 /**
  * Exactly the fields a research card reads. Every listing uses this instead of `include`.
@@ -16,8 +18,8 @@ import { researchLookupWhere } from "./researchPath";
  *
  * It is one shared object so this cannot drift back: a listing that wants a card says
  * `select: cardArticleSelect`, and a field the card does not read has no way to get in. The
- * body is the one exception and it is not here — `withPreviewBodies` fetches it afterwards,
- * only for the cards whose locale summary is empty.
+ * body is the one exception and it is not here — `withPreviewBodies` fetches it afterwards
+ * only for a missing preview or to verify a stored target before display.
  */
 export const cardArticleSelect = {
   id: true,
@@ -29,7 +31,7 @@ export const cardArticleSelect = {
   institution: { select: { name: true, slug: true } },
   analysis: { select: { summary: true, summaryZh: true } },
   translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true } },
-  articleAssets: { select: { direction: true, target: true, previousTarget: true, asset: { select: { ticker: true, name: true } } } },
+  articleAssets: { select: { direction: true, target: true, previousTarget: true, timeHorizon: true, asset: { select: { ticker: true, name: true } } } },
   classification: {
     select: {
       jurisdictionState: true,
@@ -85,18 +87,28 @@ export function byDisplayRecency<T extends { publishedAt: Date; createdAt: Date 
  * front repeating the work on every request.
  *
  * Most cards never look at the body at all, because `Analysis.summary` is what they show. So
- * the body is not part of the listing query: the rows are fetched first, and only the cards
- * whose locale-appropriate summary is empty go back for it. On a typical page that is a
- * handful of rows rather than twenty, and none at all when every report carries a summary.
+ * the body is not part of the listing query: the rows are fetched first, and only cards whose
+ * locale summary is empty or whose stored target must be source-checked go back for it. This
+ * keeps ordinary direction-only cards small without letting an old unverified target render.
  *
- * The chain served is the card's own — English shows `summary ?? rawText`, Chinese shows
- * `summaryZh ?? translation ?? rawText` — so both fields come back and the card decides.
+ * The preview chain served is the card's own — English shows `summary ?? rawText`, Chinese
+ * shows `summaryZh ?? translation ?? rawText` — while the fetched body used only for target
+ * verification is discarded before the card props are returned.
  */
 export async function withPreviewBodies<
-  T extends { id: string; analysis: { summary?: string | null; summaryZh?: string | null } | null; translations: Array<{ title: string }> },
->(rows: T[], locale: Locale | undefined) {
+  T extends {
+    id: string;
+    analysis: { summary?: string | null; summaryZh?: string | null } | null;
+    translations: Array<{ title: string }>;
+    articleAssets: Array<{ target: number | null; previousTarget: number | null; timeHorizon: string | null; asset: { ticker: string } }>;
+  },
+>(rows: T[], locale: Locale | undefined): Promise<Array<T & {
+  rawText: string | null;
+  translations: Array<T["translations"][number] & { text?: string }>;
+  articleAssets: T["articleAssets"];
+}>> {
   const needsBody = (row: T) => !(locale === "zh-CN" ? row.analysis?.summaryZh?.trim() : row.analysis?.summary?.trim());
-  const ids = rows.filter(needsBody).map((row) => row.id);
+  const ids = rows.filter((row) => needsBody(row) || row.articleAssets.some((asset) => asset.target != null || asset.previousTarget != null || asset.timeHorizon)).map((row) => row.id);
   const bodies = ids.length
     ? await prisma.article.findMany({
         where: { id: { in: ids } },
@@ -108,10 +120,15 @@ export async function withPreviewBodies<
     const body = fallback.get(row.id);
     return {
       ...row,
-      rawText: body?.rawText ?? null,
+      rawText: needsBody(row) ? body?.rawText ?? null : null,
+      articleAssets: row.articleAssets.map((asset) => {
+        if (!body?.rawText) return { ...asset, target: null, previousTarget: null, timeHorizon: null };
+        const safe = validateStructuredResearch({}, body.rawText, [{ ticker: asset.asset.ticker, target: asset.target, previousTarget: asset.previousTarget, timeHorizon: asset.timeHorizon }]).forecasts[0];
+        return { ...asset, target: safe.target ?? null, previousTarget: safe.previousTarget ?? null, timeHorizon: safe.timeHorizon ?? null };
+      }),
       translations: row.translations.map((translation) => ({ ...translation, text: body?.translationText ?? undefined })),
     };
-  });
+  }) as Array<T & { rawText: string | null; translations: Array<T["translations"][number] & { text?: string }>; articleAssets: T["articleAssets"] }>;
 }
 
 /**
@@ -154,23 +171,31 @@ export async function getAssetView(ticker: string, locale?: Locale) {
   const [c, deltas] = await Promise.all([computeConsensus(asset.id), consensusDeltas([asset.id], [1, 7, 30])]);
   const d = deltas.get(asset.id) ?? {};
   const d1 = d[1] ?? null, d7 = d[7] ?? null, d30 = d[30] ?? null;
-  const targets = (c?.contributors ?? []).map((x) => x.target).filter((t): t is number => t != null);
-  targets.sort((a, b) => a - b);
-  const dist = targets.length
-    ? {
-        low: targets[0],
-        high: targets[targets.length - 1],
-        median: targets[Math.floor(targets.length / 2)],
-        avg: Math.round(targets.reduce((s, t) => s + t, 0) / targets.length),
-      }
-    : null;
+  // Re-check stored target values against their own source before building a public
+  // distribution. Old rows predate the strict write gate and cannot be trusted merely
+  // because they have a number and a horizon.
+  const targetSources = c?.contributors.length ? await prisma.article.findMany({
+    where: { id: { in: c.contributors.map((row) => row.articleId) } },
+    select: { id: true, institutionId: true, rawText: true, articleAssets: { where: { assetId: asset.id }, take: 1, select: { target: true, previousTarget: true, timeHorizon: true, asset: { select: { ticker: true } } } } },
+  }) : [];
+  const safeTargets = new Map(targetSources.flatMap((row) => {
+    const view = row.articleAssets[0];
+    if (!view) return [];
+    const safe = validateStructuredResearch({}, row.rawText ?? "", [{ ticker: view.asset.ticker, target: view.target, previousTarget: view.previousTarget, timeHorizon: view.timeHorizon }]).forecasts[0];
+    return [[row.id, safe] as const];
+  }));
+  const consensus = c ? { ...c, contributors: c.contributors.map((row) => {
+    const safe = safeTargets.get(row.articleId);
+    return { ...row, target: safe?.target ?? null, previousTarget: safe?.previousTarget ?? null, timeHorizon: safe?.timeHorizon ?? null };
+  }) } : null;
+  const dist = buildTargetDistribution(consensus?.contributors ?? []);
   const articles = await withPreviewBodies(await prisma.article.findMany({
     where: publicationReadyWhere({ articleAssets: { some: { assetId: asset.id } } }, locale),
     orderBy: { publishedAt: "desc" },
     take: 8,
     select: cardArticleSelect,
   }), locale);
-  return { asset, consensus: c, d1, d7, d30, dist, articles };
+  return { asset, consensus, d1, d7, d30, dist, articles };
 }
 
 export interface InstTimeline {
@@ -189,7 +214,7 @@ export async function getAssetTimeline(assetId: string): Promise<InstTimeline[]>
   const rows = await prisma.articleAsset.findMany({
     where: { assetId, article: publicationReadyWhere() },
     // The chain needs a direction, a target and a date per view — not the body behind them.
-    include: { article: { select: { publishedAt: true, institutionId: true, institution: { select: { name: true, slug: true } } } } },
+    include: { article: { select: { publishedAt: true, institutionId: true, rawText: true, institution: { select: { name: true, slug: true } } } } },
     orderBy: { article: { publishedAt: "asc" } },
   });
   const byInst = new Map<string, typeof rows>();
@@ -202,8 +227,9 @@ export async function getAssetTimeline(assetId: string): Promise<InstTimeline[]>
   for (const list of byInst.values()) {
     const targets: number[] = [];
     for (const r of list) {
-      if (r.previousTarget != null && targets.length === 0) targets.push(r.previousTarget);
-      if (r.target != null) targets.push(r.target);
+      const safe = validateStructuredResearch({}, r.article.rawText ?? "", [{ ticker: "asset", target: r.target, previousTarget: r.previousTarget, timeHorizon: r.timeHorizon }]).forecasts[0];
+      if (safe.previousTarget != null && targets.length === 0) targets.push(safe.previousTarget);
+      if (safe.target != null) targets.push(safe.target);
     }
     // de-dup consecutive equal targets
     const targetChain = targets.filter((t, i) => i === 0 || t !== targets[i - 1]);
@@ -234,7 +260,7 @@ export async function getInstitutionView(slug: string, locale?: Locale) {
   const articles = await withPreviewBodies(await prisma.article.findMany({
     where: publicationReadyWhere({ institutionId: inst.id, publishedAt: { gte: since } }, locale),
     orderBy: { publishedAt: "desc" },
-    select: { ...cardArticleSelect, articleAssets: { select: { direction: true, target: true, previousTarget: true, asset: { select: { ticker: true, name: true, assetClass: true } } } } },
+    select: { ...cardArticleSelect, articleAssets: { select: { direction: true, target: true, previousTarget: true, timeHorizon: true, asset: { select: { ticker: true, name: true, assetClass: true } } } } },
   }), locale);
   // Current views = latest direction per asset.
   const views = new Map<string, { ticker: string; name: string; direction: number; target: number | null; when: Date }>();
@@ -283,6 +309,7 @@ export async function getResearchView(identifier: string) {
         take: 1,
         include: { segments: { orderBy: { position: "asc" } } },
       },
+      articleAssets: { include: { asset: true } },
       atomicViews: { where: { reviewStatus: "ok" }, orderBy: { position: "asc" } },
       classification: { include: { jurisdictions: true, topics: true, institutions: true } },
     },

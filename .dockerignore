@@ -1,14 +1,27 @@
 node_modules
 .next
+.next-*
 .git
 .env
+.env.*
 *.db
 *.db-journal
 storage
 data/cache
+data/crawl-probe*.json
 storage/qa*
 npm-debug.log*
 backups
 docs
 *.xlsx
 *.md
+# Local harnesses and one-off state that must never ride into a build context: the
+# verify/check build trees alone were ~1.5 GB, copied into every release's context.
+.preview
+tmp
+.runtime
+.zcode
+*.tsbuildinfo
+ff.json
+_seed.json
+next-env.d.ts

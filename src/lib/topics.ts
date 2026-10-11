@@ -128,7 +128,24 @@ interface IndexedTopic extends TopicStat {
   byLocale: Record<Locale, LocaleCoverage>;
 }
 
-const loadTopicIndex = cache(async (): Promise<Map<string, IndexedTopic>> => {
+/**
+ * One full-window query and an O(rows) grouping pass, answering every topic surface in a
+ * request: the hub, each topic page, the sitemap shard. React `cache()` only deduplicates
+ * within a single request, so without the memo below every request re-ran the whole thing —
+ * and the topics shard of the sitemap re-ran it once per crawl. A short TTL is the honest
+ * trade for an aggregate: a report that just went live appears on /research immediately and
+ * on its topic hub within minutes, which matches how the hub is used. A write path that
+ * needs it sooner calls {@link invalidateTopicIndex}.
+ */
+const TOPIC_INDEX_TTL_MS = Math.max(60_000, Number(process.env.TOPIC_INDEX_TTL_MS || 300_000));
+let topicIndexMemo: { at: number; index: Map<string, IndexedTopic> } | null = null;
+
+/** Drop the memo after a write that moves a topic's counts, so the next read rebuilds. */
+export function invalidateTopicIndex() {
+  topicIndexMemo = null;
+}
+
+const buildTopicIndex = async (): Promise<Map<string, IndexedTopic>> => {
   const since = new Date(Date.now() - WINDOW_DAYS * 864e5);
   // Only four scalar columns and the institution id: this groups the whole window, and the
   // article body columns are the ones that have taken the process down before.
@@ -178,6 +195,13 @@ const loadTopicIndex = cache(async (): Promise<Map<string, IndexedTopic>> => {
     entry.institutions = entry.institutionIds.size;
     entry.tickers = [...entry.tickerCounts.entries()].sort((a, b) => b[1] - a[1]).map(([ticker]) => ticker).slice(0, 12);
   }
+  return index;
+};
+
+const loadTopicIndex = cache(async (): Promise<Map<string, IndexedTopic>> => {
+  if (topicIndexMemo && Date.now() - topicIndexMemo.at < TOPIC_INDEX_TTL_MS) return topicIndexMemo.index;
+  const index = await buildTopicIndex();
+  topicIndexMemo = { at: Date.now(), index };
   return index;
 });
 

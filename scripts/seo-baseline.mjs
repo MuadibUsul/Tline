@@ -200,7 +200,10 @@ const edgeCases = [
   { path: "/en/research?page=9999", expectation: "404 or noindex", check: (result, meta) => result.status === 404 || /noindex/i.test(`${result.robotsHeader} ${meta.robots}`) },
   { path: "/en/research?page=2", expectation: "indexable self-canonical pagination with onward links", check: (result, meta) => result.status === 200 && !/noindex/i.test(`${result.robotsHeader} ${meta.robots}`) && normalizedUrl(meta.canonical) === normalizedUrl(new URL("/en/research?page=2", canonicalOrigin)) && /href="\/en\/research\?page=3"/.test(result.body) },
   { path: "/en/markets/SPX", expectation: "redirect to canonical slug", check: (result) => result.status >= 300 && result.status < 400 && Boolean(result.location) },
-  { path: "/sitemap/0.xml", expectation: "redirect to a named canonical sitemap", check: (result) => result.status === 308 && /\/sitemap\/pages-en\.xml$/.test(new URL(result.location, result.url).pathname) },
+  // The origin is asserted, not just the path: behind the reverse proxy, request.url was the
+  // internal listener and this redirect once pointed Googlebot at
+  // https://localhost:3000/sitemap/pages-en.xml, which a pathname-only test reads as correct.
+  { path: "/sitemap/0.xml", expectation: "redirect to a named canonical sitemap on the site origin", check: (result) => result.status === 308 && new URL(result.location, result.url).origin === canonicalOrigin.origin && /\/sitemap\/pages-en\.xml$/.test(new URL(result.location, result.url).pathname) },
   { path: "/api/documents/not-a-document", expectation: "non-HTML response with X-Robots-Tag noindex", check: (result) => /noindex/i.test(result.robotsHeader) },
 ];
 const edgeResults = [];

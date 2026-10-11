@@ -6,6 +6,7 @@ import {
   researchShardCount,
   sitemapPath,
 } from "@/lib/sitemap";
+import { siteUrl } from "@/lib/site";
 
 // See /sitemap.xml: the production image is built without a database, so these cannot be
 // prerendered. Caching happens at the edge instead.
@@ -20,7 +21,11 @@ export async function GET(request: Request, context: { params: Promise<{ shard: 
     const replacement = index === 0
       ? { kind: "pages" as const, locale: "en" as const, index: 1 }
       : { kind: "research" as const, locale: "en" as const, index };
-    return Response.redirect(new URL(sitemapPath(replacement), request.url), 308);
+    // The base is the configured site origin, not `request.url`: behind the reverse proxy the
+    // request address is the internal listener, and the redirect once handed Googlebot
+    // `https://localhost:3000/sitemap/pages-en.xml` — a location that resolves nowhere. Every
+    // other absolute URL this site emits goes through siteUrl(); this one now does too.
+    return Response.redirect(new URL(sitemapPath(replacement), siteUrl()), 308);
   }
 
   const sitemap = parseSitemapShard(shard);

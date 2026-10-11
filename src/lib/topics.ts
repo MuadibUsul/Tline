@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { prisma } from "./db";
 import { publicationReadyWhere } from "./publication";
-import { domainTerm, type Locale } from "./i18n";
+import { LOCALES, domainTerm, type Locale } from "./i18n";
 import { legacyTopicRedirectPath } from "./assetPath";
 
 /**
@@ -107,10 +107,25 @@ export interface TopicStat {
   lastAt: Date;
 }
 
+/**
+ * Coverage kept per language as well as in total.
+ *
+ * The hub, the topic page and the sitemap used to ask three different questions of the same
+ * corpus. The page filtered its articles through `publicationReadyWhere(…, locale)`, so a
+ * Chinese hub was withheld unless five *Chinese-indexable* reports carried it; the hub's link
+ * list and the sitemap counted every report regardless of language. A topic with ample
+ * English coverage and fewer than five Chinese reports therefore appeared in the Chinese
+ * sitemap and in the Chinese hub while its own page answered `noindex` — 15 topics, and a
+ * sitemap advertising addresses it was simultaneously telling Google to forget. One rule,
+ * asked once per language, is the only version of this that cannot drift.
+ */
+interface LocaleCoverage { views: number; articleIds: Set<string>; institutionIds: Set<string>; lastAt: Date }
+
 interface IndexedTopic extends TopicStat {
   institutionIds: Set<string>;
   articleIds: Set<string>;
   tickerCounts: Map<string, number>;
+  byLocale: Record<Locale, LocaleCoverage>;
 }
 
 const loadTopicIndex = cache(async (): Promise<Map<string, IndexedTopic>> => {
@@ -121,7 +136,7 @@ const loadTopicIndex = cache(async (): Promise<Map<string, IndexedTopic>> => {
     where: { reviewStatus: "ok", article: publicationReadyWhere({ publishedAt: { gte: since } }) },
     select: {
       topic: true, articleId: true, assetTicker: true, createdAt: true,
-      article: { select: { institutionId: true } },
+      article: { select: { institutionId: true, indexableEn: true, indexableZh: true } },
     },
   });
 
@@ -135,6 +150,10 @@ const loadTopicIndex = cache(async (): Promise<Map<string, IndexedTopic>> => {
       key, labelEn: topicLabelEn(raw), labelZh: topicLabel(raw, "zh-CN"), raw: [],
       views: 0, articles: 0, institutions: 0, tickers: [], lastAt: row.createdAt,
       institutionIds: new Set<string>(), articleIds: new Set<string>(), tickerCounts: new Map<string, number>(),
+      byLocale: {
+        en: { views: 0, articleIds: new Set<string>(), institutionIds: new Set<string>(), lastAt: row.createdAt },
+        "zh-CN": { views: 0, articleIds: new Set<string>(), institutionIds: new Set<string>(), lastAt: row.createdAt },
+      },
     };
     if (!entry.raw.includes(raw)) entry.raw.push(raw);
     entry.views += 1;
@@ -142,6 +161,15 @@ const loadTopicIndex = cache(async (): Promise<Map<string, IndexedTopic>> => {
     entry.institutionIds.add(row.article.institutionId);
     if (row.assetTicker) entry.tickerCounts.set(row.assetTicker, (entry.tickerCounts.get(row.assetTicker) ?? 0) + 1);
     if (row.createdAt > entry.lastAt) entry.lastAt = row.createdAt;
+    for (const locale of LOCALES) {
+      const indexable = locale === "zh-CN" ? row.article.indexableZh : row.article.indexableEn;
+      if (!indexable) continue;
+      const slice = entry.byLocale[locale];
+      slice.views += 1;
+      slice.articleIds.add(row.articleId);
+      slice.institutionIds.add(row.article.institutionId);
+      if (row.createdAt > slice.lastAt) slice.lastAt = row.createdAt;
+    }
     index.set(key, entry);
   }
 
@@ -160,12 +188,48 @@ const toStat = (entry: IndexedTopic): TopicStat => ({
 });
 
 /** Topics with enough independent coverage to be worth a page, strongest first. */
+/**
+ * Whether a topic's page is worth indexing in one language.
+ *
+ * The single rule the topic page, the hub's link list and the sitemap all ask. It is
+ * deliberately the *page's* question — five reports this language may index, and at least one
+ * usable view — because the page is what a crawler lands on. Anything this admits must be
+ * served indexable; anything it refuses must not be advertised anywhere. Asking it per
+ * language is what stops a Chinese hub being withheld while the English one is listed.
+ */
+function topicIndexableIn(entry: IndexedTopic, locale: Locale) {
+  const slice = entry.byLocale[locale];
+  // The corpus-wide half is not redundant: `getTopicStat` refuses a key that no longer clears
+  // the cross-institution bar, and the page answers 404 for a key it refuses. Dropping it here
+  // advertised `/en/topics/precious-metals`, which the page had stopped serving.
+  return entry.articles >= TOPIC_MIN_ARTICLES
+    && entry.institutions >= TOPIC_MIN_INSTITUTIONS
+    && slice.articleIds.size >= TOPIC_MIN_ARTICLES
+    && slice.views > 0;
+}
+
+/** Topics whose page is indexable in `locale`, strongest first. */
+export const listIndexableTopicsFor = cache(async (locale: Locale): Promise<TopicStat[]> => {
+  const index = await loadTopicIndex();
+  return [...index.values()]
+    .filter((entry) => !legacyTopicRedirectPath(entry.key) && topicIndexableIn(entry, locale))
+    .sort((a, b) => b.byLocale[locale].views - a.byLocale[locale].views || a.key.localeCompare(b.key))
+    .map(toStat);
+});
+
+/** Every topic with corpus-wide support, for surfaces that are not language-specific. */
 export const listIndexableTopics = cache(async (): Promise<TopicStat[]> => {
   const index = await loadTopicIndex();
   return [...index.values()]
     .filter((entry) => !legacyTopicRedirectPath(entry.key) && entry.articles >= TOPIC_MIN_ARTICLES && entry.institutions >= TOPIC_MIN_INSTITUTIONS)
     .sort((a, b) => b.views - a.views || a.key.localeCompare(b.key))
     .map(toStat);
+});
+
+/** The last time this topic gained a report this language may index. */
+export const topicLastAtFor = cache(async (key: string, locale: Locale): Promise<Date | null> => {
+  const entry = (await loadTopicIndex()).get(key);
+  return entry ? entry.byLocale[locale].lastAt : null;
 });
 
 /** The stat for one key, or null when the corpus does not support a page for it. */

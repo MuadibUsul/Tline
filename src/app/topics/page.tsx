@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getLocale, localePath, tr } from "@/lib/i18n";
-import { listIndexableTopics, topicPath, TOPIC_MIN_ARTICLES, TOPIC_MIN_INSTITUTIONS } from "@/lib/topics";
+import { listIndexableTopicsFor, topicPath, TOPIC_MIN_ARTICLES, TOPIC_MIN_INSTITUTIONS } from "@/lib/topics";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, itemListJsonLd, localizedUrl, ogImage, topicsSeoTitle } from "@/lib/seo";
 import { taxonomy } from "@/lib/classification/taxonomy";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  const topics = await listIndexableTopics();
+  const topics = await listIndexableTopicsFor(locale);
   const title = topicsSeoTitle(locale);
   const description = tr(
     locale,
@@ -29,9 +29,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function TopicsPage() {
   const locale = await getLocale();
-  const topics = await listIndexableTopics();
+  const topics = await listIndexableTopicsFor(locale);
   const featuredKeys = ["inflation", "employment", "energy", "equities"];
-  const featured = taxonomy.topics.filter((item) => featuredKeys.includes(item.key));
+  /**
+   * The featured chips read the taxonomy, not the coverage index, so they linked to four
+   * subjects whether or not those subjects had a page in this language — `/zh/topics/energy`
+   * and `/topics/employment` in both languages answered `noindex` while the hub linked them.
+   * A curated shortcut is still a link, and it has to clear the same bar as the list below it.
+   */
+  const published = new Set(topics.map((topic) => topic.key));
+  const featured = taxonomy.topics.filter((item) => featuredKeys.includes(item.key) && published.has(item.key));
 
   return (
     <main className="wrap">

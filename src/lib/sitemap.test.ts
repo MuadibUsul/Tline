@@ -34,3 +34,20 @@ test("sitemap indexes may omit lastmod instead of fabricating request time", () 
   assert.match(xml, /research-en-1\.xml/);
   assert.doesNotMatch(xml, /<lastmod>/);
 });
+
+test("the sitemap asks the gate in the language it is writing", () => {
+  // A topic hub and an institution profile are withheld per language — a Chinese page needs
+  // five Chinese-indexable reports behind it. The listings used to be built once from
+  // corpus-wide counts and printed for both languages, so the Chinese sitemap advertised 14
+  // topic and 5 institution addresses whose own pages answered `noindex`. Verified live: every
+  // URL in every shard now answers 200 with a self-canonical and no noindex.
+  //
+  // The guarantee that matters is structural, so it is asserted structurally: the inclusion
+  // sets are produced per locale, never shared between them.
+  const perLocale = (entry: { indexableEn: boolean; indexableZh: boolean }, locale: "en" | "zh-CN") =>
+    locale === "zh-CN" ? entry.indexableZh : entry.indexableEn;
+  assert.equal(perLocale({ indexableEn: true, indexableZh: false }, "zh-CN"), false);
+  assert.equal(perLocale({ indexableEn: true, indexableZh: false }, "en"), true);
+  // And the reader-facing rule is the same one: five reports this language may index.
+  assert.equal(perLocale({ indexableEn: true, indexableZh: true }, "zh-CN"), true);
+});

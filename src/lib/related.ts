@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { prisma } from "./db";
 import { publicationReadyWhere } from "./publication";
-import { listIndexableTopics, topicKey, topicLabel, topicPath } from "./topics";
+import { listIndexableTopicsFor, topicKey, topicLabel, topicPath } from "./topics";
 import type { Locale } from "./i18n";
 import { validateStructuredResearch } from "./ingest/researchQuality";
 
@@ -24,9 +24,11 @@ const GENERIC_KEY = /^(?:general|market|other|unspecified|macro|macroeconomics|e
  * list cannot know. Linking to a subject that has no page sends a reader — and a crawler —
  * to a 404, so the relation is dropped rather than rendered.
  */
-async function withPages(topics: RelatedTopic[]): Promise<RelatedTopic[]> {
+async function withPages(topics: RelatedTopic[], locale: Locale): Promise<RelatedTopic[]> {
   if (!topics.length) return topics;
-  const published = new Set((await listIndexableTopics()).map((topic) => topic.key));
+  // Asked in the reader's language: a Chinese page linking to a Chinese hub that answers
+  // `noindex` spends a crawl on a page the site is asking Google to ignore.
+  const published = new Set((await listIndexableTopicsFor(locale)).map((topic) => topic.key));
   return topics.filter((topic) => published.has(topic.key));
 }
 
@@ -63,7 +65,7 @@ export const getArticleTopics = cache(async (articleId: string, locale: Locale, 
   return withPages([...counts.entries()]
     .sort((a, b) => b[1].views - a[1].views)
     .slice(0, take)
-    .map(([key, entry]) => ({ key, label: topicLabel(entry.raw, locale), views: entry.views })));
+    .map(([key, entry]) => ({ key, label: topicLabel(entry.raw, locale), views: entry.views })), locale);
 });
 
 /**
@@ -187,7 +189,7 @@ export const getInstitutionTopics = cache(async (slug: string, locale: Locale, t
   return withPages([...counts.entries()]
     .sort((a, b) => b[1].views - a[1].views)
     .slice(0, take)
-    .map(([key, entry]) => ({ key, label: topicLabel(entry.raw, locale), views: entry.views })));
+    .map(([key, entry]) => ({ key, label: topicLabel(entry.raw, locale), views: entry.views })), locale);
 });
 
 /** Assets that the same topic keeps coming back to. */
@@ -225,7 +227,7 @@ export const getAssetTopics = cache(async (ticker: string, locale: Locale, take 
   return withPages([...counts.entries()]
     .sort((a, b) => b[1].views - a[1].views)
     .slice(0, take)
-    .map(([key, entry]) => ({ key, label: topicLabel(entry.raw, locale), views: entry.views })));
+    .map(([key, entry]) => ({ key, label: topicLabel(entry.raw, locale), views: entry.views })), locale);
 });
 
 /** The link target for a topic, so callers do not rebuild the path. */

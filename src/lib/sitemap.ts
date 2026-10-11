@@ -4,7 +4,7 @@ import { siteUrl } from "@/lib/site";
 import { LOCALES, localePath, type Locale } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
 import { assetPath, isPublicAssetTicker } from "@/lib/assetPath";
-import { listIndexableTopics, topicPath } from "@/lib/topics";
+import { listIndexableTopicsFor, topicPath } from "@/lib/topics";
 import { taxonomy } from "@/lib/classification/taxonomy";
 import { loadPublicThemes } from "@/lib/marketThemesPublic";
 
@@ -68,14 +68,34 @@ export function indexableSitemapLocales(article: { indexableEn: boolean; indexab
   return LOCALES.filter((locale) => locale === "zh-CN" ? article.indexableZh : article.indexableEn);
 }
 
-function localizedEntries(locale: Locale, entries: Array<Omit<SitemapEntry, "url" | "alternates"> & { path: string }>): SitemapEntry[] {
+/**
+ * One language's entries, declaring only the alternates that are published too.
+ *
+ * `available` is the set of languages this path is listed in. It was every language before,
+ * which held only while a path was either in both shards or in neither: once a topic or an
+ * institution could be published in one language and withheld in the other, the English entry
+ * still declared a Chinese alternate — pointing at the very address the Chinese shard had just
+ * stopped advertising, and which answers `noindex`. An alternate that is not a page tells a
+ * search engine the site has something it does not have.
+ */
+function localizedEntries(
+  locale: Locale,
+  entries: Array<Omit<SitemapEntry, "url" | "alternates"> & { path: string; available?: Locale[] }>,
+): SitemapEntry[] {
   const base = siteUrl();
-  return entries.map(({ path, ...entry }) => ({
-    ...entry,
-    url: base + localePath(locale, path),
-    alternates: PAGE_ALTERNATES.map((alternate) => ({ hreflang: alternate.hreflang, href: base + localePath(alternate.locale, path) })),
-  }));
+  return entries.map(({ path, available, ...entry }) => {
+    const languages = available ?? LOCALES;
+    return {
+      ...entry,
+      url: base + localePath(locale, path),
+      alternates: PAGE_ALTERNATES
+        .filter((alternate) => languages.includes(alternate.locale))
+        .map((alternate) => ({ hreflang: alternate.hreflang, href: base + localePath(alternate.locale, path) })),
+    };
+  });
 }
+
+const otherLocale = (locale: Locale): Locale => locale === "en" ? "zh-CN" : "en";
 
 export async function buildPagesSitemap(locale: Locale): Promise<SitemapEntry[]> {
   const [latestArticle, latestConsensus, latestIndicator, latestRelease, indicators, liveThemes] = await Promise.all([
@@ -126,19 +146,27 @@ export async function buildPagesSitemap(locale: Locale): Promise<SitemapEntry[]>
 }
 
 export async function buildInstitutionsSitemap(locale: Locale): Promise<SitemapEntry[]> {
+  // Same fault as the topics shard: an institution with no report this language may index
+  // still had a `noindex` profile page advertised in that language's sitemap.
   const institutions = await prisma.institution.findMany({
-    where: { articles: { some: publicationReadyWhere() } },
+    where: { articles: { some: publicationReadyWhere(undefined, locale) } },
     select: {
       slug: true,
-      articles: { where: publicationReadyWhere(), orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
+      articles: { where: publicationReadyWhere(undefined, locale), orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
       forecasts: { where: { status: "settled" }, orderBy: { settledAt: "desc" }, take: 1, select: { settledAt: true } },
     },
   });
+  const other = await prisma.institution.findMany({
+    where: { articles: { some: publicationReadyWhere(undefined, otherLocale(locale)) } },
+    select: { slug: true },
+  });
+  const otherSlugs = new Set(other.map((row) => row.slug));
   return localizedEntries(locale, institutions.flatMap((institution) => {
     const lastModified = institution.articles[0]?.updatedAt ?? changed("2026-09-17");
+    const available = otherSlugs.has(institution.slug) ? LOCALES : [locale];
     return [
-      { path: `/institution/${institution.slug}`, lastModified, changeFrequency: "daily" as const, priority: 0.6 },
-      ...(institution.forecasts.length ? [{ path: `/institution/${institution.slug}/accuracy`, lastModified: institution.forecasts[0].settledAt ?? lastModified, changeFrequency: "weekly" as const, priority: 0.5 }] : []),
+      { path: `/institution/${institution.slug}`, lastModified, changeFrequency: "daily" as const, priority: 0.6, available },
+      ...(institution.forecasts.length ? [{ path: `/institution/${institution.slug}/accuracy`, lastModified: institution.forecasts[0].settledAt ?? lastModified, changeFrequency: "weekly" as const, priority: 0.5, available }] : []),
     ];
   }));
 }
@@ -165,13 +193,26 @@ export async function buildAssetsSitemap(locale: Locale): Promise<SitemapEntry[]
   }));
 }
 
+/**
+ * Topics this language's page actually serves.
+ *
+ * The list used to be built once from corpus-wide counts and then printed for both
+ * languages, so a Chinese topic hub whose own page answered `noindex` was still advertised
+ * in the Chinese sitemap. Inclusion is now the page's question, asked in the sitemap's own
+ * language.
+ */
 export async function buildTopicsSitemap(locale: Locale): Promise<SitemapEntry[]> {
-  const topics = await listIndexableTopics();
+  const [topics, otherTopics] = await Promise.all([
+    listIndexableTopicsFor(locale),
+    listIndexableTopicsFor(otherLocale(locale)),
+  ]);
+  const publishedElsewhere = new Set(otherTopics.map((topic) => topic.key));
   return localizedEntries(locale, topics.map((topic) => ({
     path: topicPath(topic.key),
     lastModified: topic.lastAt,
     changeFrequency: "daily" as const,
     priority: 0.6,
+    available: publishedElsewhere.has(topic.key) ? LOCALES : [locale],
   })));
 }
 

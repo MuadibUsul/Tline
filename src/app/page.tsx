@@ -9,7 +9,7 @@ import LiveFeed from "./_components/LiveFeed";
 import { domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
 import { assetPath } from "@/lib/assetPath";
-import { listIndexableTopics, topicPath } from "@/lib/topics";
+import { listIndexableTopicsFor, topicPath } from "@/lib/topics";
 import { JsonLd, canonical, clamp, homeSeoTitle, localizedUrl, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export default async function Home() {
     mostActive(30, 6),
     importantReleasesThisWeek(5),
     feedPulse(),
-    listIndexableTopics(),
+    listIndexableTopicsFor(locale),
     prisma.institution.count({ where: { articles: { some: publicationReadyWhere() } } }),
     prisma.article.count({ where: publicationReadyWhere() }),
     // The same coverage rule the markets hub applies, so the count here is the count there.

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const base = new URL(process.argv.find((value) => value.startsWith("--base="))?.slice(7) || "https://tlines.tech");
+const canonicalOrigin = new URL(process.argv.find((value) => value.startsWith("--canonical-origin="))?.slice(19) || process.env.SITE_URL || "https://tlines.tech");
 const sampleLimit = Math.max(6, Number(process.argv.find((value) => value.startsWith("--sample="))?.slice(9) || 24));
 const browserUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36";
 const googleUa = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
@@ -11,6 +12,10 @@ const decode = (value) => value
   .replaceAll("&lt;", "<").replaceAll("&gt;", ">").replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)));
 const attrs = (tag) => Object.fromEntries([...tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map((match) => [match[1].toLowerCase(), decode(match[2] ?? match[3] ?? "")]));
 const normalizedUrl = (value) => value ? new URL(value, base).toString().replace(/\/$/, "") : "";
+const fetchUrl = (value) => {
+  const canonical = new URL(value, canonicalOrigin);
+  return canonical.origin === base.origin ? canonical.toString() : new URL(`${canonical.pathname}${canonical.search}`, base).toString();
+};
 const text = (html) => decode(html
   .replace(/<(?:script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/(?:script|style|noscript|svg)>/gi, " ")
   .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
@@ -75,7 +80,7 @@ function sitemapEntries(xml) {
 
 function representative(entries) {
   const urls = entries.map((entry) => entry.loc);
-  const picks = new Set([new URL("/en", base).toString(), new URL("/zh", base).toString(), new URL("/en/research", base).toString(), new URL("/zh/research", base).toString()]);
+  const picks = new Set([new URL("/en", canonicalOrigin).toString(), new URL("/zh", canonicalOrigin).toString(), new URL("/en/research", canonicalOrigin).toString(), new URL("/zh/research", canonicalOrigin).toString()]);
   const groups = ["/en/research/", "/zh/research/", "/en/institution/", "/zh/institution/", "/en/markets/", "/zh/markets/", "/en/topics/", "/zh/topics/", "/en/economies/", "/zh/economies/"];
   const matchesByGroup = groups.map((fragment) => urls.filter((url) => new URL(url).pathname.startsWith(fragment)));
   // Cover every page type and locale before spending the remaining sample budget on the
@@ -98,12 +103,12 @@ if (robotsResult.status !== 200) failures.push(`robots.txt returned ${robotsResu
 if (sitemapIndex.status !== 200 || !/xml/i.test(sitemapIndex.type)) failures.push(`sitemap.xml returned ${sitemapIndex.status || "an error"} (${sitemapIndex.type || "no content type"})`);
 
 const shardUrls = xmlValues(sitemapIndex.body, "loc");
-const shardResults = await Promise.all(shardUrls.map((url) => request(url)));
+const shardResults = await Promise.all(shardUrls.map((url) => request(fetchUrl(url))));
 const entries = shardResults.flatMap((result) => sitemapEntries(result.body));
 const locs = entries.map((entry) => entry.loc);
 const locSet = new Set(locs);
 const duplicateLocs = locs.length - locSet.size;
-const offOrigin = locs.filter((url) => { try { return new URL(url).origin !== base.origin; } catch { return true; } });
+const offOrigin = locs.filter((url) => { try { return new URL(url).origin !== canonicalOrigin.origin; } catch { return true; } });
 const alternateTargets = entries.flatMap((entry) => entry.alternates.map((alternate) => alternate.href));
 const missingAlternates = [...new Set(alternateTargets.filter((url) => !locSet.has(url)))];
 const futureLastmod = entries.filter((entry) => entry.lastmod && new Date(entry.lastmod).getTime() > Date.now() + 86_400_000);
@@ -116,13 +121,59 @@ if (futureLastmod.length) warnings.push(`sitemap contains ${futureLastmod.length
 
 const disallows = [...robotsResult.body.matchAll(/^\s*Disallow:\s*(\S+)\s*$/gim)].map((match) => match[1]);
 const blockedSitemapUrls = locs.filter((url) => disallows.some((rule) => rule !== "/" && new URL(url).pathname.startsWith(rule)));
+const researchCounts = {
+  en: entries.filter((entry) => /^\/en\/research\//.test(new URL(entry.loc).pathname)).length,
+  zh: entries.filter((entry) => /^\/zh\/research\//.test(new URL(entry.loc).pathname)).length,
+};
 if (blockedSitemapUrls.length) failures.push(`${blockedSitemapUrls.length} sitemap URLs match a robots.txt Disallow rule`);
-if (!robotsResult.body.includes(`${base.origin}/sitemap.xml`)) failures.push("robots.txt does not advertise the canonical sitemap index");
+if (!robotsResult.body.includes(`${canonicalOrigin.origin}/sitemap.xml`)) failures.push("robots.txt does not advertise the canonical sitemap index");
+
+/**
+ * `--full-sitemap`: every advertised URL, not a sample.
+ *
+ * The sampled run below can pass 24/24 while a shard advertises pages that answer `noindex`,
+ * or alternates whose targets are not published — both shipped once, and only an exhaustive
+ * crawl caught them. One concurrent pass over every <loc> entry: each must answer 200 to
+ * Googlebot without redirecting, carry no `noindex`, and name itself canonical at its own
+ * path. Slow (one request per URL), so it is opt-in rather than the default run.
+ */
+let fullSitemapChecked = 0;
+let fullSitemapProblems = 0;
+if (process.argv.includes("--full-sitemap")) {
+  const targets = entries.map((entry) => fetchUrl(entry.loc));
+  const problems = [];
+  const concurrency = 8;
+  for (let index = 0; index < targets.length; index += concurrency) {
+    await Promise.all(targets.slice(index, index + concurrency).map(async (url) => {
+      try {
+        const response = await request(url);
+        fullSitemapChecked++;
+        if (response.status !== 200) {
+          problems.push(`${url}: status ${response.status}${response.location ? ` -> ${response.location}` : ""}`);
+          return;
+        }
+        const meta = pageMeta(response.body);
+        if (/noindex/i.test(meta.robots)) problems.push(`${url}: noindex (robots="${meta.robots}")`);
+        else if (meta.canonical && meta.canonical !== `${canonicalOrigin.origin}${new URL(url).pathname}`) problems.push(`${url}: canonical=${meta.canonical}`);
+      } catch (error) {
+        fullSitemapChecked++;
+        problems.push(`${url}: ${String(error).slice(0, 80)}`);
+      }
+    }));
+    process.stderr.write(`\rfull sitemap: ${Math.min(index + concurrency, targets.length)}/${targets.length}`);
+  }
+  process.stderr.write("\n");
+  fullSitemapProblems = problems.length;
+  // Every problem is a failure; the slice only keeps one pathological shard from burying the
+  // rest of the report, and the count in the summary still says how many there are.
+  failures.push(...problems.slice(0, 40));
+}
 
 const sampledUrls = representative(entries);
 const sampled = [];
 for (const url of sampledUrls) {
-  const [browser, google] = await Promise.all([request(url, browserUa), request(url, googleUa)]);
+  const target = fetchUrl(url);
+  const [browser, google] = await Promise.all([request(target, browserUa), request(target, googleUa)]);
   const browserMeta = pageMeta(browser.body);
   const googleMeta = pageMeta(google.body);
   const issues = [];
@@ -147,6 +198,7 @@ for (const url of sampledUrls) {
 const edgeCases = [
   { path: "/en/institutions?page=9999", expectation: "404 or noindex", check: (result, meta) => result.status === 404 || /noindex/i.test(`${result.robotsHeader} ${meta.robots}`) },
   { path: "/en/research?page=9999", expectation: "404 or noindex", check: (result, meta) => result.status === 404 || /noindex/i.test(`${result.robotsHeader} ${meta.robots}`) },
+  { path: "/en/research?page=2", expectation: "indexable self-canonical pagination with onward links", check: (result, meta) => result.status === 200 && !/noindex/i.test(`${result.robotsHeader} ${meta.robots}`) && normalizedUrl(meta.canonical) === normalizedUrl(new URL("/en/research?page=2", canonicalOrigin)) && /href="\/en\/research\?page=3"/.test(result.body) },
   { path: "/en/markets/SPX", expectation: "redirect to canonical slug", check: (result) => result.status >= 300 && result.status < 400 && Boolean(result.location) },
   { path: "/sitemap/0.xml", expectation: "redirect to a named canonical sitemap", check: (result) => result.status === 308 && /\/sitemap\/pages-en\.xml$/.test(new URL(result.location, result.url).pathname) },
   { path: "/api/documents/not-a-document", expectation: "non-HTML response with X-Robots-Tag noindex", check: (result) => /noindex/i.test(result.robotsHeader) },
@@ -177,8 +229,8 @@ const challengeObserved = cfSignals.some((result) => [403, 429, 503].includes(re
 if (challengeObserved) failures.push("a sampled request encountered a block/rate-limit/challenge response");
 if (!cfObserved) warnings.push("no Cloudflare response headers observed; dashboard/WAF configuration remains待验证");
 
-console.log(`# Tlines SEO baseline\n\nGenerated: ${new Date().toISOString()}  \nBase: ${base.origin}  \nCommand: \`node scripts/seo-baseline.mjs --base=${base.origin} --sample=${sampleLimit}\`\n`);
-console.log(`## Summary\n\n- Failures: **${failures.length}**\n- Warnings: **${warnings.length}**\n- Sitemap shards: **${shardUrls.length}**\n- Sitemap URLs: **${entries.length}** (${entries.filter((entry) => /\/en\//.test(new URL(entry.loc).pathname) || new URL(entry.loc).pathname === "/en").length} English, ${entries.filter((entry) => /\/zh\//.test(new URL(entry.loc).pathname) || new URL(entry.loc).pathname === "/zh").length} Chinese)\n- Sampled indexable URLs: **${sampled.length}**\n- Cloudflare edge headers observed: **${cfObserved ? "yes" : "no"}**\n- Challenge/block responses observed: **${challengeObserved ? "yes" : "no"}**\n`);
+console.log(`# Tlines SEO baseline\n\nGenerated: ${new Date().toISOString()}  \nBase: ${base.origin}  \nCanonical origin: ${canonicalOrigin.origin}  \nCommand: \`node scripts/seo-baseline.mjs --base=${base.origin} --sample=${sampleLimit}\`\n`);
+console.log(`## Summary\n\n- Failures: **${failures.length}**\n- Warnings: **${warnings.length}**\n- Sitemap shards: **${shardUrls.length}**\n- Sitemap URLs: **${entries.length}** (${entries.filter((entry) => /\/en\//.test(new URL(entry.loc).pathname) || new URL(entry.loc).pathname === "/en").length} English, ${entries.filter((entry) => /\/zh\//.test(new URL(entry.loc).pathname) || new URL(entry.loc).pathname === "/zh").length} Chinese)\n- Sampled indexable URLs: **${sampled.length}**${process.argv.includes("--full-sitemap") ? `\n- Full sitemap crawl: **${fullSitemapChecked} URLs, ${fullSitemapProblems} problems**` : ""}\n- Cloudflare edge headers observed: **${cfObserved ? "yes" : "no"}**\n- Challenge/block responses observed: **${challengeObserved ? "yes" : "no"}**\n`);
 console.log("## Machine endpoints\n\n| URL | Status | Content-Type | X-Robots-Tag | Cache-Control | ms |\n|---|---:|---|---|---|---:|");
 for (const result of [robotsResult, sitemapIndex, ...shardResults]) console.log(`| ${escapeCell(result.url)} | ${result.status || "ERR"} | ${escapeCell(result.type)} | ${escapeCell(result.robotsHeader || "—")} | ${escapeCell(result.cache || "—")} | ${result.ms} |`);
 console.log("\n## Sampled pages\n\n| URL | Browser / Googlebot | Canonical | Robots | hreflang | SSR chars | Result |\n|---|---|---|---|---:|---:|---|");
@@ -189,6 +241,6 @@ console.log("\n## Redirects\n\n| Start | Chain | Result |\n|---|---|---|");
 for (const hops of redirects) console.log(`| ${escapeCell(hops[0]?.url)} | ${escapeCell(hops.map((hop) => `${hop.status || "ERR"} ${hop.location ? `→ ${new URL(hop.location, hop.url).pathname}` : new URL(hop.url).pathname}`).join(" · "))} | ${hops.at(-1)?.status === 200 && hops.length <= 2 ? "PASS" : "CHECK"} |`);
 console.log(`\n## Failures\n\n${failures.length ? failures.map((item) => `- ${item}`).join("\n") : "- None."}`);
 console.log(`\n\n## Warnings / manual verification\n\n${warnings.length ? warnings.map((item) => `- ${item}`).join("\n") : "- None."}`);
-console.log(`\n\n## Sitemap integrity\n\n- Duplicate locs: ${duplicateLocs}\n- Off-origin/invalid locs: ${offOrigin.length}\n- Alternate targets absent from loc set: ${missingAlternates.length}\n- URLs blocked by a listed Disallow prefix: ${blockedSitemapUrls.length}\n- Future lastmod values: ${futureLastmod.length}\n`);
+console.log(`\n\n## Sitemap integrity\n\n- Duplicate locs: ${duplicateLocs}\n- Off-origin/invalid locs: ${offOrigin.length}\n- Alternate targets absent from loc set: ${missingAlternates.length}\n- URLs blocked by a listed Disallow prefix: ${blockedSitemapUrls.length}\n- Future lastmod values: ${futureLastmod.length}\n- Research URLs: ${researchCounts.en} English, ${researchCounts.zh} Chinese\n`);
 
 process.exitCode = failures.length ? 1 : 0;

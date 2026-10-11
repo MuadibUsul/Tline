@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { validateTranslation } from "../src/lib/translation/quality";
+import { refreshGate } from "../src/lib/gate";
 
 /**
  * Re-score stored translations against the current quality checker.
@@ -8,6 +9,11 @@ import { validateTranslation } from "../src/lib/translation/quality";
  * Scores are written at translation time, so a change to the checker leaves every existing
  * row graded by the old rules. Reporting is the default; `--apply` rewrites `qualityScore`
  * and `status` so the site's quality notices reflect the checker actually in force.
+ *
+ * `--apply` also refreshes the publication gate for every article it touched: the gate's
+ * verdict reads the translation's score and status, and the listings and sitemap trust the
+ * stored columns. Skipping the refresh would leave a listing advertising a report whose
+ * page now answers 404 — the exact disagreement the gate exists to prevent.
  *
  *   npx tsx scripts/translation-quality.ts
  *   npx tsx scripts/translation-quality.ts --apply
@@ -30,6 +36,7 @@ async function main() {
   const before = new Map<string, number>();
   const after = new Map<string, number>();
   const byCode = new Map<string, number>();
+  const touched = new Set<string>();
   let scored = 0;
   let sumBefore = 0;
   let sumAfter = 0;
@@ -58,7 +65,17 @@ async function main() {
           status: result.score >= 0.8 ? "reviewed" : "needs_review",
         },
       });
+      touched.add(row.articleId);
     }
+  }
+
+  if (apply && touched.size) {
+    let flipped = 0;
+    for (const articleId of touched) {
+      const verdict = await refreshGate(articleId);
+      if (verdict && !verdict.indexable["zh-CN"]) flipped += 1;
+    }
+    console.log(`gate refreshed: ${touched.size} articles, zh pages now withheld: ${flipped}`);
   }
 
   const order = [">=0.8", "0.6-0.8", "0.3-0.6", "<0.3"];

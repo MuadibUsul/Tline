@@ -5,6 +5,7 @@ import { macroPosts, researchPosts, validatePost } from "./content";
 import { sendDraftCard, updateDraftCard } from "./feishu";
 import { createXPost } from "./x";
 import { localePath } from "../i18n";
+import { publicationReadyWhere } from "../publication";
 import { researchPath } from "../researchPath";
 import { authorizedExpectationIds } from "../macro/expectationUse";
 import { autoApproveDrafts } from "./autoApprove";
@@ -62,10 +63,17 @@ async function createResearchCandidates() {
   // report appears on the site. The unique(sourceKind, sourceId) index dedupes;
   // the window only bounds how far back a missed backlog reaches, and the
   // per-cycle take spreads that backlog over a few ticks.
+  //
+  // The candidates ask the same publication gate every public surface asks: a
+  // draft whose reply link points at an address the gate withholds (or that was
+  // withdrawn after the draft was made) is how a follower ends up at a 404.
   const windowMs = Math.max(1, Number(process.env.SOCIAL_RESEARCH_REVIEW_HOURS || 48)) * 3600_000;
   const perCycle = Math.max(1, Number(process.env.SOCIAL_RESEARCH_REVIEW_PER_CYCLE || 25));
   const analyses = await prisma.analysis.findMany({
-    where: { reviewStatus: "ok", summaryZh: { not: null }, article: { rawText: { not: null }, publishedAt: { gte: new Date(Date.now() - windowMs) } } },
+    where: {
+      reviewStatus: "ok", summaryZh: { not: null },
+      article: publicationReadyWhere({ publishedAt: { gte: new Date(Date.now() - windowMs) } }),
+    },
     orderBy: { article: { publishedAt: "desc" } }, take: perCycle,
     include: { article: { include: { institution: true } } },
   });
@@ -208,6 +216,22 @@ async function publishDelivery(id: string) {
   if (!claimed.count) return;
   const delivery = await prisma.socialDelivery.findUnique({ where: { id }, include: { draft: true, account: true } });
   if (!delivery) return;
+  // The reply link is the gate's job to keep true: between approval and posting, a report
+  // can be withdrawn or lose its verdict in this delivery's language. Retrying cannot fix
+  // that, so the delivery fails outright instead of burning its attempt budget.
+  if (delivery.draft.sourceKind === "research") {
+    const article = await prisma.article.findUnique({
+      where: { id: delivery.draft.sourceId },
+      select: { withdrawnAt: true, indexableEn: true, indexableZh: true },
+    });
+    const indexable = delivery.language === "zh-CN" ? article?.indexableZh : article?.indexableEn;
+    if (!article || article.withdrawnAt || !indexable) {
+      await prisma.socialDelivery.update({ where: { id }, data: { status: "FAILED", lastError: "source is no longer public in this language" } });
+      await writeAudit({ action: "social.delivery.gate_blocked", targetType: "socialDelivery", targetId: id, metadata: { accountId: delivery.accountId, sourceId: delivery.draft.sourceId, language: delivery.language } });
+      await updateDraftStatus(delivery.draftId);
+      return;
+    }
+  }
   try {
     const post = delivery.language === "zh-CN" ? delivery.draft.textZh : delivery.draft.textEn;
     const invalid = validatePost(post);

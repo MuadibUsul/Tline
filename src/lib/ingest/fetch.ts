@@ -13,6 +13,23 @@ const MAX_TEXT_BYTES = 10 * 1024 * 1024;
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
 const BLOCKED_HOSTS = new Set(["localhost", "metadata", "metadata.google.internal"]);
 let lastCachePrune = 0;
+/** Upper bound on honouring a publisher's Retry-After, so one slow source cannot pin a worker slot forever. */
+const RETRY_AFTER_CAP_MS = 120_000;
+
+/**
+ * How long to wait before the one retry a 429/503 earns: the interval the publisher
+ * named (an HTTP-date or unparseable value falls back to `fallbackMs`), capped so a
+ * "come back in an hour" answer cannot pin a worker slot for that hour.
+ */
+export function retryDelayMs(retryAfter: string | null, fallbackMs: number): number {
+  // `Number(null)` and `Number("")` are 0, so an absent header must be checked before the
+  // numeric parse — a 429 with no Retry-After would otherwise "wait" zero milliseconds.
+  if (!retryAfter) return fallbackMs;
+  const seconds = Number(retryAfter);
+  return Number.isFinite(seconds) ? Math.min(seconds * 1000, RETRY_AFTER_CAP_MS) : fallbackMs;
+}
+const CACHE_MB = Number(process.env.HTTP_CACHE_MAX_MB);
+const MAX_CACHE_BYTES = (Number.isFinite(CACHE_MB) && CACHE_MB >= 64 ? CACHE_MB : 512) * 1024 * 1024;
 
 async function pruneTextCache() {
   if (Date.now() - lastCachePrune < 60 * 60_000) return;
@@ -21,11 +38,23 @@ async function pruneTextCache() {
   const rows = await Promise.all(files.map(async (name) => {
     const file = path.join(textCacheDir, name);
     const info = await stat(file).catch(() => null);
-    return info?.isFile() ? { file, mtimeMs: info.mtimeMs } : null;
+    return info?.isFile() ? { file, mtimeMs: info.mtimeMs, size: info.size } : null;
   }));
-  const ordered = rows.filter((row): row is { file: string; mtimeMs: number } => Boolean(row)).sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const ordered = rows.filter((row): row is { file: string; mtimeMs: number; size: number } => Boolean(row)).sort((a, b) => b.mtimeMs - a.mtimeMs);
   const cutoff = Date.now() - 30 * 864e5;
-  await Promise.all(ordered.filter((row, index) => index >= 2_000 || row.mtimeMs < cutoff).map((row) => unlink(row.file).catch(() => undefined)));
+  // A byte quota, not a file count: the count version began evicting entries written
+  // the same hour once the cache passed 2 000 files, and conditional requests — the
+  // whole point of the cache — quietly stopped reaching publishers.
+  let kept = 0;
+  const victims: string[] = [];
+  for (const row of ordered) {
+    if (row.mtimeMs >= cutoff && kept + row.size <= MAX_CACHE_BYTES) {
+      kept += row.size;
+      continue;
+    }
+    victims.push(row.file);
+  }
+  await Promise.all(victims.map((row) => unlink(row).catch(() => undefined)));
 }
 
 /** The eight hextets of an IPv6 address, or null when it is not one this can read. */
@@ -204,8 +233,9 @@ export async function fetchText(url: string, timeoutMs = 15000): Promise<string 
 
   let result = await fetchResource(url, timeoutMs, cached ?? undefined);
   if (!result.ok && [429, 503].includes(result.status)) {
-    const seconds = Number(result.retryAfter);
-    await sleep(Number.isFinite(seconds) ? Math.min(seconds * 1000, 10000) : 1000);
+    // The publisher asked for a pause. Honour the interval it named instead of a token
+    // 10 s that just burns the request budget of a rate-limited source and wastes the round.
+    await sleep(retryDelayMs(result.retryAfter, 2000));
     result = await fetchResource(url, timeoutMs, cached ?? undefined);
   }
   if (result.status === 304 && cached) return cached.body;
@@ -233,6 +263,13 @@ export async function fetchText(url: string, timeoutMs = 15000): Promise<string 
 export async function fetchPdf(url: string, timeoutMs = 30000): Promise<Buffer | null> {
   lastReasons.delete(url);
   let result = await fetchResource(url, timeoutMs, undefined, undefined, MAX_PDF_BYTES);
+  // A rate-limited or briefly unavailable file server gets real backoff instead of a
+  // failed round: the next scheduled look at this source is hours away, so a retry now
+  // is the difference between a document landing today and next week.
+  for (let attempt = 0; !result.ok && [429, 503].includes(result.status) && attempt < 2; attempt++) {
+    await sleep(retryDelayMs(result.retryAfter, 5000 * 2 ** attempt));
+    result = await fetchResource(url, timeoutMs, undefined, undefined, MAX_PDF_BYTES);
+  }
   // Intesa's public PDFs redirect once through a disclaimer. The publisher's own
   // acceptance flow records the document id as an "accepted" cookie.
   try {

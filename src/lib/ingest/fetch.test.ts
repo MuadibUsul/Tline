@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertPublicHttpUrl, fetchPdf, fetchResource } from "./fetch";
+import { assertPublicHttpUrl, fetchPdf, fetchResource, retryDelayMs } from "./fetch";
+
+test("a 429/503 retry waits out the publisher's Retry-After, capped", () => {
+  // The old cap was 10 s: a source answering "come back in 60 s" got a 10 s wait, a
+  // wasted request, and a whole round lost to source-level backoff. The named interval
+  // is honoured now — only shorter than the cap.
+  assert.equal(retryDelayMs("60", 2000), 60_000);
+  assert.equal(retryDelayMs("3600", 2000), 120_000);
+  assert.equal(retryDelayMs("0.2", 2000), 200);
+  // An HTTP-date or a missing header falls back, it does not explode.
+  assert.equal(retryDelayMs("Wed, 21 Oct 2015 07:28:00 GMT", 2000), 2000);
+  assert.equal(retryDelayMs(null, 2000), 2000);
+});
 
 test("outbound fetches reject private network destinations", async () => {
   await assert.rejects(() => assertPublicHttpUrl("http://127.0.0.1/private"), /non-public/);

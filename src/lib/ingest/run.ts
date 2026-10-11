@@ -1,7 +1,7 @@
 import "dotenv/config";
 import Parser from "rss-parser";
 import { prisma } from "../db";
-import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep } from "./fetch";
+import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, sleep, UA } from "./fetch";
 import { extractLinks, extractArticle, extractFeedLinks, extractFullArticleLinks, extractPaginationLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, isBroadcastOrEvent, looksLikeArticle, looksLikeResearchTopic, newestByPublication } from "./extract";
 import { ensureAssets, evidenceText, persistArticle, type RawArticle } from "./store";
 import { resolveDocumentTitle } from "./documentTitle";
@@ -33,7 +33,6 @@ function arg(name: string): string | undefined {
 const flag = (name: string) => process.argv.includes(`--${name}`);
 
 const rss = new Parser({ timeout: 15000 });
-const UA = "InstitutionalIntelligenceBot";
 const MIN_DELAY_MS = 1000; // politeness floor even when robots is silent
 
 async function notifySourceProtection(event: "source.blocked" | "source.circuit_open", source: { slug: string; name: string; researchUrl: string }, status: number, failures: number, retrySeconds: number) {
@@ -112,16 +111,25 @@ async function ingestInstitution(
 
   // --- Runtime robots.txt compliance check ---
   // Robots is per host, so each origin is checked against its own file. Sharing one
-  // host's rules across another host would be a compliance claim we cannot make.
-  // When robots.txt cannot be fetched we proceed (treat as allowed) rather than pausing;
-  // an explicit Disallow in a robots.txt we DID retrieve is still respected.
+  // host's rules across another host would be a compliance claim we cannot make. The
+  // UA used for these decisions is the exact string the fetcher sends, so a group the
+  // publisher names at our full token is a group we honour.
+  //
+  // A robots.txt that cannot be read at all — 5xx or timeout, with no last-known-good
+  // within 24 h — pauses the source for this round instead of being read as permission:
+  // deciding a host's rules are "whatever we feel like" on the one day its robots
+  // endpoint is down is how a compliance claim becomes fiction. The pause schedules a
+  // retry an hour out; when robots answers again, the source resumes on its own.
   const robotsByOrigin = new Map<string, string | null>();
   for (const target of allowedOrigins) robotsByOrigin.set(target, await fetchRobots(target));
 
-  const robotsTxt = robotsByOrigin.get(origin) ?? null;
-  if (robotsTxt === null) {
-    console.log(`  ${inst.name.padEnd(26)} robots unavailable — proceeding (treated as allowed)`);
-  } else if (!robotsAllows(robotsTxt, UA, new URL(inst.researchUrl).pathname)) {
+  const unreadable = [...robotsByOrigin.entries()].filter(([, txt]) => txt === null).map(([target]) => target);
+  if (unreadable.length) {
+    console.log(`  ${inst.name.padEnd(26)} SKIP · robots unreadable: ${unreadable.join(", ")}`);
+    return finish("paused", `robots unreachable: ${unreadable.join(", ")}`, 0);
+  }
+  const robotsTxt = robotsByOrigin.get(origin)!;
+  if (!robotsAllows(robotsTxt, UA, new URL(inst.researchUrl).pathname)) {
     console.log(`  ${inst.name.padEnd(26)} SKIP · robots disallows research path`);
     return finish("refused", "robots disallows research path", 0);
   }
@@ -137,8 +145,10 @@ async function ingestInstitution(
     try {
       const url = new URL(u);
       if (!allowedOrigins.has(url.origin)) return false;
-      const rules = robotsByOrigin.get(url.origin) ?? null;
-      return rules === null || robotsAllows(rules, UA, url.pathname);
+      // Every allowed origin got a readable robots file above (an unreadable one pauses
+      // the whole source), so an empty string here is only a defensive default — and an
+      // empty file allows everything, which matches a publisher with no robots.txt.
+      return robotsAllows(robotsByOrigin.get(url.origin) ?? "", UA, url.pathname);
     } catch {
       return false;
     }

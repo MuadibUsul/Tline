@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fetchResource } from "./fetch";
+import { fetchResource, sleep } from "./fetch";
 
 // Minimal but spec-faithful robots.txt evaluation (Google-style longest-match).
 // Supports User-agent grouping, Allow/Disallow with * and $ wildcards, Crawl-delay.
@@ -140,7 +140,14 @@ export async function fetchRobots(origin: string): Promise<string | null> {
     return cached.text;
   }
 
-  const result = await fetchResource(`${origin}/robots.txt`, 12000, cached ?? undefined);
+  let result = await fetchResource(`${origin}/robots.txt`, 12000, cached ?? undefined);
+  // One quiet retry on a server error or a network blip: an hour-long pause of a whole
+  // source is a high price for a single dropped packet, but a sustained outage still
+  // ends at the null below — the origin is called unreadable, never "allowed".
+  if (result.status === 0 || result.status >= 500) {
+    await sleep(2000);
+    result = await fetchResource(`${origin}/robots.txt`, 12000, cached ?? undefined);
+  }
   if (result.status === 304 && cached) {
     const fresh = { ...cached, fetchedAt: new Date().toISOString() };
     await writeCached(fresh);

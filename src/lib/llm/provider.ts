@@ -28,6 +28,15 @@ function pick(...values: (string | undefined)[]): string | undefined {
   return values.find((value) => value && value.trim().length > 0);
 }
 
+/**
+ * Every provider waits at most this long for a completion, however each vendor's client
+ * expresses it. DeepSeek and Gemini set it on their fetch signal; the OpenAI call gets the
+ * same signal and the Anthropic SDK the same client timeout. Without it a hung request
+ * stalls the ingest or translation pipeline indefinitely — the schedulers' source-seconds
+ * budget does not cover the LLM stage.
+ */
+const COMPLETION_TIMEOUT_MS = 120_000;
+
 class AnthropicProvider implements LLMProvider {
   readonly name = "anthropic";
   readonly model: string;
@@ -40,7 +49,7 @@ class AnthropicProvider implements LLMProvider {
 
   async complete(input: CompletionInput): Promise<CompletionResult> {
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic({ apiKey: this.apiKey });
+    const client = new Anthropic({ apiKey: this.apiKey, timeout: COMPLETION_TIMEOUT_MS });
     const response = await client.messages.create({
       model: this.model,
       max_tokens: input.maxTokens ?? 1800,
@@ -88,6 +97,7 @@ class OpenAIProvider implements LLMProvider {
         input: input.user,
         max_output_tokens: input.maxTokens ?? 1800,
       }),
+      signal: AbortSignal.timeout(COMPLETION_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new Error(`OpenAI request failed (${response.status}): ${(await response.text()).slice(0, 500)}`);

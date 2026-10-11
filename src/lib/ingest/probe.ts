@@ -5,14 +5,13 @@ import Parser from "rss-parser";
 import { prisma } from "../db";
 import { extractPdf } from "../documents/extractPdf";
 import { extractArticle, extractFeedLinks, extractLinks, extractPdfCandidates, inferPublicationDate, isAccessGateText, looksLikeArticle, looksLikeResearchTopic } from "./extract";
-import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus } from "./fetch";
+import { fetchPdf, fetchText, lastFetchReason, lastFetchStatus, UA } from "./fetch";
 import { lastRenderReason, renderHtml } from "./render";
 import { fetchRobots, robotsAllows, robotsSitemaps } from "./robots";
 import { discoverFromSitemaps } from "./sitemap";
 import { candidateAllowed, documentOrigins, listingUrls, sitemapEnabled } from "./sourceRules";
 import { apiDiscoveryEnabled, discoverFromApi } from "./apiSources";
 
-const UA = "InstitutionalIntelligenceBot";
 const rss = new Parser({ timeout: 15000 });
 
 function arg(name: string): string | undefined {
@@ -106,8 +105,8 @@ async function probeInstitution(inst: {
   try {
     const source = new URL(inst.researchUrl);
     // Mirrors run.ts: an institution may publish across several hosts, each checked
-    // against its own robots.txt. An unavailable robots.txt is treated as allowed, while
-    // an explicit Disallow in one we DID retrieve is still respected.
+    // against its own robots.txt — with the same full UA the fetcher sends, and the
+    // same policy for an unreadable file: refused, never "treated as allowed".
     const originOf = (url: string) => { try { return new URL(url).origin; } catch { return null; } };
     const allowedOrigins = new Set([
       source.origin,
@@ -116,14 +115,15 @@ async function probeInstitution(inst: {
     const robotsByOrigin = new Map<string, string | null>();
     for (const target of allowedOrigins) robotsByOrigin.set(target, await fetchRobots(target));
 
-    const robots = robotsByOrigin.get(source.origin) ?? null;
-    if (robots !== null && !robotsAllows(robots, UA, source.pathname)) return { ...base, status: "refused", reason: "robots disallows research path" };
+    const unreadable = [...robotsByOrigin.entries()].filter(([, txt]) => txt === null).map(([target]) => target);
+    if (unreadable.length) return { ...base, status: "refused", reason: `robots unreachable: ${unreadable.join(", ")}` };
+    const robots = robotsByOrigin.get(source.origin)!;
+    if (!robotsAllows(robots, UA, source.pathname)) return { ...base, status: "refused", reason: "robots disallows research path" };
     const allows = (url: string) => {
       try {
         const target = new URL(url);
         if (!allowedOrigins.has(target.origin)) return false;
-        const rules = robotsByOrigin.get(target.origin) ?? null;
-        return rules === null || robotsAllows(rules, UA, target.pathname);
+        return robotsAllows(robotsByOrigin.get(target.origin) ?? "", UA, target.pathname);
       } catch { return false; }
     };
 

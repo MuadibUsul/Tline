@@ -69,7 +69,7 @@ export default async function Home() {
         take: 5,
         select: {
           id: true, viewEn: true, viewZh: true, assetTicker: true,
-          article: { select: { slug: true, institution: { select: { slug: true, name: true } } } },
+          article: { select: { slug: true, publishedAt: true, institution: { select: { slug: true, name: true } } } },
         },
       }),
       loadPublicThemes(),
@@ -92,10 +92,12 @@ export default async function Home() {
         watch={watchRows.map((row) => ({
           id: row.id,
           view: (locale === "zh-CN" ? row.viewZh || row.viewEn : row.viewEn || row.viewZh) ?? "",
+          viewIsFallback: locale === "zh-CN" && !row.viewZh,
           assetTicker: row.assetTicker,
           institution: row.article.institution.name,
           institutionSlug: row.article.institution.slug,
           slug: row.article.slug,
+          publishedAt: row.article.publishedAt.toISOString(),
         }))}
         topics={topics}
         themes={themes}

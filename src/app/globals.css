@@ -1403,3 +1403,27 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .search-overlay .results .k{font:10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent-ink);white-space:nowrap;padding-top:3px;min-width:56px}
 .search-overlay .results .t{font-size:13.5px}
 .search-overlay .results small{display:block;font:11px var(--mono);color:var(--faint);margin-top:2px}
+
+/* ---- Front-page & reading polish v2 (after first visual QA, 2026-10-17) ----
+   Overrides earlier rules at equal specificity, so this block stays at the end. */
+.minibtn.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.minibtn.p:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+.front-mast h1{font-family:var(--sans);font-weight:700;font-size:27px;letter-spacing:0}
+.front-mast{border-bottom:1px solid var(--border);padding-bottom:14px}
+.ed-feature{display:flex;flex-direction:column;gap:10px;padding:22px}
+.ed-feature h2{font-family:var(--sans);font-weight:700;font-size:22.5px;line-height:1.42;letter-spacing:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:6px 0 2px}
+.ed-feature h2 a:hover{color:var(--accent-ink)}
+.ed-feature .sub{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-size:14px;line-height:1.75}
+.ed-feature .ed-actions{margin-top:auto;padding-top:6px}
+.front-lead-links a{padding:13px 0;border-bottom:1px solid var(--border)}
+.front-lead-links h3{font-size:15px;font-weight:650;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 4px}
+.front-watch .r{display:grid;grid-template-columns:minmax(118px,148px) minmax(0,1fr);gap:2px 16px;align-items:baseline;padding:13px 2px;border-bottom:1px solid var(--border)}
+.front-watch .r .who{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:normal;padding-top:3px}
+.front-watch .r .who a{color:var(--ink-2)}
+.front-watch .r .what{font-size:14px;line-height:1.75;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.front-watch .r .meta{grid-column:2;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font:11px var(--mono);color:var(--faint);margin-top:3px}
+.front-band{grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:20px}
+.art-title{font-family:var(--serif-display);font-size:clamp(24px,3.4vw,34px);line-height:1.32;letter-spacing:-.01em}
+.art-head{max-width:840px;padding-top:6px}
+.front-grid{align-items:start}
+.front-watch .r .who .lang-tag{font-size:9.5px;border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--faint);margin-left:4px}

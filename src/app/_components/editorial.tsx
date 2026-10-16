@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate, institutionName, localePath, tr, type Locale } from "@/lib/i18n";
+import { stripPublisherPrefix } from "@/lib/seo";
 
 /**
  * The editorial component set (PRD §6.3). Server components throughout — they only shape
@@ -129,4 +130,31 @@ export function CorrectionBanner({ locale, note }: { locale: Locale; note: strin
       </span>
     </aside>
   );
+}
+
+/**
+ * The headline a reader sees on a card, as opposed to the publisher's full title.
+ *
+ * Publisher titles arrive with the series name and the research-brand line attached —
+ * "The Commodities Feed: … · THINK economic and financial analysis". That is accurate and
+ * belongs in the metadata, but as a display headline it says the same thing twice in two
+ * languages. Each rule below only fires when the removed part is clearly a label, never a
+ * sentence: the prefix must be short and Latin before a colon, the suffix a short
+ * capitalised brand segment after a middot, and the institution's own name is dropped the
+ * same way the search title already drops it.
+ */
+export function cleanDisplayTitle(title: string, publisher?: string) {
+  let clean = (publisher ? stripPublisherPrefix(title, publisher) : title).replace(/\s+/g, " ").trim();
+  const colon = clean.match(/^([^：:]{2,48})[：:]\s*(.+)$/);
+  if (colon && /^[\x20-\x7E·–—&\s]+$/.test(colon[1]) && /[\u4e00-\u9fff]/.test(colon[2]) && colon[2].trim().length >= 10) {
+    clean = colon[2].trim();
+  }
+  const parts = clean.split(/\s+[·|]\s+/);
+  if (parts.length > 1) {
+    const last = parts[parts.length - 1];
+    if (last.length <= 24 && /^[A-Z]/.test(last) && !/[。！？：:；;，,]/.test(last)) {
+      clean = parts.slice(0, -1).join(" · ").trim();
+    }
+  }
+  return clean;
 }

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { formatDate, getLocale, tr, localePath, type Locale } from "@/lib/i18n";
 import { beijingDateTime, frequencyLabel, macroDateTime, macroNumber, unitLabel } from "@/lib/macro/presentation";
+import { getMacroIndicator } from "@/lib/macro/registry";
 import IndicatorChart from "./IndicatorChart";
 import { JsonLd, breadcrumbJsonLd, canonical, datasetJsonLd } from "@/lib/seo";
 
@@ -67,11 +68,12 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
   const nm = (en: string, zh?: string | null) => (locale === "zh-CN" ? zh ?? en : en);
 
   // Latest vintage per period, oldest→newest, for the chart and previous-value change.
-  const byPeriod = new Map<number, { period: Date; value: number; source: (typeof indicator.seriesSources)[number] }>();
+  // `fetchedAt` rides along so the metadata bar can say when the newest value was pulled.
+  const byPeriod = new Map<number, { period: Date; value: number; fetchedAt: Date; source: (typeof indicator.seriesSources)[number] }>();
   for (const source of indicator.seriesSources) {
     for (const observation of source.observations) {
       const key = observation.period.getTime();
-      if (!byPeriod.has(key)) byPeriod.set(key, { period: observation.period, value: Number(observation.value.toString()), source });
+      if (!byPeriod.has(key)) byPeriod.set(key, { period: observation.period, value: Number(observation.value.toString()), fetchedAt: observation.fetchedAt, source });
     }
   }
   const series = [...byPeriod.values()].sort((a, b) => a.period.getTime() - b.period.getTime());
@@ -82,6 +84,15 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
   const high = window.length ? Math.max(...window) : null;
   const low = window.length ? Math.min(...window) : null;
   const up = Boolean(latest && previous && latest.value >= previous.value);
+
+  // PRD P06: what the series measures and where it stands. The registry definition is the
+  // canonical source for unit/cadence/adjustment (the DB row mirrors it); the newest
+  // observation supplies the period, the source it came from and when it was fetched.
+  const definition = getMacroIndicator(params.key);
+  const metaUnit = definition?.unit || indicator.unit;
+  const metaFrequency = definition?.frequency || indicator.frequency;
+  const metaSeasonalAdjustment = definition?.seasonalAdjustment ?? indicator.seasonalAdjustment;
+  const hasMetadata = Boolean(metaUnit || metaFrequency || metaSeasonalAdjustment || latest);
 
   const [calendar, nextFamily] = await Promise.all([
     prisma.macroReleaseValue.findMany({
@@ -149,6 +160,22 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
         </div>
         <Link href={localePath(locale, "/macro")} className="minibtn" style={{ alignSelf: "flex-start" }}>← {tr(locale, "Economic data", "经济数据")}</Link>
       </div>
+
+      {/* PRD P06: one bar that states what the series measures and where it stands — unit,
+          cadence, seasonal adjustment, the newest observation's period and source, and when
+          that value was fetched. The page carried none of this above the fold: the provider
+          appeared only per vintage, in a collapsed table. An item whose data is missing is
+          omitted, so a series with no observations still states its unit, not a placeholder. */}
+      {hasMetadata && (
+        <div className="macro-stats">
+          {metaUnit && <Stat label={tr(locale, "Unit", "单位")} value={unitLabel(metaUnit, locale)} />}
+          {metaFrequency && <Stat label={tr(locale, "Frequency", "频率")} value={frequencyLabel(metaFrequency, locale)} />}
+          {metaSeasonalAdjustment && <Stat label={tr(locale, "Seasonal adjustment", "季节调整")} value={metaSeasonalAdjustment} />}
+          {latest && <Stat label={tr(locale, "Latest observation", "最新观察期")} value={formatDate(latest.period, locale)} />}
+          {latest && <Stat label={tr(locale, "Source", "来源")} value={latest.source.provider} />}
+          {latest && <Stat label={tr(locale, "Data as of", "数据截止")} value={macroDateTime(latest.fetchedAt, locale)} />}
+        </div>
+      )}
 
       {series.length >= 2 && (
         <section className="blk">

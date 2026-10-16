@@ -14,6 +14,13 @@ import { effectiveSummaryZh } from "@/lib/summary";
 import { assetPath } from "@/lib/assetPath";
 import { getArticleTopics, getPeerReports, topicHref } from "@/lib/related";
 import { ClassificationChips } from "@/app/_components/ui";
+import ReadingProgress from "@/app/_components/ReadingProgress";
+import BookmarkButton from "@/app/_components/BookmarkButton";
+import ShareCiteButton from "@/app/_components/ShareCiteButton";
+import NewsletterCTA from "@/app/_components/NewsletterCTA";
+import { Byline, SourceBadge } from "@/app/_components/editorial";
+import { redesignAtLeast } from "@/lib/redesign";
+import { getSessionUser } from "@/lib/auth";
 import { directionLabel } from "@/lib/assets";
 import { validateStructuredResearch } from "@/lib/ingest/researchQuality";
 
@@ -299,6 +306,14 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
     getArticleTopics(a.id, locale),
     primaryTicker ? getPeerReports({ articleId: a.id, ticker: primaryTicker, institutionId: a.institution.id, locale }) : Promise.resolve([]),
   ]);
+  // The editorial reading layer (PRD P03), gated by the redesign flag. Everything below
+  // that is not in this branch — gate, metadata, JSON-LD, evidence, downloads — is
+  // identical in both modes.
+  const redesigned = redesignAtLeast("article");
+  const user = redesigned ? await getSessionUser() : null;
+  const bookmarked = user
+    ? Boolean(await prisma.articleBookmark.findUnique({ where: { userId_articleId: { userId: user.id, articleId: a.id } }, select: { id: true } }))
+    : false;
 
   return (
     <main className="wrap" style={{ maxWidth: publisherPdf ? 1080 : 820 }}>
@@ -320,15 +335,50 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         { name: institutionName(a.institution.name, locale), path: `/institution/${a.institution.slug}` },
         { name: heading, path: researchPath(a) },
       ])} />
-      <div className="page-head">
-        <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
-          <Link href={localePath(locale, `/institution/${a.institution.slug}`)}>{institutionName(a.institution.name, locale)}</Link>
-          {a.author ? ` · ${a.author}` : ""} · {date}
+      {redesigned ? (
+        <>
+          <ReadingProgress />
+          <header className="art-head">
+            <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")} style={{ marginBottom: 10 }}>
+              <Link href={localePath(locale, "/research")}>{tr(locale, "Research", "研报")}</Link>
+              <span>›</span>
+              <Link href={localePath(locale, `/institution/${a.institution.slug}`)}>{institutionName(a.institution.name, locale)}</Link>
+            </nav>
+            <h1 className="art-title">{heading}</h1>
+            {locale === "en" && usableTranslation?.title ? (
+              <details className="art-sub" style={{ fontStyle: "normal", fontSize: 14 }}>
+                <summary style={{ cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" }}>中文标题</summary>
+                <p style={{ margin: "6px 0 0" }}>{localizeChineseContent(usableTranslation.title)}</p>
+              </details>
+            ) : null}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 14px", alignItems: "center", marginTop: 12 }}>
+              <Byline locale={locale} institution={a.institution.name} institutionSlug={a.institution.slug} publishedAt={a.publishedAt} updatedAt={a.updatedAt} />
+              <SourceBadge href={a.sourceUrl} locale={locale} />
+              <BookmarkButton articleId={a.id} initialBookmarked={bookmarked} signedIn={Boolean(user)} locale={locale} />
+              <ShareCiteButton
+                citation={`${heading} — ${institutionName(a.institution.name, locale)} — ${date} — ${localizedUrl(researchPath(a), locale)} — ${a.sourceUrl}`}
+                labels={{
+                  cite: tr(locale, "Copy citation", "复制引文"),
+                  copied: tr(locale, "Citation copied", "引文已复制"),
+                  copyLink: tr(locale, "Copy link", "复制链接"),
+                  linkCopied: tr(locale, "Link copied", "链接已复制"),
+                }}
+              />
+            </div>
+            <ClassificationChips classification={a.classification} locale={locale} />
+          </header>
+        </>
+      ) : (
+        <div className="page-head">
+          <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
+            <Link href={localePath(locale, `/institution/${a.institution.slug}`)}>{institutionName(a.institution.name, locale)}</Link>
+            {a.author ? ` · ${a.author}` : ""} · {date}
+          </div>
+          <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{heading}</h1>
+          <ClassificationChips classification={a.classification} locale={locale} />
+          <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p" style={{ alignSelf: "flex-start" }}>{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
         </div>
-        <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{heading}</h1>
-        <ClassificationChips classification={a.classification} locale={locale} />
-        <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p" style={{ alignSelf: "flex-start" }}>{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
-      </div>
+      )}
 
       <section className="citation-card" aria-labelledby="citation-summary">
         <div className="section-t">{tr(locale, "Citable research brief", "可引用研究简报")}</div>
@@ -516,6 +566,8 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         </table></div>}
         {primaryAssetView && peerReports.length === 0 && <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{tr(locale, "Only one institution is available, so Tlines does not label this as market consensus.", "目前仅有一家机构数据，因此 Tlines 不将其称为市场共识。")}</p>}
       </section>}
+
+      {redesigned && <NewsletterCTA locale={locale} source="article" />}
 
       <section className="blk">
         <h2 className="section-t">{tr(locale, "How this page was produced", "本页如何生成")}</h2>

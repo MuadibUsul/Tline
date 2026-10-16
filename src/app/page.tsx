@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
-import { feedPulse, importantReleasesThisWeek, latestFeed, mostActive } from "@/lib/queries";
+import { feedPulse, featuredFeed, importantReleasesThisWeek, latestFeed, mostActive } from "@/lib/queries";
 import { FeedCard } from "./_components/ui";
+import HomeFront from "./_components/HomeFront";
 import SearchBox from "./_components/SearchBox";
 import LiveFeed from "./_components/LiveFeed";
 import { domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
@@ -11,6 +12,8 @@ import { beijingDateTime } from "@/lib/macro/presentation";
 import { assetPath } from "@/lib/assetPath";
 import { isLegacyNonAssetAlias } from "@/lib/classification/taxonomy";
 import { listIndexableTopicsFor, topicPath } from "@/lib/topics";
+import { loadPublicThemes } from "@/lib/marketThemesPublic";
+import { redesignAtLeast } from "@/lib/redesign";
 import { JsonLd, canonical, clamp, homeSeoTitle, localizedUrl, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +59,53 @@ export default async function Home() {
     // assets. The markets hub has always excluded them; without the same rule here the
     // homepage advertised two more "covered assets" than the directory it links to.
     .filter((asset) => !isLegacyNonAssetAlias(asset.ticker) && asset.reports >= 2 && asset.institutions >= 2);
+
+  if (redesignAtLeast("home")) {
+    const [featured, watchRows, themes, figureRow] = await Promise.all([
+      featuredFeed(5, locale),
+      prisma.atomicView.findMany({
+        where: { reviewStatus: "ok", article: publicationReadyWhere() },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true, viewEn: true, viewZh: true, assetTicker: true,
+          article: { select: { slug: true, institution: { select: { slug: true, name: true } } } },
+        },
+      }),
+      loadPublicThemes(),
+      prisma.articleFigure.findFirst({
+        where: { article: publicationReadyWhere() },
+        orderBy: { article: { publishedAt: "desc" } },
+        select: { id: true, caption: true, article: { select: { slug: true, title: true } } },
+      }),
+    ]);
+    // Featured reports lead; when nothing is picked yet the stream carries the cover itself.
+    const lead = featured.length ? featured : feed.slice(0, 5);
+    const leadIds = new Set(lead.map((row) => row.id));
+    const secondary = feed.filter((row) => !leadIds.has(row.id)).slice(0, 4);
+    return (
+      <HomeFront
+        locale={locale}
+        pulse={pulse}
+        lead={lead}
+        secondary={secondary}
+        watch={watchRows.map((row) => ({
+          id: row.id,
+          view: (locale === "zh-CN" ? row.viewZh || row.viewEn : row.viewEn || row.viewZh) ?? "",
+          assetTicker: row.assetTicker,
+          institution: row.article.institution.name,
+          institutionSlug: row.article.institution.slug,
+          slug: row.article.slug,
+        }))}
+        topics={topics}
+        themes={themes}
+        thisWeek={thisWeek}
+        figure={figureRow ? { id: figureRow.id, caption: figureRow.caption, slug: figureRow.article.slug, title: figureRow.article.title } : null}
+        counts={{ reports: reportCount, institutions: institutionCount, assets: coveredAssets.length }}
+        assets={coveredAssets}
+      />
+    );
+  }
 
   return (
     <main className="wrap home">

@@ -10,6 +10,8 @@ import { writeAudit } from "@/lib/audit";
 import { trackServerEvent } from "@/lib/analytics/serverEvent";
 import { can } from "@/lib/permissions";
 import { checkWebhookUrl } from "@/lib/alertDelivery";
+import { toggleBookmark } from "@/lib/bookmarks";
+import { getLocale } from "@/lib/i18n";
 
 function str(fd: FormData, key: string): string {
   return (fd.get(key)?.toString() ?? "").trim();
@@ -174,4 +176,33 @@ export async function setAlertWebhook(fd: FormData) {
     metadata: { host: new URL(raw).host },
   });
   revalidatePath("/watchlist");
+}
+
+// ---- bookmarks ----
+/** What the bookmark button renders: the state after the press, or why nothing changed. */
+export interface BookmarkFormState {
+  bookmarked?: boolean;
+  error?: "unauthorised" | "invalid";
+}
+
+/**
+ * Save or unsave a report for the signed-in account.
+ *
+ * Returns the new state instead of redirecting, because the button that called this is the
+ * only thing that has to change. Both pages that can be showing stale content are told to
+ * re-render: the bookmark list, and the page the button sits on — whose address is the one
+ * the button itself sent back in `path`.
+ */
+export async function toggleBookmarkAction(_previous: BookmarkFormState, formData: FormData): Promise<BookmarkFormState> {
+  const user = await getSessionUser();
+  if (!user) return { error: "unauthorised" };
+  const articleId = str(formData, "articleId");
+  // Checked before the write: a bookmark naming a row that does not exist would fail on the
+  // foreign key, and the button deserves an error state rather than a 500.
+  if (!articleId || articleId.length > 80) return { error: "invalid" };
+  if (!(await prisma.article.findUnique({ where: { id: articleId }, select: { id: true } }))) return { error: "invalid" };
+  const state = await toggleBookmark(user.id, articleId, await getLocale());
+  revalidatePath("/account/bookmarks");
+  revalidatePath(localPath(str(formData, "path"), "/account/bookmarks"));
+  return state;
 }

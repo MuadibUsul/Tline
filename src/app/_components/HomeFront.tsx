@@ -1,0 +1,240 @@
+import Link from "next/link";
+import SearchBox from "./SearchBox";
+import LiveFeed from "./LiveFeed";
+import NewsletterCTA from "./NewsletterCTA";
+import { Byline } from "./editorial";
+import { assetPath } from "@/lib/assetPath";
+import { domainTerm, institutionName, localePath, tr, type Locale } from "@/lib/i18n";
+import { beijingDateTime } from "@/lib/macro/presentation";
+import { researchPath } from "@/lib/researchPath";
+import { topicPath, type TopicStat } from "@/lib/topics";
+import { JsonLd, organizationJsonLd, siteJsonLd } from "@/lib/seo";
+import type { FeedPulse, featuredFeed, importantReleasesThisWeek } from "@/lib/queries";
+
+/**
+ * The editorial front page (PRD P01): what is worth reading today, where to verify it, and
+ * what the institutions changed their minds about — no marketing hero, every item
+ * traceable. All rows arrive already filtered by the publication gate; this component
+ * only lays them out.
+ */
+
+type FeedRow = Awaited<ReturnType<typeof featuredFeed>>[number];
+
+export interface FrontTheme {
+  key: string;
+  titleEn: string;
+  titleZh: string;
+  direction: string;
+  institutionCount: number;
+  viewCount: number;
+}
+
+export interface FrontWatchRow {
+  id: string;
+  view: string;
+  assetTicker: string | null;
+  institution: string;
+  institutionSlug: string;
+  slug: string;
+}
+
+export interface FrontFigure {
+  id: string;
+  caption: string | null;
+  slug: string;
+  title: string;
+}
+
+export default function HomeFront({
+  locale,
+  pulse,
+  lead,
+  secondary,
+  watch,
+  topics,
+  themes,
+  thisWeek,
+  figure,
+  counts,
+  assets,
+}: {
+  locale: Locale;
+  pulse: FeedPulse;
+  lead: FeedRow[];
+  secondary: FeedRow[];
+  watch: FrontWatchRow[];
+  topics: TopicStat[];
+  themes: FrontTheme[];
+  thisWeek: Awaited<ReturnType<typeof importantReleasesThisWeek>>;
+  figure: FrontFigure | null;
+  counts: { reports: number; institutions: number; assets: number };
+  assets: Array<{ ticker: string; name: string }>;
+}) {
+  const zh = locale === "zh-CN";
+  const [top, ...restLeads] = lead;
+  const secondaryRows = [...restLeads, ...secondary].slice(0, 4);
+
+  return (
+    <main className="wrap home">
+      <JsonLd data={organizationJsonLd(locale)} />
+      <JsonLd data={siteJsonLd(locale, tr(locale, "Institutional research turned into comparable, traceable market signals.", "把机构研报转换为可比较、可追踪的市场信号。"))} />
+      <LiveFeed
+        initial={pulse}
+        label={tr(locale, "New research", "有新研报")}
+        ariaLabel={tr(locale, "Load newly published research", "载入新发布的研报")}
+      />
+
+      {/* Masthead: what this is, how to search, how much is here — one quiet row. */}
+      <section className="front-mast">
+        <h1>{tr(locale, "Institutional research, made legible", "读懂机构怎样看市场")}</h1>
+        <p className="sub">{tr(locale, "From source reports to verifiable market judgement.", "从原始研报到可核验的市场判断。")}</p>
+        <div style={{ flexBasis: "100%", maxWidth: 560 }}>
+          <SearchBox
+            locale={locale}
+            placeholder={tr(locale, "Search an institution, asset, topic or view…", "搜索机构、资产、主题或观点……")}
+            ariaLabel={tr(locale, "Search the site", "全站搜索")}
+          />
+        </div>
+        <p className="sub mono" style={{ flexBasis: "100%", fontSize: 11.5, margin: "2px 0 0" }}>
+          <Link href={localePath(locale, "/research")}>{counts.reports.toLocaleString(locale)} {tr(locale, "source-linked reports", "篇可溯源研报")}</Link>
+          {" · "}
+          <Link href={localePath(locale, "/institutions-directory")}>{counts.institutions} {tr(locale, "publishing houses", "家发布机构")}</Link>
+          {" · "}
+          <Link href={localePath(locale, "/markets")}>{counts.assets} {tr(locale, "covered assets", "个覆盖资产")}</Link>
+          {" · "}
+          <Link href={localePath(locale, "/topics")}>{topics.length} {tr(locale, "research topics", "个研究主题")}</Link>
+        </p>
+      </section>
+
+      {/* The editorial cover: one lead story, the rest of the picks beside it. */}
+      <section className="front-grid" aria-label={tr(locale, "Today's cover", "今日封面")}>
+        {top ? (
+          <article className="ed-feature">
+            <Byline locale={locale} institution={top.institution.name} institutionSlug={top.institution.slug} publishedAt={top.publishedAt} />
+            <h2>
+              <Link href={localePath(locale, researchPath(top))}>{zh && top.translations?.[0]?.title ? top.translations[0].title : top.title}</Link>
+            </h2>
+            {(zh ? top.analysis?.summaryZh : top.analysis?.summary)
+              ? <p className="sub" style={{ marginTop: 6, maxWidth: "62ch" }}>{zh ? top.analysis?.summaryZh : top.analysis?.summary}</p>
+              : null}
+            <p className="ed-actions">
+              <Link className="minibtn p" href={localePath(locale, researchPath(top))}>
+                {tr(locale, "Read the analysis", "阅读深度分析")} <span aria-hidden="true">→</span>
+              </Link>
+            </p>
+          </article>
+        ) : (
+          <div className="empty-state">{tr(locale, "No report is published yet.", "暂无已发布研报。")}</div>
+        )}
+        <div className="front-lead-links">
+          {secondaryRows.map((row) => (
+            <Link key={row.id} href={localePath(locale, researchPath(row))}>
+              <h3>{zh && row.translations?.[0]?.title ? row.translations[0].title : row.title}</h3>
+              <p className="sub mono">{institutionName(row.institution.name, locale)} · {new Date(row.publishedAt).toISOString().slice(0, 10)}</p>
+            </Link>
+          ))}
+          <Link href={localePath(locale, "/research")}><p className="sub mono" style={{ margin: 0 }}>{tr(locale, "All research", "全部研报")} →</p></Link>
+        </div>
+      </section>
+
+      {/* Institutions changed their minds about… */}
+      {watch.length > 0 && (
+        <section className="blk" style={{ marginTop: 26 }} aria-label={tr(locale, "Today's institutional observations", "今日机构观察")}>
+          <div className="section-t">{tr(locale, "Today's institutional observations", "今日机构观察")}</div>
+          <div className="front-watch">
+            {watch.map((row) => (
+              <div className="r" key={row.id}>
+                <span className="who"><Link href={localePath(locale, `/institution/${row.institutionSlug}`)}>{institutionName(row.institution, locale)}</Link></span>
+                <span className="what">
+                  <Link href={localePath(locale, `/research/${row.slug}`)}>{row.view}</Link>
+                  {row.assetTicker ? <> <Link className="chip acc" href={localePath(locale, assetPath(row.assetTicker))}>{row.assetTicker}</Link></> : null}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* This week: themes in motion, the data ahead, and the topics being written about. */}
+      <section className="front-band" aria-label={tr(locale, "This week", "本周")}>
+        <div className="blk">
+          <div className="section-t"><span>{tr(locale, "Themes in motion", "交易主线")}</span><Link className="chip gray" href={localePath(locale, "/market-themes")}>{tr(locale, "All", "全部")} →</Link></div>
+          <div className="front-watch">
+            {themes.slice(0, 3).map((theme) => (
+              <div className="r" key={theme.key}>
+                <span className="who">
+                  <span className={`chip ${theme.direction === "bullish" ? "bull" : theme.direction === "bearish" ? "bear" : "neu"}`}>
+                    {theme.direction === "bullish" ? tr(locale, "Bullish", "看多") : theme.direction === "bearish" ? tr(locale, "Bearish", "看跌") : tr(locale, "Neutral", "中性")}
+                  </span>
+                </span>
+                <span className="what">
+                  {zh ? theme.titleZh : theme.titleEn}
+                  <span className="mono" style={{ display: "block", fontSize: 10.5, color: "var(--faint)" }}>{theme.institutionCount} {tr(locale, "institutions", "家机构")} · {theme.viewCount} {tr(locale, "views", "条观点")}</span>
+                </span>
+              </div>
+            ))}
+            {themes.length === 0 && <p className="sub">{tr(locale, "No active theme right now.", "当前没有活跃主线。")}</p>}
+          </div>
+        </div>
+        <div className="blk">
+          <div className="section-t"><span>{tr(locale, "Key data this week", "本周重要数据")}</span><Link className="chip gray" href={localePath(locale, "/macro/calendar")}>{tr(locale, "Calendar", "日历")} →</Link></div>
+          <div className="front-watch">
+            {thisWeek.map((release) => (
+              <div className="r" key={release.id}>
+                <span className="who">{beijingDateTime(release.scheduledAt, locale)}</span>
+                <span className="what">
+                  <Link href={localePath(locale, `/macro/release/${release.id}`)}>{zh ? release.titleZh ?? release.titleEn : release.titleEn}</Link>
+                </span>
+              </div>
+            ))}
+            {thisWeek.length === 0 && <p className="sub">{tr(locale, "No high-impact releases left this week.", "本周暂无重要数据发布。")}</p>}
+          </div>
+        </div>
+        <div className="blk">
+          <div className="section-t"><span>{tr(locale, "Topics institutions write about", "机构正在讨论的主题")}</span><Link className="chip gray" href={localePath(locale, "/topics")}>{tr(locale, "All", "全部")} →</Link></div>
+          <div className="tag-row">
+            {topics.slice(0, 7).map((topic) => (
+              <Link key={topic.key} href={localePath(locale, topicPath(topic.key))} className="chip gray">
+                {zh ? topic.labelZh : topic.labelEn}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* One figure worth reading. */}
+      {figure && (
+        <section className="blk" aria-label={tr(locale, "Chart of the day", "一张值得读的图")}>
+          <div className="section-t">{tr(locale, "A figure worth reading", "一张值得读的图")}</div>
+          <figure className="ed-figure" style={{ margin: "6px 0 0" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- served from the private figure store, not a static asset */}
+            <img src={`/api/figures/${figure.id}`} alt={figure.caption ?? figure.title} loading="lazy" style={{ maxWidth: "100%", borderRadius: 10, border: "1px solid var(--border)" }} />
+            <figcaption>
+              <span>{figure.caption ?? figure.title}</span>
+              <Link href={localePath(locale, `/research/${figure.slug}`)}>{tr(locale, "From the report", "出自研报")}：{figure.title} →</Link>
+            </figcaption>
+          </figure>
+        </section>
+      )}
+
+      <NewsletterCTA locale={locale} source="home" />
+
+      <section className="home-verification" style={{ marginTop: 8 }}>
+        <div><span aria-hidden="true">✓</span><p><strong>{tr(locale, "Built to be checked", "经得起核对")}</strong>{tr(locale, "Every view links back to its original report. Our extraction rules, accepted sources, AI use and correction process are public.", "每条观点都链接回原始研报；提取规则、来源标准、AI 使用方式与纠错流程全部公开。")}</p></div>
+        <nav aria-label={tr(locale, "Verification policies", "验证与政策")}>
+          <Link href={localePath(locale, "/methodology")}>{tr(locale, "Methodology", "方法论")}</Link>
+          <Link href={localePath(locale, "/sources")}>{tr(locale, "Sources", "来源政策")}</Link>
+          <Link href={localePath(locale, "/ai-usage")}>{tr(locale, "AI usage", "AI 使用说明")}</Link>
+          <Link href={localePath(locale, "/corrections")}>{tr(locale, "Corrections", "更正机制")}</Link>
+        </nav>
+      </section>
+
+      {assets.length > 0 && (
+        <div className="home-asset-line">
+          <span>{tr(locale, "Popular coverage", "热门覆盖")}</span>
+          <div>{assets.slice(0, 12).map((asset) => <Link key={asset.ticker} href={localePath(locale, assetPath(asset.ticker))}>{domainTerm(asset.name, locale)}</Link>)}</div>
+        </div>
+      )}
+    </main>
+  );
+}

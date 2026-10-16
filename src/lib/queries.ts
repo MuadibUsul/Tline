@@ -149,6 +149,20 @@ export async function latestFeed(limit = 8, locale?: Locale) {
   }), locale);
 }
 
+/**
+ * The editorial picks, newest pick first — what an operator chose in the console to sit
+ * above the chronological stream. The public gate still applies: a featured report the
+ * gate withholds drops out of the lead slot like any other row.
+ */
+export async function featuredFeed(limit = 5, locale?: Locale) {
+  return withPreviewBodies(await prisma.article.findMany({
+    where: publicationReadyWhere({ featuredAt: { not: null } }, locale),
+    orderBy: { featuredAt: "desc" },
+    take: limit,
+    select: cardArticleSelect,
+  }), locale);
+}
+
 export async function mostActive(days = 7, limit = 6) {
   const since = new Date(Date.now() - days * 864e5);
   const rows = await prisma.article.groupBy({

@@ -13,8 +13,23 @@ import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, itemL
 import { queryClassifiedArticleIds } from "@/lib/classification/query";
 import { resolveCanonicalKey, taxonomy } from "@/lib/classification/taxonomy";
 import type { JurisdictionKey } from "@/lib/classification/types";
+import topicIntros from "../../../../data/topic-intros.json";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * The operator-authored evergreen introduction, when one exists for this topic.
+ *
+ * Both languages must be present — an entry with one language would render the same text
+ * to both audiences, which is worse than rendering none. An absent entry renders nothing:
+ * the generated summary below is the page's fallback, and nothing is fabricated (PRD P04).
+ */
+function TopicIntro({ topicKey, locale }: { topicKey: string; locale: Locale }) {
+  const entry = (topicIntros as Record<string, { zh?: string; en?: string }>)[topicKey];
+  const text = entry ? (locale === "zh-CN" ? entry.zh : entry.en) : undefined;
+  if (!entry?.zh || !entry?.en || !text) return null;
+  return <p className="ed-lede">{text}</p>;
+}
 
 /** A Chinese page needs enough translated views to be worth showing, or it is a shell. */
 const ZH_MIN_VIEWS = 3;
@@ -148,6 +163,7 @@ export default async function TopicPage(props: { params: Promise<TopicParams>; s
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Topic", "主题")}</div>
         <h1>{label}</h1>
+        <TopicIntro topicKey={topic} locale={locale} />
         <p className="sub" style={{ maxWidth: "72ch" }}>
           {tr(locale,
             `${stat.institutions} institutions have written about this across ${stat.articles} indexed reports, producing ${stat.views} extracted views. The claims below are quoted from those reports; each links to the report it came from and to the asset it concerns.`,

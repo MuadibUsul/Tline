@@ -69,6 +69,10 @@ model Article {
   // searcher could have been looking for; leaving it up as a permanent `noindex` buys a
   // crawl of it forever and never produces a page.
   withdrawnAt    DateTime?
+  // Editorial pick for the front page and the "编辑精选" mode of the research feed. Set by
+  // an operator in the console; ordering is `featuredAt desc, publishedAt desc`, so
+  // clearing it simply returns the report to the chronological stream.
+  featuredAt     DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
 
@@ -110,6 +114,7 @@ model Article {
   macroForecasts MacroForecast[]
   contentRetries ContentRetry[]
   classification ContentClassification?
+  bookmarks      ArticleBookmark[]
 
   @@index([institutionId, publishedAt])
   // The home feed and /research order globally by recency; without this the planner sorts the whole table.
@@ -1089,6 +1094,7 @@ model User {
   sessions  Session[]
   apiKeys   ApiKey[]
   mcpDrafts McpPublicationDraft[]
+  bookmarks ArticleBookmark[]
 }
 
 model Account {
@@ -1621,4 +1627,41 @@ model LlmBudget {
   limitCost   Float? // cost ceiling for the period, in the price table's currency; null = no cost cap
   enabled     Boolean  @default(true)
   updatedAt   DateTime @updatedAt
+}
+
+// ---- Premium-media redesign (docs/redesign/) ----
+
+// A newsletter subscription, double opt-in by construction: a row starts PENDING and the
+// confirmation link moves it to CONFIRMED; nothing is ever sent to a PENDING address. The
+// unsubscribe link (same token) moves it to UNSUBSCRIBED and keeps the row, so a re-subscribe
+// is a state change rather than a second identity, and "we never send after unsubscribe"
+// stays provable.
+model NewsletterSubscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  locale         String    @default("zh-CN")
+  status         String    @default("PENDING") // PENDING | CONFIRMED | UNSUBSCRIBED
+  confirmToken   String    @unique
+  source         String? // where the signup came from: "home", "article", "footer", "newsletter"
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, createdAt])
+}
+
+// A reader's saved report. Private to the account; nothing public reads this table, and
+// the bookmarked article's own indexing never depends on it.
+model ArticleBookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  articleId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@index([userId, createdAt])
 }

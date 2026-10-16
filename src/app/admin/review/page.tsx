@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { getAdminLocale, tr, localePath } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { approveClassificationReview, correctClassificationReview, queueContentRetry, resolveContentReview } from "../actions";
+import { toggleFeatured } from "./feature-actions";
 import { age } from "../_components/format";
 import { researchPath } from "@/lib/researchPath";
 import { taxonomy } from "@/lib/classification/taxonomy";
@@ -19,7 +20,9 @@ export default async function ReviewPage() {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.review")) notFound();
   const locale = await getAdminLocale();
-  const article = { include: { institution: true } } as const;
+  // The queue rows both show and toggle the editorial pick, so `featuredAt` rides along
+  // with the fields the rows render and link by (id for the forms, slug for the href).
+  const article = { select: { id: true, slug: true, title: true, featuredAt: true, institution: { select: { name: true } } } } as const;
 
   const [analysisReview, translationReview, classificationReview, retries, analysisTotal, translationTotal, classificationTotal] = await Promise.all([
     prisma.analysis.findMany({ where: { reviewStatus: "needs_review" }, orderBy: { createdAt: "desc" }, take: PAGE_SIZE, include: { article } }),
@@ -65,6 +68,7 @@ export default async function ReviewPage() {
         {queue.map((item) => <div className="admin-review-row" key={item.key}>
           <Link href={localePath(locale, researchPath(item.article))}>
             <span><b>{item.article.title}</b><small>{item.article.institution.name} · {item.kind} · {age(item.at, locale)}</small></span>
+            {item.article.featuredAt && <span className="chip acc">{tr(locale, "Featured", "精选")}</span>}
             <span className="chip bear">需要审核</span>
           </Link>
           {/* The rerun lives here rather than only on the report: this list is where an
@@ -78,6 +82,13 @@ export default async function ReviewPage() {
             <input type="hidden" name="articleId" value={item.article.id} />
             <input type="hidden" name="kind" value={item.kind} />
             <button className="minibtn p" type="submit">{tr(locale, "Mark reviewed", "标记已审核")}</button>
+          </form>
+          {/* The pick is set here, where an operator already triages: featuring a
+              candidate by visiting its report first would cost a round trip per pick. */}
+          <form action={toggleFeatured}>
+            <input type="hidden" name="articleId" value={item.article.id} />
+            <input type="hidden" name="featured" value={item.article.featuredAt ? "0" : "1"} />
+            <button className="minibtn" type="submit">{item.article.featuredAt ? tr(locale, "Unfeature", "取消精选") : tr(locale, "Feature", "精选")}</button>
           </form>
         </div>)}
       </div>

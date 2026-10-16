@@ -9,6 +9,7 @@ import { publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
 import { byDisplayRecency, feedPulse, withPreviewBodies } from "@/lib/queries";
 import { paginationWindow } from "@/lib/pagination";
+import { redesignAtLeast } from "@/lib/redesign";
 import { classificationWhere } from "@/lib/classification/query";
 import { resolveCanonicalKey, taxonomy } from "@/lib/classification/taxonomy";
 import type { ContentFilter } from "@/lib/classification/types";
@@ -119,7 +120,7 @@ export default async function ResearchIndex(
     prisma.article.findMany({
       where,
       orderBy: { id: "desc" },
-      select: { id: true, publishedAt: true, createdAt: true },
+      select: { id: true, publishedAt: true, createdAt: true, featuredAt: true },
     }),
     prisma.institution.findMany({ where: { articles: { some: publicationReadyWhere() } }, orderBy: { name: "asc" }, select: { slug: true, name: true } }),
     prisma.asset.findMany({ where: { articleAssets: { some: { article: publicationReadyWhere() } } }, orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
@@ -127,7 +128,20 @@ export default async function ResearchIndex(
     feedPulse(),
   ]);
   const total = articles.length;
-  const pageIds = articles.sort(byDisplayRecency).slice((page - 1) * take, page * take).map(({ id }) => id);
+  // Editorial picks lead the stream (PRD P02): operator-featured reports first, newest
+  // pick first; everything else keeps the chronological order the page has always used.
+  const ordered = redesignAtLeast("article")
+    ? [...articles].sort((left, right) => {
+        const lf = left.featuredAt ? left.featuredAt.getTime() : null;
+        const rf = right.featuredAt ? right.featuredAt.getTime() : null;
+        if (lf !== null && rf === null) return -1;
+        if (lf === null && rf !== null) return 1;
+        if (lf !== null && rf !== null && lf !== rf) return rf - lf;
+        return byDisplayRecency(left, right);
+      })
+    : articles.sort(byDisplayRecency);
+  const featuredIds = new Set(ordered.filter((row) => row.featuredAt).map((row) => row.id));
+  const pageIds = ordered.slice((page - 1) * take, page * take).map(({ id }) => id);
   /**
    * `select`, never `include`, on a listing query.
    *
@@ -259,7 +273,16 @@ export default async function ResearchIndex(
           </select>
           <button className="minibtn p" type="submit">{tr(locale, "Apply filters", "应用筛选")}</button>
         </form>
-        {feed.length ? <div className="research-grid">{feed.map((article) => <ResearchCard key={article.id} a={article} locale={locale} />)}</div> : <div className="empty-state">{tr(locale, "No research matches these filters.", "没有符合筛选条件的研报。")}</div>}
+        {feed.length ? <div className="research-grid">{feed.map((article) => (
+          <div key={article.id} style={{ position: "relative" }}>
+            {featuredIds.has(article.id) && (
+              <span className="chip acc" style={{ position: "absolute", top: 10, right: 10, zIndex: 2 }}>
+                {tr(locale, "Editor's pick", "编辑精选")}
+              </span>
+            )}
+            <ResearchCard a={article} locale={locale} />
+          </div>
+        ))}</div> : <div className="empty-state">{tr(locale, "No research matches these filters.", "没有符合筛选条件的研报。")}</div>}
         {pages > 1 && (
           <nav className="pagination" aria-label={tr(locale, "Research pages", "研报分页")}>
             {page > 1

@@ -9,7 +9,10 @@ import { doSignOut } from "./actions";
 import { isFormalAuthConfigured } from "@/lib/auth-config";
 import OAuthSignOutButton from "./_components/OAuthSignOutButton";
 import MobileNav, { type MobileNavItem } from "./_components/MobileNav";
+import SearchOverlay from "./_components/SearchOverlay";
+import TopbarScroll from "./_components/TopbarScroll";
 import Analytics from "./_components/Analytics";
+import { redesignAtLeast } from "@/lib/redesign";
 import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { siteUrl } from "@/lib/site";
@@ -53,17 +56,29 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     redirect(localePath(locale, "/account/password"));
   }
 
-  const navItems: MobileNavItem[] = ([
-    { href: "/", label: tr(locale, "Home", "首页") },
-    { href: "/markets", label: tr(locale, "Markets", "资产") },
-    { href: "/macro", label: tr(locale, "Economic Data", "经济数据") },
-    { href: "/economies", label: tr(locale, "Economies", "经济体") },
-    { href: "/institutions", label: tr(locale, "Views", "观点") },
-    { href: "/research", label: tr(locale, "Research", "研报") },
-    { href: "/watchlist", label: tr(locale, "Market Themes", "交易主线") },
-    { href: "/dashboards", label: tr(locale, "Dashboards", "看板") },
-    ...(can(user, "admin.access") ? [{ href: "/admin", label: tr(locale, "Operations", "运营") }] : []),
-  ] as MobileNavItem[]).map((item) => ({ ...item, href: localePath(locale, item.href) }));
+  const redesign = redesignAtLeast("design-system");
+  const navItems: MobileNavItem[] = (redesign
+    ? [
+        // The premium-media IA (PRD §3.1). The legacy tools keep their addresses and move
+        // to the footer: same pages, same URLs, quieter placement — nothing was removed.
+        { href: "/", label: tr(locale, "Home", "首页") },
+        { href: "/research", label: tr(locale, "Latest research", "最新研究") },
+        { href: "/topics", label: tr(locale, "Topics", "主题") },
+        { href: "/institutions-directory", label: tr(locale, "Institutions", "机构") },
+        { href: "/macro", label: tr(locale, "Data & charts", "数据与图表") },
+        { href: "/about", label: tr(locale, "About", "关于") },
+      ]
+    : [
+        { href: "/", label: tr(locale, "Home", "首页") },
+        { href: "/markets", label: tr(locale, "Markets", "资产") },
+        { href: "/macro", label: tr(locale, "Economic Data", "经济数据") },
+        { href: "/economies", label: tr(locale, "Economies", "经济体") },
+        { href: "/institutions", label: tr(locale, "Views", "观点") },
+        { href: "/research", label: tr(locale, "Research", "研报") },
+        { href: "/watchlist", label: tr(locale, "Market Themes", "交易主线") },
+        { href: "/dashboards", label: tr(locale, "Dashboards", "看板") },
+        ...(can(user, "admin.access") ? [{ href: "/admin", label: tr(locale, "Operations", "运营") }] : []),
+      ] as MobileNavItem[]).map((item) => ({ ...item, href: localePath(locale, item.href) }));
 
   const account = user && formalAuth ? (
     <div className="account-controls">
@@ -84,6 +99,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     ["sources", tr(locale, "Sources", "来源说明")], ["privacy", tr(locale, "Privacy", "隐私政策")],
     ["corrections", tr(locale, "Corrections", "更正机制")], ["financial-disclaimer", tr(locale, "Financial disclaimer", "金融免责声明")],
   ];
+  // Under the redesign the primary nav is the editorial IA; the legacy tools (themes,
+  // dashboards) and the newsletter keep their addresses in the footer so nothing becomes
+  // unreachable just because it left the top bar.
+  const toolLinks: Array<[string, string]> = redesign
+    ? [
+        ["watchlist", tr(locale, "Market Themes", "交易主线")],
+        ["dashboards", tr(locale, "Dashboards", "看板")],
+        ["newsletter", tr(locale, "Newsletter", "订阅")],
+        ...(user ? [["account/bookmarks", tr(locale, "Saved", "我的收藏")] as [string, string]] : []),
+      ]
+    : [];
   // A plain <a>, not <Link>: the two languages share this root layout, and a client-side
   // navigation across locales would swap the page content but leave the chrome (nav, this
   // button, <html lang>) rendered in the previous language — the reader ends up on /zh with
@@ -112,6 +138,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {navItems.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
             </nav>
             <div className="sp" />
+            {redesign && (
+              <SearchOverlay
+                locale={locale}
+                labels={{
+                  placeholder: tr(locale, "Search institutions, assets, topics or views…", "搜索机构、资产、主题或观点……"),
+                  trigger: tr(locale, "Search", "搜索"),
+                  aria: tr(locale, "Search the site", "全站搜索"),
+                  all: tr(locale, "See all results", "查看全部结果"),
+                  none: tr(locale, "Nothing matched — try another wording.", "没有匹配结果,换个说法试试。"),
+                  hint: tr(locale, "↑↓ to choose · Enter to open · Esc to close", "↑↓ 选择 · Enter 打开 · Esc 关闭"),
+                }}
+              />
+            )}
             <div className="topbar-account">{account}</div>
             {languageSwitch}
             <ThemeToggle label={tr(locale, "Theme", "主题")} ariaLabel={tr(locale, "Toggle theme", "切换主题")} />
@@ -125,12 +164,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </MobileNav>
           </div>
         </div>
+        {redesign && <TopbarScroll />}
         {children}
         {/* Mounted last and rendering nothing: the beacon must never be on the path to
             first paint of the page it is measuring. */}
         {process.env.ANALYTICS_ENABLED !== "false" && <Analytics />}
         <footer className="footer wrap">
           <span>{brandName(locale)} · {tr(locale, "Research → Data → Signal", "研报 → 数据 → 信号")}</span>
+          <nav className="footer-links" aria-label={tr(locale, "Site", "站点")}>
+            {toolLinks.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}
+          </nav>
           <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{policyLinks.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}</nav>
         </footer>
       </body>

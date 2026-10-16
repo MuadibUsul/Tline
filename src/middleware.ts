@@ -84,9 +84,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Retired sections (/consensus, /search) no longer exist. Send their old links to the
-  // research feed in the same language rather than 308-ing them into a dead page.
-  const retired = /^(?:\/(en|zh))?\/(?:consensus|search)(?:\/|$)/i.exec(pathname);
+  // Retired /consensus no longer exists; old links go to the research feed in the same
+  // language rather than 308-ing into a dead page. /search left this list when the
+  // redesign gave it a real page (PRD P07) — the redirect existed because there was
+  // nothing there, and there is now.
+  const retired = /^(?:\/(en|zh))?\/(?:consensus)(?:\/|$)/i.exec(pathname);
   if (retired) {
     const url = request.nextUrl.clone();
     url.pathname = `/${retired[1] ?? preferredSegment(request)}/research`;

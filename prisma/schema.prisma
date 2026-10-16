@@ -1088,6 +1088,7 @@ model User {
   accounts  Account[]
   sessions  Session[]
   apiKeys   ApiKey[]
+  mcpDrafts McpPublicationDraft[]
 }
 
 model Account {
@@ -1305,6 +1306,33 @@ model ApiKey {
   createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([revokedAt])
+}
+
+// A publication draft submitted through the Publisher MCP. Deliberately its own table,
+// not an Article: nothing unreviewed may leak into the crawler, translation, classification,
+// sitemap or social pipelines, and the only door from here into publishing is the review
+// queue in the operations console. `version` is the optimistic lock the MCP tools hand back
+// and forth — an update or submit carrying a stale version is refused, not applied.
+model McpPublicationDraft {
+  id               String    @id @default(cuid())
+  title            String
+  content          String
+  sourceUrl        String?
+  institutionSlug  String?
+  language         String    @default("en")
+  sourcePublishedAt DateTime?
+  status           String    @default("DRAFT") // DRAFT | PENDING_REVIEW
+  validationIssues String    @default("[]") // JSON array of { code, field, message, blocking }
+  version          Int       @default(1)
+  createdById      String
+  submittedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById, status, updatedAt])
+  @@index([status, submittedAt])
 }
 
 // ---- Audience analytics (Phase 3). Cookie-less and IP-free by construction. ----

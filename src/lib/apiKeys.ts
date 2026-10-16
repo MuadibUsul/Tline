@@ -22,9 +22,19 @@ const PREFIX_LENGTH = 8;
  * parsing — dropping it here would silently strip the scope off existing keys and the
  * reason would not be visible anywhere. Wire it up when the endpoint ships, or delete both
  * lines then; until one of those happens this comment is the answer to "is it dead?".
+ *
+ * `mcp:user` and `publisher:draft` are the two MCP scopes, kept apart on purpose: a key
+ * that can read the public corpus is not a key that can write into the review queue, and
+ * issuing both to one key would erase the only mechanical boundary between the two
+ * servers' audiences. The operator console refuses to combine them (see API_SCOPES users
+ * in admin actions); the MCP routes additionally reject a key carrying both, so a
+ * hand-edited row cannot get past either check.
  */
-export type ApiScope = "research:read" | "consensus:read";
-export const API_SCOPES: ApiScope[] = ["research:read", "consensus:read"];
+export type ApiScope = "research:read" | "consensus:read" | "mcp:user" | "publisher:draft";
+export const API_SCOPES: ApiScope[] = ["research:read", "consensus:read", "mcp:user", "publisher:draft"];
+
+/** The MCP scopes, which are mutually exclusive on a single key. */
+export const MCP_SCOPES: ApiScope[] = ["mcp:user", "publisher:draft"];
 
 export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -48,11 +58,26 @@ export function parseScopes(value: string): ApiScope[] {
   }
 }
 
+/** The account a key is bound to, as MCP authorization needs to re-check it per call. */
+export interface KeyOwner {
+  id: string;
+  email: string;
+  tier: string;
+  role: string;
+  suspendedAt: Date | null;
+}
+
 export interface AuthenticatedKey {
   id: string;
   name: string;
   scopes: ApiScope[];
   rateLimit: number;
+  /**
+   * Null for operator keys with no account row. The `/api/v1` routes never look at this;
+   * MCP does, because a key whose owner was demoted or suspended must stop being honoured
+   * on the next call rather than when someone remembers to revoke it.
+   */
+  owner: KeyOwner | null;
 }
 
 export type AuthFailure = "missing" | "malformed" | "unknown" | "revoked" | "forbidden" | "rate_limited";
@@ -110,7 +135,10 @@ export async function authenticate(
   if (!token.startsWith(`${API_KEY_PREFIX}_`)) return { failure: "malformed" };
 
   const digest = hashToken(token);
-  const record = await prisma.apiKey.findUnique({ where: { tokenHash: digest } });
+  const record = await prisma.apiKey.findUnique({
+    where: { tokenHash: digest },
+    include: { createdBy: { select: { id: true, email: true, tier: true, role: true, suspendedAt: true } } },
+  });
   if (!record) return { failure: "unknown" };
   // The lookup already matched on the digest; this compares it again in constant time so
   // the code does not depend on the database's comparison for a secret-dependent branch.
@@ -130,7 +158,13 @@ export async function authenticate(
     .catch(() => {});
 
   return {
-    key: { id: record.id, name: record.name, scopes, rateLimit: record.rateLimit },
+    key: {
+      id: record.id,
+      name: record.name,
+      scopes,
+      rateLimit: record.rateLimit,
+      owner: record.createdBy ? { ...record.createdBy } : null,
+    },
     remaining: rate.remaining,
     resetAt: rate.resetAt,
   };

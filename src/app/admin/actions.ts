@@ -7,7 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { can, type PermissionAction } from "@/lib/permissions";
 import { isRetryKind, queueRetry } from "@/lib/contentRetry";
-import { API_SCOPES, generateToken, hashToken, tokenPrefix } from "@/lib/apiKeys";
+import { API_SCOPES, MCP_SCOPES, generateToken, hashToken, tokenPrefix } from "@/lib/apiKeys";
 import { taxonomy } from "@/lib/classification/taxonomy";
 
 /** The actor, if they hold `action`; null otherwise. Every mutation names its own gate. */
@@ -194,6 +194,11 @@ export async function createApiKey(_previous: CreateKeyResult, formData: FormDat
   const requested = formData.getAll("scopes").map(String);
   const scopes = API_SCOPES.filter((scope) => requested.includes(scope));
   if (scopes.length === 0) return { error: "请至少选择一个权限范围。" };
+  // The two MCP audiences stay on separate keys: the whole isolation between the User
+  // and Publisher servers rests on no credential carrying both scopes.
+  if (MCP_SCOPES.every((scope) => scopes.includes(scope))) {
+    return { error: "mcp:user 与 publisher:draft 必须分开签发，不能写在同一把密钥上。" };
+  }
 
   const rateLimit = Number(formData.get("rateLimit") ?? 60);
   if (!Number.isInteger(rateLimit) || rateLimit < 1 || rateLimit > 6000) {

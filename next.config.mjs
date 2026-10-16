@@ -61,6 +61,9 @@ const nextConfig = {
       { source: "/api/analytics", headers: ROBOTS_NOINDEX },
       { source: "/api/feed/:path*", headers: ROBOTS_NOINDEX },
       { source: "/api/health", headers: ROBOTS_NOINDEX },
+      // The MCP endpoints are machine surfaces: nothing there is a page, so crawlers are
+      // told so at the edge as well as on each response (src/lib/mcp/http.ts).
+      { source: "/api/mcp/:path*", headers: ROBOTS_NOINDEX },
       { source: "/api/search", headers: ROBOTS_NOINDEX },
       { source: "/api/social/:path*", headers: ROBOTS_NOINDEX },
       { source: "/api/v1/:path*", headers: ROBOTS_NOINDEX },

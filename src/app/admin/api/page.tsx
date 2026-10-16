@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getAdminLocale, tr } from "@/lib/i18n";
+import { getAdminLocale, localePath, tr } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
 import { API_SCOPES, parseScopes } from "@/lib/apiKeys";
 import { usagePerKey, usageReport } from "@/lib/apiUsage";
@@ -228,7 +229,13 @@ export default async function ApiPage() {
                 <li><code>GET /api/v1/research</code> — <span>{tr(locale, "newest first, cursor paged", "按时间倒序,游标翻页")}</span></li>
                 <li><code>GET /api/v1/research/&#123;id&#125;</code> — <span>{tr(locale, "one report", "单篇研报")}</span></li>
                 <li><code>GET /api/v1/institutions</code> — <span>{tr(locale, "source list", "机构列表")}</span></li>
+                <li><code>POST /api/mcp/user</code> — <span>{tr(locale, "MCP, read-only (scope mcp:user)", "MCP 用户端,只读(scope mcp:user)")}</span></li>
+                <li><code>POST /api/mcp/publisher</code> — <span>{tr(locale, "MCP, draft review (scope publisher:draft)", "MCP 发布端,草稿送审(scope publisher:draft)")}</span></li>
               </ul>
+              <p className="apikey-note">
+                {tr(locale, "The MCP servers have their own overview: ", "MCP 两端的说明与调用统计见：")}
+                <Link href={localePath(locale, "/admin/mcp")}>{tr(locale, "MCP servers", "MCP 服务")} →</Link>
+              </p>
               <p className="apikey-note">
                 {tr(
                   locale,

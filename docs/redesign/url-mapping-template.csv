@@ -3,7 +3,7 @@ old_url,target_url,action,evidence,owner,reviewed_at,rollback_action,notes
 # 全量 3,422 条 canonical URL 见 url-inventory-2026-10-16.csv；本表只记录"需要决策"的条目。
 /{locale}/research,~,keep,src/lib/sitemap.ts:49 STATIC_ROUTES priority 0.9,site-owner,pending,revert-page-change,研究列表为收录主力，禁止改址
 /{locale}/research/{slug},~,keep,slug 不可变（buildResearchSlug；id→slug 308 已存在）,site-owner,pending,revert-redirect,存量 1,889(en)/1,153(zh) 条
-/{locale}/institutions,~,keep,现为观点流（7天窗口）；PRD §3.2 要求保留原址,site-owner,pending,revert-page-change,⚠️ 与站主早前"观点下架"指令冲突，待裁决（README 开放问题 1）
+/{locale}/institutions,~,keep,现为观点流（7天窗口）；PRD §3.2 要求保留原址,site-owner,2026-10-16,revert-page-change,已裁决(2026-10-16):按 PRD keep；早前"下架"指令作废
 /{locale}/markets,~,keep,STATIC_ROUTES priority 0.8,site-owner,pending,revert-page-change,
 /{locale}/markets/{ticker},~,keep,sitemap assets 分片 18 条,site-owner,pending,revert-page-change,历史别名 /asset/{ticker} 已 308
 /{locale}/macro,~,keep,STATIC_ROUTES priority 0.8,site-owner,pending,revert-page-change,

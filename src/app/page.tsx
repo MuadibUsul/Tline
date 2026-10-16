@@ -9,6 +9,7 @@ import LiveFeed from "./_components/LiveFeed";
 import { domainTerm, getLocale, institutionName, tr, localePath } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
 import { assetPath } from "@/lib/assetPath";
+import { isLegacyNonAssetAlias } from "@/lib/classification/taxonomy";
 import { listIndexableTopicsFor, topicPath } from "@/lib/topics";
 import { JsonLd, canonical, clamp, homeSeoTitle, localizedUrl, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 
@@ -51,7 +52,10 @@ export default async function Home() {
   ]);
   const coveredAssets = assets
     .map((asset) => ({ ...asset, institutions: new Set(asset.articleAssets.map((item) => item.article.institutionId)).size, reports: asset.articleAssets.length }))
-    .filter((asset) => asset.reports >= 2 && asset.institutions >= 2);
+    // FED and CPI are legacy ticker aliases standing for an institution and an event, not
+    // assets. The markets hub has always excluded them; without the same rule here the
+    // homepage advertised two more "covered assets" than the directory it links to.
+    .filter((asset) => !isLegacyNonAssetAlias(asset.ticker) && asset.reports >= 2 && asset.institutions >= 2);
 
   return (
     <main className="wrap home">

@@ -1,0 +1,5189 @@
+{
+ "capturedAt": "2026-10-16T15:31:25.567Z",
+ "base": "https://tlines.tech",
+ "urlCount": 256,
+ "entries": [
+  {
+   "url": "/en",
+   "status": 200,
+   "title": "Tlines — Institutional Research & Bank Consensus",
+   "description": "Compare what banks and asset managers say about gold, oil, rates, FX, equities and crypto: the consensus, every published target, what changed this week…",
+   "canonical": "https://tlines.tech/en",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en",
+    "zh-CN": "https://tlines.tech/zh",
+    "x-default": "https://tlines.tech/en"
+   },
+   "jsonLdTypes": [
+    "Organization",
+    "WebSite"
+   ],
+   "h1": "Institutional research, turned into market signals.",
+   "bodyTextLength": 3339,
+   "bodyTextHash": "26967dcfc7dff651"
+  },
+  {
+   "url": "/en/research",
+   "status": 200,
+   "title": "Institutional Research Feed: Source-Linked Bank Reports",
+   "description": "1889 source-linked bank and asset-manager reports, structured into conclusions, asset views, stated targets, horizons and risks.",
+   "canonical": "https://tlines.tech/en/research",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research",
+    "zh-CN": "https://tlines.tech/zh/research",
+    "x-default": "https://tlines.tech/en/research"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList"
+   ],
+   "h1": "1889 source-linked institutional research reports",
+   "bodyTextLength": 10681,
+   "bodyTextHash": "304387abcaa9620b"
+  },
+  {
+   "url": "/en/markets",
+   "status": 200,
+   "title": "Institutional Market Outlooks by Asset",
+   "description": "Every asset covered by at least two institutional publishers, with the current balance of opinion, each published target price, and the reports behind them.",
+   "canonical": "https://tlines.tech/en/markets",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets",
+    "zh-CN": "https://tlines.tech/zh/markets",
+    "x-default": "https://tlines.tech/en/markets"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Markets",
+   "bodyTextLength": 1740,
+   "bodyTextHash": "cae925a9405e795a"
+  },
+  {
+   "url": "/en/institutions",
+   "status": 200,
+   "title": "Institutional Market Views, Ranked by Heat",
+   "description": "The most consequential institutional views of the last seven days, ranked by cross-institution heat, publisher authority and freshness, each linked to the…",
+   "canonical": "https://tlines.tech/en/institutions",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institutions",
+    "zh-CN": "https://tlines.tech/zh/institutions",
+    "x-default": "https://tlines.tech/en/institutions"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Views",
+   "bodyTextLength": 18422,
+   "bodyTextHash": "d0e7b621b0049b7d"
+  },
+  {
+   "url": "/en/macro",
+   "status": 200,
+   "title": "Economic Data: Releases, Consensus & Institutional Forecasts",
+   "description": "Scheduled releases with the consensus institutions expected before the print, the figures as published, every revision, and which banks forecast what.",
+   "canonical": "https://tlines.tech/en/macro",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro",
+    "zh-CN": "https://tlines.tech/zh/macro",
+    "x-default": "https://tlines.tech/en/macro"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Economic Data",
+   "bodyTextLength": 3612,
+   "bodyTextHash": "410244b2148efeb3"
+  },
+  {
+   "url": "/en/macro/calendar",
+   "status": 200,
+   "title": "Economic Calendar · Tlines",
+   "description": "What is scheduled and what has landed: 104 releases across 1 economies, each with the consensus institutions expected, the previous value and every revision.",
+   "canonical": "https://tlines.tech/en/macro/calendar",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/calendar",
+    "zh-CN": "https://tlines.tech/zh/macro/calendar",
+    "x-default": "https://tlines.tech/en/macro/calendar"
+   },
+   "jsonLdTypes": [],
+   "h1": "Economic Calendar",
+   "bodyTextLength": 7939,
+   "bodyTextHash": "c69624b0db7d1733"
+  },
+  {
+   "url": "/en/topics",
+   "status": 200,
+   "title": "Market Topics: What Institutions Are Researching",
+   "description": "The subjects institutions are actually writing about, each with the number of publishing houses behind it, the assets involved and the reports it comes from.",
+   "canonical": "https://tlines.tech/en/topics",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics",
+    "zh-CN": "https://tlines.tech/zh/topics",
+    "x-default": "https://tlines.tech/en/topics"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "What institutions are researching",
+   "bodyTextLength": 3671,
+   "bodyTextHash": "204fa3c6d3a33f05"
+  },
+  {
+   "url": "/en/economies",
+   "status": 200,
+   "title": "Economy dashboards · Tlines",
+   "description": "Macro releases, policy institutions, markets and institutional research organized by economy.",
+   "canonical": "https://tlines.tech/en/economies",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies",
+    "zh-CN": "https://tlines.tech/zh/economies",
+    "x-default": "https://tlines.tech/en/economies"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Economy dashboards",
+   "bodyTextLength": 920,
+   "bodyTextHash": "1212bac575500f87"
+  },
+  {
+   "url": "/en/about",
+   "status": 200,
+   "title": "About Tlines · Tlines",
+   "description": "Tlines turns public institutional research into comparable, traceable market intelligence. It preserves the original source while adding structured…",
+   "canonical": "https://tlines.tech/en/about",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/about",
+    "zh-CN": "https://tlines.tech/zh/about",
+    "x-default": "https://tlines.tech/en/about"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "About Tlines",
+   "bodyTextLength": 929,
+   "bodyTextHash": "e9bf4c4f38607421"
+  },
+  {
+   "url": "/en/methodology",
+   "status": 200,
+   "title": "Methodology · Tlines",
+   "description": "Research is admitted only from public, source-verifiable pages. Tlines extracts asset, direction, target, horizon, conditions and source evidence, then…",
+   "canonical": "https://tlines.tech/en/methodology",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/methodology",
+    "zh-CN": "https://tlines.tech/zh/methodology",
+    "x-default": "https://tlines.tech/en/methodology"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "Methodology",
+   "bodyTextLength": 1025,
+   "bodyTextHash": "89e95f8b9bfd2e8a"
+  },
+  {
+   "url": "/en/editorial-policy",
+   "status": 200,
+   "title": "Editorial Policy · Tlines",
+   "description": "Original institutional authorship and wording are separated from Tlines summaries and automated analysis. Pages identify publication time, institution and…",
+   "canonical": "https://tlines.tech/en/editorial-policy",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/editorial-policy",
+    "zh-CN": "https://tlines.tech/zh/editorial-policy",
+    "x-default": "https://tlines.tech/en/editorial-policy"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "Editorial Policy",
+   "bodyTextLength": 956,
+   "bodyTextHash": "0790bb445dcae58e"
+  },
+  {
+   "url": "/en/ai-usage",
+   "status": 200,
+   "title": "AI Usage · Tlines",
+   "description": "AI may structure, translate and summarize source material. Outputs are quality-checked, labelled as automated and withheld from indexing when they fail the…",
+   "canonical": "https://tlines.tech/en/ai-usage",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/ai-usage",
+    "zh-CN": "https://tlines.tech/zh/ai-usage",
+    "x-default": "https://tlines.tech/en/ai-usage"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "AI Usage",
+   "bodyTextLength": 968,
+   "bodyTextHash": "ef2a5209ac298b86"
+  },
+  {
+   "url": "/en/sources",
+   "status": 200,
+   "title": "Sources · Tlines",
+   "description": "Every research record links to the institution's public page or document. Tlines respects source robots policies, does not bypass login or access controls…",
+   "canonical": "https://tlines.tech/en/sources",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/sources",
+    "zh-CN": "https://tlines.tech/zh/sources",
+    "x-default": "https://tlines.tech/en/sources"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "Sources",
+   "bodyTextLength": 924,
+   "bodyTextHash": "337e283b449ec75c"
+  },
+  {
+   "url": "/en/privacy",
+   "status": 200,
+   "title": "Privacy · Tlines",
+   "description": "Tlines measures its own audience without a tracking cookie and without storing anyone's IP address. A visitor is counted as a one-way digest of a…",
+   "canonical": "https://tlines.tech/en/privacy",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/privacy",
+    "zh-CN": "https://tlines.tech/zh/privacy",
+    "x-default": "https://tlines.tech/en/privacy"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "Privacy",
+   "bodyTextLength": 1236,
+   "bodyTextHash": "56b65d0f5c0bba3e"
+  },
+  {
+   "url": "/en/corrections",
+   "status": 200,
+   "title": "Corrections · Tlines",
+   "description": "Readers can report an error with the research URL, disputed text and official evidence. Until a dedicated form is available, contact the site operator…",
+   "canonical": "https://tlines.tech/en/corrections",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/corrections",
+    "zh-CN": "https://tlines.tech/zh/corrections",
+    "x-default": "https://tlines.tech/en/corrections"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "Corrections",
+   "bodyTextLength": 974,
+   "bodyTextHash": "d746528646d72b2c"
+  },
+  {
+   "url": "/en/financial-disclaimer",
+   "status": 200,
+   "title": "Financial Disclaimer · Tlines",
+   "description": "Tlines provides informational summaries of public institutional research. Content may be delayed, incomplete or incorrect and is not investment, legal, tax…",
+   "canonical": "https://tlines.tech/en/financial-disclaimer",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/financial-disclaimer",
+    "zh-CN": "https://tlines.tech/zh/financial-disclaimer",
+    "x-default": "https://tlines.tech/en/financial-disclaimer"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "Financial Disclaimer",
+   "bodyTextLength": 981,
+   "bodyTextHash": "dcc20f694a1b046c"
+  },
+  {
+   "url": "/en/macro/indicator/US_JOLTS_OPENINGS",
+   "status": 200,
+   "title": "JOLTS Job Openings · Tlines",
+   "description": "JOLTS Job Openings (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in Thousands.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_JOLTS_OPENINGS",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_JOLTS_OPENINGS",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_JOLTS_OPENINGS",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_JOLTS_OPENINGS"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "JOLTS Job Openings",
+   "bodyTextLength": 6464,
+   "bodyTextHash": "f7d9d6fb085c0ef2"
+  },
+  {
+   "url": "/en/macro/indicator/US_PCE_PRICE",
+   "status": 200,
+   "title": "PCE Price Index · Tlines",
+   "description": "PCE Price Index (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in points.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_PCE_PRICE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_PCE_PRICE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_PCE_PRICE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_PCE_PRICE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "PCE Price Index",
+   "bodyTextLength": 10970,
+   "bodyTextHash": "2c5f0dd6fbb59722"
+  },
+  {
+   "url": "/en/macro/indicator/US_CORE_PCE_PRICE",
+   "status": 200,
+   "title": "Core PCE Price Index · Tlines",
+   "description": "Core PCE Price Index (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in points.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_CORE_PCE_PRICE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_CORE_PCE_PRICE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_CORE_PCE_PRICE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_CORE_PCE_PRICE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Core PCE Price Index",
+   "bodyTextLength": 10988,
+   "bodyTextHash": "2ccc252d4509af1d"
+  },
+  {
+   "url": "/en/macro/indicator/US_GDP",
+   "status": 200,
+   "title": "Real Gross Domestic Product · Tlines",
+   "description": "Real Gross Domestic Product (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported quarterly, in Percent Change Saar.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_GDP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_GDP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_GDP",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_GDP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Real Gross Domestic Product",
+   "bodyTextLength": 4008,
+   "bodyTextHash": "ab26f427768ef917"
+  },
+  {
+   "url": "/en/macro/indicator/US_PERSONAL_INCOME",
+   "status": 200,
+   "title": "Personal Income · Tlines",
+   "description": "Personal Income (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in Billions Usd.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_PERSONAL_INCOME",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_PERSONAL_INCOME",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_PERSONAL_INCOME",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_PERSONAL_INCOME"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Personal Income",
+   "bodyTextLength": 11179,
+   "bodyTextHash": "9fbc2ff771b2ea7d"
+  },
+  {
+   "url": "/en/macro/indicator/US_PERSONAL_SPENDING",
+   "status": 200,
+   "title": "Personal Consumption Expenditures · Tlines",
+   "description": "Personal Consumption Expenditures (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in Billions Usd.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_PERSONAL_SPENDING",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_PERSONAL_SPENDING",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_PERSONAL_SPENDING",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_PERSONAL_SPENDING"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Personal Consumption Expenditures",
+   "bodyTextLength": 11232,
+   "bodyTextHash": "900c05e2fb6e5dea"
+  },
+  {
+   "url": "/en/macro/indicator/US_FED_FUNDS_TARGET_LOWER",
+   "status": 200,
+   "title": "Federal Funds Target Range — Lower Limit · Tlines",
+   "description": "Federal Funds Target Range — Lower Limit (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported as scheduled, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_LOWER",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_LOWER",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_FED_FUNDS_TARGET_LOWER",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_LOWER"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Federal Funds Target Range — Lower Limit",
+   "bodyTextLength": 40109,
+   "bodyTextHash": "b74506657ff595db"
+  },
+  {
+   "url": "/en/macro/indicator/US_FED_FUNDS_TARGET_UPPER",
+   "status": 200,
+   "title": "Federal Funds Target Range — Upper Limit · Tlines",
+   "description": "Federal Funds Target Range — Upper Limit (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported as scheduled, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_UPPER",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_UPPER",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_FED_FUNDS_TARGET_UPPER",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_UPPER"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Federal Funds Target Range — Upper Limit",
+   "bodyTextLength": 40088,
+   "bodyTextHash": "a367ccaf87c525a5"
+  },
+  {
+   "url": "/en/macro/indicator/US_EIA_CRUDE_INVENTORIES",
+   "status": 200,
+   "title": "U.S. Commercial Crude Oil Inventories · Tlines",
+   "description": "U.S. Commercial Crude Oil Inventories (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported weekly, in K barrels.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_EIA_CRUDE_INVENTORIES",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_EIA_CRUDE_INVENTORIES",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_EIA_CRUDE_INVENTORIES",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_EIA_CRUDE_INVENTORIES"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "U.S. Commercial Crude Oil Inventories",
+   "bodyTextLength": 13404,
+   "bodyTextHash": "bb0095b822fbcee9"
+  },
+  {
+   "url": "/en/macro/indicator/EA_HICP_HEADLINE",
+   "status": 200,
+   "title": "Euro Area HICP Inflation · Tlines",
+   "description": "Euro Area HICP Inflation (EA): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in % YoY.",
+   "canonical": "https://tlines.tech/en/macro/indicator/EA_HICP_HEADLINE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/EA_HICP_HEADLINE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/EA_HICP_HEADLINE",
+    "x-default": "https://tlines.tech/en/macro/indicator/EA_HICP_HEADLINE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Euro Area HICP Inflation",
+   "bodyTextLength": 3167,
+   "bodyTextHash": "315d9521b78b72db"
+  },
+  {
+   "url": "/en/macro/indicator/EA_HICP_CORE",
+   "status": 200,
+   "title": "Euro Area Core HICP Inflation · Tlines",
+   "description": "Euro Area Core HICP Inflation (EA): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in % YoY.",
+   "canonical": "https://tlines.tech/en/macro/indicator/EA_HICP_CORE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/EA_HICP_CORE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/EA_HICP_CORE",
+    "x-default": "https://tlines.tech/en/macro/indicator/EA_HICP_CORE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Euro Area Core HICP Inflation",
+   "bodyTextLength": 3212,
+   "bodyTextHash": "f74bb78136a764a1"
+  },
+  {
+   "url": "/en/macro/indicator/EA_UNEMPLOYMENT",
+   "status": 200,
+   "title": "Euro Area Unemployment Rate · Tlines",
+   "description": "Euro Area Unemployment Rate (EA): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/EA_UNEMPLOYMENT",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/EA_UNEMPLOYMENT",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/EA_UNEMPLOYMENT",
+    "x-default": "https://tlines.tech/en/macro/indicator/EA_UNEMPLOYMENT"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Euro Area Unemployment Rate",
+   "bodyTextLength": 3908,
+   "bodyTextHash": "876b65f48b1cc0e9"
+  },
+  {
+   "url": "/en/macro/indicator/EA_GDP",
+   "status": 200,
+   "title": "Euro Area Real GDP Growth · Tlines",
+   "description": "Euro Area Real GDP Growth (EA): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported quarterly, in % QoQ.",
+   "canonical": "https://tlines.tech/en/macro/indicator/EA_GDP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/EA_GDP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/EA_GDP",
+    "x-default": "https://tlines.tech/en/macro/indicator/EA_GDP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Euro Area Real GDP Growth",
+   "bodyTextLength": 2150,
+   "bodyTextHash": "d1be7e503f23147f"
+  },
+  {
+   "url": "/en/macro/indicator/US_CPI_HEADLINE",
+   "status": 200,
+   "title": "Consumer Price Index · Tlines",
+   "description": "Consumer Price Index (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in points.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_CPI_HEADLINE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_CPI_HEADLINE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_CPI_HEADLINE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_CPI_HEADLINE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Consumer Price Index",
+   "bodyTextLength": 6631,
+   "bodyTextHash": "06b7d2ec31396a1b"
+  },
+  {
+   "url": "/en/macro/indicator/US_PPI",
+   "status": 200,
+   "title": "Producer Price Index — Final Demand · Tlines",
+   "description": "Producer Price Index — Final Demand (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in points.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_PPI",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_PPI",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_PPI",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_PPI"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Producer Price Index — Final Demand",
+   "bodyTextLength": 4724,
+   "bodyTextHash": "9c4a519083593c7c"
+  },
+  {
+   "url": "/en/macro/indicator/US_NFP",
+   "status": 200,
+   "title": "Total Nonfarm Payrolls · Tlines",
+   "description": "Total Nonfarm Payrolls (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in K persons.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_NFP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_NFP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_NFP",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_NFP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Total Nonfarm Payrolls",
+   "bodyTextLength": 7270,
+   "bodyTextHash": "625b249b91bf7c56"
+  },
+  {
+   "url": "/en/macro/indicator/US_UNEMPLOYMENT_RATE",
+   "status": 200,
+   "title": "Unemployment Rate · Tlines",
+   "description": "Unemployment Rate (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_UNEMPLOYMENT_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_UNEMPLOYMENT_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_UNEMPLOYMENT_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_UNEMPLOYMENT_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Unemployment Rate",
+   "bodyTextLength": 6206,
+   "bodyTextHash": "cbe04f7130adf762"
+  },
+  {
+   "url": "/en/macro/indicator/US_CPI_CORE",
+   "status": 200,
+   "title": "Core Consumer Price Index · Tlines",
+   "description": "Core Consumer Price Index (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in points.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_CPI_CORE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_CPI_CORE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_CPI_CORE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_CPI_CORE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Core Consumer Price Index",
+   "bodyTextLength": 6636,
+   "bodyTextHash": "734ccc650cd5eea1"
+  },
+  {
+   "url": "/en/macro/indicator/JP_GDP",
+   "status": 200,
+   "title": "Japan Gross Domestic Product · Tlines",
+   "description": "Japan Gross Domestic Product (JP): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported quarterly, in Billions Jpy.",
+   "canonical": "https://tlines.tech/en/macro/indicator/JP_GDP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/JP_GDP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/JP_GDP",
+    "x-default": "https://tlines.tech/en/macro/indicator/JP_GDP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Japan Gross Domestic Product",
+   "bodyTextLength": 2123,
+   "bodyTextHash": "c0b2260bd8dd8a4a"
+  },
+  {
+   "url": "/en/macro/indicator/JP_UNEMPLOYMENT",
+   "status": 200,
+   "title": "Japan Unemployment Rate · Tlines",
+   "description": "Japan Unemployment Rate (JP): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/JP_UNEMPLOYMENT",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/JP_UNEMPLOYMENT",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/JP_UNEMPLOYMENT",
+    "x-default": "https://tlines.tech/en/macro/indicator/JP_UNEMPLOYMENT"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Japan Unemployment Rate",
+   "bodyTextLength": 3697,
+   "bodyTextHash": "cc6e08e24dce724c"
+  },
+  {
+   "url": "/en/macro/indicator/JP_CALL_RATE",
+   "status": 200,
+   "title": "Japan Overnight Call Rate · Tlines",
+   "description": "Japan Overnight Call Rate (JP): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/JP_CALL_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/JP_CALL_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/JP_CALL_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/JP_CALL_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "Japan Overnight Call Rate",
+   "bodyTextLength": 3917,
+   "bodyTextHash": "46e2aa4325f0c942"
+  },
+  {
+   "url": "/en/macro/indicator/UK_GDP",
+   "status": 200,
+   "title": "United Kingdom Gross Domestic Product · Tlines",
+   "description": "United Kingdom Gross Domestic Product (GB): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported quarterly, in Millions Gbp.",
+   "canonical": "https://tlines.tech/en/macro/indicator/UK_GDP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/UK_GDP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/UK_GDP",
+    "x-default": "https://tlines.tech/en/macro/indicator/UK_GDP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "United Kingdom Gross Domestic Product",
+   "bodyTextLength": 2784,
+   "bodyTextHash": "36e47d57b5b797d3"
+  },
+  {
+   "url": "/en/macro/indicator/UK_UNEMPLOYMENT",
+   "status": 200,
+   "title": "United Kingdom Unemployment Rate · Tlines",
+   "description": "United Kingdom Unemployment Rate (GB): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/UK_UNEMPLOYMENT",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/UK_UNEMPLOYMENT",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/UK_UNEMPLOYMENT",
+    "x-default": "https://tlines.tech/en/macro/indicator/UK_UNEMPLOYMENT"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "United Kingdom Unemployment Rate",
+   "bodyTextLength": 3558,
+   "bodyTextHash": "1b05c079ce111dd2"
+  },
+  {
+   "url": "/en/macro/indicator/UK_CALL_RATE",
+   "status": 200,
+   "title": "United Kingdom Overnight Interbank Rate · Tlines",
+   "description": "United Kingdom Overnight Interbank Rate (GB): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported monthly, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/UK_CALL_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/UK_CALL_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/UK_CALL_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/UK_CALL_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "United Kingdom Overnight Interbank Rate",
+   "bodyTextLength": 3994,
+   "bodyTextHash": "710159d748897c80"
+  },
+  {
+   "url": "/en/macro/indicator/US_WTI_SPOT",
+   "status": 200,
+   "title": "WTI Crude Oil Spot Price · Tlines",
+   "description": "WTI Crude Oil Spot Price (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported daily, in USD/bbl.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_WTI_SPOT",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_WTI_SPOT",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_WTI_SPOT",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_WTI_SPOT"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "WTI Crude Oil Spot Price",
+   "bodyTextLength": 40815,
+   "bodyTextHash": "187236609bdff602"
+  },
+  {
+   "url": "/en/macro/indicator/US_2Y_TREASURY_YIELD",
+   "status": 200,
+   "title": "U.S. 2-Year Treasury Yield · Tlines",
+   "description": "U.S. 2-Year Treasury Yield (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported daily, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_2Y_TREASURY_YIELD",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_2Y_TREASURY_YIELD",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_2Y_TREASURY_YIELD",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_2Y_TREASURY_YIELD"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "U.S. 2-Year Treasury Yield",
+   "bodyTextLength": 40215,
+   "bodyTextHash": "9a4e61e3f896111f"
+  },
+  {
+   "url": "/en/macro/indicator/US_10Y_TREASURY_YIELD",
+   "status": 200,
+   "title": "U.S. 10-Year Treasury Yield · Tlines",
+   "description": "U.S. 10-Year Treasury Yield (US): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported daily, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/US_10Y_TREASURY_YIELD",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_10Y_TREASURY_YIELD",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_10Y_TREASURY_YIELD",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_10Y_TREASURY_YIELD"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "U.S. 10-Year Treasury Yield",
+   "bodyTextLength": 40222,
+   "bodyTextHash": "5b505d7de7d5176a"
+  },
+  {
+   "url": "/en/macro/indicator/ECB_DEPOSIT_RATE",
+   "status": 200,
+   "title": "ECB Deposit Facility Rate · Tlines",
+   "description": "ECB Deposit Facility Rate (EA): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported daily, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/ECB_DEPOSIT_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/ECB_DEPOSIT_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/ECB_DEPOSIT_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/ECB_DEPOSIT_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "ECB Deposit Facility Rate",
+   "bodyTextLength": 38593,
+   "bodyTextHash": "d72f68170aed5442"
+  },
+  {
+   "url": "/en/macro/indicator/ECB_MAIN_REFI_RATE",
+   "status": 200,
+   "title": "ECB Main Refinancing Operations Rate · Tlines",
+   "description": "ECB Main Refinancing Operations Rate (EA): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported daily, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/ECB_MAIN_REFI_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/ECB_MAIN_REFI_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/ECB_MAIN_REFI_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/ECB_MAIN_REFI_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "ECB Main Refinancing Operations Rate",
+   "bodyTextLength": 39705,
+   "bodyTextHash": "502de001799188da"
+  },
+  {
+   "url": "/en/macro/indicator/ECB_MARGINAL_LENDING_RATE",
+   "status": 200,
+   "title": "ECB Marginal Lending Facility Rate · Tlines",
+   "description": "ECB Marginal Lending Facility Rate (EA): the released series and every revision, the consensus institutions expected before each print, and the next release date. Reported daily, in %.",
+   "canonical": "https://tlines.tech/en/macro/indicator/ECB_MARGINAL_LENDING_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/ECB_MARGINAL_LENDING_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/ECB_MARGINAL_LENDING_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/ECB_MARGINAL_LENDING_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "ECB Marginal Lending Facility Rate",
+   "bodyTextLength": 39362,
+   "bodyTextHash": "84c18a60e3488a92"
+  },
+  {
+   "url": "/en/economies/us",
+   "status": 200,
+   "title": "United States economy dashboard · Tlines",
+   "description": "United States macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/us",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/us",
+    "zh-CN": "https://tlines.tech/zh/economies/us",
+    "x-default": "https://tlines.tech/en/economies/us"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "United States",
+   "bodyTextLength": 5272,
+   "bodyTextHash": "799a8cd93bfc5cee"
+  },
+  {
+   "url": "/en/economies/eurozone",
+   "status": 200,
+   "title": "Eurozone economy dashboard · Tlines",
+   "description": "Eurozone macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/eurozone",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/eurozone",
+    "zh-CN": "https://tlines.tech/zh/economies/eurozone",
+    "x-default": "https://tlines.tech/en/economies/eurozone"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Eurozone",
+   "bodyTextLength": 4327,
+   "bodyTextHash": "0cde410ed056fe90"
+  },
+  {
+   "url": "/en/economies/uk",
+   "status": 200,
+   "title": "United Kingdom economy dashboard · Tlines",
+   "description": "United Kingdom macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/uk",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/uk",
+    "zh-CN": "https://tlines.tech/zh/economies/uk",
+    "x-default": "https://tlines.tech/en/economies/uk"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "United Kingdom",
+   "bodyTextLength": 4298,
+   "bodyTextHash": "b9928df699af96b1"
+  },
+  {
+   "url": "/en/economies/japan",
+   "status": 200,
+   "title": "Japan economy dashboard · Tlines",
+   "description": "Japan macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/japan",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/japan",
+    "zh-CN": "https://tlines.tech/zh/economies/japan",
+    "x-default": "https://tlines.tech/en/economies/japan"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Japan",
+   "bodyTextLength": 4356,
+   "bodyTextHash": "a90db707f4847b7f"
+  },
+  {
+   "url": "/en/economies/china",
+   "status": 200,
+   "title": "China economy dashboard · Tlines",
+   "description": "China macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/china",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/china",
+    "zh-CN": "https://tlines.tech/zh/economies/china",
+    "x-default": "https://tlines.tech/en/economies/china"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "China",
+   "bodyTextLength": 4072,
+   "bodyTextHash": "9395fc83224a5293"
+  },
+  {
+   "url": "/en/economies/indonesia",
+   "status": 200,
+   "title": "Indonesia economy dashboard · Tlines",
+   "description": "Indonesia macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/indonesia",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/indonesia",
+    "zh-CN": "https://tlines.tech/zh/economies/indonesia",
+    "x-default": "https://tlines.tech/en/economies/indonesia"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Indonesia",
+   "bodyTextLength": 4271,
+   "bodyTextHash": "185b4383003bc19f"
+  },
+  {
+   "url": "/en/economies/australia",
+   "status": 200,
+   "title": "Australia economy dashboard · Tlines",
+   "description": "Australia macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/australia",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/australia",
+    "zh-CN": "https://tlines.tech/zh/economies/australia",
+    "x-default": "https://tlines.tech/en/economies/australia"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Australia",
+   "bodyTextLength": 4132,
+   "bodyTextHash": "3b4c89f1cf18dfee"
+  },
+  {
+   "url": "/en/economies/new-zealand",
+   "status": 200,
+   "title": "New Zealand economy dashboard · Tlines",
+   "description": "New Zealand macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/new-zealand",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/new-zealand",
+    "zh-CN": "https://tlines.tech/zh/economies/new-zealand",
+    "x-default": "https://tlines.tech/en/economies/new-zealand"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "New Zealand",
+   "bodyTextLength": 4274,
+   "bodyTextHash": "dd158e4ba1f52087"
+  },
+  {
+   "url": "/en/economies/canada",
+   "status": 200,
+   "title": "Canada economy dashboard · Tlines",
+   "description": "Canada macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/canada",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/canada",
+    "zh-CN": "https://tlines.tech/zh/economies/canada",
+    "x-default": "https://tlines.tech/en/economies/canada"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Canada",
+   "bodyTextLength": 4127,
+   "bodyTextHash": "0be773117cf30969"
+  },
+  {
+   "url": "/en/economies/switzerland",
+   "status": 200,
+   "title": "Switzerland economy dashboard · Tlines",
+   "description": "Switzerland macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/switzerland",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/switzerland",
+    "zh-CN": "https://tlines.tech/zh/economies/switzerland",
+    "x-default": "https://tlines.tech/en/economies/switzerland"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Switzerland",
+   "bodyTextLength": 4171,
+   "bodyTextHash": "b4f97a037a95b87a"
+  },
+  {
+   "url": "/en/economies/south-korea",
+   "status": 200,
+   "title": "South Korea economy dashboard · Tlines",
+   "description": "South Korea macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/south-korea",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/south-korea",
+    "zh-CN": "https://tlines.tech/zh/economies/south-korea",
+    "x-default": "https://tlines.tech/en/economies/south-korea"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "South Korea",
+   "bodyTextLength": 4220,
+   "bodyTextHash": "e072542f3f65691c"
+  },
+  {
+   "url": "/en/economies/india",
+   "status": 200,
+   "title": "India economy dashboard · Tlines",
+   "description": "India macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/india",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/india",
+    "zh-CN": "https://tlines.tech/zh/economies/india",
+    "x-default": "https://tlines.tech/en/economies/india"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "India",
+   "bodyTextLength": 4165,
+   "bodyTextHash": "813b17f5e43f113a"
+  },
+  {
+   "url": "/en/economies/brazil",
+   "status": 200,
+   "title": "Brazil economy dashboard · Tlines",
+   "description": "Brazil macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/brazil",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/brazil",
+    "zh-CN": "https://tlines.tech/zh/economies/brazil",
+    "x-default": "https://tlines.tech/en/economies/brazil"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Brazil",
+   "bodyTextLength": 3945,
+   "bodyTextHash": "75fb59b2e35a8b61"
+  },
+  {
+   "url": "/en/economies/mexico",
+   "status": 200,
+   "title": "Mexico economy dashboard · Tlines",
+   "description": "Mexico macro data, central-bank policy, related markets and institutional research.",
+   "canonical": "https://tlines.tech/en/economies/mexico",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/mexico",
+    "zh-CN": "https://tlines.tech/zh/economies/mexico",
+    "x-default": "https://tlines.tech/en/economies/mexico"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Mexico",
+   "bodyTextLength": 4231,
+   "bodyTextHash": "91fb70528334f77b"
+  },
+  {
+   "url": "/en/market-themes",
+   "status": 200,
+   "title": "Market Themes: Narratives Backed by Institutional Research",
+   "description": "The asset narratives institutions are writing about right now: how many houses support each, which assets they touch, and whether the market has moved with…",
+   "canonical": "https://tlines.tech/en/market-themes",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/market-themes",
+    "zh-CN": "https://tlines.tech/zh/market-themes",
+    "x-default": "https://tlines.tech/en/market-themes"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Market Themes",
+   "bodyTextLength": 2931,
+   "bodyTextHash": "464d134c09c7d755"
+  },
+  {
+   "url": "/en/institution/nab-markets",
+   "status": 200,
+   "title": "NAB Markets Research, Market Views & Forecasts",
+   "description": "Read 1 public NAB Markets report, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/nab-markets",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/nab-markets",
+    "zh-CN": "https://tlines.tech/zh/institution/nab-markets",
+    "x-default": "https://tlines.tech/en/institution/nab-markets"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ProfilePage"
+   ],
+   "h1": "NAB Markets: 1 source-linked public report",
+   "bodyTextLength": 912,
+   "bodyTextHash": "95887090c88b7992"
+  },
+  {
+   "url": "/en/institution/danske",
+   "status": 200,
+   "title": "Danske Bank Research, Market Views & Forecasts",
+   "description": "Compare 9 public Danske Bank reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/danske",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/danske",
+    "zh-CN": "https://tlines.tech/zh/institution/danske",
+    "x-default": "https://tlines.tech/en/institution/danske"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Danske Bank: 9 source-linked public reports",
+   "bodyTextLength": 2315,
+   "bodyTextHash": "5bafbf5b810f606c"
+  },
+  {
+   "url": "/en/institution/man",
+   "status": 200,
+   "title": "Man Group / Man Institute Research, Market Views & Forecasts",
+   "description": "Compare 6 public Man Group / Man Institute reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/man",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/man",
+    "zh-CN": "https://tlines.tech/zh/institution/man",
+    "x-default": "https://tlines.tech/en/institution/man"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Man Group / Man Institute: 6 source-linked public reports",
+   "bodyTextLength": 2071,
+   "bodyTextHash": "f5c21d02b1ca05d8"
+  },
+  {
+   "url": "/en/institution/schroders",
+   "status": 200,
+   "title": "Schroders Research, Market Views & Forecasts",
+   "description": "Compare 26 public Schroders reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/schroders",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/schroders",
+    "zh-CN": "https://tlines.tech/zh/institution/schroders",
+    "x-default": "https://tlines.tech/en/institution/schroders"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Schroders: 26 source-linked public reports",
+   "bodyTextLength": 2790,
+   "bodyTextHash": "69b28a8bdb4c68ed"
+  },
+  {
+   "url": "/en/institution/seb",
+   "status": 200,
+   "title": "SEB Research, Market Views & Forecasts",
+   "description": "Compare 7 public SEB reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/seb",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/seb",
+    "zh-CN": "https://tlines.tech/zh/institution/seb",
+    "x-default": "https://tlines.tech/en/institution/seb"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "SEB: 7 source-linked public reports",
+   "bodyTextLength": 1928,
+   "bodyTextHash": "cf855bbccc04c139"
+  },
+  {
+   "url": "/en/institution/westpac",
+   "status": 200,
+   "title": "Westpac IQ Economic Outlook & Rate Forecasts",
+   "description": "Compare 86 public Westpac / Westpac IQ reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/westpac",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/westpac",
+    "zh-CN": "https://tlines.tech/zh/institution/westpac",
+    "x-default": "https://tlines.tech/en/institution/westpac"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Westpac IQ economic outlook and rate views: 86 source-linked public reports",
+   "bodyTextLength": 2783,
+   "bodyTextHash": "d96c247c2b70c421"
+  },
+  {
+   "url": "/en/institution/abn",
+   "status": 200,
+   "title": "ABN AMRO Research — Market Views & Forecasts",
+   "description": "Compare 27 public ABN AMRO Research reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/abn",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/abn",
+    "zh-CN": "https://tlines.tech/zh/institution/abn",
+    "x-default": "https://tlines.tech/en/institution/abn"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "ABN AMRO Research: 27 source-linked public reports",
+   "bodyTextLength": 2714,
+   "bodyTextHash": "d6943118a8721b3b"
+  },
+  {
+   "url": "/en/institution/natixis",
+   "status": 200,
+   "title": "Natixis Research, Market Views & Forecasts",
+   "description": "Compare 102 public Natixis reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/natixis",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/natixis",
+    "zh-CN": "https://tlines.tech/zh/institution/natixis",
+    "x-default": "https://tlines.tech/en/institution/natixis"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Natixis: 102 source-linked public reports",
+   "bodyTextLength": 2828,
+   "bodyTextHash": "9db1d3f21e074005"
+  },
+  {
+   "url": "/en/institution/morgan-stanley",
+   "status": 200,
+   "title": "Morgan Stanley Research, Market Views & Forecasts",
+   "description": "Read 1 public Morgan Stanley report, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/morgan-stanley",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/morgan-stanley",
+    "zh-CN": "https://tlines.tech/zh/institution/morgan-stanley",
+    "x-default": "https://tlines.tech/en/institution/morgan-stanley"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Morgan Stanley: 1 source-linked public report",
+   "bodyTextLength": 1244,
+   "bodyTextHash": "7ae0380e043e3b29"
+  },
+  {
+   "url": "/en/institution/aqr",
+   "status": 200,
+   "title": "AQR Research, Market Views & Forecasts",
+   "description": "Compare 12 public AQR reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/aqr",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/aqr",
+    "zh-CN": "https://tlines.tech/zh/institution/aqr",
+    "x-default": "https://tlines.tech/en/institution/aqr"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "AQR: 12 source-linked public reports",
+   "bodyTextLength": 2024,
+   "bodyTextHash": "f8ba51193718932c"
+  },
+  {
+   "url": "/en/institution/j-p-morgan",
+   "status": 200,
+   "title": "J.P. Morgan Research, Market Views & Forecasts",
+   "description": "Compare 11 public J.P. Morgan reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/j-p-morgan",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/j-p-morgan",
+    "zh-CN": "https://tlines.tech/zh/institution/j-p-morgan",
+    "x-default": "https://tlines.tech/en/institution/j-p-morgan"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "J.P. Morgan: 11 source-linked public reports",
+   "bodyTextLength": 2650,
+   "bodyTextHash": "70a0d9c9063a18e8"
+  },
+  {
+   "url": "/en/institution/deutsche",
+   "status": 200,
+   "title": "Deutsche Bank Research, Market Views & Forecasts",
+   "description": "Compare 12 public Deutsche Bank reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/deutsche",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/deutsche",
+    "zh-CN": "https://tlines.tech/zh/institution/deutsche",
+    "x-default": "https://tlines.tech/en/institution/deutsche"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Deutsche Bank: 12 source-linked public reports",
+   "bodyTextLength": 2795,
+   "bodyTextHash": "72bf82046d3c39c4"
+  },
+  {
+   "url": "/en/institution/wellington-management",
+   "status": 200,
+   "title": "Wellington Management Market Outlook & Research",
+   "description": "Compare 18 public Wellington Management reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/wellington-management",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/wellington-management",
+    "zh-CN": "https://tlines.tech/zh/institution/wellington-management",
+    "x-default": "https://tlines.tech/en/institution/wellington-management"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Wellington Management market outlook: 18 source-linked public reports",
+   "bodyTextLength": 2765,
+   "bodyTextHash": "bb5c86f23aac1e84"
+  },
+  {
+   "url": "/en/institution/charles-schwab",
+   "status": 200,
+   "title": "Charles Schwab Research, Market Views & Forecasts",
+   "description": "Compare 30 public Charles Schwab reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/charles-schwab",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/charles-schwab",
+    "zh-CN": "https://tlines.tech/zh/institution/charles-schwab",
+    "x-default": "https://tlines.tech/en/institution/charles-schwab"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Charles Schwab: 30 source-linked public reports",
+   "bodyTextLength": 2701,
+   "bodyTextHash": "925a0d103ba42b56"
+  },
+  {
+   "url": "/en/institution/soci-t-g-n-rale",
+   "status": 200,
+   "title": "Société Générale Research, Market Views & Forecasts",
+   "description": "Compare 31 public Société Générale reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/soci-t-g-n-rale",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/soci-t-g-n-rale",
+    "zh-CN": "https://tlines.tech/zh/institution/soci-t-g-n-rale",
+    "x-default": "https://tlines.tech/en/institution/soci-t-g-n-rale"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Société Générale: 31 source-linked public reports",
+   "bodyTextLength": 2379,
+   "bodyTextHash": "dd6fae4c40c7de41"
+  },
+  {
+   "url": "/en/institution/goldman-sachs",
+   "status": 200,
+   "title": "Goldman Sachs Research, Market Views & Forecasts",
+   "description": "Compare 6 public Goldman Sachs reports, with publication dates, extracted asset views, stated targets and original sources.",
+   "canonical": "https://tlines.tech/en/institution/goldman-sachs",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/goldman-sachs",
+    "zh-CN": "https://tlines.tech/zh/institution/goldman-sachs",
+    "x-default": "https://tlines.tech/en/institution/goldman-sachs"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "Goldman Sachs: 6 source-linked public reports",
+   "bodyTextLength": 1994,
+   "bodyTextHash": "471774fe0a17c975"
+  },
+  {
+   "url": "/en/markets/xagusd",
+   "status": 200,
+   "title": "Silver (XAGUSD) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on Silver (XAGUSD).",
+   "canonical": "https://tlines.tech/en/markets/xagusd",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/xagusd",
+    "zh-CN": "https://tlines.tech/zh/markets/xagusd",
+    "x-default": "https://tlines.tech/en/markets/xagusd"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "Silver — what institutions are forecasting",
+   "bodyTextLength": 2314,
+   "bodyTextHash": "c89f6fa7a53784ab"
+  },
+  {
+   "url": "/en/markets/crude-oil-wti",
+   "status": 200,
+   "title": "WTI Crude Oil Forecasts | Bank Targets & Outlook",
+   "description": "Compare wti crude oil forecasts across 36 institutions and 391 public reports, with publication dates, stated targets, view changes and original sources.",
+   "canonical": "https://tlines.tech/en/markets/crude-oil-wti",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/crude-oil-wti",
+    "zh-CN": "https://tlines.tech/zh/markets/crude-oil-wti",
+    "x-default": "https://tlines.tech/en/markets/crude-oil-wti"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "WTI crude oil forecasts: source-linked views from 3 institutions",
+   "bodyTextLength": 5006,
+   "bodyTextHash": "665c15d2b8003644"
+  },
+  {
+   "url": "/en/markets/natgas",
+   "status": 200,
+   "title": "Natural Gas (NATGAS) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on Natural Gas (NATGAS).",
+   "canonical": "https://tlines.tech/en/markets/natgas",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/natgas",
+    "zh-CN": "https://tlines.tech/zh/markets/natgas",
+    "x-default": "https://tlines.tech/en/markets/natgas"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "Natural Gas — what institutions are forecasting",
+   "bodyTextLength": 2566,
+   "bodyTextHash": "924ddcb63057f5ac"
+  },
+  {
+   "url": "/en/markets/copper",
+   "status": 200,
+   "title": "Copper Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on Copper (COPPER).",
+   "canonical": "https://tlines.tech/en/markets/copper",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/copper",
+    "zh-CN": "https://tlines.tech/zh/markets/copper",
+    "x-default": "https://tlines.tech/en/markets/copper"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "Copper — what institutions are forecasting",
+   "bodyTextLength": 2870,
+   "bodyTextHash": "74357fa0cb3ebd4b"
+  },
+  {
+   "url": "/en/markets/bitcoin",
+   "status": 200,
+   "title": "Bitcoin (BTC) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on Bitcoin (BTC).",
+   "canonical": "https://tlines.tech/en/markets/bitcoin",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/bitcoin",
+    "zh-CN": "https://tlines.tech/zh/markets/bitcoin",
+    "x-default": "https://tlines.tech/en/markets/bitcoin"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "Bitcoin — what institutions are forecasting",
+   "bodyTextLength": 2540,
+   "bodyTextHash": "3d8d2de4e9fb4b02"
+  },
+  {
+   "url": "/en/markets/ethereum",
+   "status": 200,
+   "title": "Ethereum (ETH) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on Ethereum (ETH).",
+   "canonical": "https://tlines.tech/en/markets/ethereum",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/ethereum",
+    "zh-CN": "https://tlines.tech/zh/markets/ethereum",
+    "x-default": "https://tlines.tech/en/markets/ethereum"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "Ethereum — what institutions are forecasting",
+   "bodyTextLength": 2420,
+   "bodyTextHash": "62ddd10eb9c7683e"
+  },
+  {
+   "url": "/en/markets/sp-500",
+   "status": 200,
+   "title": "S&P 500 (SPX) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on S&P 500 (SPX).",
+   "canonical": "https://tlines.tech/en/markets/sp-500",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/sp-500",
+    "zh-CN": "https://tlines.tech/zh/markets/sp-500",
+    "x-default": "https://tlines.tech/en/markets/sp-500"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "S&P 500 — what institutions are forecasting",
+   "bodyTextLength": 3971,
+   "bodyTextHash": "002de963d0c0de31"
+  },
+  {
+   "url": "/en/markets/nasdaq-100",
+   "status": 200,
+   "title": "Technology Stock Outlook | Nasdaq-100 Institutional Views",
+   "description": "Compare technology stock and nasdaq-100 outlook across 20 institutions and 77 public reports, with publication dates, stated targets, view changes and…",
+   "canonical": "https://tlines.tech/en/markets/nasdaq-100",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/nasdaq-100",
+    "zh-CN": "https://tlines.tech/zh/markets/nasdaq-100",
+    "x-default": "https://tlines.tech/en/markets/nasdaq-100"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "Technology stock and Nasdaq-100 outlook: source-linked views from 2 institutions",
+   "bodyTextLength": 2490,
+   "bodyTextHash": "5803e293b56a688b"
+  },
+  {
+   "url": "/en/markets/nvda",
+   "status": 200,
+   "title": "NVIDIA (NVDA) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on NVIDIA (NVDA).",
+   "canonical": "https://tlines.tech/en/markets/nvda",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/nvda",
+    "zh-CN": "https://tlines.tech/zh/markets/nvda",
+    "x-default": "https://tlines.tech/en/markets/nvda"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "NVIDIA — what institutions are forecasting",
+   "bodyTextLength": 2581,
+   "bodyTextHash": "94e4939281099282"
+  },
+  {
+   "url": "/en/markets/aapl",
+   "status": 200,
+   "title": "Apple (AAPL) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on Apple (AAPL).",
+   "canonical": "https://tlines.tech/en/markets/aapl",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/aapl",
+    "zh-CN": "https://tlines.tech/zh/markets/aapl",
+    "x-default": "https://tlines.tech/en/markets/aapl"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "Apple — what institutions are forecasting",
+   "bodyTextLength": 2001,
+   "bodyTextHash": "ca10bc3736ce8f92"
+  },
+  {
+   "url": "/en/markets/sox",
+   "status": 200,
+   "title": "Semiconductors (SOX) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on Semiconductors (SOX).",
+   "canonical": "https://tlines.tech/en/markets/sox",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/sox",
+    "zh-CN": "https://tlines.tech/zh/markets/sox",
+    "x-default": "https://tlines.tech/en/markets/sox"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "Semiconductors — what institutions are forecasting",
+   "bodyTextLength": 2494,
+   "bodyTextHash": "de712438435aae37"
+  },
+  {
+   "url": "/en/markets/us-dollar-index",
+   "status": 200,
+   "title": "US Dollar Index (DXY) Outlook | Institutional Views",
+   "description": "Compare us dollar index (dxy) outlook across 33 institutions and 280 public reports, with publication dates, stated targets, view changes and original…",
+   "canonical": "https://tlines.tech/en/markets/us-dollar-index",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/us-dollar-index",
+    "zh-CN": "https://tlines.tech/zh/markets/us-dollar-index",
+    "x-default": "https://tlines.tech/en/markets/us-dollar-index"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "US Dollar Index (DXY) outlook: source-linked views from 1 institutions",
+   "bodyTextLength": 4030,
+   "bodyTextHash": "74e722937097f683"
+  },
+  {
+   "url": "/en/markets/eur-usd",
+   "status": 200,
+   "title": "EUR/USD Bank Forecasts | Targets & Outlook",
+   "description": "Compare eur/usd forecasts across 21 institutions and 239 public reports, with publication dates, stated targets, view changes and original sources.",
+   "canonical": "https://tlines.tech/en/markets/eur-usd",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/eur-usd",
+    "zh-CN": "https://tlines.tech/zh/markets/eur-usd",
+    "x-default": "https://tlines.tech/en/markets/eur-usd"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "EUR/USD forecasts: source-linked views from 2 institutions",
+   "bodyTextLength": 3835,
+   "bodyTextHash": "f24f7eaf6b03ddd0"
+  },
+  {
+   "url": "/en/markets/usd-jpy",
+   "status": 200,
+   "title": "USD/JPY (USDJPY) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on USD/JPY (USDJPY).",
+   "canonical": "https://tlines.tech/en/markets/usd-jpy",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/usd-jpy",
+    "zh-CN": "https://tlines.tech/zh/markets/usd-jpy",
+    "x-default": "https://tlines.tech/en/markets/usd-jpy"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "USD/JPY — what institutions are forecasting",
+   "bodyTextLength": 3838,
+   "bodyTextHash": "786c08d46f73643a"
+  },
+  {
+   "url": "/en/markets/gbpusd",
+   "status": 200,
+   "title": "GBP/USD (GBPUSD) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on GBP/USD (GBPUSD).",
+   "canonical": "https://tlines.tech/en/markets/gbpusd",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/gbpusd",
+    "zh-CN": "https://tlines.tech/zh/markets/gbpusd",
+    "x-default": "https://tlines.tech/en/markets/gbpusd"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "GBP/USD — what institutions are forecasting",
+   "bodyTextLength": 2639,
+   "bodyTextHash": "a52cc050132c3ea9"
+  },
+  {
+   "url": "/en/markets/us-10-year-treasury",
+   "status": 200,
+   "title": "US 10-Year Treasury Yield Forecasts | Bank Outlook",
+   "description": "Compare us 10-year treasury yield forecasts across 36 institutions and 514 public reports, with publication dates, stated targets, view changes and original…",
+   "canonical": "https://tlines.tech/en/markets/us-10-year-treasury",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/us-10-year-treasury",
+    "zh-CN": "https://tlines.tech/zh/markets/us-10-year-treasury",
+    "x-default": "https://tlines.tech/en/markets/us-10-year-treasury"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "US 10-year Treasury yield forecasts: source-linked views from 7 institutions",
+   "bodyTextLength": 5944,
+   "bodyTextHash": "8150002ec37f16fc"
+  },
+  {
+   "url": "/en/markets/us-2-year-treasury",
+   "status": 200,
+   "title": "US 2Y Treasury (US2Y) Institutional Outlook & Bank Forecasts",
+   "description": "Source-linked institutional research and recent views on US 2Y Treasury (US2Y).",
+   "canonical": "https://tlines.tech/en/markets/us-2-year-treasury",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/us-2-year-treasury",
+    "zh-CN": "https://tlines.tech/zh/markets/us-2-year-treasury",
+    "x-default": "https://tlines.tech/en/markets/us-2-year-treasury"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "US 2Y Treasury — what institutions are forecasting",
+   "bodyTextLength": 2943,
+   "bodyTextHash": "596a6c350ed5624b"
+  },
+  {
+   "url": "/en/markets/gold",
+   "status": 200,
+   "title": "Gold Price Forecasts by Banks | Targets & Outlook",
+   "description": "Compare gold price forecasts across 28 institutions and 266 public reports, with publication dates, stated targets, view changes and original sources.",
+   "canonical": "https://tlines.tech/en/markets/gold",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/gold",
+    "zh-CN": "https://tlines.tech/zh/markets/gold",
+    "x-default": "https://tlines.tech/en/markets/gold"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "Gold price forecasts: source-linked views from 4 institutions",
+   "bodyTextLength": 3851,
+   "bodyTextHash": "6bae1d08503bf643"
+  },
+  {
+   "url": "/en/topics/inflation",
+   "status": 200,
+   "title": "Inflation — institutional views, forecasts and research",
+   "description": "38 institutions have published 623 reports touching Inflation. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/inflation",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/inflation",
+    "zh-CN": "https://tlines.tech/zh/topics/inflation",
+    "x-default": "https://tlines.tech/en/topics/inflation"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Inflation",
+   "bodyTextLength": 6559,
+   "bodyTextHash": "9faaf8837574d284"
+  },
+  {
+   "url": "/en/topics/fixed-income",
+   "status": 200,
+   "title": "Fixed Income — institutional views, forecasts and research",
+   "description": "11 institutions have published 16 reports touching Fixed Income. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/fixed-income",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/fixed-income",
+    "zh-CN": "https://tlines.tech/zh/topics/fixed-income",
+    "x-default": "https://tlines.tech/en/topics/fixed-income"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Fixed Income",
+   "bodyTextLength": 6036,
+   "bodyTextHash": "b9ec437bd07f9547"
+  },
+  {
+   "url": "/en/topics/equity-market",
+   "status": 200,
+   "title": "Equity market — institutional views, forecasts and research",
+   "description": "7 institutions have published 12 reports touching Equity market. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/equity-market",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/equity-market",
+    "zh-CN": "https://tlines.tech/zh/topics/equity-market",
+    "x-default": "https://tlines.tech/en/topics/equity-market"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Equity market",
+   "bodyTextLength": 6196,
+   "bodyTextHash": "852aef846bfdf150"
+  },
+  {
+   "url": "/en/topics/credit",
+   "status": 200,
+   "title": "Credit — institutional views, forecasts and research",
+   "description": "6 institutions have published 7 reports touching Credit. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/credit",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/credit",
+    "zh-CN": "https://tlines.tech/zh/topics/credit",
+    "x-default": "https://tlines.tech/en/topics/credit"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Credit",
+   "bodyTextLength": 5416,
+   "bodyTextHash": "ef473a9170aee82e"
+  },
+  {
+   "url": "/en/topics/investment-strategy",
+   "status": 200,
+   "title": "Investment strategy — institutional views, forecasts and…",
+   "description": "11 institutions have published 14 reports touching Investment strategy. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/investment-strategy",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/investment-strategy",
+    "zh-CN": "https://tlines.tech/zh/topics/investment-strategy",
+    "x-default": "https://tlines.tech/en/topics/investment-strategy"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Investment strategy",
+   "bodyTextLength": 6299,
+   "bodyTextHash": "b34607d67a46b886"
+  },
+  {
+   "url": "/en/topics/interest-rates",
+   "status": 200,
+   "title": "Interest rates — institutional views, forecasts and research",
+   "description": "11 institutions have published 12 reports touching Interest rates. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/interest-rates",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/interest-rates",
+    "zh-CN": "https://tlines.tech/zh/topics/interest-rates",
+    "x-default": "https://tlines.tech/en/topics/interest-rates"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Interest rates",
+   "bodyTextLength": 6006,
+   "bodyTextHash": "481ed63d24f7a3c7"
+  },
+  {
+   "url": "/en/topics/investment",
+   "status": 200,
+   "title": "Investment — institutional views, forecasts and research",
+   "description": "6 institutions have published 9 reports touching Investment. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/investment",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/investment",
+    "zh-CN": "https://tlines.tech/zh/topics/investment",
+    "x-default": "https://tlines.tech/en/topics/investment"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "Investment",
+   "bodyTextLength": 5969,
+   "bodyTextHash": "b9e36c4721c76a90"
+  },
+  {
+   "url": "/en/topics/diversification",
+   "status": 200,
+   "title": "Diversification — institutional views, forecasts and…",
+   "description": "7 institutions have published 9 reports touching Diversification. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/diversification",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/diversification",
+    "zh-CN": "https://tlines.tech/zh/topics/diversification",
+    "x-default": "https://tlines.tech/en/topics/diversification"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Diversification",
+   "bodyTextLength": 5749,
+   "bodyTextHash": "70cb46f572efebdf"
+  },
+  {
+   "url": "/en/topics/ai-capex",
+   "status": 200,
+   "title": "AI Capex — institutional views, forecasts and research",
+   "description": "7 institutions have published 8 reports touching AI Capex. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/ai-capex",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/ai-capex",
+    "zh-CN": "https://tlines.tech/zh/topics/ai-capex",
+    "x-default": "https://tlines.tech/en/topics/ai-capex"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "AI Capex",
+   "bodyTextLength": 4892,
+   "bodyTextHash": "31461ac400c42574"
+  },
+  {
+   "url": "/en/topics/market-sentiment",
+   "status": 200,
+   "title": "Market sentiment — institutional views, forecasts and…",
+   "description": "5 institutions have published 8 reports touching Market sentiment. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/market-sentiment",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/market-sentiment",
+    "zh-CN": "https://tlines.tech/zh/topics/market-sentiment",
+    "x-default": "https://tlines.tech/en/topics/market-sentiment"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Market sentiment",
+   "bodyTextLength": 5259,
+   "bodyTextHash": "649ec4f283f94134"
+  },
+  {
+   "url": "/en/topics/energy-prices",
+   "status": 200,
+   "title": "Energy prices — institutional views, forecasts and research",
+   "description": "6 institutions have published 7 reports touching Energy prices. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/energy-prices",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/energy-prices",
+    "zh-CN": "https://tlines.tech/zh/topics/energy-prices",
+    "x-default": "https://tlines.tech/en/topics/energy-prices"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Energy prices",
+   "bodyTextLength": 4645,
+   "bodyTextHash": "8424c6fe3b725173"
+  },
+  {
+   "url": "/en/topics/bond-yields",
+   "status": 200,
+   "title": "Bond yields — institutional views, forecasts and research",
+   "description": "6 institutions have published 6 reports touching Bond yields. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/bond-yields",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/bond-yields",
+    "zh-CN": "https://tlines.tech/zh/topics/bond-yields",
+    "x-default": "https://tlines.tech/en/topics/bond-yields"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Bond yields",
+   "bodyTextLength": 4294,
+   "bodyTextHash": "d1f03b2483a13e02"
+  },
+  {
+   "url": "/en/topics/market-risk",
+   "status": 200,
+   "title": "Market Risk — institutional views, forecasts and research",
+   "description": "5 institutions have published 5 reports touching Market Risk. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/market-risk",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/market-risk",
+    "zh-CN": "https://tlines.tech/zh/topics/market-risk",
+    "x-default": "https://tlines.tech/en/topics/market-risk"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Market Risk",
+   "bodyTextLength": 3841,
+   "bodyTextHash": "8c8dcdf1b01d7802"
+  },
+  {
+   "url": "/en/topics/economic-outlook",
+   "status": 200,
+   "title": "Economic Outlook — institutional views, forecasts and…",
+   "description": "4 institutions have published 5 reports touching Economic Outlook. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/economic-outlook",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/economic-outlook",
+    "zh-CN": "https://tlines.tech/zh/topics/economic-outlook",
+    "x-default": "https://tlines.tech/en/topics/economic-outlook"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Economic Outlook",
+   "bodyTextLength": 3499,
+   "bodyTextHash": "58b4dfa3ba86575a"
+  },
+  {
+   "url": "/en/topics/treasury-buybacks",
+   "status": 200,
+   "title": "Treasury buybacks — institutional views, forecasts and…",
+   "description": "4 institutions have published 5 reports touching Treasury buybacks. Compare their views, the assets involved and the source reports.",
+   "canonical": "https://tlines.tech/en/topics/treasury-buybacks",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/treasury-buybacks",
+    "zh-CN": "https://tlines.tech/zh/topics/treasury-buybacks",
+    "x-default": "https://tlines.tech/en/topics/treasury-buybacks"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Treasury buybacks",
+   "bodyTextLength": 3801,
+   "bodyTextHash": "659c8209af23e82f"
+  },
+  {
+   "url": "/en/research/uob-research-uob-group-research-fimfbrd3vs",
+   "status": 200,
+   "title": "UOB Group Research",
+   "description": "The article analyzes the impact of the European Union's Carbon Border Adjustment Mechanism (CBAM) on Malaysia, focusing on the compliance challenges and…",
+   "canonical": "https://tlines.tech/en/research/uob-research-uob-group-research-fimfbrd3vs",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/uob-research-uob-group-research-fimfbrd3vs",
+    "zh-CN": "https://tlines.tech/zh/research/uob-research-uob-group-research-fimfbrd3vs",
+    "x-default": "https://tlines.tech/en/research/uob-research-uob-group-research-fimfbrd3vs"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "UOB Group Research",
+   "bodyTextLength": 3048,
+   "bodyTextHash": "73ad165007bccb73"
+  },
+  {
+   "url": "/en/research/ubs-cio-daily-robust-demand-remains-key-to-ai-trade-despite-financing-concerns-xysogdc4vp",
+   "status": 200,
+   "title": "Daily: Robust demand remains key to AI trade despite…",
+   "description": "UBS CIO assesses the AI trade amid circular financing concerns. Robust demand, strong monetization, and rising advance orders support a constructive view on…",
+   "canonical": "https://tlines.tech/en/research/ubs-cio-daily-robust-demand-remains-key-to-ai-trade-despite-financing-concerns-xysogdc4vp",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ubs-cio-daily-robust-demand-remains-key-to-ai-trade-despite-financing-concerns-xysogdc4vp",
+    "zh-CN": "https://tlines.tech/zh/research/ubs-cio-daily-robust-demand-remains-key-to-ai-trade-despite-financing-concerns-xysogdc4vp",
+    "x-default": "https://tlines.tech/en/research/ubs-cio-daily-robust-demand-remains-key-to-ai-trade-despite-financing-concerns-xysogdc4vp"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Daily: Robust demand remains key to AI trade despite financing concerns",
+   "bodyTextLength": 7249,
+   "bodyTextHash": "922f1fe886a9eb0f"
+  },
+  {
+   "url": "/en/research/standard-chartered-is-gold-set-to-shine-once-more-xyf1nac32j",
+   "status": 200,
+   "title": "Is gold set to shine once more?",
+   "description": "Standard Chartered believes gold prices have likely bottomed and will grind higher to USD 4,600 over the next 6-12 months, supported by strong central bank…",
+   "canonical": "https://tlines.tech/en/research/standard-chartered-is-gold-set-to-shine-once-more-xyf1nac32j",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/standard-chartered-is-gold-set-to-shine-once-more-xyf1nac32j",
+    "zh-CN": "https://tlines.tech/zh/research/standard-chartered-is-gold-set-to-shine-once-more-xyf1nac32j",
+    "x-default": "https://tlines.tech/en/research/standard-chartered-is-gold-set-to-shine-once-more-xyf1nac32j"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Is gold set to shine once more?",
+   "bodyTextLength": 32361,
+   "bodyTextHash": "0aff60bb631ecea3"
+  },
+  {
+   "url": "/en/research/franklin-templeton-franklin-templeton-institute-gfhgh90j12",
+   "status": 200,
+   "title": "Franklin Templeton Institute",
+   "description": "Franklin Templeton Institute's mid-2026 outlook highlights a major shift in global dynamics: the US-China division of labor has inverted, with China now…",
+   "canonical": "https://tlines.tech/en/research/franklin-templeton-franklin-templeton-institute-gfhgh90j12",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/franklin-templeton-franklin-templeton-institute-gfhgh90j12",
+    "zh-CN": "https://tlines.tech/zh/research/franklin-templeton-franklin-templeton-institute-gfhgh90j12",
+    "x-default": "https://tlines.tech/en/research/franklin-templeton-franklin-templeton-institute-gfhgh90j12"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Franklin Templeton Institute",
+   "bodyTextLength": 10326,
+   "bodyTextHash": "e91d5f4f5b7193e7"
+  },
+  {
+   "url": "/en/research/mufg-2026-jackson-hole-recap-cbaflpm2n5",
+   "status": 200,
+   "title": "2026 Jackson Hole Recap",
+   "description": "“Here is a quick overview of what I'll cover in my remarks this morning. You can call it an outline…you can call it a trail map…just don't call it forward…",
+   "canonical": "https://tlines.tech/en/research/mufg-2026-jackson-hole-recap-cbaflpm2n5",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/mufg-2026-jackson-hole-recap-cbaflpm2n5",
+    "x-default": "https://tlines.tech/en/research/mufg-2026-jackson-hole-recap-cbaflpm2n5"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "2026 Jackson Hole Recap",
+   "bodyTextLength": 6373,
+   "bodyTextHash": "c24f98e6cd3025ea"
+  },
+  {
+   "url": "/en/research/soci-t-g-n-rale-eurofinance-2026-yo66whhfm4",
+   "status": 200,
+   "title": "EUROFINANCE 2026",
+   "description": "The article is a summary of the SOCIETE GENERALE Eurofinance 2026 conference, with a focus on oil prices pressure from Iran conflict and Trump's limited…",
+   "canonical": "https://tlines.tech/en/research/soci-t-g-n-rale-eurofinance-2026-yo66whhfm4",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/soci-t-g-n-rale-eurofinance-2026-yo66whhfm4",
+    "x-default": "https://tlines.tech/en/research/soci-t-g-n-rale-eurofinance-2026-yo66whhfm4"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "EUROFINANCE 2026",
+   "bodyTextLength": 4403,
+   "bodyTextHash": "2e6b56df052daada"
+  },
+  {
+   "url": "/en/research/nomura-connects-nomura-s-chip-shortage-index-a-signal-for-ai-era-business-cycle-yjzftr48li",
+   "status": 200,
+   "title": "Nomura’s Chip Shortage Index: A Signal for AI Era Business…",
+   "description": "Nomura introduces a Chip Shortage Index (CSI) to track semiconductor supply-demand imbalances, which it identifies as a key driver of the AI-era business…",
+   "canonical": "https://tlines.tech/en/research/nomura-connects-nomura-s-chip-shortage-index-a-signal-for-ai-era-business-cycle-yjzftr48li",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/nomura-connects-nomura-s-chip-shortage-index-a-signal-for-ai-era-business-cycle-yjzftr48li",
+    "x-default": "https://tlines.tech/en/research/nomura-connects-nomura-s-chip-shortage-index-a-signal-for-ai-era-business-cycle-yjzftr48li"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Nomura’s Chip Shortage Index: A Signal for AI Era Business Cycle",
+   "bodyTextLength": 4340,
+   "bodyTextHash": "0b8693c4c35e630c"
+  },
+  {
+   "url": "/en/research/ocbc-research-monthly-credit-view-monthly-themes-house-view-8jp6fxwwd1",
+   "status": 200,
+   "title": "Monthly Credit View · Monthly Themes & House View",
+   "description": "For August 2026, OCBC Research observes that Asian and US high-yield (HY) credit outperformed investment-grade (IG), driven by resilient fundamentals, low…",
+   "canonical": "https://tlines.tech/en/research/ocbc-research-monthly-credit-view-monthly-themes-house-view-8jp6fxwwd1",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ocbc-research-monthly-credit-view-monthly-themes-house-view-8jp6fxwwd1",
+    "x-default": "https://tlines.tech/en/research/ocbc-research-monthly-credit-view-monthly-themes-house-view-8jp6fxwwd1"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Monthly Credit View · Monthly Themes & House View",
+   "bodyTextLength": 12332,
+   "bodyTextHash": "bfcbc556876d3f04"
+  },
+  {
+   "url": "/en/research/ing-think-latam-fx-talking-september-2026-ujnbpnvmaa",
+   "status": 200,
+   "title": "Latam fx talking september 2026",
+   "description": "Article | 7 September 2026 1 THINK Economic and financial analysis Article | 7 September 2026 FX Latam FX Talking: Polls tighten in the Brazilian election…",
+   "canonical": "https://tlines.tech/en/research/ing-think-latam-fx-talking-september-2026-ujnbpnvmaa",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ing-think-latam-fx-talking-september-2026-ujnbpnvmaa",
+    "x-default": "https://tlines.tech/en/research/ing-think-latam-fx-talking-september-2026-ujnbpnvmaa"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Latam fx talking september 2026",
+   "bodyTextLength": 2448,
+   "bodyTextHash": "af03453fb4e46c64"
+  },
+  {
+   "url": "/en/research/scotiabank-economics-forecast-tables-pdf-version-fy8afg28on",
+   "status": 200,
+   "title": "Forecast Tables, PDF version",
+   "description": "GLOBAL ECONOMICS Visit our website at scotiabank.com/economics | Follow us on Twitter at @ScotiaEconomics | Contact us by email at…",
+   "canonical": "https://tlines.tech/en/research/scotiabank-economics-forecast-tables-pdf-version-fy8afg28on",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/scotiabank-economics-forecast-tables-pdf-version-fy8afg28on",
+    "x-default": "https://tlines.tech/en/research/scotiabank-economics-forecast-tables-pdf-version-fy8afg28on"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Forecast Tables, PDF version",
+   "bodyTextLength": 6010,
+   "bodyTextHash": "0c0d6d137ebe6a71"
+  },
+  {
+   "url": "/en/research/standard-chartered-bond-vigilantes-strike-in-japan-96w9yjyq2o",
+   "status": 200,
+   "title": "Japan 10Y Yield Hits 3% Forces BoJ Rate Hike to 1.25%",
+   "description": "Standard Chartered argues that the surge in Japan's 10-year government bond yield to a three-decade high of 3% has forced Prime Minister Takaichi to abandon…",
+   "canonical": "https://tlines.tech/en/research/standard-chartered-bond-vigilantes-strike-in-japan-96w9yjyq2o",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/standard-chartered-bond-vigilantes-strike-in-japan-96w9yjyq2o",
+    "x-default": "https://tlines.tech/en/research/standard-chartered-bond-vigilantes-strike-in-japan-96w9yjyq2o"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Bond vigilantes strike in Japan",
+   "bodyTextLength": 32571,
+   "bodyTextHash": "fbc62383ddb5c037"
+  },
+  {
+   "url": "/en/research/mufg-a-more-differentiated-regional-fx-environment-asia-fx-weekly-19b38accbe",
+   "status": 200,
+   "title": "Asia FX Diverges as Brent Tops $100 and BOJ Hikes 25bps",
+   "description": "MUFG expects the September FOMC and BOJ meetings to reinforce a more differentiated Asia FX environment amid Brent above $100/bbl. With the Fed on hold and…",
+   "canonical": "https://tlines.tech/en/research/mufg-a-more-differentiated-regional-fx-environment-asia-fx-weekly-19b38accbe",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/mufg-a-more-differentiated-regional-fx-environment-asia-fx-weekly-19b38accbe",
+    "x-default": "https://tlines.tech/en/research/mufg-a-more-differentiated-regional-fx-environment-asia-fx-weekly-19b38accbe"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "A more differentiated regional FX environment · Asia FX Weekly",
+   "bodyTextLength": 4284,
+   "bodyTextHash": "6af57a09870c66a2"
+  },
+  {
+   "url": "/en/research/saxo-bank-bond-yields-at-5-questions-investors-should-ask-now-b9993f7b0d",
+   "status": 200,
+   "title": "US 10-Year Treasury Yield Hits 5%: What It Means for…",
+   "description": "The US 10-year Treasury yield briefly crossed 5% on 14 September, the first time since October 2023, driven by higher energy prices, renewed inflation…",
+   "canonical": "https://tlines.tech/en/research/saxo-bank-bond-yields-at-5-questions-investors-should-ask-now-b9993f7b0d",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/saxo-bank-bond-yields-at-5-questions-investors-should-ask-now-b9993f7b0d",
+    "zh-CN": "https://tlines.tech/zh/research/saxo-bank-bond-yields-at-5-questions-investors-should-ask-now-b9993f7b0d",
+    "x-default": "https://tlines.tech/en/research/saxo-bank-bond-yields-at-5-questions-investors-should-ask-now-b9993f7b0d"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Bond yields at 5 Questions investors should ask now",
+   "bodyTextLength": 16532,
+   "bodyTextHash": "567267286e30f728"
+  },
+  {
+   "url": "/en/research/wellington-management-monthly-market-review-august-2026-874ac94090",
+   "status": 200,
+   "title": "Global Equities Gain 2.4% in August as 30-Year Treasury…",
+   "description": "Global equities rose 2.4% in August 2026, lifting year-to-date gains to 14.7%, as strong earnings and resilient activity outweighed persistent inflation…",
+   "canonical": "https://tlines.tech/en/research/wellington-management-monthly-market-review-august-2026-874ac94090",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/wellington-management-monthly-market-review-august-2026-874ac94090",
+    "zh-CN": "https://tlines.tech/zh/research/wellington-management-monthly-market-review-august-2026-874ac94090",
+    "x-default": "https://tlines.tech/en/research/wellington-management-monthly-market-review-august-2026-874ac94090"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Monthly Market Review: August 2026",
+   "bodyTextLength": 26532,
+   "bodyTextHash": "7f48963af3769942"
+  },
+  {
+   "url": "/en/research/mufg-asia-fx-weekly-markets-turn-to-pmis-and-xi-trump-summit-c1712168b3",
+   "status": 200,
+   "title": "DXY Hits 100.29 as Fed Hikes and Dollar Rallies",
+   "description": "The Fed's 25bp hike and higher-for-longer dot plot lifted the DXY 1.2% to 100.29, driving broad Asian currency weakness; USD/JPY rose 2.6% to 157.55 while…",
+   "canonical": "https://tlines.tech/en/research/mufg-asia-fx-weekly-markets-turn-to-pmis-and-xi-trump-summit-c1712168b3",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/mufg-asia-fx-weekly-markets-turn-to-pmis-and-xi-trump-summit-c1712168b3",
+    "x-default": "https://tlines.tech/en/research/mufg-asia-fx-weekly-markets-turn-to-pmis-and-xi-trump-summit-c1712168b3"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Asia FX Weekly Markets turn to PMIs and Xi-Trump summit",
+   "bodyTextLength": 4103,
+   "bodyTextHash": "ee761c6155d4107b"
+  },
+  {
+   "url": "/en/research/hsbc-tech-is-transforming-fixed-income-in-asia-e41279dd65",
+   "status": 200,
+   "title": "Asia Digital Bonds, Algo Trading Reshape Credit Markets",
+   "description": "HSBC desk view argues Asia's fixed income market is being reshaped by two technological forces: digitally native bonds, which are already live and…",
+   "canonical": "https://tlines.tech/en/research/hsbc-tech-is-transforming-fixed-income-in-asia-e41279dd65",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/hsbc-tech-is-transforming-fixed-income-in-asia-e41279dd65",
+    "zh-CN": "https://tlines.tech/zh/research/hsbc-tech-is-transforming-fixed-income-in-asia-e41279dd65",
+    "x-default": "https://tlines.tech/en/research/hsbc-tech-is-transforming-fixed-income-in-asia-e41279dd65"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Tech is transforming fixed income in Asia",
+   "bodyTextLength": 15657,
+   "bodyTextHash": "de591ff846f79557"
+  },
+  {
+   "url": "/en/research/ing-think-rates-spark-double-edged-sword-cc493ccdcf",
+   "status": 200,
+   "title": "US 10-Year Treasury Yield Above 5.1% on Strong PMI, Hike…",
+   "description": "A strong September US composite PMI (58.4) pushed the US 10-year Treasury yield back above 5%, breaching 5.1%, with October rate-hike odds above 70%. Euro…",
+   "canonical": "https://tlines.tech/en/research/ing-think-rates-spark-double-edged-sword-cc493ccdcf",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ing-think-rates-spark-double-edged-sword-cc493ccdcf",
+    "zh-CN": "https://tlines.tech/zh/research/ing-think-rates-spark-double-edged-sword-cc493ccdcf",
+    "x-default": "https://tlines.tech/en/research/ing-think-rates-spark-double-edged-sword-cc493ccdcf"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Rates spark double edged sword",
+   "bodyTextLength": 6734,
+   "bodyTextHash": "bf1b19c0c44e6102"
+  },
+  {
+   "url": "/en/research/ubs-cio-daily-ai-infrastructure-strong-demand-does-not-remove-execution-risks-a62b9ef472",
+   "status": 200,
+   "title": "AI capex seen at $1.2tn in 2027 despite data center delays",
+   "description": "UBS CIO flags fresh data center financing concerns after reports of a potential one-year delay to Oracle's Project Jupiter campus and a contractual move to…",
+   "canonical": "https://tlines.tech/en/research/ubs-cio-daily-ai-infrastructure-strong-demand-does-not-remove-execution-risks-a62b9ef472",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ubs-cio-daily-ai-infrastructure-strong-demand-does-not-remove-execution-risks-a62b9ef472",
+    "zh-CN": "https://tlines.tech/zh/research/ubs-cio-daily-ai-infrastructure-strong-demand-does-not-remove-execution-risks-a62b9ef472",
+    "x-default": "https://tlines.tech/en/research/ubs-cio-daily-ai-infrastructure-strong-demand-does-not-remove-execution-risks-a62b9ef472"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Daily: AI infrastructure: Strong demand does not remove execution risks",
+   "bodyTextLength": 8428,
+   "bodyTextHash": "befcfe7122209313"
+  },
+  {
+   "url": "/en/research/saxo-bank-bonds-101-a-simple-investor-guide-to-navigating-todays-high-yields-769830d481",
+   "status": 200,
+   "title": "US 10-Year Treasury Yield Above 5%: Bond Investor Guide",
+   "description": "The US 10-year Treasury yield has risen above 5% after a global bond sell-off, and the Federal Reserve has lifted its policy rate to 3.75–4.00% while…",
+   "canonical": "https://tlines.tech/en/research/saxo-bank-bonds-101-a-simple-investor-guide-to-navigating-todays-high-yields-769830d481",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/saxo-bank-bonds-101-a-simple-investor-guide-to-navigating-todays-high-yields-769830d481",
+    "zh-CN": "https://tlines.tech/zh/research/saxo-bank-bonds-101-a-simple-investor-guide-to-navigating-todays-high-yields-769830d481",
+    "x-default": "https://tlines.tech/en/research/saxo-bank-bonds-101-a-simple-investor-guide-to-navigating-todays-high-yields-769830d481"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Bonds 101 A simple investor guide to navigating todays high yields",
+   "bodyTextLength": 14588,
+   "bodyTextHash": "b622d475da353cd7"
+  },
+  {
+   "url": "/en/research/mufg-asia-fx-talk-less-hawkish-fed-comments-lowers-us-yields-4cab0d010f",
+   "status": 200,
+   "title": "Fed's Williams Cools October Hike Bets, US 2Y Yield 4.88%",
+   "description": "New York Fed President Williams' less hawkish remarks (one more hike 'late this year', no urgency) helped pull US 2-year yields about 5bp lower to 4.88% and…",
+   "canonical": "https://tlines.tech/en/research/mufg-asia-fx-talk-less-hawkish-fed-comments-lowers-us-yields-4cab0d010f",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/mufg-asia-fx-talk-less-hawkish-fed-comments-lowers-us-yields-4cab0d010f",
+    "zh-CN": "https://tlines.tech/zh/research/mufg-asia-fx-talk-less-hawkish-fed-comments-lowers-us-yields-4cab0d010f",
+    "x-default": "https://tlines.tech/en/research/mufg-asia-fx-talk-less-hawkish-fed-comments-lowers-us-yields-4cab0d010f"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Asia FX Talk · Less hawkish Fed comments lowers US yields",
+   "bodyTextLength": 12872,
+   "bodyTextHash": "3a45947394321dd5"
+  },
+  {
+   "url": "/en/research/state-street-private-credit-secondaries-2b64b567bd",
+   "status": 200,
+   "title": "Private Credit Secondaries Hit $20B as Volume Could Top $50B",
+   "description": "Private credit secondaries volume reached $20 billion in 2025, an 83% increase from 2024 and an eightfold rise since 2020, and could exceed $50 billion…",
+   "canonical": "https://tlines.tech/en/research/state-street-private-credit-secondaries-2b64b567bd",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/state-street-private-credit-secondaries-2b64b567bd",
+    "zh-CN": "https://tlines.tech/zh/research/state-street-private-credit-secondaries-2b64b567bd",
+    "x-default": "https://tlines.tech/en/research/state-street-private-credit-secondaries-2b64b567bd"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Private credit secondaries",
+   "bodyTextLength": 4121,
+   "bodyTextHash": "c05659b20cdbef75"
+  },
+  {
+   "url": "/en/research/bnp-paribas-pays-avances-d-une-resilience-a-l-autre-b5f727a918",
+   "status": 200,
+   "title": "Global Growth Resilient via AI CapEx as Inflation Stays…",
+   "description": "Advanced economies show resilient growth despite oil price shocks, driven by AI-related capital spending. Inflation exceeds targets in the US, UK, and…",
+   "canonical": "https://tlines.tech/en/research/bnp-paribas-pays-avances-d-une-resilience-a-l-autre-b5f727a918",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/bnp-paribas-pays-avances-d-une-resilience-a-l-autre-b5f727a918",
+    "x-default": "https://tlines.tech/en/research/bnp-paribas-pays-avances-d-une-resilience-a-l-autre-b5f727a918"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Pays avancés : d'une résilience à l'autre",
+   "bodyTextLength": 3248,
+   "bodyTextHash": "9884723d7eb7f9a6"
+  },
+  {
+   "url": "/en/research/ing-think-rates-spark-volatility-is-no-friend-of-spreads-c194979846",
+   "status": 200,
+   "title": "EGB Spreads Stay Wide as US 10Y Above 5% Lifts Rate…",
+   "description": "Elevated global rates volatility, driven partly by the US 10-year Treasury yield passing 5%, is keeping eurozone government bond spreads wide despite…",
+   "canonical": "https://tlines.tech/en/research/ing-think-rates-spark-volatility-is-no-friend-of-spreads-c194979846",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ing-think-rates-spark-volatility-is-no-friend-of-spreads-c194979846",
+    "zh-CN": "https://tlines.tech/zh/research/ing-think-rates-spark-volatility-is-no-friend-of-spreads-c194979846",
+    "x-default": "https://tlines.tech/en/research/ing-think-rates-spark-volatility-is-no-friend-of-spreads-c194979846"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Rates spark volatility is no friend of spreads",
+   "bodyTextLength": 4385,
+   "bodyTextHash": "f72e522facc0193d"
+  },
+  {
+   "url": "/en/research/westpac-westpac-iq-weekly-economic-commentary-fuel-housing-and-the-bumpy-road-ahead-535a7082eb",
+   "status": 200,
+   "title": "NZ Inflation Seen Above 4% by Year-End, RBNZ to Hold at 3%",
+   "description": "Westpac NZ argues higher fuel costs, a weaker NZD and a soft housing market have shifted the near-term outlook. Annual CPI is expected to dip to 3.7% in…",
+   "canonical": "https://tlines.tech/en/research/westpac-westpac-iq-weekly-economic-commentary-fuel-housing-and-the-bumpy-road-ahead-535a7082eb",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/westpac-westpac-iq-weekly-economic-commentary-fuel-housing-and-the-bumpy-road-ahead-535a7082eb",
+    "x-default": "https://tlines.tech/en/research/westpac-westpac-iq-weekly-economic-commentary-fuel-housing-and-the-bumpy-road-ahead-535a7082eb"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "WEEKLY ECONOMIC COMMENTARY · Fuel, housing and the bumpy road ahead.",
+   "bodyTextLength": 8323,
+   "bodyTextHash": "cd02baf586a6c9db"
+  },
+  {
+   "url": "/en/research/saxo-bank-market-quick-take-chip-stocks-steady-in-asia-before-us-inflation-14-october-2026-629e7cdb85",
+   "status": 200,
+   "title": "Brent Oil Above $106 on Middle East Attacks; Gold Steady",
+   "description": "Brent crude trades back above USD 106 after Houthi attacks on Saudi Aramco's headquarters and Iran's tanker strikes in Hormuz. Gold holds near USD 4,160…",
+   "canonical": "https://tlines.tech/en/research/saxo-bank-market-quick-take-chip-stocks-steady-in-asia-before-us-inflation-14-october-2026-629e7cdb85",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/saxo-bank-market-quick-take-chip-stocks-steady-in-asia-before-us-inflation-14-october-2026-629e7cdb85",
+    "x-default": "https://tlines.tech/en/research/saxo-bank-market-quick-take-chip-stocks-steady-in-asia-before-us-inflation-14-october-2026-629e7cdb85"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "Market Quick Take - Chip stocks steady in Asia before US inflation - 14 October 2026",
+   "bodyTextLength": 13157,
+   "bodyTextHash": "feb30f3d3945c621"
+  },
+  {
+   "url": "/zh",
+   "status": 200,
+   "title": "Tlines 全球机构情报：银行研报与市场共识",
+   "description": "逐家比较银行与资管机构对黄金、原油、利率、外汇、股票与加密资产的公开观点：共识方向、每条目标价、本周变化，以及每个观点背后的原始研报。",
+   "canonical": "https://tlines.tech/zh",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en",
+    "zh-CN": "https://tlines.tech/zh",
+    "x-default": "https://tlines.tech/en"
+   },
+   "jsonLdTypes": [
+    "Organization",
+    "WebSite"
+   ],
+   "h1": "把机构研报， 变成市场信号。",
+   "bodyTextLength": 1517,
+   "bodyTextHash": "588c8f9b4e8503da"
+  },
+  {
+   "url": "/zh/research",
+   "status": 200,
+   "title": "机构研报流：可溯源的银行研究",
+   "description": "1153篇可溯源的银行与资管机构公开研报，按结论、资产观点、明确目标、期限与风险进行结构化整理。",
+   "canonical": "https://tlines.tech/zh/research",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research",
+    "zh-CN": "https://tlines.tech/zh/research",
+    "x-default": "https://tlines.tech/en/research"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList"
+   ],
+   "h1": "1153篇可溯源机构研报",
+   "bodyTextLength": 6151,
+   "bodyTextHash": "b4a71f83ea071936"
+  },
+  {
+   "url": "/zh/markets",
+   "status": 200,
+   "title": "资产机构展望：各资产机构观点与共识",
+   "description": "每个至少有 2 家机构公开覆盖的资产：当前多空分布、各机构公布的目标价，以及背后的原始研报。",
+   "canonical": "https://tlines.tech/zh/markets",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets",
+    "zh-CN": "https://tlines.tech/zh/markets",
+    "x-default": "https://tlines.tech/en/markets"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "资产市场",
+   "bodyTextLength": 862,
+   "bodyTextHash": "7fe4b10c6cb2f40f"
+  },
+  {
+   "url": "/zh/institutions",
+   "status": 200,
+   "title": "机构观点：按热度排序的银行市场观点",
+   "description": "最近 7 天最值得关注的机构观点，按跨机构热度、机构权威度与新鲜度排序，每条都链接到原始研报。",
+   "canonical": "https://tlines.tech/zh/institutions",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institutions",
+    "zh-CN": "https://tlines.tech/zh/institutions",
+    "x-default": "https://tlines.tech/en/institutions"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "观点",
+   "bodyTextLength": 16608,
+   "bodyTextHash": "3b34acc951843da7"
+  },
+  {
+   "url": "/zh/macro",
+   "status": 200,
+   "title": "经济数据：发布、预期与机构预测",
+   "description": "已排期的数据发布：发布前机构预期的共识、实际公布值、后续修订，以及各家银行的预测。",
+   "canonical": "https://tlines.tech/zh/macro",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro",
+    "zh-CN": "https://tlines.tech/zh/macro",
+    "x-default": "https://tlines.tech/en/macro"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "经济数据",
+   "bodyTextLength": 2096,
+   "bodyTextHash": "dd24a693732e5e01"
+  },
+  {
+   "url": "/zh/macro/calendar",
+   "status": 200,
+   "title": "经济日历 · Tlines",
+   "description": "已排期与已公布的宏观数据：104 项发布，覆盖 1 个经济体，每项含机构预期共识、前值以及后续修订。",
+   "canonical": "https://tlines.tech/zh/macro/calendar",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/calendar",
+    "zh-CN": "https://tlines.tech/zh/macro/calendar",
+    "x-default": "https://tlines.tech/en/macro/calendar"
+   },
+   "jsonLdTypes": [],
+   "h1": "经济日历",
+   "bodyTextLength": 5007,
+   "bodyTextHash": "a9bb85cdc58b34f8"
+  },
+  {
+   "url": "/zh/topics",
+   "status": 200,
+   "title": "宏观与市场主题：机构正在研究什么",
+   "description": "机构实际在研究的主题：每个主题有多少家机构、涉及哪些资产，以及来自哪些研报。",
+   "canonical": "https://tlines.tech/zh/topics",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics",
+    "zh-CN": "https://tlines.tech/zh/topics",
+    "x-default": "https://tlines.tech/en/topics"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "机构正在研究什么",
+   "bodyTextLength": 1462,
+   "bodyTextHash": "bfcd54b4417118bf"
+  },
+  {
+   "url": "/zh/economies",
+   "status": 200,
+   "title": "经济体看板 · Tlines",
+   "description": "按经济体组织宏观发布、政策机构、市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies",
+    "zh-CN": "https://tlines.tech/zh/economies",
+    "x-default": "https://tlines.tech/en/economies"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "经济体看板",
+   "bodyTextLength": 343,
+   "bodyTextHash": "a3072cf7db79dfa0"
+  },
+  {
+   "url": "/zh/about",
+   "status": 200,
+   "title": "关于 Tlines · Tlines",
+   "description": "Tlines 将公开机构研报转化为可比较、可追踪的市场情报，并保留原始来源，同时补充结构化实体、资产关系、共识和变化历史。",
+   "canonical": "https://tlines.tech/zh/about",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/about",
+    "zh-CN": "https://tlines.tech/zh/about",
+    "x-default": "https://tlines.tech/en/about"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "关于 Tlines",
+   "bodyTextLength": 373,
+   "bodyTextHash": "300b3891a6a1e810"
+  },
+  {
+   "url": "/zh/methodology",
+   "status": 200,
+   "title": "方法论 · Tlines",
+   "description": "仅收录公开且可核验来源的研报。Tlines 提取资产、方向、目标、期限、条件与来源证据，再以公开说明的机构权重和时间衰减聚合共识。缺失证据保持缺失，绝不补造。",
+   "canonical": "https://tlines.tech/zh/methodology",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/methodology",
+    "zh-CN": "https://tlines.tech/zh/methodology",
+    "x-default": "https://tlines.tech/en/methodology"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "方法论",
+   "bodyTextLength": 393,
+   "bodyTextHash": "38d6e4bd8b8ad772"
+  },
+  {
+   "url": "/zh/editorial-policy",
+   "status": 200,
+   "title": "编辑政策 · Tlines",
+   "description": "原机构作者与原文措辞和 Tlines 摘要、自动分析明确分开。页面标明发布时间、机构和官网来源；重要判断应回到原始来源核验。",
+   "canonical": "https://tlines.tech/zh/editorial-policy",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/editorial-policy",
+    "zh-CN": "https://tlines.tech/zh/editorial-policy",
+    "x-default": "https://tlines.tech/en/editorial-policy"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "编辑政策",
+   "bodyTextLength": 366,
+   "bodyTextHash": "6ddb1db07e52942f"
+  },
+  {
+   "url": "/zh/ai-usage",
+   "status": 200,
+   "title": "AI 使用说明 · Tlines",
+   "description": "AI 可用于结构化、翻译和总结来源材料。输出经过质量检查、明确标注为自动生成；未通过质量闸门时不开放索引。AI 输出不被表述为机构原话，也不构成投资建议。",
+   "canonical": "https://tlines.tech/zh/ai-usage",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/ai-usage",
+    "zh-CN": "https://tlines.tech/zh/ai-usage",
+    "x-default": "https://tlines.tech/en/ai-usage"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "AI 使用说明",
+   "bodyTextLength": 383,
+   "bodyTextHash": "0be9dd0500526e1e"
+  },
+  {
+   "url": "/zh/sources",
+   "status": 200,
+   "title": "来源政策 · Tlines",
+   "description": "每条研报记录均链接到机构公开页面或文档。Tlines 遵守来源站 robots 规则，不绕过登录或访问控制，并让机器可引用结论始终伴随来源归属。",
+   "canonical": "https://tlines.tech/zh/sources",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/sources",
+    "zh-CN": "https://tlines.tech/zh/sources",
+    "x-default": "https://tlines.tech/en/sources"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "来源政策",
+   "bodyTextLength": 373,
+   "bodyTextHash": "434c5cbf92d4f54c"
+  },
+  {
+   "url": "/zh/privacy",
+   "status": 200,
+   "title": "隐私说明 · Tlines",
+   "description": "Tlines 不使用跟踪 Cookie，也不保存任何访客的 IP 地址。访客身份是「服务端密钥 + 自然日 + 来访地址 + 浏览器标识」的单向摘要：同一读者在一天内只计一次，且无法与其次日的访问关联。页面地址不含查询串，来源仅保留域名，原始记录在保留期后删除，只留下按日汇总。登录后，访问活动会在账户存续期间与该…",
+   "canonical": "https://tlines.tech/zh/privacy",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/privacy",
+    "zh-CN": "https://tlines.tech/zh/privacy",
+    "x-default": "https://tlines.tech/en/privacy"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "隐私说明",
+   "bodyTextLength": 451,
+   "bodyTextHash": "f784626d1ade7281"
+  },
+  {
+   "url": "/zh/corrections",
+   "status": 200,
+   "title": "纠错政策 · Tlines",
+   "description": "读者可提交研报网址、有争议文本和官方证据。专用表单上线前，请通过部署方公布的支持渠道联系站点运营者。纠错会保留来源和审计记录。",
+   "canonical": "https://tlines.tech/zh/corrections",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/corrections",
+    "zh-CN": "https://tlines.tech/zh/corrections",
+    "x-default": "https://tlines.tech/en/corrections"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "纠错政策",
+   "bodyTextLength": 364,
+   "bodyTextHash": "b8b852b48b6c0750"
+  },
+  {
+   "url": "/zh/financial-disclaimer",
+   "status": 200,
+   "title": "金融免责声明 · Tlines",
+   "description": "Tlines 提供公开机构研究的信息性整理。内容可能延迟、不完整或存在错误，不构成投资、法律、税务或会计建议。重要决策应核对页面链接的官方来源，并咨询具备资质的专业人士。",
+   "canonical": "https://tlines.tech/zh/financial-disclaimer",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/financial-disclaimer",
+    "zh-CN": "https://tlines.tech/zh/financial-disclaimer",
+    "x-default": "https://tlines.tech/en/financial-disclaimer"
+   },
+   "jsonLdTypes": [
+    "WebPage"
+   ],
+   "h1": "金融免责声明",
+   "bodyTextLength": 381,
+   "bodyTextHash": "7b6ad063a3098f1f"
+  },
+  {
+   "url": "/zh/macro/indicator/US_JOLTS_OPENINGS",
+   "status": 200,
+   "title": "美国职位空缺数 · Tlines",
+   "description": "美国职位空缺数（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为Thousands。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_JOLTS_OPENINGS",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_JOLTS_OPENINGS",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_JOLTS_OPENINGS",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_JOLTS_OPENINGS"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国职位空缺数",
+   "bodyTextLength": 4707,
+   "bodyTextHash": "c543bd7947b9cf85"
+  },
+  {
+   "url": "/zh/macro/indicator/US_PCE_PRICE",
+   "status": 200,
+   "title": "美国个人消费支出价格指数 · Tlines",
+   "description": "美国个人消费支出价格指数（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为指数点。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_PCE_PRICE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_PCE_PRICE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_PCE_PRICE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_PCE_PRICE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国个人消费支出价格指数",
+   "bodyTextLength": 8328,
+   "bodyTextHash": "67cbdc6142696937"
+  },
+  {
+   "url": "/zh/macro/indicator/US_CORE_PCE_PRICE",
+   "status": 200,
+   "title": "美国核心个人消费支出价格指数 · Tlines",
+   "description": "美国核心个人消费支出价格指数（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为指数点。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_CORE_PCE_PRICE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_CORE_PCE_PRICE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_CORE_PCE_PRICE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_CORE_PCE_PRICE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国核心个人消费支出价格指数",
+   "bodyTextLength": 8337,
+   "bodyTextHash": "2f6384ae4a31520a"
+  },
+  {
+   "url": "/zh/macro/indicator/US_GDP",
+   "status": 200,
+   "title": "美国实际国内生产总值 · Tlines",
+   "description": "美国实际国内生产总值（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每季度发布，单位为Percent Change Saar。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_GDP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_GDP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_GDP",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_GDP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国实际国内生产总值",
+   "bodyTextLength": 2871,
+   "bodyTextHash": "caa26ebe69ea7802"
+  },
+  {
+   "url": "/zh/macro/indicator/US_PERSONAL_INCOME",
+   "status": 200,
+   "title": "美国个人收入 · Tlines",
+   "description": "美国个人收入（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为Billions Usd。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_PERSONAL_INCOME",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_PERSONAL_INCOME",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_PERSONAL_INCOME",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_PERSONAL_INCOME"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国个人收入",
+   "bodyTextLength": 8528,
+   "bodyTextHash": "d74e665249f7a63f"
+  },
+  {
+   "url": "/zh/macro/indicator/US_PERSONAL_SPENDING",
+   "status": 200,
+   "title": "美国个人消费支出 · Tlines",
+   "description": "美国个人消费支出（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为Billions Usd。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_PERSONAL_SPENDING",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_PERSONAL_SPENDING",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_PERSONAL_SPENDING",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_PERSONAL_SPENDING"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国个人消费支出",
+   "bodyTextLength": 8533,
+   "bodyTextHash": "fc5659c95a101c35"
+  },
+  {
+   "url": "/zh/macro/indicator/US_FED_FUNDS_TARGET_LOWER",
+   "status": 200,
+   "title": "联邦基金目标区间下限 · Tlines",
+   "description": "联邦基金目标区间下限（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按不定期发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_FED_FUNDS_TARGET_LOWER",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_LOWER",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_FED_FUNDS_TARGET_LOWER",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_LOWER"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "联邦基金目标区间下限",
+   "bodyTextLength": 29577,
+   "bodyTextHash": "4455ecde0880ff51"
+  },
+  {
+   "url": "/zh/macro/indicator/US_FED_FUNDS_TARGET_UPPER",
+   "status": 200,
+   "title": "联邦基金目标区间上限 · Tlines",
+   "description": "联邦基金目标区间上限（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按不定期发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_FED_FUNDS_TARGET_UPPER",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_UPPER",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_FED_FUNDS_TARGET_UPPER",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_FED_FUNDS_TARGET_UPPER"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "联邦基金目标区间上限",
+   "bodyTextLength": 29556,
+   "bodyTextHash": "71538f774a23ae10"
+  },
+  {
+   "url": "/zh/macro/indicator/US_EIA_CRUDE_INVENTORIES",
+   "status": 200,
+   "title": "美国商业原油库存 · Tlines",
+   "description": "美国商业原油库存（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每周发布，单位为千桶。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_EIA_CRUDE_INVENTORIES",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_EIA_CRUDE_INVENTORIES",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_EIA_CRUDE_INVENTORIES",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_EIA_CRUDE_INVENTORIES"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国商业原油库存",
+   "bodyTextLength": 9884,
+   "bodyTextHash": "d953d0d01982be4d"
+  },
+  {
+   "url": "/zh/macro/indicator/EA_HICP_HEADLINE",
+   "status": 200,
+   "title": "欧元区调和消费者价格通胀 · Tlines",
+   "description": "欧元区调和消费者价格通胀（EA）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为% 同比。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/EA_HICP_HEADLINE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/EA_HICP_HEADLINE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/EA_HICP_HEADLINE",
+    "x-default": "https://tlines.tech/en/macro/indicator/EA_HICP_HEADLINE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "欧元区调和消费者价格通胀",
+   "bodyTextLength": 2267,
+   "bodyTextHash": "2a6ba1aeaac1d1b9"
+  },
+  {
+   "url": "/zh/macro/indicator/EA_HICP_CORE",
+   "status": 200,
+   "title": "欧元区核心调和消费者价格通胀 · Tlines",
+   "description": "欧元区核心调和消费者价格通胀（EA）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为% 同比。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/EA_HICP_CORE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/EA_HICP_CORE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/EA_HICP_CORE",
+    "x-default": "https://tlines.tech/en/macro/indicator/EA_HICP_CORE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "欧元区核心调和消费者价格通胀",
+   "bodyTextLength": 2303,
+   "bodyTextHash": "ebc5e2328b9668c8"
+  },
+  {
+   "url": "/zh/macro/indicator/EA_UNEMPLOYMENT",
+   "status": 200,
+   "title": "欧元区失业率 · Tlines",
+   "description": "欧元区失业率（EA）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/EA_UNEMPLOYMENT",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/EA_UNEMPLOYMENT",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/EA_UNEMPLOYMENT",
+    "x-default": "https://tlines.tech/en/macro/indicator/EA_UNEMPLOYMENT"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "欧元区失业率",
+   "bodyTextLength": 2809,
+   "bodyTextHash": "64af651356d1478a"
+  },
+  {
+   "url": "/zh/macro/indicator/EA_GDP",
+   "status": 200,
+   "title": "欧元区实际 GDP 增长 · Tlines",
+   "description": "欧元区实际 GDP 增长（EA）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每季度发布，单位为% 环比。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/EA_GDP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/EA_GDP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/EA_GDP",
+    "x-default": "https://tlines.tech/en/macro/indicator/EA_GDP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "欧元区实际 GDP 增长",
+   "bodyTextLength": 1480,
+   "bodyTextHash": "a4e89c9d724f1565"
+  },
+  {
+   "url": "/zh/macro/indicator/US_CPI_HEADLINE",
+   "status": 200,
+   "title": "美国消费者价格指数 · Tlines",
+   "description": "美国消费者价格指数（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为指数点。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_CPI_HEADLINE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_CPI_HEADLINE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_CPI_HEADLINE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_CPI_HEADLINE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国消费者价格指数",
+   "bodyTextLength": 4895,
+   "bodyTextHash": "fc22ac6d0020527c"
+  },
+  {
+   "url": "/zh/macro/indicator/US_PPI",
+   "status": 200,
+   "title": "美国最终需求生产者价格指数 · Tlines",
+   "description": "美国最终需求生产者价格指数（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为指数点。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_PPI",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_PPI",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_PPI",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_PPI"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国最终需求生产者价格指数",
+   "bodyTextLength": 3455,
+   "bodyTextHash": "fec743f5b4d7ba51"
+  },
+  {
+   "url": "/zh/macro/indicator/US_NFP",
+   "status": 200,
+   "title": "美国非农就业人数 · Tlines",
+   "description": "美国非农就业人数（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为千人。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_NFP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_NFP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_NFP",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_NFP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国非农就业人数",
+   "bodyTextLength": 5353,
+   "bodyTextHash": "9b6e2ca471238e38"
+  },
+  {
+   "url": "/zh/macro/indicator/US_UNEMPLOYMENT_RATE",
+   "status": 200,
+   "title": "美国失业率 · Tlines",
+   "description": "美国失业率（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_UNEMPLOYMENT_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_UNEMPLOYMENT_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_UNEMPLOYMENT_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_UNEMPLOYMENT_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国失业率",
+   "bodyTextLength": 4476,
+   "bodyTextHash": "19da369a661b9901"
+  },
+  {
+   "url": "/zh/macro/indicator/US_CPI_CORE",
+   "status": 200,
+   "title": "美国核心消费者价格指数 · Tlines",
+   "description": "美国核心消费者价格指数（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为指数点。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_CPI_CORE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_CPI_CORE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_CPI_CORE",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_CPI_CORE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国核心消费者价格指数",
+   "bodyTextLength": 4891,
+   "bodyTextHash": "8e5dc860928665c9"
+  },
+  {
+   "url": "/zh/macro/indicator/JP_GDP",
+   "status": 200,
+   "title": "日本国内生产总值 · Tlines",
+   "description": "日本国内生产总值（JP）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每季度发布，单位为Billions Jpy。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/JP_GDP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/JP_GDP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/JP_GDP",
+    "x-default": "https://tlines.tech/en/macro/indicator/JP_GDP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "日本国内生产总值",
+   "bodyTextLength": 1480,
+   "bodyTextHash": "8fe4fdaac41d2b17"
+  },
+  {
+   "url": "/zh/macro/indicator/JP_UNEMPLOYMENT",
+   "status": 200,
+   "title": "日本失业率 · Tlines",
+   "description": "日本失业率（JP）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/JP_UNEMPLOYMENT",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/JP_UNEMPLOYMENT",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/JP_UNEMPLOYMENT",
+    "x-default": "https://tlines.tech/en/macro/indicator/JP_UNEMPLOYMENT"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "日本失业率",
+   "bodyTextLength": 2622,
+   "bodyTextHash": "0199317440f40ea5"
+  },
+  {
+   "url": "/zh/macro/indicator/JP_CALL_RATE",
+   "status": 200,
+   "title": "日本隔夜拆借利率 · Tlines",
+   "description": "日本隔夜拆借利率（JP）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/JP_CALL_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/JP_CALL_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/JP_CALL_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/JP_CALL_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "日本隔夜拆借利率",
+   "bodyTextLength": 2825,
+   "bodyTextHash": "0b839f1d557100f1"
+  },
+  {
+   "url": "/zh/macro/indicator/UK_GDP",
+   "status": 200,
+   "title": "英国国内生产总值 · Tlines",
+   "description": "英国国内生产总值（GB）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每季度发布，单位为Millions Gbp。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/UK_GDP",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/UK_GDP",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/UK_GDP",
+    "x-default": "https://tlines.tech/en/macro/indicator/UK_GDP"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "英国国内生产总值",
+   "bodyTextLength": 1964,
+   "bodyTextHash": "fc9876218ba12e0d"
+  },
+  {
+   "url": "/zh/macro/indicator/UK_UNEMPLOYMENT",
+   "status": 200,
+   "title": "英国失业率 · Tlines",
+   "description": "英国失业率（GB）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/UK_UNEMPLOYMENT",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/UK_UNEMPLOYMENT",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/UK_UNEMPLOYMENT",
+    "x-default": "https://tlines.tech/en/macro/indicator/UK_UNEMPLOYMENT"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "英国失业率",
+   "bodyTextLength": 2496,
+   "bodyTextHash": "2fe963177e503d53"
+  },
+  {
+   "url": "/zh/macro/indicator/UK_CALL_RATE",
+   "status": 200,
+   "title": "英国隔夜银行间利率 · Tlines",
+   "description": "英国隔夜银行间利率（GB）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每月发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/UK_CALL_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/UK_CALL_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/UK_CALL_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/UK_CALL_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "英国隔夜银行间利率",
+   "bodyTextLength": 2863,
+   "bodyTextHash": "0b166fefb7f3fa7e"
+  },
+  {
+   "url": "/zh/macro/indicator/US_WTI_SPOT",
+   "status": 200,
+   "title": "WTI 原油现货价格 · Tlines",
+   "description": "WTI 原油现货价格（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每日发布，单位为美元/桶。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_WTI_SPOT",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_WTI_SPOT",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_WTI_SPOT",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_WTI_SPOT"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "WTI 原油现货价格",
+   "bodyTextLength": 30387,
+   "bodyTextHash": "e429e0f7f6b0cd26"
+  },
+  {
+   "url": "/zh/macro/indicator/US_2Y_TREASURY_YIELD",
+   "status": 200,
+   "title": "美国2年期国债收益率 · Tlines",
+   "description": "美国2年期国债收益率（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每日发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_2Y_TREASURY_YIELD",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_2Y_TREASURY_YIELD",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_2Y_TREASURY_YIELD",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_2Y_TREASURY_YIELD"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国2年期国债收益率",
+   "bodyTextLength": 29790,
+   "bodyTextHash": "e7f0d9967c0e9307"
+  },
+  {
+   "url": "/zh/macro/indicator/US_10Y_TREASURY_YIELD",
+   "status": 200,
+   "title": "美国10年期国债收益率 · Tlines",
+   "description": "美国10年期国债收益率（US）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每日发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/US_10Y_TREASURY_YIELD",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/US_10Y_TREASURY_YIELD",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/US_10Y_TREASURY_YIELD",
+    "x-default": "https://tlines.tech/en/macro/indicator/US_10Y_TREASURY_YIELD"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "美国10年期国债收益率",
+   "bodyTextLength": 29797,
+   "bodyTextHash": "890b72d1c797f277"
+  },
+  {
+   "url": "/zh/macro/indicator/ECB_DEPOSIT_RATE",
+   "status": 200,
+   "title": "欧洲央行存款机制利率 · Tlines",
+   "description": "欧洲央行存款机制利率（EA）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每日发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/ECB_DEPOSIT_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/ECB_DEPOSIT_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/ECB_DEPOSIT_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/ECB_DEPOSIT_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "欧洲央行存款机制利率",
+   "bodyTextLength": 28171,
+   "bodyTextHash": "25c623d999d3c189"
+  },
+  {
+   "url": "/zh/macro/indicator/ECB_MAIN_REFI_RATE",
+   "status": 200,
+   "title": "欧洲央行主要再融资利率 · Tlines",
+   "description": "欧洲央行主要再融资利率（EA）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每日发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/ECB_MAIN_REFI_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/ECB_MAIN_REFI_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/ECB_MAIN_REFI_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/ECB_MAIN_REFI_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "欧洲央行主要再融资利率",
+   "bodyTextLength": 29253,
+   "bodyTextHash": "e00ffba519581bd4"
+  },
+  {
+   "url": "/zh/macro/indicator/ECB_MARGINAL_LENDING_RATE",
+   "status": 200,
+   "title": "欧洲央行边际贷款利率 · Tlines",
+   "description": "欧洲央行边际贷款利率（EA）：历史发布序列与每次修订、发布前各机构的预期共识，以及下次发布日期。按每日发布，单位为%。",
+   "canonical": "https://tlines.tech/zh/macro/indicator/ECB_MARGINAL_LENDING_RATE",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/macro/indicator/ECB_MARGINAL_LENDING_RATE",
+    "zh-CN": "https://tlines.tech/zh/macro/indicator/ECB_MARGINAL_LENDING_RATE",
+    "x-default": "https://tlines.tech/en/macro/indicator/ECB_MARGINAL_LENDING_RATE"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset"
+   ],
+   "h1": "欧洲央行边际贷款利率",
+   "bodyTextLength": 28913,
+   "bodyTextHash": "a3ed2fc92d45d89b"
+  },
+  {
+   "url": "/zh/economies/us",
+   "status": 200,
+   "title": "美国经济看板 · Tlines",
+   "description": "美国的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/us",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/us",
+    "zh-CN": "https://tlines.tech/zh/economies/us",
+    "x-default": "https://tlines.tech/en/economies/us"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "美国",
+   "bodyTextLength": 3103,
+   "bodyTextHash": "0cf3a938226276f8"
+  },
+  {
+   "url": "/zh/economies/eurozone",
+   "status": 200,
+   "title": "欧元区经济看板 · Tlines",
+   "description": "欧元区的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/eurozone",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/eurozone",
+    "zh-CN": "https://tlines.tech/zh/economies/eurozone",
+    "x-default": "https://tlines.tech/en/economies/eurozone"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "欧元区",
+   "bodyTextLength": 2584,
+   "bodyTextHash": "a4325a9aeec51a27"
+  },
+  {
+   "url": "/zh/economies/uk",
+   "status": 200,
+   "title": "英国经济看板 · Tlines",
+   "description": "英国的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/uk",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/uk",
+    "zh-CN": "https://tlines.tech/zh/economies/uk",
+    "x-default": "https://tlines.tech/en/economies/uk"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "英国",
+   "bodyTextLength": 2382,
+   "bodyTextHash": "8ca36ec0123c1c18"
+  },
+  {
+   "url": "/zh/economies/japan",
+   "status": 200,
+   "title": "日本经济看板 · Tlines",
+   "description": "日本的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/japan",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/japan",
+    "zh-CN": "https://tlines.tech/zh/economies/japan",
+    "x-default": "https://tlines.tech/en/economies/japan"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "日本",
+   "bodyTextLength": 2588,
+   "bodyTextHash": "fdaf6fba22250ff2"
+  },
+  {
+   "url": "/zh/economies/china",
+   "status": 200,
+   "title": "中国经济看板 · Tlines",
+   "description": "中国的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/china",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/china",
+    "zh-CN": "https://tlines.tech/zh/economies/china",
+    "x-default": "https://tlines.tech/en/economies/china"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "中国",
+   "bodyTextLength": 2302,
+   "bodyTextHash": "c01d924497e5a0f8"
+  },
+  {
+   "url": "/zh/economies/indonesia",
+   "status": 200,
+   "title": "印度尼西亚经济看板 · Tlines",
+   "description": "印度尼西亚的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/indonesia",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/indonesia",
+    "zh-CN": "https://tlines.tech/zh/economies/indonesia",
+    "x-default": "https://tlines.tech/en/economies/indonesia"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "印度尼西亚",
+   "bodyTextLength": 2313,
+   "bodyTextHash": "059bfe37b76f5f76"
+  },
+  {
+   "url": "/zh/economies/australia",
+   "status": 200,
+   "title": "澳大利亚经济看板 · Tlines",
+   "description": "澳大利亚的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/australia",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/australia",
+    "zh-CN": "https://tlines.tech/zh/economies/australia",
+    "x-default": "https://tlines.tech/en/economies/australia"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "澳大利亚",
+   "bodyTextLength": 2353,
+   "bodyTextHash": "5b6258e50ec1e2b0"
+  },
+  {
+   "url": "/zh/economies/new-zealand",
+   "status": 200,
+   "title": "新西兰经济看板 · Tlines",
+   "description": "新西兰的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/new-zealand",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/new-zealand",
+    "zh-CN": "https://tlines.tech/zh/economies/new-zealand",
+    "x-default": "https://tlines.tech/en/economies/new-zealand"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "新西兰",
+   "bodyTextLength": 2393,
+   "bodyTextHash": "ed18d8732a7dba50"
+  },
+  {
+   "url": "/zh/economies/canada",
+   "status": 200,
+   "title": "加拿大经济看板 · Tlines",
+   "description": "加拿大的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/canada",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/canada",
+    "zh-CN": "https://tlines.tech/zh/economies/canada",
+    "x-default": "https://tlines.tech/en/economies/canada"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "加拿大",
+   "bodyTextLength": 2277,
+   "bodyTextHash": "1ab80f29cb03b307"
+  },
+  {
+   "url": "/zh/economies/switzerland",
+   "status": 200,
+   "title": "瑞士经济看板 · Tlines",
+   "description": "瑞士的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/switzerland",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/switzerland",
+    "zh-CN": "https://tlines.tech/zh/economies/switzerland",
+    "x-default": "https://tlines.tech/en/economies/switzerland"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "瑞士",
+   "bodyTextLength": 2238,
+   "bodyTextHash": "5ec1f8498cae0ffa"
+  },
+  {
+   "url": "/zh/economies/south-korea",
+   "status": 200,
+   "title": "韩国经济看板 · Tlines",
+   "description": "韩国的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/south-korea",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/south-korea",
+    "zh-CN": "https://tlines.tech/zh/economies/south-korea",
+    "x-default": "https://tlines.tech/en/economies/south-korea"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "韩国",
+   "bodyTextLength": 2329,
+   "bodyTextHash": "8fa0ca5ea7f285dc"
+  },
+  {
+   "url": "/zh/economies/india",
+   "status": 200,
+   "title": "印度经济看板 · Tlines",
+   "description": "印度的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/india",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/india",
+    "zh-CN": "https://tlines.tech/zh/economies/india",
+    "x-default": "https://tlines.tech/en/economies/india"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "印度",
+   "bodyTextLength": 2300,
+   "bodyTextHash": "5fb803a6fcb9fb6d"
+  },
+  {
+   "url": "/zh/economies/brazil",
+   "status": 200,
+   "title": "巴西经济看板 · Tlines",
+   "description": "巴西的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/brazil",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/brazil",
+    "zh-CN": "https://tlines.tech/zh/economies/brazil",
+    "x-default": "https://tlines.tech/en/economies/brazil"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "巴西",
+   "bodyTextLength": 2052,
+   "bodyTextHash": "652b2d6da3512831"
+  },
+  {
+   "url": "/zh/economies/mexico",
+   "status": 200,
+   "title": "墨西哥经济看板 · Tlines",
+   "description": "墨西哥的宏观数据、央行政策、相关市场与机构研报。",
+   "canonical": "https://tlines.tech/zh/economies/mexico",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/economies/mexico",
+    "zh-CN": "https://tlines.tech/zh/economies/mexico",
+    "x-default": "https://tlines.tech/en/economies/mexico"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "墨西哥",
+   "bodyTextLength": 2276,
+   "bodyTextHash": "cc1262a5a1f1af66"
+  },
+  {
+   "url": "/zh/market-themes",
+   "status": 200,
+   "title": "交易主线：机构研报支持的当期市场逻辑",
+   "description": "机构当前正在讨论的资产逻辑：每个逻辑有多少家机构支持、涉及哪些资产，以及行情是否同向。",
+   "canonical": "https://tlines.tech/zh/market-themes",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/market-themes",
+    "zh-CN": "https://tlines.tech/zh/market-themes",
+    "x-default": "https://tlines.tech/en/market-themes"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "交易主线",
+   "bodyTextLength": 1466,
+   "bodyTextHash": "b2809279540c7025"
+  },
+  {
+   "url": "/zh/institution/nab-markets",
+   "status": 200,
+   "title": "澳大利亚国民银行市场研究、市场观点与预测",
+   "description": "查看1篇澳大利亚国民银行市场研究公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/nab-markets",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/nab-markets",
+    "zh-CN": "https://tlines.tech/zh/institution/nab-markets",
+    "x-default": "https://tlines.tech/en/institution/nab-markets"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ProfilePage"
+   ],
+   "h1": "澳大利亚国民银行市场研究：1篇可溯源公开研报",
+   "bodyTextLength": 413,
+   "bodyTextHash": "320300d12ca6cf5d"
+  },
+  {
+   "url": "/zh/institution/danske",
+   "status": 200,
+   "title": "丹麦银行研报、市场观点与预测",
+   "description": "比较2篇丹麦银行公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/danske",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/danske",
+    "zh-CN": "https://tlines.tech/zh/institution/danske",
+    "x-default": "https://tlines.tech/en/institution/danske"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "丹麦银行：2篇可溯源公开研报",
+   "bodyTextLength": 611,
+   "bodyTextHash": "2b9697f94796b251"
+  },
+  {
+   "url": "/zh/institution/man",
+   "status": 200,
+   "title": "英仕曼集团与英仕曼研究院研报、市场观点与预测",
+   "description": "比较3篇英仕曼集团与英仕曼研究院公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/man",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/man",
+    "zh-CN": "https://tlines.tech/zh/institution/man",
+    "x-default": "https://tlines.tech/en/institution/man"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "英仕曼集团与英仕曼研究院：3篇可溯源公开研报",
+   "bodyTextLength": 725,
+   "bodyTextHash": "8371afff2f1f7626"
+  },
+  {
+   "url": "/zh/institution/schroders",
+   "status": 200,
+   "title": "施罗德研报、市场观点与预测",
+   "description": "比较26篇施罗德公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/schroders",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/schroders",
+    "zh-CN": "https://tlines.tech/zh/institution/schroders",
+    "x-default": "https://tlines.tech/en/institution/schroders"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "施罗德：26篇可溯源公开研报",
+   "bodyTextLength": 1414,
+   "bodyTextHash": "a96b4827033b99b7"
+  },
+  {
+   "url": "/zh/institution/seb",
+   "status": 200,
+   "title": "瑞典北欧斯安银行研报、市场观点与预测",
+   "description": "比较5篇瑞典北欧斯安银行公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/seb",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/seb",
+    "zh-CN": "https://tlines.tech/zh/institution/seb",
+    "x-default": "https://tlines.tech/en/institution/seb"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "瑞典北欧斯安银行：5篇可溯源公开研报",
+   "bodyTextLength": 857,
+   "bodyTextHash": "eafb2a57fd654498"
+  },
+  {
+   "url": "/zh/institution/westpac",
+   "status": 200,
+   "title": "西太平洋银行研究：经济展望与利率观点",
+   "description": "比较60篇西太平洋银行研究公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/westpac",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/westpac",
+    "zh-CN": "https://tlines.tech/zh/institution/westpac",
+    "x-default": "https://tlines.tech/en/institution/westpac"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "西太平洋银行经济展望与利率观点：60篇可溯源公开研报",
+   "bodyTextLength": 1384,
+   "bodyTextHash": "eea2fef4cb09c7c9"
+  },
+  {
+   "url": "/zh/institution/abn",
+   "status": 200,
+   "title": "荷兰银行研究、市场观点与预测",
+   "description": "比较17篇荷兰银行研究公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/abn",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/abn",
+    "zh-CN": "https://tlines.tech/zh/institution/abn",
+    "x-default": "https://tlines.tech/en/institution/abn"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "荷兰银行研究：17篇可溯源公开研报",
+   "bodyTextLength": 1284,
+   "bodyTextHash": "93821f522358227d"
+  },
+  {
+   "url": "/zh/institution/natixis",
+   "status": 200,
+   "title": "法国外贸银行研报、市场观点与预测",
+   "description": "比较50篇法国外贸银行公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/natixis",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/natixis",
+    "zh-CN": "https://tlines.tech/zh/institution/natixis",
+    "x-default": "https://tlines.tech/en/institution/natixis"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "法国外贸银行：50篇可溯源公开研报",
+   "bodyTextLength": 1341,
+   "bodyTextHash": "7957941edd73dfca"
+  },
+  {
+   "url": "/zh/institution/morgan-stanley",
+   "status": 200,
+   "title": "摩根士丹利研报、市场观点与预测",
+   "description": "查看1篇摩根士丹利公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/morgan-stanley",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/morgan-stanley",
+    "zh-CN": "https://tlines.tech/zh/institution/morgan-stanley",
+    "x-default": "https://tlines.tech/en/institution/morgan-stanley"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "摩根士丹利：1篇可溯源公开研报",
+   "bodyTextLength": 535,
+   "bodyTextHash": "f164ae00fe961474"
+  },
+  {
+   "url": "/zh/institution/aqr",
+   "status": 200,
+   "title": "AQR资本管理研报、市场观点与预测",
+   "description": "比较11篇AQR资本管理公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/aqr",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/aqr",
+    "zh-CN": "https://tlines.tech/zh/institution/aqr",
+    "x-default": "https://tlines.tech/en/institution/aqr"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "AQR资本管理：11篇可溯源公开研报",
+   "bodyTextLength": 912,
+   "bodyTextHash": "264029d167a519d2"
+  },
+  {
+   "url": "/zh/institution/j-p-morgan",
+   "status": 200,
+   "title": "摩根大通研报、市场观点与预测",
+   "description": "比较6篇摩根大通公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/j-p-morgan",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/j-p-morgan",
+    "zh-CN": "https://tlines.tech/zh/institution/j-p-morgan",
+    "x-default": "https://tlines.tech/en/institution/j-p-morgan"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "摩根大通：6篇可溯源公开研报",
+   "bodyTextLength": 1000,
+   "bodyTextHash": "0c2b1aff84809ea4"
+  },
+  {
+   "url": "/zh/institution/deutsche",
+   "status": 200,
+   "title": "德意志银行研报、市场观点与预测",
+   "description": "比较6篇德意志银行公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/deutsche",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/deutsche",
+    "zh-CN": "https://tlines.tech/zh/institution/deutsche",
+    "x-default": "https://tlines.tech/en/institution/deutsche"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "德意志银行：6篇可溯源公开研报",
+   "bodyTextLength": 1014,
+   "bodyTextHash": "c101bc445e2a2203"
+  },
+  {
+   "url": "/zh/institution/wellington-management",
+   "status": 200,
+   "title": "惠灵顿管理市场展望与公开研究",
+   "description": "比较13篇惠灵顿管理公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/wellington-management",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/wellington-management",
+    "zh-CN": "https://tlines.tech/zh/institution/wellington-management",
+    "x-default": "https://tlines.tech/en/institution/wellington-management"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "惠灵顿管理市场展望：13篇可溯源公开研报",
+   "bodyTextLength": 1260,
+   "bodyTextHash": "cf6749f0bc9e00ec"
+  },
+  {
+   "url": "/zh/institution/charles-schwab",
+   "status": 200,
+   "title": "嘉信理财研报、市场观点与预测",
+   "description": "比较22篇嘉信理财公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/charles-schwab",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/charles-schwab",
+    "zh-CN": "https://tlines.tech/zh/institution/charles-schwab",
+    "x-default": "https://tlines.tech/en/institution/charles-schwab"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "嘉信理财：22篇可溯源公开研报",
+   "bodyTextLength": 1251,
+   "bodyTextHash": "e612e3f00a7bcd9d"
+  },
+  {
+   "url": "/zh/institution/soci-t-g-n-rale",
+   "status": 200,
+   "title": "法国兴业银行研报、市场观点与预测",
+   "description": "比较12篇法国兴业银行公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/soci-t-g-n-rale",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/soci-t-g-n-rale",
+    "zh-CN": "https://tlines.tech/zh/institution/soci-t-g-n-rale",
+    "x-default": "https://tlines.tech/en/institution/soci-t-g-n-rale"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "法国兴业银行：12篇可溯源公开研报",
+   "bodyTextLength": 895,
+   "bodyTextHash": "b1e7a1776dd5784d"
+  },
+  {
+   "url": "/zh/institution/goldman-sachs",
+   "status": 200,
+   "title": "高盛研报、市场观点与预测",
+   "description": "比较4篇高盛公开研报，包含发布日期、实际提取到的资产观点、明确给出的目标以及原始出处。",
+   "canonical": "https://tlines.tech/zh/institution/goldman-sachs",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/institution/goldman-sachs",
+    "zh-CN": "https://tlines.tech/zh/institution/goldman-sachs",
+    "x-default": "https://tlines.tech/en/institution/goldman-sachs"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "ItemList",
+    "ProfilePage"
+   ],
+   "h1": "高盛：4篇可溯源公开研报",
+   "bodyTextLength": 764,
+   "bodyTextHash": "cee07cf6f73d709a"
+  },
+  {
+   "url": "/zh/markets/xagusd",
+   "status": 200,
+   "title": "白银机构展望、目标价与共识",
+   "description": "白银（XAGUSD）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/xagusd",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/xagusd",
+    "zh-CN": "https://tlines.tech/zh/markets/xagusd",
+    "x-default": "https://tlines.tech/en/markets/xagusd"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "白银：机构正在预测什么",
+   "bodyTextLength": 1042,
+   "bodyTextHash": "0861cf4274f49aa9"
+  },
+  {
+   "url": "/zh/markets/crude-oil-wti",
+   "status": 200,
+   "title": "WTI原油价格预测：机构目标与观点对比",
+   "description": "比较36家机构在391篇公开研报中的WTI原油价格预测、发布日期、明确给出的目标与观点变化，并核对原始来源。",
+   "canonical": "https://tlines.tech/zh/markets/crude-oil-wti",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/crude-oil-wti",
+    "zh-CN": "https://tlines.tech/zh/markets/crude-oil-wti",
+    "x-default": "https://tlines.tech/en/markets/crude-oil-wti"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "WTI原油价格预测：3家机构的可溯源观点",
+   "bodyTextLength": 2481,
+   "bodyTextHash": "53f193fa747dd46e"
+  },
+  {
+   "url": "/zh/markets/natgas",
+   "status": 200,
+   "title": "天然气机构展望、目标价与共识",
+   "description": "天然气（NATGAS）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/natgas",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/natgas",
+    "zh-CN": "https://tlines.tech/zh/markets/natgas",
+    "x-default": "https://tlines.tech/en/markets/natgas"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "天然气：机构正在预测什么",
+   "bodyTextLength": 1226,
+   "bodyTextHash": "0a22f29d829d8727"
+  },
+  {
+   "url": "/zh/markets/copper",
+   "status": 200,
+   "title": "铜机构展望、目标价与共识",
+   "description": "铜（COPPER）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/copper",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/copper",
+    "zh-CN": "https://tlines.tech/zh/markets/copper",
+    "x-default": "https://tlines.tech/en/markets/copper"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "铜：机构正在预测什么",
+   "bodyTextLength": 1434,
+   "bodyTextHash": "e1eee38d7baf2b27"
+  },
+  {
+   "url": "/zh/markets/bitcoin",
+   "status": 200,
+   "title": "比特币机构展望、目标价与共识",
+   "description": "比特币（BTC）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/bitcoin",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/bitcoin",
+    "zh-CN": "https://tlines.tech/zh/markets/bitcoin",
+    "x-default": "https://tlines.tech/en/markets/bitcoin"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "比特币：机构正在预测什么",
+   "bodyTextLength": 1185,
+   "bodyTextHash": "dc10a8320164e215"
+  },
+  {
+   "url": "/zh/markets/ethereum",
+   "status": 200,
+   "title": "以太坊机构展望、目标价与共识",
+   "description": "以太坊（ETH）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/ethereum",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/ethereum",
+    "zh-CN": "https://tlines.tech/zh/markets/ethereum",
+    "x-default": "https://tlines.tech/en/markets/ethereum"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "以太坊：机构正在预测什么",
+   "bodyTextLength": 914,
+   "bodyTextHash": "b59edefb01ee7f44"
+  },
+  {
+   "url": "/zh/markets/sp-500",
+   "status": 200,
+   "title": "标普500指数机构展望、目标价与共识",
+   "description": "标普500指数（SPX）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/sp-500",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/sp-500",
+    "zh-CN": "https://tlines.tech/zh/markets/sp-500",
+    "x-default": "https://tlines.tech/en/markets/sp-500"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "标普500指数：机构正在预测什么",
+   "bodyTextLength": 2003,
+   "bodyTextHash": "69666ff802499874"
+  },
+  {
+   "url": "/zh/markets/nasdaq-100",
+   "status": 200,
+   "title": "科技股前景：纳斯达克100机构观点",
+   "description": "比较20家机构在77篇公开研报中的科技股与纳斯达克100前景、发布日期、明确给出的目标与观点变化，并核对原始来源。",
+   "canonical": "https://tlines.tech/zh/markets/nasdaq-100",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/nasdaq-100",
+    "zh-CN": "https://tlines.tech/zh/markets/nasdaq-100",
+    "x-default": "https://tlines.tech/en/markets/nasdaq-100"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "科技股与纳斯达克100前景：2家机构的可溯源观点",
+   "bodyTextLength": 1300,
+   "bodyTextHash": "87c79287c45720f1"
+  },
+  {
+   "url": "/zh/markets/nvda",
+   "status": 200,
+   "title": "英伟达机构展望、目标价与共识",
+   "description": "英伟达（NVDA）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/nvda",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/nvda",
+    "zh-CN": "https://tlines.tech/zh/markets/nvda",
+    "x-default": "https://tlines.tech/en/markets/nvda"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "英伟达：机构正在预测什么",
+   "bodyTextLength": 1215,
+   "bodyTextHash": "d6b534aedd2288b2"
+  },
+  {
+   "url": "/zh/markets/aapl",
+   "status": 200,
+   "title": "苹果公司机构展望、目标价与共识",
+   "description": "苹果公司（AAPL）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/aapl",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/aapl",
+    "zh-CN": "https://tlines.tech/zh/markets/aapl",
+    "x-default": "https://tlines.tech/en/markets/aapl"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "苹果公司：机构正在预测什么",
+   "bodyTextLength": 827,
+   "bodyTextHash": "92c98a221979b2f5"
+  },
+  {
+   "url": "/zh/markets/sox",
+   "status": 200,
+   "title": "半导体机构展望、目标价与共识",
+   "description": "半导体（SOX）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/sox",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/sox",
+    "zh-CN": "https://tlines.tech/zh/markets/sox",
+    "x-default": "https://tlines.tech/en/markets/sox"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "半导体：机构正在预测什么",
+   "bodyTextLength": 1138,
+   "bodyTextHash": "e5563ba362e24913"
+  },
+  {
+   "url": "/zh/markets/us-dollar-index",
+   "status": 200,
+   "title": "美元指数DXY展望：机构观点与变化",
+   "description": "比较33家机构在280篇公开研报中的美元指数DXY展望、发布日期、明确给出的目标与观点变化，并核对原始来源。",
+   "canonical": "https://tlines.tech/zh/markets/us-dollar-index",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/us-dollar-index",
+    "zh-CN": "https://tlines.tech/zh/markets/us-dollar-index",
+    "x-default": "https://tlines.tech/en/markets/us-dollar-index"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "美元指数DXY展望：1家机构的可溯源观点",
+   "bodyTextLength": 2005,
+   "bodyTextHash": "ca0a6e805f2dfe5a"
+  },
+  {
+   "url": "/zh/markets/eur-usd",
+   "status": 200,
+   "title": "欧元兑美元预测：机构目标与观点对比",
+   "description": "比较21家机构在239篇公开研报中的欧元兑美元预测、发布日期、明确给出的目标与观点变化，并核对原始来源。",
+   "canonical": "https://tlines.tech/zh/markets/eur-usd",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/eur-usd",
+    "zh-CN": "https://tlines.tech/zh/markets/eur-usd",
+    "x-default": "https://tlines.tech/en/markets/eur-usd"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "欧元兑美元预测：2家机构的可溯源观点",
+   "bodyTextLength": 1980,
+   "bodyTextHash": "ad26c251be729992"
+  },
+  {
+   "url": "/zh/markets/usd-jpy",
+   "status": 200,
+   "title": "美元兑日元机构展望、目标价与共识",
+   "description": "美元兑日元（USDJPY）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/usd-jpy",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/usd-jpy",
+    "zh-CN": "https://tlines.tech/zh/markets/usd-jpy",
+    "x-default": "https://tlines.tech/en/markets/usd-jpy"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "美元兑日元：机构正在预测什么",
+   "bodyTextLength": 1914,
+   "bodyTextHash": "a6511eaf80d3f895"
+  },
+  {
+   "url": "/zh/markets/gbpusd",
+   "status": 200,
+   "title": "英镑兑美元机构展望、目标价与共识",
+   "description": "英镑兑美元（GBPUSD）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/gbpusd",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/gbpusd",
+    "zh-CN": "https://tlines.tech/zh/markets/gbpusd",
+    "x-default": "https://tlines.tech/en/markets/gbpusd"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "WebPage"
+   ],
+   "h1": "英镑兑美元：机构正在预测什么",
+   "bodyTextLength": 1310,
+   "bodyTextHash": "2f257d734af75173"
+  },
+  {
+   "url": "/zh/markets/us-10-year-treasury",
+   "status": 200,
+   "title": "美国10年期国债收益率预测：机构观点与变化",
+   "description": "比较36家机构在514篇公开研报中的美国10年期国债收益率预测、发布日期、明确给出的目标与观点变化，并核对原始来源。",
+   "canonical": "https://tlines.tech/zh/markets/us-10-year-treasury",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/us-10-year-treasury",
+    "zh-CN": "https://tlines.tech/zh/markets/us-10-year-treasury",
+    "x-default": "https://tlines.tech/en/markets/us-10-year-treasury"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "美国10年期国债收益率预测：7家机构的可溯源观点",
+   "bodyTextLength": 3119,
+   "bodyTextHash": "9c1f679f4f009508"
+  },
+  {
+   "url": "/zh/markets/us-2-year-treasury",
+   "status": 200,
+   "title": "美国2年期国债机构展望、目标价与共识",
+   "description": "美国2年期国债（US2Y）的机构公开研报与近期观点。",
+   "canonical": "https://tlines.tech/zh/markets/us-2-year-treasury",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/us-2-year-treasury",
+    "zh-CN": "https://tlines.tech/zh/markets/us-2-year-treasury",
+    "x-default": "https://tlines.tech/en/markets/us-2-year-treasury"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "美国2年期国债：机构正在预测什么",
+   "bodyTextLength": 1589,
+   "bodyTextHash": "0e5e1e9e13a5a330"
+  },
+  {
+   "url": "/zh/markets/gold",
+   "status": 200,
+   "title": "黄金价格预测：机构目标与观点对比",
+   "description": "比较28家机构在266篇公开研报中的黄金价格预测、发布日期、明确给出的目标与观点变化，并核对原始来源。",
+   "canonical": "https://tlines.tech/zh/markets/gold",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/markets/gold",
+    "zh-CN": "https://tlines.tech/zh/markets/gold",
+    "x-default": "https://tlines.tech/en/markets/gold"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "Dataset",
+    "ItemList",
+    "WebPage"
+   ],
+   "h1": "黄金价格预测：4家机构的可溯源观点",
+   "bodyTextLength": 2003,
+   "bodyTextHash": "3caa482b72bc4940"
+  },
+  {
+   "url": "/zh/topics/inflation",
+   "status": 200,
+   "title": "通胀：机构观点与研报",
+   "description": "38 家机构发布了 623 篇涉及通胀的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/inflation",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/inflation",
+    "zh-CN": "https://tlines.tech/zh/topics/inflation",
+    "x-default": "https://tlines.tech/en/topics/inflation"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "通胀",
+   "bodyTextLength": 3328,
+   "bodyTextHash": "eb372bfc0882e824"
+  },
+  {
+   "url": "/zh/topics/geopolitical-risk",
+   "status": 200,
+   "title": "地缘政治风险：机构观点与研报",
+   "description": "9 家机构发布了 22 篇涉及地缘政治风险的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/geopolitical-risk",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/geopolitical-risk",
+    "zh-CN": "https://tlines.tech/zh/topics/geopolitical-risk",
+    "x-default": "https://tlines.tech/en/topics/geopolitical-risk"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "地缘政治风险",
+   "bodyTextLength": 3124,
+   "bodyTextHash": "4add15da5b6ca3b8"
+  },
+  {
+   "url": "/zh/topics/equity-market",
+   "status": 200,
+   "title": "股票市场：机构观点与研报",
+   "description": "7 家机构发布了 12 篇涉及股票市场的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/equity-market",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/equity-market",
+    "zh-CN": "https://tlines.tech/zh/topics/equity-market",
+    "x-default": "https://tlines.tech/en/topics/equity-market"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "股票市场",
+   "bodyTextLength": 2023,
+   "bodyTextHash": "fdab94a65bfe9286"
+  },
+  {
+   "url": "/zh/topics/energy",
+   "status": 200,
+   "title": "Energy：机构观点与研报",
+   "description": "5 家机构发布了 9 篇涉及Energy的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/energy",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/energy",
+    "zh-CN": "https://tlines.tech/zh/topics/energy",
+    "x-default": "https://tlines.tech/en/topics/energy"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "Energy",
+   "bodyTextLength": 2392,
+   "bodyTextHash": "4bcaae6125cf7ade"
+  },
+  {
+   "url": "/zh/topics/labor-market",
+   "status": 200,
+   "title": "就业市场：机构观点与研报",
+   "description": "7 家机构发布了 8 篇涉及就业市场的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/labor-market",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/labor-market",
+    "zh-CN": "https://tlines.tech/zh/topics/labor-market",
+    "x-default": "https://tlines.tech/en/topics/labor-market"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "就业市场",
+   "bodyTextLength": 2185,
+   "bodyTextHash": "cb6ae479fb872db7"
+  },
+  {
+   "url": "/zh/topics/employment",
+   "status": 200,
+   "title": "就业：机构观点与研报",
+   "description": "6 家机构发布了 8 篇涉及就业的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/employment",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/employment",
+    "zh-CN": "https://tlines.tech/zh/topics/employment",
+    "x-default": "https://tlines.tech/en/topics/employment"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "就业",
+   "bodyTextLength": 2161,
+   "bodyTextHash": "b0d3d7d304378d1e"
+  },
+  {
+   "url": "/zh/topics/ai-investment",
+   "status": 200,
+   "title": "AI 投资：机构观点与研报",
+   "description": "4 家机构发布了 8 篇涉及AI 投资的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/ai-investment",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/ai-investment",
+    "zh-CN": "https://tlines.tech/zh/topics/ai-investment",
+    "x-default": "https://tlines.tech/en/topics/ai-investment"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "AI 投资",
+   "bodyTextLength": 2100,
+   "bodyTextHash": "100fdfb896166a0b"
+  },
+  {
+   "url": "/zh/topics/equities",
+   "status": 200,
+   "title": "股票：机构观点与研报",
+   "description": "8 家机构发布了 11 篇涉及股票的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/equities",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/equities",
+    "zh-CN": "https://tlines.tech/zh/topics/equities",
+    "x-default": "https://tlines.tech/en/topics/equities"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "股票",
+   "bodyTextLength": 2052,
+   "bodyTextHash": "b77fb4d43a62ef63"
+  },
+  {
+   "url": "/zh/topics/oil-prices",
+   "status": 200,
+   "title": "油价：机构观点与研报",
+   "description": "8 家机构发布了 15 篇涉及油价的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/oil-prices",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/oil-prices",
+    "zh-CN": "https://tlines.tech/zh/topics/oil-prices",
+    "x-default": "https://tlines.tech/en/topics/oil-prices"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage",
+    "ItemList"
+   ],
+   "h1": "油价",
+   "bodyTextLength": 2355,
+   "bodyTextHash": "3bc6ee601c992d32"
+  },
+  {
+   "url": "/zh/topics/consumption",
+   "status": 200,
+   "title": "消费：机构观点与研报",
+   "description": "5 家机构发布了 7 篇涉及消费的研报。比较各家观点、涉及的资产与原始研报。",
+   "canonical": "https://tlines.tech/zh/topics/consumption",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/topics/consumption",
+    "zh-CN": "https://tlines.tech/zh/topics/consumption",
+    "x-default": "https://tlines.tech/en/topics/consumption"
+   },
+   "jsonLdTypes": [
+    "BreadcrumbList",
+    "CollectionPage"
+   ],
+   "h1": "消费",
+   "bodyTextLength": 1750,
+   "bodyTextHash": "3e8572ed920e3392"
+  },
+  {
+   "url": "/zh/research/uob-research-uob-group-research-fimfbrd3vs",
+   "status": 200,
+   "title": "UOB集团研究",
+   "description": "可持续发展入门：马来西亚 欧盟的碳边境调节机制（CBAM）如何影响马来西亚？",
+   "canonical": "https://tlines.tech/zh/research/uob-research-uob-group-research-fimfbrd3vs",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/uob-research-uob-group-research-fimfbrd3vs",
+    "zh-CN": "https://tlines.tech/zh/research/uob-research-uob-group-research-fimfbrd3vs",
+    "x-default": "https://tlines.tech/en/research/uob-research-uob-group-research-fimfbrd3vs"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "UOB集团研究",
+   "bodyTextLength": 4458,
+   "bodyTextHash": "dea36427ea5597d2"
+  },
+  {
+   "url": "/zh/research/hsbc-asean-business-expansion-opportunities-xy7tfa1yzr",
+   "status": 200,
+   "title": "东盟业务扩展机遇",
+   "description": "汇丰强调东南亚是一个极具吸引力的业务扩张区域，指出该地区经济韧性强大、市场多元、互联互通完善。报告识别了新加坡、马来西亚、印度尼西亚、菲律宾、泰国和越南的关键机遇，并概述了汇丰在支持跨境运营方面的全面银行服务能力。",
+   "canonical": "https://tlines.tech/zh/research/hsbc-asean-business-expansion-opportunities-xy7tfa1yzr",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/hsbc-asean-business-expansion-opportunities-xy7tfa1yzr",
+    "zh-CN": "https://tlines.tech/zh/research/hsbc-asean-business-expansion-opportunities-xy7tfa1yzr",
+    "x-default": "https://tlines.tech/en/research/hsbc-asean-business-expansion-opportunities-xy7tfa1yzr"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "东盟业务扩展机遇",
+   "bodyTextLength": 15402,
+   "bodyTextHash": "f9cc667014ed9dff"
+  },
+  {
+   "url": "/zh/research/ing-think-rates-spark-an-uneasy-calm-xyxmyu2l7c",
+   "status": 200,
+   "title": "利率快评：不安的平静",
+   "description": "美国国债长期买断计划正在收窄互换利差并压低长期收益率，但市场仍保持谨慎。美联储不太可能加息，地缘政治风险持续存在，尽管波动率较低。欧洲央行可能再加息一次，油价是关键风险。",
+   "canonical": "https://tlines.tech/zh/research/ing-think-rates-spark-an-uneasy-calm-xyxmyu2l7c",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ing-think-rates-spark-an-uneasy-calm-xyxmyu2l7c",
+    "zh-CN": "https://tlines.tech/zh/research/ing-think-rates-spark-an-uneasy-calm-xyxmyu2l7c",
+    "x-default": "https://tlines.tech/en/research/ing-think-rates-spark-an-uneasy-calm-xyxmyu2l7c"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "利率快评：不安的平静",
+   "bodyTextLength": 8385,
+   "bodyTextHash": "b7e20be81969af14"
+  },
+  {
+   "url": "/zh/research/franklin-templeton-on-my-mind-rearranging-the-debt-chairs-k2o8kqykh7",
+   "status": 200,
+   "title": "我的思考：重新排列债务席位",
+   "description": "富兰克林邓普顿固定收益研究认为，美国财政部回购长期国债的措施在未减少财政赤字的情况下无效，且美联储在主席凯文·沃什领导下转向鹰派，优先控制通胀而非支持财政政策，这将持续对收益率构成上行压力。",
+   "canonical": "https://tlines.tech/zh/research/franklin-templeton-on-my-mind-rearranging-the-debt-chairs-k2o8kqykh7",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/franklin-templeton-on-my-mind-rearranging-the-debt-chairs-k2o8kqykh7",
+    "zh-CN": "https://tlines.tech/zh/research/franklin-templeton-on-my-mind-rearranging-the-debt-chairs-k2o8kqykh7",
+    "x-default": "https://tlines.tech/en/research/franklin-templeton-on-my-mind-rearranging-the-debt-chairs-k2o8kqykh7"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "我的思考：重新排列债务席位",
+   "bodyTextLength": 10439,
+   "bodyTextHash": "45720ba4f3b142b9"
+  },
+  {
+   "url": "/zh/research/westpac-westpac-iq-first-impressions-nz-building-consents-july-2026-b3tm3e943w",
+   "status": 200,
+   "title": "初步看法：新西兰建筑许可，2026年7月",
+   "description": "西太平洋银行IQ对2026年7月新西兰建筑许可的回顾表明，尽管月度数据有所下滑，住宅许可水平仍处于高位，且对未来至2027年的住宅建设活动前景持积极态度，这得益于奥克兰和坎特伯雷等地区的强劲增长。然而，由于审批量趋于平稳、成本上升、利率上行、房市疲软、人口增长低迷及住房供应增加等因素，需保持谨慎，这些因素可能在来…",
+   "canonical": "https://tlines.tech/zh/research/westpac-westpac-iq-first-impressions-nz-building-consents-july-2026-b3tm3e943w",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/westpac-westpac-iq-first-impressions-nz-building-consents-july-2026-b3tm3e943w",
+    "zh-CN": "https://tlines.tech/zh/research/westpac-westpac-iq-first-impressions-nz-building-consents-july-2026-b3tm3e943w",
+    "x-default": "https://tlines.tech/en/research/westpac-westpac-iq-first-impressions-nz-building-consents-july-2026-b3tm3e943w"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "初步看法：新西兰建筑许可，2026年7月",
+   "bodyTextLength": 23350,
+   "bodyTextHash": "be65024ecac632e6"
+  },
+  {
+   "url": "/zh/research/commonwealth-bank-the-high-tech-lettuce-farm-transforming-creek-water-into-premium-produce-terzrcxbho",
+   "status": 200,
+   "title": "高科技生菜农场：溪水变身优质农产品的绿色革命",
+   "description": "澳大利亚联邦银行重点介绍了位于利斯莫尔的家族水培生菜农场Brombal's Fresh Produce，该农场利用海水淡化和自动化监控技术提高作物品质和效率。案例研究强调了技术在可持续农业中的作用，以及通过机器人和人工智能解决劳动力短缺的潜力。",
+   "canonical": "https://tlines.tech/zh/research/commonwealth-bank-the-high-tech-lettuce-farm-transforming-creek-water-into-premium-produce-terzrcxbho",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/commonwealth-bank-the-high-tech-lettuce-farm-transforming-creek-water-into-premium-produce-terzrcxbho",
+    "zh-CN": "https://tlines.tech/zh/research/commonwealth-bank-the-high-tech-lettuce-farm-transforming-creek-water-into-premium-produce-terzrcxbho",
+    "x-default": "https://tlines.tech/en/research/commonwealth-bank-the-high-tech-lettuce-farm-transforming-creek-water-into-premium-produce-terzrcxbho"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "高科技生菜农场：溪水变身优质农产品的绿色革命",
+   "bodyTextLength": 11544,
+   "bodyTextHash": "a35f1baae42a5fdb"
+  },
+  {
+   "url": "/zh/research/scotiabank-economics-fomc-hikes-guides-at-least-one-more-to-come-global-economics-d2d279af69",
+   "status": 200,
+   "title": "FOMC加息，指引至少还会有一次加息 · 全球经济",
+   "description": "FOMC以一致票将目标区间上调25个基点至3.75%-4%，并指引年内至少再加息一次，相当一部分委员认为2027年可能还需加息，但非多数。两年期收益率上升14个基点，曲线呈熊市趋平，美元走强，标普500下跌约0.75%。OIS计入累计100个基点紧缩。丰业银行提示可能存在政策失误，认为加拿大央行获得近期加息的空间…",
+   "canonical": "https://tlines.tech/zh/research/scotiabank-economics-fomc-hikes-guides-at-least-one-more-to-come-global-economics-d2d279af69",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/scotiabank-economics-fomc-hikes-guides-at-least-one-more-to-come-global-economics-d2d279af69",
+    "zh-CN": "https://tlines.tech/zh/research/scotiabank-economics-fomc-hikes-guides-at-least-one-more-to-come-global-economics-d2d279af69",
+    "x-default": "https://tlines.tech/en/research/scotiabank-economics-fomc-hikes-guides-at-least-one-more-to-come-global-economics-d2d279af69"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "FOMC加息，指引至少还会有一次加息 · 全球经济",
+   "bodyTextLength": 13288,
+   "bodyTextHash": "ea5df9387aaef014"
+  },
+  {
+   "url": "/zh/research/ing-think-the-commodities-feed-oil-cools-off-from-the-highs-6470a568bf",
+   "status": 200,
+   "title": "大宗商品每日快讯：油价自高位回落",
+   "description": "布伦特原油下跌约2%至每桶102美元下方，WTI回落至约98美元/桶，获利了结以及对联合国大会和特朗普-习近平会谈的建设性预期改善市场情绪，尽管沙特阿美警告称东西管道遭无人机袭击后可能无法按长期合同足额分配下月原油货。布伦特投机净多头增至282,657手，为2026年5月底以来最大。黄金因美联储2023年以来首次…",
+   "canonical": "https://tlines.tech/zh/research/ing-think-the-commodities-feed-oil-cools-off-from-the-highs-6470a568bf",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ing-think-the-commodities-feed-oil-cools-off-from-the-highs-6470a568bf",
+    "zh-CN": "https://tlines.tech/zh/research/ing-think-the-commodities-feed-oil-cools-off-from-the-highs-6470a568bf",
+    "x-default": "https://tlines.tech/en/research/ing-think-the-commodities-feed-oil-cools-off-from-the-highs-6470a568bf"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "大宗商品每日快讯：油价自高位回落",
+   "bodyTextLength": 6225,
+   "bodyTextHash": "2bc055cb5cfd2c5b"
+  },
+  {
+   "url": "/zh/research/ing-think-labour-shortages-and-regulation-reshape-the-dutch-staffing-industry-41a0bba7b4",
+   "status": 200,
+   "title": "劳动力短缺与监管重塑荷兰人力派遣行业",
+   "description": "ING研究预计，荷兰灵活就业工时2026年增长1%，2027年增长1.5%；此前经历两年收缩，去年工时仅增0.5%。增长集中于规模较小、专业化的企业，而ABU下属大型临时用工机构工时持续下降。新的集体劳动协议推高临时用工成本，2026年费率预计平均上调6.5%，但利润率仍承压。2027年1月1日起，《临时就业机构…",
+   "canonical": "https://tlines.tech/zh/research/ing-think-labour-shortages-and-regulation-reshape-the-dutch-staffing-industry-41a0bba7b4",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ing-think-labour-shortages-and-regulation-reshape-the-dutch-staffing-industry-41a0bba7b4",
+    "zh-CN": "https://tlines.tech/zh/research/ing-think-labour-shortages-and-regulation-reshape-the-dutch-staffing-industry-41a0bba7b4",
+    "x-default": "https://tlines.tech/en/research/ing-think-labour-shortages-and-regulation-reshape-the-dutch-staffing-industry-41a0bba7b4"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "劳动力短缺与监管重塑荷兰人力派遣行业",
+   "bodyTextLength": 6186,
+   "bodyTextHash": "bd6b77fcf09319f7"
+  },
+  {
+   "url": "/zh/research/ing-think-hungarian-labour-market-shows-cracks-again-86262feb38",
+   "status": 200,
+   "title": "匈牙利劳动力市场再现裂痕",
+   "description": "2026年8月匈牙利失业率升至4.7%，三个月移动平均为4.8%，仅比十年高点低0.1个百分点。失业人数约23万至23.5万。就业人数较7月减少约2.1万，主要受退休和裁员推动。ING维持今年平均失业率约4.5%的预测，但因地缘政治不确定性持续，现认为存在上行风险。",
+   "canonical": "https://tlines.tech/zh/research/ing-think-hungarian-labour-market-shows-cracks-again-86262feb38",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ing-think-hungarian-labour-market-shows-cracks-again-86262feb38",
+    "zh-CN": "https://tlines.tech/zh/research/ing-think-hungarian-labour-market-shows-cracks-again-86262feb38",
+    "x-default": "https://tlines.tech/en/research/ing-think-hungarian-labour-market-shows-cracks-again-86262feb38"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "匈牙利劳动力市场再现裂痕",
+   "bodyTextLength": 5567,
+   "bodyTextHash": "a4f6c5f74fa67161"
+  },
+  {
+   "url": "/zh/research/scotiabank-economics-global-economics-daily-points-739a067306",
+   "status": 200,
+   "title": "全球经济学 · 每日要点",
+   "description": "丰业银行的Derek Holt预览数据密集的一个交易日，包括加拿大7月GDP和加拿大央行关于回购市场与货币政策实施的讲话。他预计市场波动有限，美国消费者信心、JOLTS和美联储官员讲话也在日程上。西班牙CPI高于预期，但被认为不会实质性改变欧洲央行10月29日的按兵不动预期；澳洲联储加息至4.60%，但措辞有所缓…",
+   "canonical": "https://tlines.tech/zh/research/scotiabank-economics-global-economics-daily-points-739a067306",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/scotiabank-economics-global-economics-daily-points-739a067306",
+    "zh-CN": "https://tlines.tech/zh/research/scotiabank-economics-global-economics-daily-points-739a067306",
+    "x-default": "https://tlines.tech/en/research/scotiabank-economics-global-economics-daily-points-739a067306"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "全球经济学 · 每日要点",
+   "bodyTextLength": 10988,
+   "bodyTextHash": "40bcce29e0d1328e"
+  },
+  {
+   "url": "/zh/research/bnp-paribas-ecoflash-2027-budget-fiscal-consolidation-must-now-resume-36b5120e18",
+   "status": 200,
+   "title": "EcoFlash · 2027 预算：财政整顿现在必须恢复",
+   "description": "法国2027年预算案将赤字从2026年的5.4%降至5%（占GDP），为整顿第一步。实际财政努力为GDP的1个百分点，而非0.4个百分点，因债务利息与国防支出增加0.6个百分点。三分之一来自强制性税收增加，三分之二来自支出削减。巴黎银行预计2027年公共债务达GDP的121%，若3%目标推迟至2032年则2032…",
+   "canonical": "https://tlines.tech/zh/research/bnp-paribas-ecoflash-2027-budget-fiscal-consolidation-must-now-resume-36b5120e18",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/bnp-paribas-ecoflash-2027-budget-fiscal-consolidation-must-now-resume-36b5120e18",
+    "zh-CN": "https://tlines.tech/zh/research/bnp-paribas-ecoflash-2027-budget-fiscal-consolidation-must-now-resume-36b5120e18",
+    "x-default": "https://tlines.tech/en/research/bnp-paribas-ecoflash-2027-budget-fiscal-consolidation-must-now-resume-36b5120e18"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "EcoFlash · 2027 预算：财政整顿现在必须恢复",
+   "bodyTextLength": 3846,
+   "bodyTextHash": "47f9771a94e7660e"
+  },
+  {
+   "url": "/zh/research/wellington-management-quarterly-asset-allocation-outlook-the-rally-refusing-to-yield-4563055725",
+   "status": 200,
+   "title": "季度资产配置展望：涨势：拒绝让收益率上行？",
+   "description": "威灵顿管理将全球股票评级从超配下调至适度超配，同时将美国与英国国债上调至适度超配，因油价上涨、债券收益率攀升及政策转鹰削弱了近期风险回报。新兴市场股票同样被削减，但仍优于英国。黄金与大宗商品维持中性；信用维持中性，因利差补偿有限。",
+   "canonical": "https://tlines.tech/zh/research/wellington-management-quarterly-asset-allocation-outlook-the-rally-refusing-to-yield-4563055725",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/wellington-management-quarterly-asset-allocation-outlook-the-rally-refusing-to-yield-4563055725",
+    "zh-CN": "https://tlines.tech/zh/research/wellington-management-quarterly-asset-allocation-outlook-the-rally-refusing-to-yield-4563055725",
+    "x-default": "https://tlines.tech/en/research/wellington-management-quarterly-asset-allocation-outlook-the-rally-refusing-to-yield-4563055725"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "季度资产配置展望：涨势：拒绝让收益率上行？",
+   "bodyTextLength": 20472,
+   "bodyTextHash": "0dcae2c0af555eef"
+  },
+  {
+   "url": "/zh/research/state-street-monthly-cash-review-october-2026-usd-9587539dc3",
+   "status": 200,
+   "title": "月度现金回顾：2026年10月（美元）",
+   "description": "9月，美国国债收益率大幅飙升，而高质量信用利差几乎未动。2年期收益率上升57个基点至4.91%，10年期上升49个基点至5.21%，30年期达到5.54%，但AAA利差维持在27个基点。低质量信用利差显著扩大：BB级+34个基点，B级+42个基点，CCC级+135个基点。美联储加息25个基点至3.75-4.00%…",
+   "canonical": "https://tlines.tech/zh/research/state-street-monthly-cash-review-october-2026-usd-9587539dc3",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/state-street-monthly-cash-review-october-2026-usd-9587539dc3",
+    "zh-CN": "https://tlines.tech/zh/research/state-street-monthly-cash-review-october-2026-usd-9587539dc3",
+    "x-default": "https://tlines.tech/en/research/state-street-monthly-cash-review-october-2026-usd-9587539dc3"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "月度现金回顾：2026年10月（美元）",
+   "bodyTextLength": 12477,
+   "bodyTextHash": "41558f4327533de6"
+  },
+  {
+   "url": "/zh/research/mufg-uae-gdp-q-2-2026-middle-east-macro-9fceae50f7",
+   "status": 200,
+   "title": "阿联酋 2 年第四季度 GDP 2026 · 中东宏观",
+   "description": "阿联酋2026年二季度实际GDP同比萎缩2.1%，为疫情以来首次收缩，尽管上半年仍增长0.4%。石油、制造业、物流、酒店和批发零售贸易是主要拖累，金融服务业则连续第五个季度实现两位数增长。PMI已从4月低点52.1回升至9月的55以上，但港口活动仍低于冲突前水平，迪拜1-8月平均通胀率达4.6%。阿布扎比输油管道…",
+   "canonical": "https://tlines.tech/zh/research/mufg-uae-gdp-q-2-2026-middle-east-macro-9fceae50f7",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/mufg-uae-gdp-q-2-2026-middle-east-macro-9fceae50f7",
+    "zh-CN": "https://tlines.tech/zh/research/mufg-uae-gdp-q-2-2026-middle-east-macro-9fceae50f7",
+    "x-default": "https://tlines.tech/en/research/mufg-uae-gdp-q-2-2026-middle-east-macro-9fceae50f7"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "阿联酋 2 年第四季度 GDP 2026 · 中东宏观",
+   "bodyTextLength": 12322,
+   "bodyTextHash": "d7d47c9b2e302282"
+  },
+  {
+   "url": "/zh/research/ubs-cio-daily-higher-inflation-need-not-derail-us-assets-182091db68",
+   "status": 200,
+   "title": "每日观点：通胀上升未必会颠覆美国资产",
+   "description": "美国9月整体通胀环比上涨0.6%，核心通胀环比上涨0.3%，核心年率达2.6%。瑞银仍预计美联储仅再加息两次（12月、3月），而非市场定价的约3.5次。该行将10年期美债收益率12月底预测从4.6%上调至4.9%，仍低于周三5.19%的收盘水平，并维持对美国资产的积极看法，预测标普500每股盈利增长28%。",
+   "canonical": "https://tlines.tech/zh/research/ubs-cio-daily-higher-inflation-need-not-derail-us-assets-182091db68",
+   "robots": "index, follow",
+   "hreflang": {
+    "en": "https://tlines.tech/en/research/ubs-cio-daily-higher-inflation-need-not-derail-us-assets-182091db68",
+    "zh-CN": "https://tlines.tech/zh/research/ubs-cio-daily-higher-inflation-need-not-derail-us-assets-182091db68",
+    "x-default": "https://tlines.tech/en/research/ubs-cio-daily-higher-inflation-need-not-derail-us-assets-182091db68"
+   },
+   "jsonLdTypes": [
+    "AnalysisNewsArticle",
+    "BreadcrumbList"
+   ],
+   "h1": "每日观点：通胀上升未必会颠覆美国资产",
+   "bodyTextLength": 7611,
+   "bodyTextHash": "5a4456de276ef8b6"
+  }
+ ]
+}

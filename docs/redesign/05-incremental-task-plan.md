@@ -10,9 +10,9 @@
 | TL-001 仓库/部署审计 | ✅ 本次 | 见 01 文档；部署路径与回滚见 07 |
 | TL-002 URL 清单 | ◐ 本次完成一半 | [url-inventory csv](./url-inventory-2026-10-16.csv) 已含 3,422 条；GSC 列留空（无凭据，开放问题 2） |
 | TL-003 数据契约 | ◐ | 01 文档 §3 覆盖核心机制；`prisma/schema.prisma`（72 模型）即事实源；PRD §5.1 目标模型与现状的字段级 diff 待做（M） |
-| TL-004 基准截图/性能 | ❌ 待做（M） | 建议：`scripts/` 下建 `baseline-capture.mjs`（Playwright + 既有浏览器工具），六档宽度截图 + 关键模板 CWV 采样 |
-| TL-005 Flag/回滚/E2E 骨架 | ❌ 待做（S） | 方案见 07 §3；E2E 用既有 Playwright 依赖做冒烟脚本 |
-| TL-006 计数口径 | ◐ 根因已定位 | 修改点：`src/app/page.tsx:52-54` 补 `isLegacyNonAssetAlias`；文案标注两种机构口径（见 03 §4） |
+| TL-004 基准截图/性能 | ◐ head 快照完成 | `scripts/redesign-baseline.mjs` + `baseline/head-snapshot-2026-10-16.json`（256 URL）；六档宽度截图与 CWV 采样待 TL-101 落地前完成 |
+| TL-005 Flag/回滚/E2E 骨架 | ✅ 本次 | `src/lib/redesign.ts`（env `TL_REDESIGN`，默认 off，视图层专用）+ 单测；回滚方案见 07 |
+| TL-006 计数口径 | ✅ 本次 | `src/app/page.tsx` 补 `isLegacyNonAssetAlias` 过滤（20→18 与目录一致）；两种机构口径的文案说明见 03 §4 |
 
 ## EPIC 1 — 设计系统（新文件集中在 `src/app/_components/editorial/`）
 

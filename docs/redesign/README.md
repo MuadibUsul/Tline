@@ -18,6 +18,7 @@
 | [07-rollback-plan.md](./07-rollback-plan.md) | 输出 7 | 回滚方案（部署/迁移/特性开关/SEO） |
 | [url-inventory-2026-10-16.csv](./url-inventory-2026-10-16.csv) | TL-002 之一 | 线上 sitemap 全量 3,422 条 URL（locale/section/分片） |
 | [url-mapping-template.csv](./url-mapping-template.csv) | TL-002 之二 | URL 决策表模板（默认 keep 原则） |
+| [baseline/head-snapshot-2026-10-16.json](./baseline/head-snapshot-2026-10-16.json) | TL-004 | 256 条核心模板的 head 元数据 + 正文指纹（`scripts/redesign-baseline.mjs --check` 可 diff） |
 
 ## 执行摘要（七条结论）
 
@@ -36,9 +37,21 @@
 - 文档侧：`ARCHITECTURE.md` 存在多处过期陈述（见 01 文档 §6），审计以代码为准，文档仅作意图参考。
 - 权限边界：无 GSC 凭据、无生产日志访问、无法验证真实用户指标——对应 PRD §1 审计限制，列为阻塞或后续项。
 
+## 决策记录
+
+- **2026-10-16 站主裁决：按最新口径执行——PRD v1.0 为准。** PRD §3.2 的"旧 URL 200 原址保留或严格映射"生效；早前"观点页下架 + 看板/交易主线/经济体三合一"的方向**作废**。`/institutions` 保留现址（观点流标签后续仅做视觉/文案级更新），`/watchlist`、`/dashboards`、`/economies` 维持现路径与功能。
+
+## 进度（相对 05 任务清单）
+
+- ✅ TL-005 feature flag 骨架（`src/lib/redesign.ts`，env `TL_REDESIGN`，默认 off）。
+- ✅ TL-006 计数口径修复（首页补 `isLegacyNonAssetAlias`，20→18 与目录一致；代码注释说明）。
+- ◐ TL-004 基线：head 元数据快照已采（`baseline/head-snapshot-2026-10-16.json`，256 URL 全 200），六档宽度截图待首个视觉改动（TL-101）落地前采集。
+- ◐ TL-002：URL 清单完成；GSC 列缺失（开放问题 2，无凭据）。
+- ❌ TL-003 数据契约字段级 diff、TL-001 余项（baseline 截图/性能）。
+
 ## 开放问题（需要站主或后续输入）
 
-1. **导航方向裁决**（见结论 4）：PRD"保留/映射"路线 vs 早前"下架+合并"路线，二选一或明确先后。
+1. ~~导航方向裁决~~ **已裁决，见"决策记录"**。
 2. **GSC 数据接入**：TL-002 的"URL × 点击/展现"合并需要 Search Console 凭据（或导出 CSV）；目前 `docs/seo-recovery/06` 提供了 CSV 导入通道但无凭据。
 3. **版权/授权核查**（PRD §5.3）：存量中文全文译文的展示合法性需要法务口径；审计无法代替。
 4. **Newsletter 基础设施**：现状只有事务邮件（nodemailer，注册/找回密码）；订阅列表/双重确认/偏好中心是全新增量，需要服务商选型（如发信配额、退订合规）。

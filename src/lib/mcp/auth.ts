@@ -1,4 +1,4 @@
-import { authenticate, type ApiScope, type AuthFailure, type AuthenticatedKey } from "../apiKeys";
+import { authenticate, PUBLISHER_SCOPES, type ApiScope, type AuthFailure, type AuthenticatedKey } from "../apiKeys";
 import { can, effectiveRole, type PermissionUser } from "../permissions";
 
 /**
@@ -23,9 +23,10 @@ export const MCP_ENDPOINTS: Record<McpAudience, string> = {
   publisher: "/api/mcp/publisher",
 };
 
-const AUDIENCE_SCOPE: Record<McpAudience, ApiScope> = {
+const AUDIENCE_SCOPE: Record<McpAudience, ApiScope | ApiScope[]> = {
   user: "mcp:user",
-  publisher: "publisher:draft",
+  // Either publisher scope opens this endpoint; each tool then checks its own scope.
+  publisher: PUBLISHER_SCOPES,
 };
 
 export interface McpAuthContext {
@@ -85,9 +86,10 @@ export async function authenticateMcp(header: string | null, audience: McpAudien
   }
   const key = result.key;
   // The console blocks this combination at issue time; serving one anyway would merge the
-  // two audiences onto a single credential, so it is refused here too.
-  if (key.scopes.includes("mcp:user") && key.scopes.includes("publisher:draft")) {
-    return { ok: false, status: 403, code: "scope_conflict", message: "This key carries both MCP scopes; the two MCP servers require separate keys." };
+  // two audiences onto a single credential, so it is refused here too. The publisher
+  // scopes may share a key with each other — one publisher, full flow.
+  if (key.scopes.includes("mcp:user") && key.scopes.some((scope) => PUBLISHER_SCOPES.includes(scope))) {
+    return { ok: false, status: 403, code: "scope_conflict", message: "This key carries the user MCP scope together with a publisher scope; the two audiences require separate keys." };
   }
   const refusal = entitlementRefusal(key.owner, audience);
   if (refusal) return { ok: false, status: 403, ...refusal };

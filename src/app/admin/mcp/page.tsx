@@ -44,14 +44,14 @@ const SERVERS = [
   },
   {
     endpoint: "/api/mcp/publisher",
-    scope: "publisher:draft",
+    scope: "publisher:draft / publisher:publish",
     en: "Publisher MCP",
     zh: "MCP 发布端",
-    purposeEn: "A drafting channel for AI clients: create, revise and validate drafts, then submit them for review. It cannot publish, withdraw or delete — whether content goes live is decided by a human in the review queue.",
-    purposeZh: "给 AI 客户端用的投稿通道:创建、修改、校验草稿并送审。它不能发布、撤回或删除——最终是否发布由人在审核队列决定。",
-    audienceEn: "requires a reviewer / admin key; the owner's role is re-checked on every call",
-    audienceZh: "需 reviewer / admin 密钥,每次调用复查持有人角色",
-    tools: ["create_publication_draft", "update_publication_draft", "validate_publication_draft", "submit_publication_for_review", "list_publication_drafts"],
+    purposeEn: "The drafting-and-publishing channel for AI clients: create, revise and validate drafts, submit them for review — and, when the key also carries publisher:publish, publish a draft as a public report. Publishing is judged by the same gate as every crawled report (the reply carries the verdict), and taking anything down stays an operations action, never an MCP one.",
+    purposeZh: "给 AI 客户端的投稿与发布通道:创建、修改、校验草稿并送审;密钥带 publisher:publish 时还可直接发布。发布与抓取的文章走同一道公开闸门(结果随响应返回可核验);下架始终是运营操作,MCP 不提供。",
+    audienceEn: "requires a reviewer / admin key; publishing additionally requires the publisher:publish scope, and the owner's role is re-checked on every call",
+    audienceZh: "需 reviewer / admin 密钥;直接发布另需 publisher:publish scope;每次调用复查持有人角色",
+    tools: ["create_publication_draft", "update_publication_draft", "validate_publication_draft", "submit_publication_for_review", "publish_publication_draft", "list_publication_drafts"],
   },
 ] as const;
 
@@ -136,7 +136,7 @@ export default async function McpPage() {
           <li>
             {tr(locale, "Issue a key on the ", "在「")}
             <Link href={localePath(locale, "/admin/api")}>{tr(locale, "API & keys", "API 与密钥")}</Link>
-            {tr(locale, " page and tick the scope of the server it is for. The two MCP scopes must be issued on separate keys.", "」页签发密钥,勾选对应端点的 scope。两个 MCP scope 必须分开签发。")}
+            {tr(locale, " page and tick the scope of the server it is for. mcp:user must be issued on a key of its own; the two publisher scopes may share one key.", "」页签发密钥,勾选对应端点的 scope。mcp:user 必须单独签发;publisher:draft 与 publisher:publish 可签在同一把密钥上。")}
           </li>
           <li>
             {tr(locale, "In the AI client, add a remote MCP server: the endpoint URL above, with header ", "在 AI 客户端里添加远程 MCP Server:填上方端点 URL,请求头 ")}

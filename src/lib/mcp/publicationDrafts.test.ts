@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { blockingIssues, validateDraftInput, type DraftInput } from "./publicationDrafts";
+import { blockingIssues, draftContentHash, publishBlockers, validateDraftInput, type DraftInput } from "./publicationDrafts";
 
 const base: DraftInput = {
   title: "Q4 rates outlook from the desk",
@@ -52,4 +52,50 @@ test("publication dates must parse and not be in the future", () => {
 test("an institution slug must be registered", () => {
   assert.ok(validateDraftInput({ ...base, institutionSlug: "nobody" }, new Set(["ubs"])).some((issue) => issue.code === "institution.unknown" && issue.blocking));
   assert.deepEqual(blockingIssues(validateDraftInput({ ...base, institutionSlug: "ubs" }, new Set(["ubs"]))), []);
+});
+
+test("a short summary is a warning, never a blocker at draft time", () => {
+  const issues = validateDraftInput({ ...base, summary: "Too brief." }, new Set());
+  const short = issues.find((issue) => issue.code === "summary.short");
+  assert.ok(short);
+  assert.equal(short.blocking, false);
+});
+
+test("publishing requires the full publishable set", () => {
+  const complete: DraftInput = {
+    ...base,
+    summary: "We stay long gold into year-end on central-bank demand.",
+    sourceUrl: "https://example.com/report",
+    institutionSlug: "ubs",
+  };
+  assert.deepEqual(publishBlockers(complete), []);
+  const codes = (input: DraftInput) => publishBlockers(input).map((issue) => issue.code);
+  assert.deepEqual(codes({ ...complete, content: "short" }), ["content.too_short_to_publish"]);
+  assert.deepEqual(codes({ ...complete, sourceUrl: null }), ["sourceUrl.required"]);
+  assert.deepEqual(codes({ ...complete, institutionSlug: null }), ["institution.required"]);
+  assert.deepEqual(codes({ ...complete, summary: "  " }), ["summary.required"]);
+  assert.ok(publishBlockers(complete).every((issue) => issue.blocking));
+});
+
+test("the preview hash is deterministic and moves with the content it covers", () => {
+  const input: DraftInput = {
+    title: "Q4 rates outlook from the desk",
+    content: "A".repeat(400),
+    summary: "Duration stays attractive into the next meeting.",
+    sourceUrl: "https://example.com/report",
+    institutionSlug: "ubs",
+    language: "en",
+    sourcePublishedAt: "2026-10-01T00:00:00Z",
+  };
+  const hash = draftContentHash(input);
+  // Same content, same hash — including when the stored Date form is passed back in.
+  assert.equal(draftContentHash({ ...input }), hash);
+  assert.equal(draftContentHash({ ...input, sourcePublishedAt: new Date("2026-10-01T00:00:00Z") }), hash);
+  // Whitespace around trimmed fields does not change what is published.
+  assert.equal(draftContentHash({ ...input, title: `  ${input.title}  ` }), hash);
+  // Every covered field moves the hash.
+  assert.notEqual(draftContentHash({ ...input, title: `${input.title}!` }), hash);
+  assert.notEqual(draftContentHash({ ...input, summary: "Different conclusion." }), hash);
+  assert.notEqual(draftContentHash({ ...input, sourceUrl: "https://example.com/other" }), hash);
+  assert.notEqual(draftContentHash({ ...input, language: "zh-CN" }), hash);
 });

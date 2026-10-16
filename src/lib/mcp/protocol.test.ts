@@ -14,7 +14,7 @@ import type { McpAuthContext } from "./auth";
  */
 
 const USER_TOOLS = ["get_macro_calendar", "get_macro_indicator", "get_research", "list_institutions", "search_research"];
-const PUBLISHER_TOOLS = ["create_publication_draft", "list_publication_drafts", "submit_publication_for_review", "update_publication_draft", "validate_publication_draft"];
+const PUBLISHER_TOOLS = ["create_publication_draft", "list_publication_drafts", "publish_publication_draft", "submit_publication_for_review", "update_publication_draft", "validate_publication_draft"];
 
 function structured<T>(result: unknown): T {
   // callTool's return type is a union; the structured half is what every Tline tool returns.
@@ -58,8 +58,10 @@ const userDeps: UserToolDeps = {
 
 const publisherDto = {
   id: "d1", title: "Desk note", status: "DRAFT", version: 1, language: "en",
-  sourceUrl: null, institutionSlug: null, sourcePublishedAt: null,
-  validationIssues: [], submittedAt: null,
+  summary: "A one-sentence conclusion.",
+  sourceUrl: "https://example.com/note", institutionSlug: "ubs", sourcePublishedAt: null,
+  validationIssues: [], submittedAt: null, publishedArticleId: null,
+  contentHash: "a".repeat(64),
   createdAt: "2026-10-16T00:00:00.000Z", updatedAt: "2026-10-16T00:00:00.000Z",
 };
 
@@ -69,6 +71,13 @@ const publisherDeps: PublisherToolDeps = {
   validateDraft: async () => ({ ok: true, data: { ...publisherDto } }),
   // A stale submit must come back as the tool-level VERSION_CONFLICT envelope, not a protocol error.
   submitDraft: async () => ({ ok: false, code: "VERSION_CONFLICT", message: "The draft has moved on since this version was read.", details: { currentVersion: 2 } }),
+  publishDraft: async () => ({
+    ok: true,
+    data: {
+      draft: { ...publisherDto, status: "PUBLISHED", version: 2, publishedArticleId: "a1" },
+      article: { id: "a1", slug: "ubs-desk-note-abc123", pageUrl: "https://tlines.tech/en/research/ubs-desk-note-abc123", indexableEn: true, indexableZh: false, gateIssues: ["missing_translation"], documentReady: true },
+    },
+  }),
   listDrafts: async () => ({ ok: true, data: { drafts: [{ ...publisherDto }], nextCursor: null } }),
 };
 
@@ -77,6 +86,12 @@ const publisherContext: McpAuthContext = {
   key: { id: "key_1", name: "ops", scopes: ["publisher:draft"], rateLimit: 60, owner: { id: "u1", email: "ops@tlines.tech", tier: "free", role: "reviewer", suspendedAt: null } },
   owner: { id: "u1", email: "ops@tlines.tech", tier: "free", role: "reviewer", suspendedAt: null },
   actorId: "u1",
+};
+
+/** The same operator, but on a key that was explicitly granted the publish scope. */
+const publishingContext: McpAuthContext = {
+  ...publisherContext,
+  key: { ...publisherContext.key, id: "key_2", scopes: ["publisher:draft", "publisher:publish"] },
 };
 
 async function connect(server: ReturnType<typeof createUserServer>): Promise<Client> {
@@ -103,8 +118,8 @@ test("each MCP server lists only its own tools", async () => {
   const publisherTools = (await publisher.listTools()).tools.map((tool) => tool.name).sort();
   assert.deepEqual(publisherTools, PUBLISHER_TOOLS);
   for (const name of USER_TOOLS) assert.ok(!publisherTools.includes(name), `publisher server exposed ${name}`);
-  // The absence of publish/withdraw/delete is the whole phase-1 promise; assert it by name.
-  for (const banned of ["publish", "withdraw", "delete", "reject"]) {
+  // Taking content down stays an operations action: no withdraw/delete/reject tool exists.
+  for (const banned of ["withdraw", "delete", "reject", "unpublish"]) {
     assert.ok(!publisherTools.some((name) => name.includes(banned)), `publisher server must not expose ${banned}`);
   }
 });
@@ -159,4 +174,22 @@ test("a publisher submission conflict stays a tool-level error", async () => {
   const listed = await client.callTool({ name: "list_publication_drafts", arguments: {} });
   assert.ok(!listed.isError);
   assert.equal(structured<{ drafts: unknown[] }>(listed).drafts.length, 1);
+});
+
+test("publishing is refused without the publisher:publish scope", async () => {
+  const client = await connect(createPublisherServer(publisherContext, publisherDeps));
+  const denied = await client.callTool({ name: "publish_publication_draft", arguments: { id: "d1", version: 1, expectedContentHash: "a".repeat(64) } });
+  assert.equal(denied.isError, true);
+  assert.equal(structured<{ error: { code: string } }>(denied).error.code, "SCOPE_DENIED");
+});
+
+test("a publish-scoped key publishes and gets the gate verdict back", async () => {
+  const client = await connect(createPublisherServer(publishingContext, publisherDeps));
+  const published = await client.callTool({ name: "publish_publication_draft", arguments: { id: "d1", version: 1, expectedContentHash: "a".repeat(64) } });
+  assert.ok(!published.isError);
+  const data = structured<{ draft: { status: string }; article: { pageUrl: string; indexableEn: boolean; indexableZh: boolean; gateIssues: string[] } }>(published);
+  assert.equal(data.draft.status, "PUBLISHED");
+  assert.match(data.article.pageUrl, /^https:\/\/tlines\.tech\/en\/research\//);
+  assert.equal(data.article.indexableEn, true);
+  assert.deepEqual(data.article.gateIssues, ["missing_translation"]);
 });

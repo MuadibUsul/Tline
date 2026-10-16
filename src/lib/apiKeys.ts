@@ -23,18 +23,26 @@ const PREFIX_LENGTH = 8;
  * reason would not be visible anywhere. Wire it up when the endpoint ships, or delete both
  * lines then; until one of those happens this comment is the answer to "is it dead?".
  *
- * `mcp:user` and `publisher:draft` are the two MCP scopes, kept apart on purpose: a key
- * that can read the public corpus is not a key that can write into the review queue, and
- * issuing both to one key would erase the only mechanical boundary between the two
- * servers' audiences. The operator console refuses to combine them (see API_SCOPES users
- * in admin actions); the MCP routes additionally reject a key carrying both, so a
+ * `mcp:user` and the two `publisher:*` scopes are the MCP scopes. `mcp:user` stays apart
+ * from the publisher scopes on purpose: a key that can read the public corpus is not a key
+ * that can write into the review queue, and issuing both to one key would erase the only
+ * mechanical boundary between the two servers' audiences. The operator console refuses to
+ * combine them, and the MCP routes additionally reject a key carrying both, so a
  * hand-edited row cannot get past either check.
+ *
+ * `publisher:draft` and `publisher:publish` may share a key — that is one publisher with
+ * the full flow — but publish is a scope of its own (spec §12's `publisher:publish`) so it
+ * can be granted, audited and revoked separately. A publisher key that drafts all day does
+ * not gain the power to put anything on the public site until someone ticks that box.
  */
-export type ApiScope = "research:read" | "consensus:read" | "mcp:user" | "publisher:draft";
-export const API_SCOPES: ApiScope[] = ["research:read", "consensus:read", "mcp:user", "publisher:draft"];
+export type ApiScope = "research:read" | "consensus:read" | "mcp:user" | "publisher:draft" | "publisher:publish";
+export const API_SCOPES: ApiScope[] = ["research:read", "consensus:read", "mcp:user", "publisher:draft", "publisher:publish"];
 
-/** The MCP scopes, which are mutually exclusive on a single key. */
-export const MCP_SCOPES: ApiScope[] = ["mcp:user", "publisher:draft"];
+/** The MCP scopes. `mcp:user` is mutually exclusive with every publisher scope. */
+export const MCP_SCOPES: ApiScope[] = ["mcp:user", "publisher:draft", "publisher:publish"];
+
+/** The publisher-side MCP scopes, which may share a key with each other. */
+export const PUBLISHER_SCOPES: ApiScope[] = ["publisher:draft", "publisher:publish"];
 
 export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -128,7 +136,7 @@ export interface AuthRefusal {
 
 export async function authenticate(
   header: string | null,
-  required: ApiScope,
+  required: ApiScope | ApiScope[],
 ): Promise<{ key: AuthenticatedKey; remaining: number; resetAt: number } | AuthRefusal> {
   const token = bearerToken(header);
   if (!token) return { failure: header ? "malformed" : "missing" };
@@ -146,7 +154,10 @@ export async function authenticate(
   if (record.revokedAt) return { failure: "revoked", keyId: record.id };
 
   const scopes = parseScopes(record.scopes);
-  if (!scopes.includes(required)) return { failure: "forbidden", keyId: record.id };
+  // An array means "any of these": the publisher endpoint serves draft-scoped and
+  // publish-scoped keys alike, and each tool then checks its own scope.
+  const accepted = Array.isArray(required) ? required : [required];
+  if (!scopes.some((scope) => accepted.includes(scope))) return { failure: "forbidden", keyId: record.id };
 
   const rate = consumeRate(record.id, record.rateLimit);
   if (!rate.allowed) return { failure: "rate_limited", retryAfter: Math.ceil((rate.resetAt - Date.now()) / 1000), keyId: record.id };

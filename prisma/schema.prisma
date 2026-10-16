@@ -1313,17 +1313,27 @@ model ApiKey {
 // sitemap or social pipelines, and the only door from here into publishing is the review
 // queue in the operations console. `version` is the optimistic lock the MCP tools hand back
 // and forth — an update or submit carrying a stale version is refused, not applied.
+//
+// `summary` is what makes direct publishing possible without an LLM pass: the writing agent
+// supplies the one-sentence conclusion, and publish stores it as the article's Analysis —
+// the public gate requires a summary, and inventing one server-side would be either a model
+// call nobody asked for or a guess.
 model McpPublicationDraft {
   id               String    @id @default(cuid())
   title            String
   content          String
+  summary          String?
   sourceUrl        String?
   institutionSlug  String?
   language         String    @default("en")
   sourcePublishedAt DateTime?
-  status           String    @default("DRAFT") // DRAFT | PENDING_REVIEW
+  status           String    @default("DRAFT") // DRAFT | PENDING_REVIEW | PUBLISHED
   validationIssues String    @default("[]") // JSON array of { code, field, message, blocking }
+  /// The preview hash, written by the same two writers that touch content (create/update),
+  /// so the responses can carry it without fetching every 100 KB body on every list.
+  contentHash      String    @default("")
   version          Int       @default(1)
+  publishedArticleId String? // set by publish; the Article this draft became
   createdById      String
   submittedAt      DateTime?
   createdAt        DateTime  @default(now())

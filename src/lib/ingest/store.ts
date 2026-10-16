@@ -36,7 +36,8 @@ export async function ensureAssets() {
 
 export type PersistResult = "created" | "updated" | "duplicate" | "empty";
 
-async function refreshClassification(articleId: string, cHash: string, tHash: string, title: string, text: string) {
+/** Exported for the Publisher MCP's publish path, which stores an article outside the crawler. */
+export async function refreshClassification(articleId: string, cHash: string, tHash: string, title: string, text: string) {
   try {
     // Preserve human facets, but put them back in the review queue when their source changed.
     await prisma.contentClassification.updateMany({ where: { articleId, source: "MANUAL" }, data: { status: "REVIEW", fingerprint: null } });

@@ -222,7 +222,8 @@ export default async function ApiPage() {
                   "research:read": tr(locale, "Public API — read reports and institutions", "公开 API · 查询研报与机构"),
                   "consensus:read": tr(locale, "Reserved for the planned consensus endpoint", "预留 · 暂无对应端点"),
                   "mcp:user": tr(locale, "MCP for AI clients — read-only research and macro queries", "MCP 用户端 · AI 只读查询研报与宏观数据"),
-                  "publisher:draft": tr(locale, "MCP for AI clients — draft and submit for review", "MCP 发布端 · AI 写草稿并送审（不能发布）"),
+                  "publisher:draft": tr(locale, "MCP for AI clients — create drafts and submit for review", "MCP 发布端 · AI 写草稿并送审"),
+                  "publisher:publish": tr(locale, "MCP for AI clients — publish drafts as public reports (gate-judged, withdrawable in the console)", "MCP 发布端 · AI 直接发布（经公开闸门裁决，可在后台撤回）"),
                 },
               }}
             />
@@ -238,7 +239,7 @@ export default async function ApiPage() {
                 <li><code>GET /api/v1/research/&#123;id&#125;</code> — <span>{tr(locale, "one report", "单篇研报")}</span></li>
                 <li><code>GET /api/v1/institutions</code> — <span>{tr(locale, "source list", "机构列表")}</span></li>
                 <li><code>POST /api/mcp/user</code> — <span>{tr(locale, "MCP, read-only (scope mcp:user)", "MCP 用户端,只读(scope mcp:user)")}</span></li>
-                <li><code>POST /api/mcp/publisher</code> — <span>{tr(locale, "MCP, draft review (scope publisher:draft)", "MCP 发布端,草稿送审(scope publisher:draft)")}</span></li>
+                <li><code>POST /api/mcp/publisher</code> — <span>{tr(locale, "MCP, drafts and publishing (scopes publisher:draft / publisher:publish)", "MCP 发布端,草稿与发布(scope publisher:draft / publisher:publish)")}</span></li>
               </ul>
               <p className="apikey-note">
                 {tr(locale, "The MCP servers have their own overview: ", "MCP 两端的说明与调用统计见：")}

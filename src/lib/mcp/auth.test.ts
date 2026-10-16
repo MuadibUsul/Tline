@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { entitlementRefusal } from "./auth";
-import { API_SCOPES, MCP_SCOPES, parseScopes } from "../apiKeys";
+import { API_SCOPES, MCP_SCOPES, PUBLISHER_SCOPES, parseScopes } from "../apiKeys";
 
 const owner = (overrides: Record<string, unknown> = {}) => ({ id: "u1", email: "a@b.c", tier: "free", role: "member", suspendedAt: null, ...overrides });
 
@@ -34,12 +34,15 @@ test("the Publisher MCP requires the editorial role itself", () => {
   assert.equal(entitlementRefusal(owner({ role: "admin" }), "publisher"), null);
 });
 
-test("the two MCP scopes exist, stay listed, and parse off a stored key", () => {
+test("the MCP scopes exist, stay listed, and parse off a stored key", () => {
   assert.ok(API_SCOPES.includes("mcp:user"));
   assert.ok(API_SCOPES.includes("publisher:draft"));
-  assert.deepEqual(MCP_SCOPES, ["mcp:user", "publisher:draft"]);
+  assert.ok(API_SCOPES.includes("publisher:publish"));
+  assert.deepEqual(MCP_SCOPES, ["mcp:user", "publisher:draft", "publisher:publish"]);
+  // The two publisher scopes may share one key; the user scope may share with neither.
+  assert.deepEqual(PUBLISHER_SCOPES, ["publisher:draft", "publisher:publish"]);
   assert.deepEqual(parseScopes(JSON.stringify(["mcp:user"])), ["mcp:user"]);
-  assert.deepEqual(parseScopes(JSON.stringify(["publisher:draft", "research:read"])), ["publisher:draft", "research:read"]);
+  assert.deepEqual(parseScopes(JSON.stringify(["publisher:draft", "publisher:publish"])), ["publisher:draft", "publisher:publish"]);
   // An unknown scope in a stored row is dropped, not fatal.
   assert.deepEqual(parseScopes(JSON.stringify(["mcp:user", "mcp:admin"])), ["mcp:user"]);
 });

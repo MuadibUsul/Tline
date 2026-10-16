@@ -1,17 +1,19 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { fail, ok, toolGuard } from "./results";
-import { createDraft, listDrafts, submitDraft, updateDraft, validateDraft, type DraftOutcome } from "./publicationDrafts";
+import { createDraft, listDrafts, publishDraft, submitDraft, updateDraft, validateDraft, type DraftOutcome } from "./publicationDrafts";
 import type { McpAuthContext } from "./auth";
 
 /**
- * The Tline Publisher MCP: draft creation and submission for reviewers and admins.
+ * The Tline Publisher MCP: draft creation, submission and — for keys carrying the
+ * `publisher:publish` scope — direct publishing.
  *
- * The blast radius is fixed by construction: there is no publish, withdraw, delete or
- * social tool here, and no MCP transition out of PENDING_REVIEW — the only door from a
- * submitted draft into publishing is the review queue in the operations console. Every
- * call is attributed to the account the key is bound to (`context.actorId`), which the
- * HTTP layer re-verified against the live role on this same request.
+ * The blast radius is bounded by construction: publishing is a scope of its own, checked
+ * per tool call; the published article goes through the same derive-and-store path the
+ * crawler uses and is judged by the same public gate, so a publish that fails validation
+ * or the gate is reported as withheld rather than forced live; and there is still no
+ * withdraw, delete or social tool here — taking something down remains an operations
+ * action, never an MCP one.
  */
 
 export interface PublisherToolDeps {
@@ -19,28 +21,41 @@ export interface PublisherToolDeps {
   updateDraft: typeof updateDraft;
   validateDraft: typeof validateDraft;
   submitDraft: typeof submitDraft;
+  publishDraft: typeof publishDraft;
   listDrafts: typeof listDrafts;
 }
 
-export const defaultPublisherDeps: PublisherToolDeps = { createDraft, updateDraft, validateDraft, submitDraft, listDrafts };
+export const defaultPublisherDeps: PublisherToolDeps = { createDraft, updateDraft, validateDraft, submitDraft, publishDraft, listDrafts };
 
 const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } as const;
 const IDEMPOTENT_WRITE = { ...WRITE, idempotentHint: true } as const;
 
 const DRAFT_FIELDS = {
   title: z.string().min(1).max(500).describe("Headline of the piece, 8-300 characters."),
-  content: z.string().min(1).max(120_000).describe("Full text, 100-100000 characters. Plain text or light HTML."),
-  sourceUrl: z.string().max(2000).nullish().describe("HTTPS link to where this was published, when there is one."),
-  institutionSlug: z.string().max(120).nullish().describe("Tline institution slug the piece is attributed to; must already be registered."),
+  content: z.string().min(1).max(120_000).describe("Full text, 100-100000 characters. Plain text or light HTML. Publishing additionally requires at least 300 characters."),
+  summary: z.string().max(2000).nullish().describe("One-sentence conclusion the reader sees first. Required at publish time — it becomes the report's analysis on the site."),
+  sourceUrl: z.string().max(2000).nullish().describe("HTTPS link to where this was published. Required at publish time."),
+  institutionSlug: z.string().max(120).nullish().describe("Tline institution slug the piece is attributed to; must already be registered. Required at publish time."),
   language: z.string().max(35).nullish().describe("BCP-47 tag of the content; defaults to en."),
   sourcePublishedAt: z.string().max(40).nullish().describe("ISO-8601 time the source was published."),
 } as const;
 
 const DRAFT_DTO_SCHEMA = {
   id: z.string(), title: z.string(), status: z.string(), version: z.number(), language: z.string(),
+  summary: z.string().nullable(),
   sourceUrl: z.string().nullable(), institutionSlug: z.string().nullable(), sourcePublishedAt: z.string().nullable(),
   validationIssues: z.array(z.object({ code: z.string(), field: z.string(), message: z.string(), blocking: z.boolean() })),
-  submittedAt: z.string().nullable(), createdAt: z.string(), updatedAt: z.string(),
+  submittedAt: z.string().nullable(), publishedArticleId: z.string().nullable(), contentHash: z.string(),
+  createdAt: z.string(), updatedAt: z.string(),
+} as const;
+
+const PUBLISH_RESULT_SCHEMA = {
+  draft: z.object(DRAFT_DTO_SCHEMA),
+  article: z.object({
+    id: z.string(), slug: z.string(), pageUrl: z.string(),
+    indexableEn: z.boolean(), indexableZh: z.boolean(),
+    gateIssues: z.array(z.string()), documentReady: z.boolean(),
+  }),
 } as const;
 
 /** One translation from a domain outcome to the MCP envelope, so the five tools agree. */
@@ -51,8 +66,8 @@ function settle<T>(outcome: DraftOutcome<T>) {
 
 export function createPublisherServer(context: McpAuthContext, deps: PublisherToolDeps = defaultPublisherDeps): McpServer {
   const server = new McpServer(
-    { name: "tline-publisher-mcp", version: "1.0.0" },
-    { instructions: "Drafting access to Tline's review queue. You can create, revise and submit drafts; you cannot publish, reject or delete anything — a human reviewer does that in the Tline console. Always read the validationIssues in the response before submitting, and tell the operator what the draft contains before calling submit." },
+    { name: "tline-publisher-mcp", version: "1.1.0" },
+    { instructions: "Drafting and publishing access to Tline. You can create, revise and submit drafts for review; with the publisher:publish scope on your key you can also publish a draft as a public report, judged by the same gate as every other report on the site. There is no unpublish, reject or delete over MCP — a human reviewer and the console handle those. Always read validationIssues before submitting or publishing, and quote the contentHash from the draft you actually read when publishing." },
   );
   const actor = { userId: context.actorId, keyId: context.key.id };
 
@@ -82,17 +97,40 @@ export function createPublisherServer(context: McpAuthContext, deps: PublisherTo
 
   server.registerTool("submit_publication_for_review", {
     title: "Submit draft for review",
-    description: "Move a DRAFT with no blocking issues into the review queue (PENDING_REVIEW). This is the end of the MCP workflow: it does not publish anything, and the draft becomes read-only over MCP until a reviewer acts in the console. Requires the current version; resubmitting a stale or already-submitted draft is refused, never duplicated.",
+    description: "Move a DRAFT with no blocking issues into the review queue (PENDING_REVIEW), where a human decides. Requires the current version; resubmitting a stale or already-submitted draft is refused, never duplicated.",
     inputSchema: { id: z.string().describe("Draft id."), version: z.number().int().positive().describe("The current version to submit.") },
     outputSchema: DRAFT_DTO_SCHEMA,
     annotations: IDEMPOTENT_WRITE,
   }, toolGuard("submit_publication_for_review", async (args) => settle(await deps.submitDraft(args, actor))));
 
+  server.registerTool("publish_publication_draft", {
+    title: "Publish draft",
+    description: [
+      "Publish a draft as a public report on Tline. Requires a key carrying the publisher:publish scope.",
+      "The whole publishable set must be present: sourceUrl, institutionSlug, at least 300 characters of content, and a summary (it becomes the report's analysis on the site).",
+      "Pass the contentHash from the draft you read — the preview hash; publishing anything other than what was read is refused.",
+      "The article is created and then judged by the same public gate as every other report: the reply carries the gate's verdict (indexableEn/indexableZh and any issues) so you can verify what actually went live. A draft that fails the gate is reported as withheld, not forced live.",
+      "There is no unpublish over MCP: taking a report down is an operations action in the Tline console.",
+    ].join(" "),
+    inputSchema: {
+      id: z.string().describe("Draft id."),
+      version: z.number().int().positive().describe("The current version to publish."),
+      expectedContentHash: z.string().length(64).describe("The contentHash returned with the draft; proves this call publishes exactly what was read."),
+    },
+    outputSchema: PUBLISH_RESULT_SCHEMA,
+    annotations: { ...WRITE, idempotentHint: true },
+  }, toolGuard("publish_publication_draft", async (args) => {
+    if (!context.key.scopes.includes("publisher:publish")) {
+      return fail("SCOPE_DENIED", "This key lacks the publisher:publish scope; it can draft and submit but not publish. Ask an operator to issue or extend a key with publisher:publish.");
+    }
+    return settle(await deps.publishDraft(args, actor));
+  }));
+
   server.registerTool("list_publication_drafts", {
     title: "List publication drafts",
     description: "List the drafts created by this key's account, newest update first. Cross-account listing is a console feature and is not available over MCP.",
     inputSchema: {
-      status: z.enum(["DRAFT", "PENDING_REVIEW"]).optional().describe("Filter by state."),
+      status: z.enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED"]).optional().describe("Filter by state."),
       cursor: z.string().max(200).optional().describe("Opaque cursor from a previous call's nextCursor."),
       limit: z.number().int().min(1).max(50).optional().describe("Drafts per page, 1-50; default 20."),
     },

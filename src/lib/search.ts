@@ -172,7 +172,15 @@ function prepareCandidate(candidate: SearchCandidate) {
   candidate.normalizedContent = normalizeSearchText((candidate.content ?? []).join(" "));
   candidate.compactContent = candidate.normalizedContent.replace(/\s/g, "");
   candidate.contentWords = [...new Set(candidate.normalizedContent.split(" "))];
-  candidate.contentTrigrams = new Set(candidate.contentWords.flatMap(trigrams));
+  /**
+   * Trigram sets are the index's dominant memory cost — a Set of short strings per field,
+   * per candidate, and there are several candidates per report. The fuzzy gate they power
+   * (a query token must share half its trigrams to match at all) is protection against
+   * false positives on long compounds and pinyin lookups; the *content* supply is capped
+   * because pinyin targets live in the primary/alias fields, which stay uncapped.
+   */
+  const CONTENT_TRIGRAM_WORDS = 600;
+  candidate.contentTrigrams = new Set(candidate.contentWords.slice(0, CONTENT_TRIGRAM_WORDS).flatMap(trigrams));
   candidate.combinedTrigrams = new Set(trigrams(candidate.normalizedCombined));
 }
 
@@ -300,6 +308,24 @@ const INDEX_MAX_ARTICLES = Math.max(100, Number(process.env.SEARCH_INDEX_MAX_ART
  * minute would be the same as no line at all.
  */
 let truncationWarned = false;
+
+/**
+ * How much of a document's body enters the in-process index.
+ *
+ * The index carries each article's full body and full translation and derives a word list
+ * and two trigram sets from that text — and those sets, not the strings, are what made the
+ * cold build fatal: at a production corpus of ~1,300 reports the build passed 768 MB of V8
+ * heap and aborted the whole server on the first search (2026-10-17). Measured after this
+ * cap: ~14 KB of indexed text per report keeps both locale indexes near 230 MB at a
+ * thousand reports.
+ *
+ * Only the *body* is capped. Titles, summaries, extracted views, topics and tickers are
+ * indexed in full, and those carry the searches readers actually run; a query that matches
+ * only deep inside a long report's prose no longer finds it. Raise with SEARCH_CONTENT_CHARS
+ * if the box grows.
+ */
+const CONTENT_INDEX_CHARS = Math.max(1_000, Number(process.env.SEARCH_CONTENT_CHARS || 4_000));
+const indexedText = (value: string | null | undefined) => (value ?? "").slice(0, CONTENT_INDEX_CHARS);
 
 const loadSearchData = async () => {
   const [institutions, assets, articles] = await Promise.all([
@@ -452,7 +478,7 @@ export async function searchSite(query: string, limit = 12, locale: Locale = "en
         primary: [article.title, translation?.title ?? ""],
         aliases: [...assetTerms, ...article.atomicViews.flatMap((view) => [view.asset, view.assetTicker ?? "", view.topic])],
         secondary: [article.institution.name, article.institution.slug, article.author ?? ""],
-        content: [article.analysis?.summary ?? "", article.analysis?.summaryZh ?? "", article.rawText ?? "", translation?.text ?? "", ...atomicText],
+        content: [article.analysis?.summary ?? "", article.analysis?.summaryZh ?? "", indexedText(article.rawText), indexedText(translation?.text), ...atomicText],
       },
       // Each extracted view is searchable in its own right: someone looking for "gold"
       // usually wants the stance an institution took, not only the report carrying it.

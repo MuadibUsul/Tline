@@ -1,0 +1,24 @@
+old_url,target_url,action,evidence,owner,reviewed_at,rollback_action,notes
+# 规则：未决策不得上线。action 取值 keep / 301 / 410。本表由 TL-002/TL-403 维护。
+# 全量 3,422 条 canonical URL 见 url-inventory-2026-10-16.csv；本表只记录"需要决策"的条目。
+/{locale}/research,~,keep,src/lib/sitemap.ts:49 STATIC_ROUTES priority 0.9,site-owner,pending,revert-page-change,研究列表为收录主力，禁止改址
+/{locale}/research/{slug},~,keep,slug 不可变（buildResearchSlug；id→slug 308 已存在）,site-owner,pending,revert-redirect,存量 1,889(en)/1,153(zh) 条
+/{locale}/institutions,~,keep,现为观点流（7天窗口）；PRD §3.2 要求保留原址,site-owner,pending,revert-page-change,⚠️ 与站主早前"观点下架"指令冲突，待裁决（README 开放问题 1）
+/{locale}/markets,~,keep,STATIC_ROUTES priority 0.8,site-owner,pending,revert-page-change,
+/{locale}/markets/{ticker},~,keep,sitemap assets 分片 18 条,site-owner,pending,revert-page-change,历史别名 /asset/{ticker} 已 308
+/{locale}/macro,~,keep,STATIC_ROUTES priority 0.8,site-owner,pending,revert-page-change,
+/{locale}/macro/indicator/{key},~,keep,sitemap pages 分片 30 条,site-owner,pending,revert-page-change,单位/期次展示层整改不改 URL
+/{locale}/macro/calendar,~,keep,STATIC_ROUTES priority 0.6,site-owner,pending,revert-page-change,
+/{locale}/topics,~,keep,topics 分片（en 58 / zh 40）,site-owner,pending,revert-page-change,主题页新增常青介绍为内容增量
+/{locale}/topics/{topic},~,keep,同上,site-owner,pending,revert-page-change,
+/{locale}/economies,~,keep,STATIC_ROUTES priority 0.7,site-owner,pending,revert-page-change,
+/{locale}/economies/{economy},~,keep,pages 分片 14 条,site-owner,pending,revert-page-change,
+/{locale}/market-themes,~,keep,条件收录（无主线时 noindex）,site-owner,pending,revert-page-change,
+/{locale}/watchlist,~,keep,noindex；登录限定,site-owner,pending,revert-page-change,PRD 判为二级入口
+/{locale}/dashboards,~,keep,noindex,site-owner,pending,revert-page-change,同上
+/{locale}/{policy-pages},~,keep,STATIC_ROUTES 8 条政策页,site-owner,pending,revert-page-change,信任中心聚合不改址
+/{locale}/institution/{slug},~,keep,institutions 分片 62 条,site-owner,pending,revert-page-change,PRD 机构目录用新路由（如 /institutions-directory），不动此路径
+/{locale}/institution/{slug}/accuracy,~,keep,同上,site-owner,pending,revert-page-change,
+/{locale}/sitemap/{named-shard}.xml,~,keep,2026-10-09 命名分片；数字旧址已 308,site-owner,pending,revert-page-change,分片地址是搜索资产
+/admin/api-keys,/admin/api,301(已实现),src/app/admin/api-keys/page.tsx:8,site-owner,done,revert-page-change,noindex 后台内部跳转
+/{locale}/feed.xml,~,keep,rss.xml re-export,site-owner,pending,revert-page-change,低危：建议加 self 引用（03 R10）

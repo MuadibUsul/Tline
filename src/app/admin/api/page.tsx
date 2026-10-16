@@ -216,6 +216,14 @@ export default async function ApiPage() {
                 ),
                 copy: tr(locale, "Copy", "复制"),
                 copied: tr(locale, "Copied", "已复制"),
+                // What each scope opens, in one line — the raw scope names alone told an
+                // operator nothing about which boxes to tick for an MCP client.
+                scopeNotes: {
+                  "research:read": tr(locale, "Public API — read reports and institutions", "公开 API · 查询研报与机构"),
+                  "consensus:read": tr(locale, "Reserved for the planned consensus endpoint", "预留 · 暂无对应端点"),
+                  "mcp:user": tr(locale, "MCP for AI clients — read-only research and macro queries", "MCP 用户端 · AI 只读查询研报与宏观数据"),
+                  "publisher:draft": tr(locale, "MCP for AI clients — draft and submit for review", "MCP 发布端 · AI 写草稿并送审（不能发布）"),
+                },
               }}
             />
           </section>

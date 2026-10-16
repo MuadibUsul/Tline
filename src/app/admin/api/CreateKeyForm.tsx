@@ -25,6 +25,8 @@ export default function CreateKeyForm({
     warning: string;
     copy: string;
     copied: string;
+    /** One line per scope explaining what a key with it can do. */
+    scopeNotes?: Record<string, string>;
   };
 }) {
   const [state, action, pending] = useActionState<CreateKeyResult, FormData>(createApiKey, {});
@@ -43,6 +45,7 @@ export default function CreateKeyForm({
             <label key={scope} className="apikey-scope">
               <input type="checkbox" name="scopes" value={scope} defaultChecked />
               <code>{scope}</code>
+              {labels.scopeNotes?.[scope] && <small>{labels.scopeNotes[scope]}</small>}
             </label>
           ))}
         </fieldset>

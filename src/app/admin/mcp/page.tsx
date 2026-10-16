@@ -18,9 +18,9 @@ export const metadata: Metadata = { title: "MCP 服务" };
  * The console's view of the two MCP servers.
  *
  * Key issuance deliberately stays on the API page — one place issues, rotates and
- * revokes every credential. This page is what was missing around it: what the two
- * servers are, which scopes they require, who is actually calling them, and which keys
- * currently carry an MCP scope.
+ * revokes every credential. This page answers what that page cannot: what the two
+ * servers are in plain language, which scope each requires, who is calling them, and
+ * which keys currently carry an MCP scope.
  */
 
 const MCP_SCOPE_SET = new Set<ApiScope>(["mcp:user", "publisher:draft"]);
@@ -36,8 +36,10 @@ const SERVERS = [
     scope: "mcp:user",
     en: "User MCP",
     zh: "MCP 用户端",
-    purposeEn: "Read-only queries for agents acting for an entitled account: report search and detail, macro indicators and calendar, institution list. Every read asks the same publication gate the site asks — no article bodies or PDFs.",
-    purposeZh: "面向已开通账户的 AI Agent 只读查询:研报搜索与详情、宏观指标与经济日历、发布机构列表。每条读取都过站点同一道公开闸门,不返回原文与 PDF。",
+    purposeEn: "A read-only connection for AI clients: search and read published reports, macro indicators and the economic calendar, list institutions. Answers match the website exactly — no article bodies or PDFs.",
+    purposeZh: "给 AI 客户端用的只读连接:搜索与阅读已发布研报、查询宏观指标与经济日历、列出机构。返回内容与网站一致,不含原文与 PDF。",
+    audienceEn: "entitlement: professional / founding / reviewer / admin",
+    audienceZh: "开通范围:professional / founding / reviewer / admin",
     tools: ["search_research", "get_research", "get_macro_indicator", "get_macro_calendar", "list_institutions"],
   },
   {
@@ -45,8 +47,10 @@ const SERVERS = [
     scope: "publisher:draft",
     en: "Publisher MCP",
     zh: "MCP 发布端",
-    purposeEn: "Draft creation and submission for reviewers and admins. There is no publish, withdraw or delete tool — a human reviewer is the only way onward, in this console.",
-    purposeZh: "面向审核员与管理员的草稿创建与送审。没有发布、撤回或删除工具——唯一出口是运营后台的人工审核队列。",
+    purposeEn: "A drafting channel for AI clients: create, revise and validate drafts, then submit them for review. It cannot publish, withdraw or delete — whether content goes live is decided by a human in the review queue.",
+    purposeZh: "给 AI 客户端用的投稿通道:创建、修改、校验草稿并送审。它不能发布、撤回或删除——最终是否发布由人在审核队列决定。",
+    audienceEn: "requires a reviewer / admin key; the owner's role is re-checked on every call",
+    audienceZh: "需 reviewer / admin 密钥,每次调用复查持有人角色",
     tools: ["create_publication_draft", "update_publication_draft", "validate_publication_draft", "submit_publication_for_review", "list_publication_drafts"],
   },
 ] as const;
@@ -90,42 +94,41 @@ export default async function McpPage() {
           <p className="sub">
             {tr(
               locale,
-              "Two Model Context Protocol servers for AI agents and LLM applications. Stateless Streamable HTTP; the same API keys as everything else, with the scopes below.",
-              "面向 AI Agent 与大模型应用的两个 MCP Server。无状态 Streamable HTTP;复用现有 API 密钥体系,凭下方 scope 区分两端。",
+              "Two connections for AI clients (Claude, ChatGPT agents, home-grown assistants). Managing them is the same as any API key: issue a key with the matching scope below.",
+              "两个供 AI 客户端(Claude、ChatGPT 里的 Agent、自建助手等)连接的接口。管理方式与普通 API 密钥相同:签发一把带对应权限(scope)的密钥即可。",
             )}
           </p>
         </div>
         <div className="tag-row">
-          <span className="chip bull">{SERVERS.length} {tr(locale, "endpoints live", "个端点在线")}</span>
-          <span className="chip acc">{activeKeys} {tr(locale, "MCP keys active", "把 MCP 密钥启用中")}</span>
+          <span className="chip bull">{SERVERS.length} {tr(locale, "endpoints live", "个端点已上线")}</span>
+          <span className="chip acc">{activeKeys} {tr(locale, "MCP keys active", "个 MCP 密钥启用中")}</span>
         </div>
       </header>
 
-      <div className="admin-columns">
-        {SERVERS.map((server, index) => {
-          const usage = usageByEndpoint.get(server.endpoint) ?? { calls: 0, errors: 0 };
-          return (
-            <section className="blk" key={server.endpoint}>
-              <div className="section-t">
-                <span>{tr(locale, server.en, server.zh)}</span>
-                <span className="chip acc">{server.scope}</span>
+      {SERVERS.map((server) => {
+        const usage = usageByEndpoint.get(server.endpoint) ?? { calls: 0, errors: 0 };
+        return (
+          <section className="blk" key={server.endpoint}>
+            <div className="section-t">
+              <span>{tr(locale, server.en, server.zh)}</span>
+              <span className="chip acc">{server.scope}</span>
+            </div>
+            <div className="apikey-docs">
+              <p>{tr(locale, server.purposeEn, server.purposeZh)}</p>
+              <code>POST {base}{server.endpoint}</code>
+              <p style={{ margin: 0 }}>{tr(locale, "Tools this server exposes:", "此端点提供的工具:")}</p>
+              <div className="tags">
+                {server.tools.map((tool) => <span key={tool} className="chip gray">{tool}</span>)}
               </div>
-              <div className="apikey-docs">
-                <code>POST {base}{server.endpoint}</code>
-                <p>{tr(locale, server.purposeEn, server.purposeZh)}</p>
-                <ul>
-                  {server.tools.map((tool) => <li key={tool}><code>{tool}</code></li>)}
-                </ul>
-                <p className="apikey-note">
-                  {tr(locale, "Last 30 days:", "近 30 天:")} {compact(usage.calls)} {tr(locale, "calls", "次调用")}
-                  {usage.errors > 0 ? ` · ${usage.errors} ${tr(locale, "≥400 responses", "次 4xx/5xx")}` : ""}
-                  {index === 0 ? ` · ${tr(locale, "entitlement: professional / founding / reviewer / admin", "开通范围:professional / founding / reviewer / admin")}` : ` · ${tr(locale, "publisher keys re-check the owner's role every call", "每次调用复查密钥持有者角色")}`}
-                </p>
-              </div>
-            </section>
-          );
-        })}
-      </div>
+              <p className="apikey-note">
+                {tr(locale, "Last 30 days:", "近 30 天:")} {compact(usage.calls)} {tr(locale, "calls", "次调用")}
+                {usage.errors > 0 ? tr(locale, ` (${usage.errors} refused: no or wrong key)`, `(其中 ${usage.errors} 次鉴权被拒)`) : ""}
+                {" · "}{tr(locale, server.audienceEn, server.audienceZh)}
+              </p>
+            </div>
+          </section>
+        );
+      })}
 
       <section className="blk">
         <div className="section-t">{tr(locale, "Connecting a client", "接入客户端")}</div>
@@ -133,14 +136,14 @@ export default async function McpPage() {
           <li>
             {tr(locale, "Issue a key on the ", "在「")}
             <Link href={localePath(locale, "/admin/api")}>{tr(locale, "API & keys", "API 与密钥")}</Link>
-            {tr(locale, " page and tick the MCP scope it is for. The two scopes must be issued on separate keys — the form refuses them together.", "」页签发密钥,勾选对应 MCP scope。两个 scope 必须分开签发,同勾会被拒绝。")}
+            {tr(locale, " page and tick the scope of the server it is for. The two MCP scopes must be issued on separate keys.", "」页签发密钥,勾选对应端点的 scope。两个 MCP scope 必须分开签发。")}
           </li>
           <li>
-            {tr(locale, "In the AI client (MCP host), add a remote MCP server: the endpoint URL above, then header ", "在 AI 客户端(MCP Host)添加远程 MCP Server:填上方端点 URL,请求头 ")}
+            {tr(locale, "In the AI client, add a remote MCP server: the endpoint URL above, with header ", "在 AI 客户端里添加远程 MCP Server:填上方端点 URL,请求头 ")}
             <code>Authorization: Bearer tli_…</code>
           </li>
           <li>
-            {tr(locale, "The client's tools/list lists the tools above. The secret is shown once at creation; a lost key is rotated, never recovered.", "连接后 tools/list 会列出上方工具。密钥仅在签发时显示一次,遗失只能轮换。")}
+            {tr(locale, "The client will list the tools above. The secret is shown once at creation; a lost key is rotated, never recovered.", "连接后客户端会列出上方工具。密钥仅在签发时显示一次,遗失只能轮换。")}
           </li>
         </ol>
       </section>

@@ -230,7 +230,13 @@
 
 .admin-danger .section-t{color:var(--bear)}
 
-.apikey-scope{flex-direction:row !important;align-items:center;gap:7px !important}
+/* Each scope is a row: [checkbox] scope-name, then a one-line explanation underneath.
+   Without `input{width:auto}` the checkbox inherited the form-wide width rule and
+   stretched to ~180px, pushing every label to the far right of the row — the whole
+   fieldset read as a broken diagonal. */
+.apikey-scope{flex-direction:row !important;flex-wrap:wrap;align-items:center;gap:7px !important}
+.apikey-scope input{width:auto;flex:none}
+.apikey-scope small{flex-basis:100%;padding-left:21px;font:10.5px/1.45 var(--mono);color:var(--faint)}
 
 .apikey-issued-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
 

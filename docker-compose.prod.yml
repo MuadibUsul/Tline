@@ -43,6 +43,10 @@ services:
       # Full report bodies are held in both locale indexes. Keep the production
       # working set bounded as the corpus grows, rather than exhausting V8 at boot.
       SEARCH_INDEX_MAX_ARTICLES: ${SEARCH_INDEX_MAX_ARTICLES:-1000}
+      # Premium-media redesign phase switch (docs/redesign/). View layer only; set "off"
+      # (or remove the line) in .env and recreate the app container to roll back.
+      # Default off so a deployment that never opted in keeps the previous appearance.
+      TL_REDESIGN: ${TL_REDESIGN:-off}
     networks:
       - default
       - web

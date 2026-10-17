@@ -17,12 +17,12 @@
 
 硬规则：
 1. 原创新闻绝不使用 publish_publication_draft、create_publication_draft 或任何研报草稿/机构研报管线。研报管线只服务第三方机构研报，新闻使用独立的 NewsPost 结构。
-2. 新闻只通过这些工具写入：create_news、update_news、publish_news、unpublish_news、delete_news、pin_news、list_news、get_news。
+2. 新闻只通过这些工具写入：create_news、update_news、publish_news、unpublish_news、delete_news、pin_news、list_news、get_news、add_news_image、list_publisher_institutions。
 3. 长期栏目是新闻的归属，不是研报的机构。栏目用 list_news_columns 查询，create_news_column 创建；每一期用 columnSlug 归档。「俄乌战场简报」的 columnSlug 是 ukraine-war-brief，每日更新。
 4. 标题和正文使用原始语言。中文内容不要伪造英文版；只有真正用英文写作时才填写 titleEn/bodyEn。两种语言都填时，两边必须是同一篇内容的真实写作。
-5. 每一条必须有 HTTPS 的 sourceUrl；正文里明确写出信息来源与置信度。不得编造数字、引语、日期或战果；不确定就标注低置信或略过。
-6. 发布前先用 get_news 读取草稿，确认标题、正文、栏目、来源都正确；发布后再 get_news 复核一次。update_news 是整字段替换：更新时必须把想保留的 titleZh/titleEn/bodyZh/bodyEn/sourceUrl/columnSlug 全部重新传入，漏传的字段会被清空。
-7. 图片：文字、结构、图片位置建议由你负责；图片文件由编辑在运营后台 /admin/news/{id} 上传。交付时给出每张图的「第几段之后、图注、alt」，不要声称已经上传了你没有上传的图片。
+5. 来源用 sources 数组（0–10 个 HTTPS 链接），sourceUrl 只作为主来源/展示。新闻没有来源唯一性：日报每天引用 CoinGecko、DeepStateMap 同一个链接是正常的，不要为了通过去编造不同链接。每条必须有至少一个 HTTPS 来源；正文里写清信息来源与置信度，不得编造数字、引语、日期或战果。
+6. 发布前先用 get_news 读取草稿，确认标题、正文、栏目、来源都正确；发布后再 get_news 复核一次。update_news 是整字段替换：更新时必须把想保留的 titleZh/titleEn/bodyZh/bodyEn/sourceUrl/sources/columnSlug 全部重新传入，漏传的字段会被清空。
+7. 图片：用 add_news_image 传一个公开的 HTTPS 图片地址，Tlines 会下载并存储，不热链。position 是插在第几段之后（0=开头），同时给 caption/alt。只接受 PNG/JPEG/WebP/GIF、≤8MB、公开主机；私网地址和重定向会被拒绝。传完用 get_news 复核 images。
 8. 工具错误码：NOT_FOUND 表示 id/slug 不存在；VALIDATION_FAILED 看 details.issues；SCOPE_DENIED 表示密钥或账号权限不足；VERSION_CONFLICT 表示内容已被改动，重新 get_news 后再操作。不要盲目重试。
 9. 新闻页/栏目页的公开地址规则：/news/{slug}、/news/columns/{slug}；不要自行拼接研报地址 /research/...。
 10. 任何不确定是否属于新闻的内容，先问站主；不要把新闻塞进研报，也不要把研报改写成新闻。
@@ -52,9 +52,9 @@
 
 流程：
 1) list_news_columns，确认 ukraine-war-brief。
-2) create_news：kind=article、titleZh、bodyZh、sourceUrl、columnSlug=ukraine-war-brief。
+2) create_news：kind=article、titleZh、bodyZh、sources（数组）、sourceUrl（主来源）、columnSlug=ukraine-war-brief。
 3) 记下返回的 id；get_news 读取并复核。
-4) 需要配图时，在交付说明中列出：插入位置（第几段之后，0=开头）、图注、alt；不要编造图片已经上传。
+4) 需要配图时，用 add_news_image：id、公开 HTTPS 图片 URL、position（第几段之后，0=开头）、caption、alt。传完 get_news 复核。
 5) 确认无误后 publish_news。
 6) 再 get_news 复核 status=published，返回 id、slug、公开 URL、栏目页 URL、来源清单、置信度摘要。
 ```
@@ -99,9 +99,11 @@
 | --- | --- | --- |
 | `list_news_columns` | 查长期栏目 | 无 |
 | `create_news_column` | 新建栏目 | `slug`, `nameZh`, `nameEn?`, `descriptionZh?`, `descriptionEn?`, `cadence?` |
-| `create_news` | 写草稿 | `kind?`, `titleZh?`, `titleEn?`, `bodyZh?`, `bodyEn?`, `sourceUrl?`, `columnSlug?` |
-| `update_news` | 整字段替换 | `id` + 上列全部字段（想保留的都要重传） |
-| `get_news` | 读全文+图片位置 | `id` 或 `slug` |
+| `create_news` | 写草稿 | `kind?`, `titleZh?`, `titleEn?`, `bodyZh?`, `bodyEn?`, `sourceUrl?`, `sources?`, `columnSlug?` |
+| `update_news` | 整字段替换 | `id` + 上列全部字段（想保留的都要重传；sources 也要重传） |
+| `get_news` | 读全文+来源+图片位置 | `id` 或 `slug` |
+| `add_news_image` | 下载并附一张图 | `id`, `url`, `position?`, `caption?`, `alt?` |
+| `list_publisher_institutions` | 查已注册机构 slug | 无 |
 | `list_news` | 列出条目 | `status?`, `limit?` |
 | `publish_news` | 发布 | `id` |
 | `unpublish_news` | 下线 | `id` |
@@ -113,5 +115,5 @@
 - 不要用 `publish_publication_draft` 发新闻；它会生成机构研报，并可能让中文正文挂在英文研报 URL 下。
 - 不要用机构（institution）作为新闻作者；新闻的归属是栏目，不是投行。
 - 不要为中文新闻编造英文标题/正文来“补全双语”。
-- 不要声称上传了图片；图片上传目前只在运营后台完成。
+- 图片必须用 add_news_image 上传并复核；不要声称已经上传而没有调用工具。
 - 不要删除或改写已发布的历史期，除非站主明确要求纠错；纠错走 `update_news` 并保留栏目。

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsLocales, newsParagraphRole, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
+import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
 
 const record = (overrides: Partial<Parameters<typeof newsTitle>[0]> = {}) => ({
   id: "p1", slug: "s", kind: "brief", titleZh: null, titleEn: null, bodyZh: null, bodyEn: null,
@@ -76,4 +76,14 @@ test("validation: at least one title, matching bodies, https sources", () => {
   assert.ok(codes({ titleZh: "美联储维持利率不变", sourceUrl: "nope" }).includes("sourceUrl.invalid"));
   assert.ok(codes({ kind: "post", titleZh: "美联储维持利率不变" }).includes("kind.invalid"));
   assert.ok(codes({ titleZh: "美" }).includes("title.zh_short"));
+});
+
+test("a brief may cite several sources, and the same URL may recur across editions", () => {
+  const codes = (input: Parameters<typeof validateNewsInput>[0]) => validateNewsInput(input).map((issue) => issue.code);
+  assert.deepEqual(codes({ titleZh: "每日简报", sources: ["https://deepstatemap.live", "https://www.reuters.com"] }), []);
+  assert.ok(codes({ titleZh: "每日简报", sources: ["http://example.com"] }).includes("sources.not_https"));
+  assert.ok(codes({ titleZh: "每日简报", sources: ["nope"] }).includes("sources.invalid"));
+  assert.ok(codes({ titleZh: "每日简报", sources: Array.from({ length: 11 }, (_, index) => `https://example.com/${index}`) }).includes("sources.too_many"));
+  // Primary first, duplicates removed.
+  assert.deepEqual(newsSources({ sourceUrl: "https://a.example", sources: [{ url: "https://a.example" }, { url: "https://b.example" }] }), ["https://a.example", "https://b.example"]);
 });

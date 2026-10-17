@@ -23,6 +23,7 @@ export default async function AdminNewsEditPage(props: { params: Promise<{ id: s
     include: {
       column: { select: { slug: true, nameZh: true, nameEn: true } },
       images: { orderBy: { position: "asc" }, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
+      sources: { orderBy: { position: "asc" }, select: { url: true } },
     },
   });
   if (!post) notFound();
@@ -57,7 +58,7 @@ export default async function AdminNewsEditPage(props: { params: Promise<{ id: s
           <NewsForm
             action={updateNewsAction}
             columns={columns}
-            initial={{ id: post.id, kind, columnSlug: post.column?.slug ?? "", titleZh: post.titleZh ?? "", titleEn: post.titleEn ?? "", bodyZh: post.bodyZh ?? "", bodyEn: post.bodyEn ?? "", sourceUrl: post.sourceUrl ?? "" }}
+            initial={{ id: post.id, kind, columnSlug: post.column?.slug ?? "", titleZh: post.titleZh ?? "", titleEn: post.titleEn ?? "", bodyZh: post.bodyZh ?? "", bodyEn: post.bodyEn ?? "", sourceUrl: post.sourceUrl ?? "", sources: post.sources.map((source) => source.url) }}
             labels={{
               kind: tr(locale, "Kind", "类型"),
               column: tr(locale, "Column", "栏目"),
@@ -66,7 +67,9 @@ export default async function AdminNewsEditPage(props: { params: Promise<{ id: s
               titleEn: tr(locale, "English title", "英文标题"),
               bodyZh: tr(locale, "Chinese body", "中文正文"),
               bodyEn: tr(locale, "English body", "英文正文"),
-              sourceUrl: tr(locale, "Source URL (https)", "来源链接（https）"),
+              sourceUrl: tr(locale, "Primary source URL (https)", "主来源链接（https）"),
+              sources: tr(locale, "All sources (one HTTPS URL per line)", "全部来源（每行一个 HTTPS 链接）"),
+              sourcesHint: tr(locale, "A daily brief may cite the same dashboard every day; sources are display metadata, not a uniqueness key.", "日报每天可以引用同一个数据源；来源只用于展示，不作为唯一键。"),
               save: tr(locale, "Save changes", "保存修改"),
               saving: tr(locale, "Saving…", "保存中……"),
               hint: tr(locale, "Blank lines separate paragraphs. Saving does not publish.", "空行分段；保存不会发布。"),

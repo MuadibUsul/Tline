@@ -98,3 +98,22 @@ test("with no summary and no translation the page is still withheld", () => {
   assert.ok(result.issues.includes("empty_summary"));
   assert.equal(result.indexable, false);
 });
+
+test("a native Chinese report is a Chinese page, not a missing translation", () => {
+  const nativeZh = {
+    title: "美联储维持利率不变，市场关注下一次降息时点",
+    rawText: "这是一篇完整的中文研报正文，包含来源、数字与上下文。".repeat(12),
+    sourceUrl: "https://example.com/zh-report",
+    language: "zh",
+    analysis: { summary: "美联储本次按兵不动，市场把下一次降息押注推迟到明年。", summaryZh: null, reviewStatus: "ok" },
+    translations: [],
+  };
+  const result = contentQuality(nativeZh, "zh-CN");
+  assert.equal(result.issues.includes("missing_translation"), false);
+  assert.equal(result.issues.includes("empty_summary"), false, "the native summary is the Chinese summary");
+  assert.equal(result.indexable, true);
+  // Metadata that still says "en" must not turn a Chinese original back into a missing translation.
+  assert.equal(contentQuality({ ...nativeZh, language: "en" }, "zh-CN").indexable, true);
+  // An English report with no Chinese translation is still withheld on the Chinese side.
+  assert.equal(contentQuality({ ...valid, translations: [], analysis: { ...valid.analysis, summaryZh: null } }, "zh-CN").indexable, false);
+});

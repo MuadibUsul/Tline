@@ -9,7 +9,7 @@ import PdfPreview from "@/app/_components/PdfPreview";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, displayTitle, localizedUrl, ogImage, reportJsonLd, stripPublisherPrefix } from "@/lib/seo";
 import { preferredEnglishDocuments, publicationReadyWhere } from "@/lib/publication";
 import { researchLookupWhere, researchPath, researchRedirectPath } from "@/lib/researchPath";
-import { contentQuality } from "@/lib/contentQuality";
+import { contentQuality, isNativeChineseArticle } from "@/lib/contentQuality";
 import { effectiveSummaryZh } from "@/lib/summary";
 import { assetPath } from "@/lib/assetPath";
 import { getArticleTopics, getPeerReports, topicHref } from "@/lib/related";
@@ -285,10 +285,13 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   // into the index: an analysis summary where there is one, the translation's opening where
   // there is not. Reading `summaryZh` alone showed the institution name on pages the gate had
   // already accepted on the strength of their translation.
+  const nativeChinese = isNativeChineseArticle(a);
   const summary = (locale === "zh-CN"
-    ? effectiveSummaryZh({ summaryZh: an?.summaryZh, translation })
+    ? nativeChinese
+      ? (an?.summaryZh?.trim() || an?.summary)
+      : effectiveSummaryZh({ summaryZh: an?.summaryZh, translation })
     : an?.summary) ?? institutionName(a.institution.name, locale);
-  const summaryProvenance = locale === "zh-CN" && !an?.summaryZh?.trim()
+  const summaryProvenance = locale === "zh-CN" && !nativeChinese && !an?.summaryZh?.trim()
     ? "translation_excerpt"
     : an?.provider === "local" ? "publisher_excerpt" : "tlines_extraction";
   const timeHorizons = [...new Set(a.atomicViews.map((view) => view.timeHorizon).filter((value) => value && value !== "unspecified"))];
@@ -456,7 +459,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         )}
         {!publisherPdf && locale === "en" && a.rawText && (
           <div style={{ marginBottom: 22 }}>
-            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Complete English original</div>
+            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>{nativeChinese ? "Complete Chinese original" : "Complete English original"}</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
         )}
@@ -471,13 +474,13 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         )}
         {!publisherPdf && locale === "zh-CN" && !usableTranslation && a.rawText && (
           <div style={{ marginBottom: 22 }}>
-            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>完整英文原文</div>
+            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>{nativeChinese ? "完整中文原文" : "完整英文原文"}</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
         )}
         {!publisherPdf && locale === "zh-CN" && usableTranslation && a.rawText && (
           <details className="article-original">
-            <summary>完整英文原文</summary>
+            <summary>{nativeChinese ? "完整中文原文" : "完整英文原文"}</summary>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </details>
         )}

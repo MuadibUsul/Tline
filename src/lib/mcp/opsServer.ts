@@ -5,7 +5,8 @@ import { fail, ok, toolGuard } from "./results";
 import { prisma } from "../db";
 import { writeAudit } from "../audit";
 import { can, type PermissionAction } from "../permissions";
-import { createNewsColumn, createNewsPost, deleteNewsPost, publishNewsPost, setNewsPinned, unpublishNewsPost, updateNewsPost, type NewsWriteResult } from "../newsAdmin";
+import { addNewsImage, createNewsColumn, createNewsPost, deleteNewsPost, publishNewsPost, setNewsPinned, unpublishNewsPost, updateNewsPost, type NewsWriteResult } from "../newsAdmin";
+import { fetchPublicImage } from "../newsImageFetch";
 import type { McpAuthContext } from "./auth";
 
 /**
@@ -33,11 +34,15 @@ export interface OpsToolDeps {
   unpublishNews: typeof unpublishNewsPost;
   deleteNews: typeof deleteNewsPost;
   pinNews: typeof setNewsPinned;
+  addNewsImage: typeof addNewsImage;
+  fetchImage: typeof fetchPublicImage;
+  listInstitutions: () => Promise<Array<{ slug: string; name: string; country: string | null; language: string }>>;
   listNews: (status: string | undefined, limit: number) => Promise<Array<{ id: string; slug: string; kind: string; titleZh: string | null; titleEn: string | null; status: string; pinned: boolean; publishedAt: Date | null; columnSlug: string | null }>>;
   getNews: (ref: { id?: string; slug?: string }) => Promise<{
     id: string; slug: string; kind: string; titleZh: string | null; titleEn: string | null;
     bodyZh: string | null; bodyEn: string | null; sourceUrl: string | null;
     status: string; pinned: boolean; publishedAt: Date | null; columnSlug: string | null;
+    sources: string[];
     images: Array<{ position: number; caption: string | null; alt: string | null; mimeType: string; width: number | null; height: number | null }>;
   } | null>;
   createNewsColumn: typeof createNewsColumn;
@@ -83,6 +88,13 @@ export const defaultOpsDeps: OpsToolDeps = {
   unpublishNews: unpublishNewsPost,
   deleteNews: deleteNewsPost,
   pinNews: setNewsPinned,
+  addNewsImage,
+  fetchImage: fetchPublicImage,
+  listInstitutions: () =>
+    prisma.institution.findMany({
+      orderBy: { name: "asc" },
+      select: { slug: true, name: true, country: true, language: true },
+    }),
   listNews: (status, limit) =>
     prisma.newsPost.findMany({
       where: status ? { status } : {},
@@ -101,9 +113,10 @@ export const defaultOpsDeps: OpsToolDeps = {
         id: true, slug: true, kind: true, titleZh: true, titleEn: true,
         bodyZh: true, bodyEn: true, sourceUrl: true, status: true, pinned: true, publishedAt: true,
         column: { select: { slug: true } },
+        sources: { orderBy: { position: "asc" }, select: { url: true } },
         images: { orderBy: { position: "asc" }, select: { position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
       },
-    }).then((row) => row ? { ...row, columnSlug: row.column?.slug ?? null } : null),
+    }).then((row) => row ? { ...row, columnSlug: row.column?.slug ?? null, sources: row.sources.map((source) => source.url) } : null),
   createNewsColumn,
   listNewsColumns: () =>
     prisma.newsColumn.findMany({
@@ -129,7 +142,8 @@ const NEWS_FIELDS = {
   titleEn: z.string().max(300).optional(),
   bodyZh: z.string().max(40_000).optional().describe("Chinese body; blank lines separate paragraphs."),
   bodyEn: z.string().max(40_000).optional(),
-  sourceUrl: z.string().max(2000).optional().describe("HTTPS source link."),
+  sourceUrl: z.string().max(2000).optional().describe("Primary HTTPS source link."),
+  sources: z.array(z.string().max(2000)).max(10).optional().describe("All HTTPS sources for this item. A daily brief may cite the same URL every day; sources are display metadata, not a uniqueness key."),
   columnSlug: z.string().max(60).optional().describe("Recurring column slug to file this edition under, e.g. ukraine-war-brief. Use list_news_columns to find one."),
 } as const;
 
@@ -220,7 +234,7 @@ export function registerOpsTools(server: McpServer, context: McpAuthContext, dep
 
   server.registerTool("create_news", {
     title: "Create a news item",
-    description: "Write a newsroom item (article, brief or flash) as a draft. At least one language needs a title; a flash may be title-only. File it under a recurring column with columnSlug when it is an edition of a desk (see list_news_columns). Publish it with publish_news.",
+    description: "Write a newsroom item (article, brief or flash) as a draft. At least one language needs a title; a flash may be title-only. A sources array may list every HTTPS link behind the item; the same link may repeat across editions. File it under a recurring column with columnSlug when it is an edition of a desk (see list_news_columns). Attach images with add_news_image, then publish with publish_news.",
     inputSchema: NEWS_FIELDS,
     outputSchema: { id: z.string(), slug: z.string() },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -232,7 +246,7 @@ export function registerOpsTools(server: McpServer, context: McpAuthContext, dep
 
   server.registerTool("update_news", {
     title: "Update a news item",
-    description: "Replace the fields of an existing item. The slug never changes.",
+    description: "Replace the fields of an existing item. The slug never changes. sources is replaced as a set: pass every source you want to keep, or an empty array to clear them.",
     inputSchema: { id: z.string().describe("News item id."), ...NEWS_FIELDS },
     outputSchema: { id: z.string(), slug: z.string() },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -306,6 +320,7 @@ export function registerOpsTools(server: McpServer, context: McpAuthContext, dep
       bodyZh: z.string().nullable(), bodyEn: z.string().nullable(),
       sourceUrl: z.string().nullable(), status: z.string(), pinned: z.boolean(),
       publishedAt: z.string().nullable(), columnSlug: z.string().nullable(),
+      sources: z.array(z.string()),
       images: z.array(z.object({
         position: z.number(), caption: z.string().nullable(), alt: z.string().nullable(),
         mimeType: z.string(), width: z.number().nullable(), height: z.number().nullable(),
@@ -376,5 +391,50 @@ export function registerOpsTools(server: McpServer, context: McpAuthContext, dep
     const denied = gate("admin.review");
     if (denied) return denied;
     return newsSettled(await deps.createNewsColumn(args, actor));
+  }));
+
+  server.registerTool("list_publisher_institutions", {
+    title: "List registered publishers",
+    description: "Every institution registered on Tline, with the exact slug to use as institutionSlug on a publication draft or to attribute a report. Includes houses with no published report yet.",
+    inputSchema: {},
+    outputSchema: {
+      institutions: z.array(z.object({
+        slug: z.string(), name: z.string(), country: z.string().nullable(), language: z.string(),
+      })),
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, toolGuard("list_publisher_institutions", async () => {
+    const denied = gate("admin.review");
+    if (denied) return denied;
+    return ok({ institutions: await deps.listInstitutions() });
+  }));
+
+  server.registerTool("add_news_image", {
+    title: "Add an image to a news item",
+    description: "Fetch an image from a public HTTPS URL and store it with the news item. position is the paragraph to insert after (0 = top). The image is served from Tlines, not hotlinked. PNG, JPEG, WebP or GIF, up to 8MB; private hosts and redirects are refused.",
+    inputSchema: {
+      id: z.string().describe("News item id."),
+      url: z.string().max(2000).describe("Public HTTPS image URL."),
+      position: z.number().int().min(0).max(10_000).optional().describe("Insert after this paragraph; 0 = before the first paragraph."),
+      caption: z.string().max(300).optional(),
+      alt: z.string().max(300).optional(),
+    },
+    outputSchema: { imageId: z.string(), slug: z.string() },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  }, toolGuard("add_news_image", async (args) => {
+    const denied = gate("admin.review");
+    if (denied) return denied;
+    const image = await deps.fetchImage(args.url);
+    if (!image.ok) return fail("VALIDATION_FAILED", image.message);
+    const result = await deps.addNewsImage({
+      postId: args.id,
+      position: args.position ?? 0,
+      caption: args.caption,
+      alt: args.alt,
+      mimeType: image.mimeType,
+      data: image.data,
+    }, actor);
+    if (!result.ok) return fail("VALIDATION_FAILED", "The image could not be attached.", { issues: result.issues });
+    return ok({ imageId: result.id, slug: result.slug });
   }));
 }

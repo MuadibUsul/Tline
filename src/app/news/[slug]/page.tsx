@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
-import { getPublishedNewsBySlug, newsBody, newsColumnName, newsDateLabel, newsLocales, newsParagraphRole, newsTitle, splitNewsParagraphs, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
+import { getPublishedNewsBySlug, newsBody, newsColumnName, newsDateLabel, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsParagraphs, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, localizedUrl, ogImage } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 
@@ -63,6 +63,7 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
   const paragraphs = splitNewsParagraphs(body);
   const images = post.images ?? [];
   const imagesAt = (position: number) => images.filter((image) => image.position === position);
+  const sources = newsSources(post);
   const publishedAt = post.publishedAt;
 
   return (
@@ -78,7 +79,7 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
         inLanguage: locale,
         publisher: { "@type": "Organization", name: "Tlines", url: siteUrl() },
         ...(post.column ? { isPartOf: { "@type": "Periodical", name: newsColumnName(post.column, locale), url: localizedUrl(`/news/columns/${post.column.slug}`, locale) } } : {}),
-        ...(post.sourceUrl ? { isBasedOn: post.sourceUrl } : {}),
+        ...(post.sourceUrl ? { isBasedOn: sources.length > 1 ? sources : post.sourceUrl } : {}),
       }} />
       <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "News", "新鲜事"), path: "/news" }, { name: title, path: `/news/${post.slug}` }])} />
       <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")} style={{ margin: "16px 0 10px" }}>
@@ -98,11 +99,14 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
           {post.pinned ? <span className="chip bull">{tr(locale, "Pinned", "置顶")}</span> : null}
         </div>
         <h1 className="art-title">{title}</h1>
-        {post.sourceUrl ? (
-          <p style={{ margin: "12px 0 0" }}>
-            <a className="ed-source" href={post.sourceUrl} target="_blank" rel="noopener noreferrer">
-              {tr(locale, "Read the source", "阅读来源")} · {(() => { try { return new URL(post.sourceUrl).hostname.replace(/^www\./, ""); } catch { return post.sourceUrl; } })()} <span aria-hidden="true">↗</span>
-            </a>
+        {sources.length > 0 ? (
+          <p className="news-sources">
+            <span>{tr(locale, "Sources", "来源")}</span>
+            {sources.map((source) => {
+              let host = source;
+              try { host = new URL(source).hostname.replace(/^www\./, ""); } catch { /* keep the address */ }
+              return <a key={source} className="ed-source" href={source} target="_blank" rel="noopener noreferrer">{host} <span aria-hidden="true">↗</span></a>;
+            })}
           </p>
         ) : null}
       </header>

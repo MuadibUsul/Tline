@@ -37,6 +37,26 @@ const DOC_SIZE_LABEL = /\b(?:pdf|document|file)\b[^a-z]{0,20}\b\d+\s*(?:kb|mb|k|
 const HAN = /\p{Script=Han}/u;
 const COMMON_COMPOUNDS = new Set(["viewpoint", "investment", "institution", "institutional", "research", "outlook", "forecast", "consensus", "economics", "strategy"]);
 
+/** Chinese share of the letters in a sample; enough to tell a native Chinese report from an English one. */
+function hanRatio(text: string): number {
+  const letters = text.match(/\p{L}/gu)?.length ?? 0;
+  if (letters < 20) return 0;
+  const han = text.match(/\p{Script=Han}/gu)?.length ?? 0;
+  return han / letters;
+}
+
+/**
+ * True when the report itself is written in Chinese, whatever its metadata says.
+ *
+ * The gate's Chinese branch was written for English reports waiting on a translation. A
+ * native Chinese report has no translation row and is not missing one; requiring it made
+ * `indexableZh` false forever for Chinese originals, however complete the page.
+ */
+export function isNativeChineseArticle(article: Pick<IndexableArticleInput, "title" | "rawText" | "language">): boolean {
+  if (/^zh\b/i.test(article.language.trim())) return true;
+  return hanRatio(`${article.title}\n${article.rawText?.slice(0, 2000) ?? ""}`) >= 0.2;
+}
+
 /**
  * True when a title is a document caption, a size label, or too short to be a subject.
  *
@@ -71,9 +91,11 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
   const title = article.title.trim();
   const body = article.rawText?.trim() ?? "";
   const translation = article.translations?.[0];
+  const nativeChinese = isNativeChineseArticle(article);
   /**
    * The Chinese summary is the analysis' own where it wrote one, and the translation's
-   * opening where it did not.
+   * opening where it did not. A native Chinese report has no translation to fall back to;
+   * its own analysis summary is the summary the Chinese page shows.
    *
    * Reading `summaryZh` alone withheld complete Chinese pages: an article parsed without a
    * model has a full Chinese translation and a null `summaryZh`, and the gate answered
@@ -83,7 +105,9 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
    * below, which still fail the page when the translation itself is poor.
    */
   const summary = locale === "zh-CN"
-    ? effectiveSummaryZh({ summaryZh: article.analysis?.summaryZh, translation })
+    ? nativeChinese
+      ? (article.analysis?.summaryZh?.trim() || article.analysis?.summary.trim())
+      : effectiveSummaryZh({ summaryZh: article.analysis?.summaryZh, translation })
     : article.analysis?.summary.trim();
 
   if (title.length < 8 || title.length > 180 || isNoiseTitle(title)) issues.push("abnormal_title");
@@ -91,7 +115,7 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
   if (body.length < 300) issues.push("thin_content");
   if (!summary) issues.push("empty_summary");
   if (!article.sourceUrl || !/^https?:\/\//i.test(article.sourceUrl)) issues.push("missing_source");
-  if (article.language === "en" && HAN.test(title)) issues.push("source_language_mismatch");
+  if (article.language === "en" && HAN.test(title) && !nativeChinese) issues.push("source_language_mismatch");
   if (article.analysis && article.analysis.reviewStatus !== "ok") issues.push("analysis_needs_review");
   /**
    * There was a rule here that withheld a report whose analysis carried no key arguments,
@@ -106,7 +130,7 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
    * already covered by empty_summary and thin_content below.
    */
 
-  if (locale === "zh-CN") {
+  if (locale === "zh-CN" && !nativeChinese) {
     if (!translation?.title.trim() || !translation.text?.trim()) issues.push("missing_translation");
     if (translation && !HAN.test(`${translation.title}\n${translation.text ?? ""}`)) issues.push("translation_language_mismatch");
     if (translation && (MOJIBAKE.test(`${translation.title}\n${translation.text ?? ""}`) || hasBrokenWord(`${translation.title}\n${translation.text ?? ""}`))) issues.push("translation_garbled");

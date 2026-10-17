@@ -15,8 +15,8 @@ export default function NewsForm({
   columns,
 }: {
   action: (previous: NewsFormState, formData: FormData) => Promise<NewsFormState>;
-  labels: { kind: string; column: string; noColumn: string; titleZh: string; titleEn: string; bodyZh: string; bodyEn: string; sourceUrl: string; save: string; saving: string; hint: string; kinds: Record<string, string> };
-  initial?: { id?: string; kind?: string; columnSlug?: string; titleZh?: string; titleEn?: string; bodyZh?: string; bodyEn?: string; sourceUrl?: string };
+  labels: { kind: string; column: string; noColumn: string; titleZh: string; titleEn: string; bodyZh: string; bodyEn: string; sourceUrl: string; sources: string; sourcesHint: string; save: string; saving: string; hint: string; kinds: Record<string, string> };
+  initial?: { id?: string; kind?: string; columnSlug?: string; titleZh?: string; titleEn?: string; bodyZh?: string; bodyEn?: string; sourceUrl?: string; sources?: string[] };
   columns: Array<{ slug: string; nameZh: string; nameEn: string | null }>;
 }) {
   const [state, submit, pending] = useActionState<NewsFormState, FormData>(action, {});
@@ -55,6 +55,11 @@ export default function NewsForm({
       <label className="news-field">
         <span>{labels.sourceUrl}</span>
         <input name="sourceUrl" defaultValue={initial?.sourceUrl ?? ""} placeholder="https://…" maxLength={2000} />
+      </label>
+      <label className="news-field">
+        <span>{labels.sources}</span>
+        <textarea name="sources" defaultValue={(initial?.sources ?? []).join("\n")} rows={4} placeholder={"https://…\nhttps://…"} />
+        <small className="sub" style={{ fontSize: 11, color: "var(--faint)" }}>{labels.sourcesHint}</small>
       </label>
       <p className="sub" style={{ margin: 0, fontSize: 11.5 }}>{labels.hint}</p>
       <button className="minibtn p" type="submit" disabled={pending}>{pending ? labels.saving : labels.save}</button>

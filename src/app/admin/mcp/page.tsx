@@ -47,7 +47,7 @@ const SERVERS = [
     purposeZh: "给 AI 客户端的投稿、发布与运营通道:创建/修改/送审/发布研报;密钥带 admin:manage 时还可撤回与恢复研报、设置首页精选、启停采集源、撰写并发布新鲜事、创建长期栏目。每个动作都按密钥持有账号的实时权限判定并写入审计。",
     audienceEn: "requires a reviewer / admin key; publishing additionally requires publisher:publish, site operations additionally require admin:manage, and the owner's role is re-checked on every call",
     audienceZh: "需 reviewer / admin 密钥;直接发布另需 publisher:publish scope,站点运营另需 admin:manage;每次调用复查持有人角色",
-    tools: ["create_publication_draft", "update_publication_draft", "validate_publication_draft", "submit_publication_for_review", "publish_publication_draft", "list_publication_drafts", "withdraw_research", "restore_research", "feature_research", "set_source_monitoring", "create_news", "update_news", "publish_news", "unpublish_news", "delete_news", "pin_news", "list_news", "get_news", "list_news_columns", "create_news_column"],
+    tools: ["create_publication_draft", "update_publication_draft", "validate_publication_draft", "submit_publication_for_review", "publish_publication_draft", "list_publication_drafts", "withdraw_research", "restore_research", "feature_research", "set_source_monitoring", "create_news", "update_news", "publish_news", "unpublish_news", "delete_news", "pin_news", "list_news", "get_news", "list_news_columns", "create_news_column", "add_news_image", "list_publisher_institutions"],
   },
 ] as const;
 

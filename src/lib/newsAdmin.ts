@@ -38,26 +38,34 @@ export async function createNewsPost(input: NewsInput, actor: { userId: string; 
   if (!column.ok) return { ok: false, issues: [column.issue] };
   const titleZh = clean(input.titleZh);
   const titleEn = clean(input.titleEn);
-  const row = await prisma.newsPost.create({
-    data: {
-      // The slug needs the generated id for its collision suffix, so the row is created
-      // under a placeholder and renamed once, before anyone can see it (still a draft).
-      slug: `pending-${randomUUID()}`,
-      kind: input.kind ?? "brief",
-      titleZh,
-      titleEn,
-      bodyZh: clean(input.bodyZh),
-      bodyEn: clean(input.bodyEn),
-      sourceUrl: clean(input.sourceUrl),
-      columnId: column.id,
-      createdById: actor.userId,
-    },
-    select: { id: true },
+  const sources = [...new Set((input.sources ?? []).map((url) => url.trim()).filter(Boolean))];
+  const sourceUrl = clean(input.sourceUrl) ?? sources[0] ?? null;
+  const row = await prisma.$transaction(async (tx) => {
+    // The slug needs the generated id for its collision suffix, so the row is created
+    // under a placeholder and renamed once, before anyone can see it (still a draft).
+    const created = await tx.newsPost.create({
+      data: {
+        slug: `pending-${randomUUID()}`,
+        kind: input.kind ?? "brief",
+        titleZh,
+        titleEn,
+        bodyZh: clean(input.bodyZh),
+        bodyEn: clean(input.bodyEn),
+        sourceUrl,
+        columnId: column.id,
+        createdById: actor.userId,
+      },
+      select: { id: true },
+    });
+    const slug = buildNewsSlug(titleZh ?? titleEn ?? "news", created.id);
+    await tx.newsPost.update({ where: { id: created.id }, data: { slug } });
+    if (sources.length) {
+      await tx.newsSource.createMany({ data: sources.map((url, position) => ({ postId: created.id, url, position })) });
+    }
+    return { id: created.id, slug };
   });
-  const slug = buildNewsSlug(titleZh ?? titleEn ?? "news", row.id);
-  await prisma.newsPost.update({ where: { id: row.id }, data: { slug } });
-  await writeAudit({ ...auditActor(actor), action: "news.create", targetType: "newsPost", targetId: row.id, metadata: { slug, kind: input.kind ?? "brief", ...(input.columnSlug ? { columnSlug: input.columnSlug } : {}) } });
-  return { ok: true, id: row.id, slug };
+  await writeAudit({ ...auditActor(actor), action: "news.create", targetType: "newsPost", targetId: row.id, metadata: { slug: row.slug, kind: input.kind ?? "brief", sources: sources.length, ...(input.columnSlug ? { columnSlug: input.columnSlug } : {}) } });
+  return { ok: true, id: row.id, slug: row.slug };
 }
 
 export async function updateNewsPost(id: string, input: NewsInput, actor: { userId: string; keyId?: string }): Promise<NewsWriteResult> {
@@ -67,19 +75,27 @@ export async function updateNewsPost(id: string, input: NewsInput, actor: { user
   if (issues.length) return { ok: false, issues };
   const column = await resolveColumn(input.columnSlug);
   if (!column.ok) return { ok: false, issues: [column.issue] };
-  await prisma.newsPost.update({
-    where: { id },
-    data: {
-      ...(input.kind !== undefined ? { kind: input.kind } : {}),
-      titleZh: clean(input.titleZh),
-      titleEn: clean(input.titleEn),
-      bodyZh: clean(input.bodyZh),
-      bodyEn: clean(input.bodyEn),
-      sourceUrl: clean(input.sourceUrl),
-      columnId: column.id,
-    },
+  const sources = [...new Set((input.sources ?? []).map((url) => url.trim()).filter(Boolean))];
+  const sourceUrl = clean(input.sourceUrl) ?? sources[0] ?? null;
+  await prisma.$transaction(async (tx) => {
+    await tx.newsPost.update({
+      where: { id },
+      data: {
+        ...(input.kind !== undefined ? { kind: input.kind } : {}),
+        titleZh: clean(input.titleZh),
+        titleEn: clean(input.titleEn),
+        bodyZh: clean(input.bodyZh),
+        bodyEn: clean(input.bodyEn),
+        sourceUrl,
+        columnId: column.id,
+      },
+    });
+    await tx.newsSource.deleteMany({ where: { postId: id } });
+    if (sources.length) {
+      await tx.newsSource.createMany({ data: sources.map((url, position) => ({ postId: id, url, position })) });
+    }
   });
-  await writeAudit({ ...auditActor(actor), action: "news.update", targetType: "newsPost", targetId: id, metadata: { slug: existing.slug, ...(input.columnSlug ? { columnSlug: input.columnSlug } : {}) } });
+  await writeAudit({ ...auditActor(actor), action: "news.update", targetType: "newsPost", targetId: id, metadata: { slug: existing.slug, sources: sources.length, ...(input.columnSlug ? { columnSlug: input.columnSlug } : {}) } });
   return { ok: true, id, slug: existing.slug };
 }
 

@@ -1693,6 +1693,7 @@ model NewsPost {
   createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
   column NewsColumn? @relation(fields: [columnId], references: [id], onDelete: SetNull)
   images NewsImage[]
+  sources NewsSource[]
 
   @@index([status, publishedAt])
   @@index([columnId, status, publishedAt])
@@ -1725,6 +1726,20 @@ model NewsImage {
   width     Int?
   height    Int?
   data      Bytes
+  createdAt DateTime @default(now())
+
+  @@index([postId, position])
+}
+
+
+// One of a news item's sources. Unlike a research report, a daily brief may cite the
+// same public dashboard every day, so a URL is not a key here.
+model NewsSource {
+  id        String   @id @default(cuid())
+  postId    String
+  post      NewsPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int      @default(0)
   createdAt DateTime @default(now())
 
   @@index([postId, position])

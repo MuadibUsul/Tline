@@ -15,7 +15,7 @@ import type { McpAuthContext } from "./auth";
  */
 
 const USER_TOOLS = ["get_macro_calendar", "get_macro_indicator", "get_research", "list_institutions", "search_research"];
-const PUBLISHER_TOOLS = ["create_news", "create_news_column", "create_publication_draft", "delete_news", "feature_research", "get_news", "list_news", "list_news_columns", "list_publication_drafts", "pin_news", "publish_news", "publish_publication_draft", "restore_research", "set_source_monitoring", "submit_publication_for_review", "unpublish_news", "update_news", "update_publication_draft", "validate_publication_draft", "withdraw_research"];
+const PUBLISHER_TOOLS = ["add_news_image", "create_news", "create_news_column", "create_publication_draft", "delete_news", "feature_research", "get_news", "list_news", "list_news_columns", "list_publication_drafts", "list_publisher_institutions", "pin_news", "publish_news", "publish_publication_draft", "restore_research", "set_source_monitoring", "submit_publication_for_review", "unpublish_news", "update_news", "update_publication_draft", "validate_publication_draft", "withdraw_research"];
 
 function structured<T>(result: unknown): T {
   // callTool's return type is a union; the structured half is what every Tline tool returns.
@@ -118,8 +118,12 @@ const opsDeps: OpsToolDeps = {
     id: "n1", slug: "fed-holds-rates-abc123", kind: "flash", titleZh: null, titleEn: "Fed holds rates",
     bodyZh: null, bodyEn: "Fed holds rates.", sourceUrl: null, status: "published", pinned: true,
     publishedAt: new Date("2026-10-17T02:00:00.000Z"), columnSlug: "ukraine-war-brief",
+    sources: [],
     images: [{ position: 1, caption: "Chart", alt: "Chart", mimeType: "image/png", width: 1200, height: 800 }],
   }),
+  addNewsImage: async () => ({ ok: true, id: "img1", slug: "fed-holds-rates-abc123" }),
+  fetchImage: async () => ({ ok: true, data: Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]), mimeType: "image/png" }),
+  listInstitutions: async () => [{ slug: "muse-agent", name: "Muse Agent", country: null, language: "zh" }],
   createNewsColumn: async () => ({ ok: true, id: "c1", slug: "ukraine-war-brief" }),
   listNewsColumns: async () => [{ id: "c1", slug: "ukraine-war-brief", nameZh: "俄乌战场简报", nameEn: "Ukraine War Brief", cadence: "daily", publishedCount: 1 }],
 };
@@ -281,6 +285,14 @@ test("site operations are refused without admin:manage and allowed with it", asy
   const columns = await client.callTool({ name: "list_news_columns", arguments: {} });
   assert.ok(!columns.isError);
   assert.equal(structured<{ columns: Array<{ slug: string; publishedCount: number }> }>(columns).columns[0]?.slug, "ukraine-war-brief");
+
+  const institutions = await client.callTool({ name: "list_publisher_institutions", arguments: {} });
+  assert.ok(!institutions.isError);
+  assert.equal(structured<{ institutions: Array<{ slug: string }> }>(institutions).institutions[0]?.slug, "muse-agent");
+
+  const image = await client.callTool({ name: "add_news_image", arguments: { id: "n1", url: "https://example.com/map.png", position: 1 } });
+  assert.ok(!image.isError);
+  assert.equal(structured<{ imageId: string }>(image).imageId, "img1");
 
   const column = await client.callTool({ name: "create_news_column", arguments: { slug: "weekly-note", nameZh: "每周观察", cadence: "weekly" } });
   assert.ok(!column.isError);

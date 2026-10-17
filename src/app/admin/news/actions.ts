@@ -43,6 +43,7 @@ function readInput(formData: FormData): NewsInput {
     bodyZh: value("bodyZh"),
     bodyEn: value("bodyEn"),
     sourceUrl: value("sourceUrl"),
+    sources: (value("sources") ?? "").split(/\r?\n/).map((url) => url.trim()).filter(Boolean),
     columnSlug: value("columnSlug"),
   };
 }

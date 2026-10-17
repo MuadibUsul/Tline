@@ -59,6 +59,14 @@ export interface NewsRecord {
   updatedAt: Date;
   column?: NewsColumnSummary | null;
   images?: NewsImageRecord[];
+  sources?: Array<{ url: string }>;
+}
+
+/** Every source a reader should be able to open, primary first, without duplicates. */
+export function newsSources(post: Pick<NewsRecord, "sourceUrl" | "sources">): string[] {
+  const urls = (post.sources ?? []).map((source) => source.url).filter(Boolean);
+  if (post.sourceUrl) urls.unshift(post.sourceUrl);
+  return [...new Set(urls)];
 }
 
 export function newsColumnName(column: NewsColumnSummary, locale: Locale): string {
@@ -183,6 +191,7 @@ export interface NewsInput {
   bodyZh?: string;
   bodyEn?: string;
   sourceUrl?: string;
+  sources?: string[];
   columnSlug?: string;
 }
 
@@ -218,6 +227,18 @@ export function validateNewsInput(input: NewsInput): NewsIssue[] {
       issues.push({ code: "sourceUrl.invalid", message: "Source URL is not a valid URL." });
     }
   }
+  // A brief is often a synthesis: several sources, and the same dashboard may appear every
+  // day. URLs are display metadata here, not a uniqueness key.
+  const sources = input.sources ?? [];
+  if (sources.length > 10) issues.push({ code: "sources.too_many", message: "At most 10 sources per item." });
+  sources.forEach((source, index) => {
+    try {
+      const url = new URL(source.trim());
+      if (url.protocol !== "https:") issues.push({ code: "sources.not_https", message: `Source ${index + 1} must use https.` });
+    } catch {
+      issues.push({ code: "sources.invalid", message: `Source ${index + 1} is not a valid URL.` });
+    }
+  });
   return issues;
 }
 
@@ -238,6 +259,7 @@ export async function getPublishedNewsBySlug(slug: string): Promise<NewsRecord |
     include: {
       column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } },
       images: { orderBy: { position: "asc" }, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
+      sources: { orderBy: { position: "asc" }, select: { url: true } },
     },
   });
   return (row as NewsRecord | null) ?? null;

@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Beijing time for the minutes on a flash — the desk's operating clock, like the calendar. */
 function clockTime(date: Date, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en-GB", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+  return new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en-GB", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(date);
 }
 
 export default async function NewsIndex() {
@@ -51,13 +51,9 @@ export default async function NewsIndex() {
   return (
     <main className="wrap news-page">
       <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "News", "新鲜事"), path: "/news" }])} />
-      <div className="page-head">
-        <div className="eyebrow">{tr(locale, "Newsroom", "新闻编辑部")}</div>
-        <h1>{tr(locale, "News", "新鲜事")}</h1>
-        <p className="sub" style={{ maxWidth: "72ch" }}>
-          {tr(locale, "Briefs, flashes and articles from the Tlines desk — written and published by the newsroom, each with its own permalink.", "来自 Tlines 编辑部的快讯、短讯与文章——由新闻编辑部撰写并发布，每条都有独立链接。")}
-        </p>
-      </div>
+      {/* The stream opens on its first item: the page title and standfirst that used to sit
+          here repeated what the navigation already says. The accessible heading remains. */}
+      <h1 className="sr-only">{tr(locale, "News", "新鲜事")}</h1>
 
       {posts.length === 0 && <div className="empty-state">{tr(locale, "Nothing has been published yet.", "暂无已发布内容。")}</div>}
 

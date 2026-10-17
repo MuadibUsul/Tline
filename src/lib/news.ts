@@ -81,6 +81,16 @@ export function newsDateLabel(date: Date, locale: Locale): string {
   return new Intl.DateTimeFormat(locale, { timeZone: DESK_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
+/** A relative stamp for the front-page rail, falling back to the desk date after a day. */
+export function newsAgo(date: Date, locale: Locale, now: Date = new Date()): string {
+  const minutes = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000));
+  if (minutes < 1) return locale === "zh-CN" ? "刚刚" : "now";
+  if (minutes < 60) return locale === "zh-CN" ? `${minutes} 分钟前` : `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return locale === "zh-CN" ? `${hours} 小时前` : `${hours} hr ago`;
+  return newsDateLabel(date, locale);
+}
+
 /**
  * A stable, readable slug: the Latin title as-is; a Chinese title transliterated (the
  * site already ships pinyin-pro for search); either way suffixed with six characters of

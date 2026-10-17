@@ -15,6 +15,7 @@ import { listIndexableTopicsFor, topicPath } from "@/lib/topics";
 import { loadPublicThemes } from "@/lib/marketThemesPublic";
 import { redesignAtLeast } from "@/lib/redesign";
 import { selectDiverseObservations } from "@/lib/observations";
+import { listPublishedNews } from "@/lib/news";
 import { JsonLd, canonical, clamp, homeSeoTitle, localizedUrl, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 import { Icon } from "./_components/Icon";
 
@@ -63,7 +64,7 @@ export default async function Home() {
     .filter((asset) => !isLegacyNonAssetAlias(asset.ticker) && asset.reports >= 2 && asset.institutions >= 2);
 
   if (redesignAtLeast("home")) {
-    const [featured, watchRows, themes, figureRow] = await Promise.all([
+    const [featured, watchRows, themes, figureRow, news] = await Promise.all([
       featuredFeed(5, locale),
       // A wide window in, a diverse selection out: one clean view per house (lib/observations).
       prisma.atomicView.findMany({
@@ -81,6 +82,8 @@ export default async function Home() {
         orderBy: { article: { publishedAt: "desc" } },
         select: { id: true, caption: true, article: { select: { slug: true, title: true } } },
       }),
+      // The rail beside the observations: the desk's latest, already limited to this language.
+      listPublishedNews(locale, 6),
     ]);
     // Featured reports lead; when nothing is picked yet the stream carries the cover itself.
     const lead = featured.length ? featured : feed.slice(0, 5);
@@ -107,6 +110,7 @@ export default async function Home() {
         thisWeek={thisWeek}
         figure={figureRow ? { id: figureRow.id, caption: figureRow.caption, slug: figureRow.article.slug, title: figureRow.article.title } : null}
         assets={coveredAssets}
+        news={news}
       />
     );
   }

@@ -4,6 +4,7 @@ import LiveFeed from "./LiveFeed";
 import NewsletterCTA from "./NewsletterCTA";
 import { Byline, cleanDisplayTitle } from "./editorial";
 import { assetPath } from "@/lib/assetPath";
+import { newsAgo, newsTitle, type NewsRecord } from "@/lib/news";
 import { domainTerm, institutionName, localePath, tr, type Locale } from "@/lib/i18n";
 import { beijingDateTime } from "@/lib/macro/presentation";
 import { researchPath } from "@/lib/researchPath";
@@ -60,6 +61,7 @@ export default function HomeFront({
   thisWeek,
   figure,
   assets,
+  news,
 }: {
   locale: Locale;
   pulse: FeedPulse;
@@ -71,6 +73,7 @@ export default function HomeFront({
   thisWeek: Awaited<ReturnType<typeof importantReleasesThisWeek>>;
   figure: FrontFigure | null;
   assets: Array<{ ticker: string; name: string }>;
+  news: NewsRecord[];
 }) {
   const zh = locale === "zh-CN";
   const [top, ...restLeads] = lead;
@@ -127,30 +130,56 @@ export default function HomeFront({
         </div>
       </section>
 
-      {/* Institutions changed their minds about… */}
-      {watch.length > 0 && (
+      {/* Institutions changed their minds about…, with the newsroom's latest beside them. */}
+      {(watch.length > 0 || news.length > 0) && (
         <section className="blk front-observations" aria-label={tr(locale, "Today's institutional observations", "今日机构观察")}>
-          <div className="section-t">
-            <span>{tr(locale, "Today's institutional observations", "今日机构观察")}</span>
-            <Link className="chip gray" href={localePath(locale, "/institutions")}>{tr(locale, "All views", "更多观点")} →</Link>
-          </div>
-          <div className="front-watch">
-            {watch.map((row) => (
-              <div className="r" key={row.id}>
-                <span className="who">
-                  <Link href={localePath(locale, `/institution/${row.institutionSlug}`)}>{institutionName(row.institution, locale)}</Link>
-                  {row.viewIsFallback ? <span className="lang-tag" title={tr(locale, "No Chinese summary for this view yet; showing the English extraction.", "该观点暂无中文摘要,显示英文提取结果。")}>EN</span> : null}
-                </span>
-                <span className="what">
-                  <Link href={localePath(locale, `/research/${row.slug}`)}>{row.view}</Link>
-                </span>
-                <span className="meta">
-                  <time dateTime={row.publishedAt}>{new Date(row.publishedAt).toISOString().slice(0, 10)}</time>
-                  {row.assetTicker ? <Link className="chip acc" href={localePath(locale, assetPath(row.assetTicker))}>{row.assetTicker}</Link> : null}
-                  <Link className="source-link" href={localePath(locale, `/research/${row.slug}`)}>{tr(locale, "source report", "原始研报")} →</Link>
-                </span>
+          <div className={`front-ob-grid${watch.length === 0 ? " solo-news" : ""}`}>
+            {watch.length > 0 && (
+              <div className="front-ob-main">
+                <div className="section-t">
+                  <span>{tr(locale, "Today's institutional observations", "今日机构观察")}</span>
+                  <Link className="chip gray" href={localePath(locale, "/institutions")}>{tr(locale, "All views", "更多观点")} →</Link>
+                </div>
+                <div className="front-watch">
+                  {watch.map((row) => (
+                    <div className="r" key={row.id}>
+                      <span className="who">
+                        <Link href={localePath(locale, `/institution/${row.institutionSlug}`)}>{institutionName(row.institution, locale)}</Link>
+                        {row.viewIsFallback ? <span className="lang-tag" title={tr(locale, "No Chinese summary for this view yet; showing the English extraction.", "该观点暂无中文摘要,显示英文提取结果。")}>EN</span> : null}
+                      </span>
+                      <span className="what">
+                        <Link href={localePath(locale, `/research/${row.slug}`)}>{row.view}</Link>
+                      </span>
+                      <span className="meta">
+                        <time dateTime={row.publishedAt}>{new Date(row.publishedAt).toISOString().slice(0, 10)}</time>
+                        {row.assetTicker ? <Link className="chip acc" href={localePath(locale, assetPath(row.assetTicker))}>{row.assetTicker}</Link> : null}
+                        <Link className="source-link" href={localePath(locale, `/research/${row.slug}`)}>{tr(locale, "source report", "原始研报")} →</Link>
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            )}
+            {news.length > 0 && (
+              <aside className="front-news-rail" aria-label={tr(locale, "Latest news", "最新新鲜事")}>
+                <div className="front-news-head">
+                  <span className="section-t" style={{ margin: 0 }}>{tr(locale, "Newsroom", "新鲜事")}</span>
+                  <Link href={localePath(locale, "/news")}>{tr(locale, "All", "全部")} →</Link>
+                </div>
+                <div className="front-news-list">
+                  {news.map((post) => {
+                    const headline = newsTitle(post, locale);
+                    if (!headline) return null;
+                    return (
+                      <Link className="front-news-item" key={post.id} href={localePath(locale, `/news/${post.slug}`)}>
+                        <time dateTime={post.publishedAt?.toISOString()}>{post.publishedAt ? newsAgo(post.publishedAt, locale) : ""}</time>
+                        <span className="headline">{headline}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </aside>
+            )}
           </div>
         </section>
       )}

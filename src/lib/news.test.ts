@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNewsSlug, newsDateLabel, newsDayKey, newsLocales, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
+import { buildNewsSlug, newsAgo, newsDateLabel, newsDayKey, newsLocales, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
 
 const record = (overrides: Partial<Parameters<typeof newsTitle>[0]> = {}) => ({
   id: "p1", slug: "s", kind: "brief", titleZh: null, titleEn: null, bodyZh: null, bodyEn: null,
@@ -37,6 +37,16 @@ test("the desk calendar is Beijing time, not UTC", () => {
   const at = new Date("2026-10-16T17:30:00.000Z");
   assert.equal(newsDayKey(at), "2026-10-17");
   assert.match(newsDateLabel(at, "zh-CN"), /2026.*10.*17/);
+});
+
+test("the front-page rail counts minutes, then hours, then falls back to the date", () => {
+  const now = new Date("2026-10-17T12:00:00.000Z");
+  const ago = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
+  assert.equal(newsAgo(ago(0), "zh-CN", now), "刚刚");
+  assert.equal(newsAgo(ago(5), "zh-CN", now), "5 分钟前");
+  assert.equal(newsAgo(ago(5), "en", now), "5 min ago");
+  assert.equal(newsAgo(ago(3 * 60), "zh-CN", now), "3 小时前");
+  assert.equal(newsAgo(ago(2 * 24 * 60), "en", now), newsDateLabel(ago(2 * 24 * 60), "en"));
 });
 
 test("validation: at least one title, matching bodies, https sources", () => {

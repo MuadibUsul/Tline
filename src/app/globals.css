@@ -1090,17 +1090,18 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .citation-card h2{font:600 17px var(--sans)}
 .citation-card p{color:var(--ink-2)}
 
-/* Four facts on one row: institution, date, topic, horizon. Three columns left the
-   fourth alone on a second row, so the block read as two different grids. */
-.citation-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
-
-@media(max-width:1040px){.citation-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Two columns for every small card in the brief — facts above, evidence below. The four
+   facts are a 2×2 block rather than a three-plus-one row, so every card has the same
+   width; only its height follows the length of its text. */
+.citation-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}
 
 .citation-facts div{padding:10px;background:var(--panel-2);border-radius:8px}
 .citation-facts dt{font:10px var(--mono);color:var(--faint);text-transform:uppercase}
 .citation-facts dd{margin:3px 0 0;font-size:13px}
 
-.citation-evidence{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:12px;margin:16px 0}
+/* Equal halves: the two evidence blocks are peers, and unequal tracks made one card
+   visibly narrower than the other beside it. Text length may change the row's height. */
+.citation-evidence{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
 
 .citation-evidence section,.citation-conditions,.citation-arguments{padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
 

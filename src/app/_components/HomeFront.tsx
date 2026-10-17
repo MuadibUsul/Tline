@@ -166,10 +166,15 @@ export default function HomeFront({
                   {news.map((post) => {
                     const headline = newsTitle(post, locale);
                     if (!headline) return null;
+                    const cover = post.images?.[0] ?? null;
                     return (
-                      <Link className="front-news-item" key={post.id} href={localePath(locale, `/news/${post.slug}`)}>
+                      <Link className={`front-news-item${cover ? " has-image" : ""}`} key={post.id} href={localePath(locale, `/news/${post.slug}`)}>
                         <time dateTime={post.publishedAt?.toISOString()}>{post.publishedAt ? newsAgo(post.publishedAt, locale) : ""}</time>
                         <span className="headline">{headline}</span>
+                        {cover ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- stored in the news image table
+                          <img className="front-news-thumb" src={`/api/news-images/${cover.id}`} alt={cover.alt ?? cover.caption ?? ""} loading="lazy" />
+                        ) : null}
                       </Link>
                     );
                   })}

@@ -18,9 +18,10 @@ export default function NewsRow({ post, locale, showColumn = false }: { post: Ne
   const title = newsTitle(post, locale) ?? "";
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
   const excerpt = newsExcerpt(post, locale);
+  const cover = post.images?.[0] ?? null;
 
   return (
-    <article className={`news-row ${kind}`}>
+    <article className={`news-row ${kind}${cover ? " has-image" : ""}`}>
       <div className="news-rail">
         <time dateTime={post.publishedAt?.toISOString()}>{post.publishedAt ? newsClock(post.publishedAt, locale) : ""}</time>
         <span className={`chip ${kind === "flash" ? "bear" : kind === "article" ? "acc" : "gray"}`}>
@@ -44,6 +45,12 @@ export default function NewsRow({ post, locale, showColumn = false }: { post: Ne
           ) : null}
         </p>
       </div>
+      {cover ? (
+        <Link className="news-thumb" href={localePath(locale, `/news/${post.slug}`)} tabIndex={-1} aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element -- stored in the news image table */}
+          <img src={`/api/news-images/${cover.id}`} alt={cover.alt ?? cover.caption ?? ""} loading="lazy" />
+        </Link>
+      ) : null}
     </article>
   );
 }

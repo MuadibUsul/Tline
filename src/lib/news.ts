@@ -248,7 +248,10 @@ export async function listPublishedNews(locale: Locale, take = 60): Promise<News
     where: { status: "published", publishedAt: { lte: new Date() } },
     orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
     take: take * 3,
-    include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } } },
+    include: {
+      column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } },
+      images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
+    },
   });
   return rows.filter((row) => newsTitle(row as NewsRecord, locale) !== null).slice(0, take) as NewsRecord[];
 }
@@ -282,7 +285,7 @@ export async function listPublishedColumns(locale: Locale): Promise<Array<NewsCo
       posts: {
         where: { status: "published", publishedAt: { lte: new Date() } },
         orderBy: { publishedAt: "desc" },
-        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } } },
+        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } }, images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } } },
       },
     },
   });
@@ -302,7 +305,7 @@ export async function getPublishedColumnBySlug(slug: string, locale: Locale): Pr
       posts: {
         where: { status: "published", publishedAt: { lte: new Date() } },
         orderBy: { publishedAt: "desc" },
-        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } } },
+        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } }, images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } } },
       },
     },
   });

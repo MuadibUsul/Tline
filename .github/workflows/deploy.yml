@@ -19,8 +19,8 @@ name: Deploy
 # change. Push to GHCR again if an off-host artifact matters more than the egress.
 
 on:
-  push:
-    branches: [main]
+  # Owner decision 2026-10-17: releases are built and started directly on the production
+  # host. Pushes no longer trigger this workflow; it remains dispatch-only for emergencies.
   workflow_dispatch:
 
 concurrency:

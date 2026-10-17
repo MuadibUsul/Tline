@@ -132,7 +132,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang={locale}>
-      <body>
+      <body className={pathname === "/" ? "page-home" : undefined}>
         <NavigationProgress />
         <div className="topbar">
           <div className="wrap inner">

@@ -44,6 +44,18 @@ export const MCP_SCOPES: ApiScope[] = ["mcp:user", "publisher:draft", "publisher
 /** The publisher-side MCP scopes, which may share a key with each other. */
 export const PUBLISHER_SCOPES: ApiScope[] = ["publisher:draft", "publisher:publish"];
 
+/**
+ * True when a key can authenticate to at least one MCP server.
+ *
+ * Derived from MCP_SCOPES rather than a hand-kept subset: the console's MCP key table
+ * used to check only `mcp:user` and `publisher:draft`, so a key issued with just
+ * `publisher:publish` (a valid publish-only key) was invisible there while working on the
+ * endpoint. Any scope added to MCP_SCOPES is now classified correctly with no other edit.
+ */
+export function hasMcpScope(scopes: readonly string[]): boolean {
+  return scopes.some((scope) => MCP_SCOPES.includes(scope as ApiScope));
+}
+
 export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }

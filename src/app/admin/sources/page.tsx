@@ -87,7 +87,9 @@ export default async function SourcesPage(props: { searchParams: Promise<{ filte
           return <tr key={source.id}>
             <td className="inst">
               <Link href={localePath(locale, `/institution/${source.slug}`)}>{source.name}</Link>
-              <small>{source.updateFreq ?? "—"}</small>
+              {/* The slug is the value MCP drafts must name; showing it here saves opening
+                  every institution page to read the address. */}
+              <small className="mono">{source.slug} · {source.updateFreq ?? "—"}</small>
             </td>
             <td>
               <span className={`chip ${tone(source.lastCrawlStatus)}`}>{adminLabel(source.monitoringEnabled ? source.lastCrawlStatus ?? "new" : source.consecutiveFailures > 0 ? "circuit_open" : "paused")}</span>

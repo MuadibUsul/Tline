@@ -9,6 +9,7 @@ import {
   parseScopes,
   resetRateLimits,
   tokenPrefix,
+  hasMcpScope,
 } from "./apiKeys";
 
 test("a generated token is prefixed and carries full entropy", () => {
@@ -36,6 +37,16 @@ test("only recognised scopes survive parsing", () => {
   assert.deepEqual(parseScopes('["research:read","admin:everything"]'), ["research:read"]);
   assert.deepEqual(parseScopes("not json"), []);
   assert.deepEqual(parseScopes('{"scope":"research:read"}'), []);
+});
+
+test("every MCP scope marks its key as an MCP key, not just the first two", () => {
+  assert.equal(hasMcpScope(["mcp:user"]), true);
+  assert.equal(hasMcpScope(["publisher:draft"]), true);
+  // The regression: a publish-only key is a real MCP credential, and so is an ops key.
+  assert.equal(hasMcpScope(["publisher:publish"]), true);
+  assert.equal(hasMcpScope(["admin:manage"]), true);
+  assert.equal(hasMcpScope(["research:read", "consensus:read"]), false);
+  assert.equal(hasMcpScope([]), false);
 });
 
 test("a bearer header is read, and anything else is refused", () => {

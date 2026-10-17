@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getAdminLocale, localePath, tr } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
-import { parseScopes, type ApiScope } from "@/lib/apiKeys";
+import { MCP_SCOPES, hasMcpScope, parseScopes, type ApiScope } from "@/lib/apiKeys";
 import { usagePerKey } from "@/lib/apiUsage";
 import { shiftDay } from "@/lib/analytics/identity";
 import { siteUrl } from "@/lib/site";
@@ -23,11 +23,7 @@ export const metadata: Metadata = { title: "MCP 服务" };
  * which keys currently carry an MCP scope.
  */
 
-const MCP_SCOPE_SET = new Set<ApiScope>(["mcp:user", "publisher:draft"]);
-
-function hasMcpScope(raw: string) {
-  return parseScopes(raw).some((scope) => MCP_SCOPE_SET.has(scope));
-}
+const MCP_SCOPE_SET = new Set<ApiScope>(MCP_SCOPES);
 
 /** Mirrors the registered tool sets; the protocol test asserts the servers expose exactly these. */
 const SERVERS = [
@@ -82,7 +78,7 @@ export default async function McpPage() {
     if (row.status >= 400) bucket.errors += row.count;
     usageByEndpoint.set(row.endpoint, bucket);
   }
-  const mcpKeys = keys.filter((key) => hasMcpScope(key.scopes));
+  const mcpKeys = keys.filter((key) => hasMcpScope(parseScopes(key.scopes)));
   const activeKeys = mcpKeys.filter((key) => !key.revokedAt).length;
   const base = siteUrl();
 
@@ -125,6 +121,11 @@ export default async function McpPage() {
                 {usage.errors > 0 ? tr(locale, ` (${usage.errors} refused: no or wrong key)`, `(其中 ${usage.errors} 次鉴权被拒)`) : ""}
                 {" · "}{tr(locale, server.audienceEn, server.audienceZh)}
               </p>
+              {server.endpoint === "/api/mcp/publisher" && (
+                <p className="apikey-note">
+                  {tr(locale, "Every published draft is attributed to a registered institution: institutionSlug must match one exactly. The list and slugs are under Content → Sources & crawler.", "每篇发布的研报都必须归属一个已注册机构:institutionSlug 必须与注册表完全一致。名单与 slug 在「内容运营 → 来源与采集」,机构名下方即为 slug。")}
+                </p>
+              )}
             </div>
           </section>
         );
@@ -153,6 +154,9 @@ export default async function McpPage() {
           <span>{tr(locale, "MCP keys", "MCP 密钥")}</span>
           <span className="chip gray">{mcpKeys.length}</span>
         </div>
+        <p className="apikey-note">
+          {tr(locale, "An MCP key is an API key carrying an MCP scope; the same table issues, rotates and revokes both kinds. Keys with publisher:publish or admin:manage are listed here too.", "MCP 密钥就是带 MCP scope 的 API 密钥,签发、轮换与吊销仍在同一张表;带 publisher:publish 或 admin:manage 的密钥也会出现在这里。")}
+        </p>
         <div className="tbl-wrap">
           <table className="admin-table">
             <thead>

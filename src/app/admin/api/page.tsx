@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getAdminLocale, localePath, tr } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
-import { API_SCOPES, parseScopes } from "@/lib/apiKeys";
+import { API_SCOPES, hasMcpScope, parseScopes } from "@/lib/apiKeys";
 import { usagePerKey, usageReport } from "@/lib/apiUsage";
 import { revokeApiKey, updateApiKeyLimit } from "../actions";
 import { age, compact, plural, when } from "../_components/format";
@@ -150,6 +150,9 @@ export default async function ApiPage() {
                     </td>
                     <td>
                       <div className="tags">
+                        {/* One credential store: whether a key serves an MCP endpoint is a
+                            property of its scopes, so the unified inventory says which. */}
+                        {hasMcpScope(parseScopes(key.scopes)) && <span className="chip acc">MCP</span>}
                         {parseScopes(key.scopes).map((scope) => <span key={scope} className="chip gray">{scope}</span>)}
                       </div>
                     </td>

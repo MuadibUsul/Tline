@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNewsSlug, newsAgo, newsDateLabel, newsDayKey, newsLocales, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
+import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsLocales, newsParagraphRole, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
 
 const record = (overrides: Partial<Parameters<typeof newsTitle>[0]> = {}) => ({
   id: "p1", slug: "s", kind: "brief", titleZh: null, titleEn: null, bodyZh: null, bodyEn: null,
@@ -42,6 +42,15 @@ test("the desk calendar is Beijing time, not UTC", () => {
   const at = new Date("2026-10-16T17:30:00.000Z");
   assert.equal(newsDayKey(at), "2026-10-17");
   assert.match(newsDateLabel(at, "zh-CN"), /2026.*10.*17/);
+});
+
+test("short numbered lines are section headings; the opening paragraph is not", () => {
+  assert.equal(newsParagraphRole("二、战况"), "heading");
+  assert.equal(newsParagraphRole("三、微观"), "heading");
+  assert.equal(newsParagraphRole("一、 俄 315 架无人机+15 枚导弹夜袭乌能源设施（沃伦 37 万+断电、哈尔科夫 2 死 12 伤）"), "body");
+  assert.equal(newsParagraphRole("普通正文。"), "body");
+  assert.equal(newsCadenceLabel("daily", "zh-CN"), "每日更新");
+  assert.equal(newsCadenceLabel(null, "en"), "Ongoing");
 });
 
 test("the front-page rail counts minutes, then hours, then falls back to the date", () => {

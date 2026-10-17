@@ -5,7 +5,7 @@ import { fail, ok, toolGuard } from "./results";
 import { prisma } from "../db";
 import { writeAudit } from "../audit";
 import { can, type PermissionAction } from "../permissions";
-import { createNewsPost, deleteNewsPost, publishNewsPost, setNewsPinned, unpublishNewsPost, updateNewsPost, type NewsWriteResult } from "../newsAdmin";
+import { createNewsColumn, createNewsPost, deleteNewsPost, publishNewsPost, setNewsPinned, unpublishNewsPost, updateNewsPost, type NewsWriteResult } from "../newsAdmin";
 import type { McpAuthContext } from "./auth";
 
 /**
@@ -33,7 +33,9 @@ export interface OpsToolDeps {
   unpublishNews: typeof unpublishNewsPost;
   deleteNews: typeof deleteNewsPost;
   pinNews: typeof setNewsPinned;
-  listNews: (status: string | undefined, limit: number) => Promise<Array<{ id: string; slug: string; kind: string; titleZh: string | null; titleEn: string | null; status: string; pinned: boolean; publishedAt: Date | null }>>;
+  listNews: (status: string | undefined, limit: number) => Promise<Array<{ id: string; slug: string; kind: string; titleZh: string | null; titleEn: string | null; status: string; pinned: boolean; publishedAt: Date | null; columnSlug: string | null }>>;
+  createNewsColumn: typeof createNewsColumn;
+  listNewsColumns: () => Promise<Array<{ id: string; slug: string; nameZh: string; nameEn: string | null; cadence: string | null; publishedCount: number }>>;
 }
 
 export const defaultOpsDeps: OpsToolDeps = {
@@ -80,8 +82,24 @@ export const defaultOpsDeps: OpsToolDeps = {
       where: status ? { status } : {},
       orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
       take: limit,
-      select: { id: true, slug: true, kind: true, titleZh: true, titleEn: true, status: true, pinned: true, publishedAt: true },
-    }),
+      select: {
+        id: true, slug: true, kind: true, titleZh: true, titleEn: true,
+        status: true, pinned: true, publishedAt: true,
+        column: { select: { slug: true } },
+      },
+    }).then((rows) => rows.map((row) => ({ ...row, columnSlug: row.column?.slug ?? null }))),
+  createNewsColumn,
+  listNewsColumns: () =>
+    prisma.newsColumn.findMany({
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true, slug: true, nameZh: true, nameEn: true, cadence: true,
+        posts: { where: { status: "published" }, select: { id: true } },
+      },
+    }).then((rows) => rows.map((row) => ({
+      id: row.id, slug: row.slug, nameZh: row.nameZh, nameEn: row.nameEn, cadence: row.cadence,
+      publishedCount: row.posts.length,
+    }))),
 };
 
 const ARTICLE_REF = {
@@ -96,6 +114,7 @@ const NEWS_FIELDS = {
   bodyZh: z.string().max(40_000).optional().describe("Chinese body; blank lines separate paragraphs."),
   bodyEn: z.string().max(40_000).optional(),
   sourceUrl: z.string().max(2000).optional().describe("HTTPS source link."),
+  columnSlug: z.string().max(60).optional().describe("Recurring column slug to file this edition under, e.g. ukraine-war-brief. Use list_news_columns to find one."),
 } as const;
 
 /** Translate a news domain result into the MCP envelope. */
@@ -185,7 +204,7 @@ export function registerOpsTools(server: McpServer, context: McpAuthContext, dep
 
   server.registerTool("create_news", {
     title: "Create a news item",
-    description: "Write a newsroom item (article, brief or flash) as a draft. At least one language needs a title; a flash may be title-only. Publish it with publish_news.",
+    description: "Write a newsroom item (article, brief or flash) as a draft. At least one language needs a title; a flash may be title-only. File it under a recurring column with columnSlug when it is an edition of a desk (see list_news_columns). Publish it with publish_news.",
     inputSchema: NEWS_FIELDS,
     outputSchema: { id: z.string(), slug: z.string() },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -267,6 +286,7 @@ export function registerOpsTools(server: McpServer, context: McpAuthContext, dep
         id: z.string(), slug: z.string(), kind: z.string(),
         titleZh: z.string().nullable(), titleEn: z.string().nullable(),
         status: z.string(), pinned: z.boolean(), publishedAt: z.string().nullable(),
+        columnSlug: z.string().nullable(),
       })),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -275,5 +295,42 @@ export function registerOpsTools(server: McpServer, context: McpAuthContext, dep
     if (denied) return denied;
     const items = await deps.listNews(args.status, args.limit ?? 20);
     return ok({ items: items.map((item) => ({ ...item, publishedAt: item.publishedAt?.toISOString() ?? null })) });
+  }));
+
+  server.registerTool("list_news_columns", {
+    title: "List newsroom columns",
+    description: "The recurring desks (e.g. the daily Ukraine brief), with the number of published editions. Use a column's slug as columnSlug when creating or updating an edition.",
+    inputSchema: {},
+    outputSchema: {
+      columns: z.array(z.object({
+        slug: z.string(), nameZh: z.string(), nameEn: z.string().nullable(),
+        cadence: z.string().nullable(), publishedCount: z.number(),
+      })),
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, toolGuard("list_news_columns", async () => {
+    const denied = gate("admin.review");
+    if (denied) return denied;
+    const columns = await deps.listNewsColumns();
+    return ok({ columns: columns.map(({ id: _id, ...column }) => column) });
+  }));
+
+  server.registerTool("create_news_column", {
+    title: "Create a newsroom column",
+    description: "Create a recurring desk that editions can be filed under. The slug is permanent; check list_news_columns first. Requires admin:manage.",
+    inputSchema: {
+      slug: z.string().min(2).max(60).describe("Lowercase letters, digits and single hyphens, e.g. ukraine-war-brief."),
+      nameZh: z.string().min(2).max(80),
+      nameEn: z.string().max(80).optional(),
+      descriptionZh: z.string().max(500).optional(),
+      descriptionEn: z.string().max(500).optional(),
+      cadence: z.enum(["daily", "weekly", "monthly", "ongoing"]).optional(),
+    },
+    outputSchema: { id: z.string(), slug: z.string() },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  }, toolGuard("create_news_column", async (args) => {
+    const denied = gate("admin.review");
+    if (denied) return denied;
+    return newsSettled(await deps.createNewsColumn(args, actor));
   }));
 }

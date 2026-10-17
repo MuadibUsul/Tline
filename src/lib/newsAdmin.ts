@@ -24,9 +24,18 @@ function auditActor(actor: { userId: string; keyId?: string }) {
   return { actorId: actor.userId, metadata: { ...(actor.keyId ? { keyId: actor.keyId } : {}) } };
 }
 
+/** Resolve the optional column a post is filed under; null clears the association. */
+async function resolveColumn(slug: string | undefined): Promise<{ ok: true; id: string | null } | { ok: false; issue: NewsIssue }> {
+  if (!slug?.trim()) return { ok: true, id: null };
+  const column = await prisma.newsColumn.findUnique({ where: { slug: slug.trim() }, select: { id: true } });
+  return column ? { ok: true, id: column.id } : { ok: false, issue: { code: "column.unknown", message: `No column with slug "${slug.trim()}".` } };
+}
+
 export async function createNewsPost(input: NewsInput, actor: { userId: string; keyId?: string }): Promise<NewsWriteResult> {
   const issues = validateNewsInput(input);
   if (issues.length) return { ok: false, issues };
+  const column = await resolveColumn(input.columnSlug);
+  if (!column.ok) return { ok: false, issues: [column.issue] };
   const titleZh = clean(input.titleZh);
   const titleEn = clean(input.titleEn);
   const row = await prisma.newsPost.create({
@@ -40,13 +49,14 @@ export async function createNewsPost(input: NewsInput, actor: { userId: string; 
       bodyZh: clean(input.bodyZh),
       bodyEn: clean(input.bodyEn),
       sourceUrl: clean(input.sourceUrl),
+      columnId: column.id,
       createdById: actor.userId,
     },
     select: { id: true },
   });
   const slug = buildNewsSlug(titleZh ?? titleEn ?? "news", row.id);
   await prisma.newsPost.update({ where: { id: row.id }, data: { slug } });
-  await writeAudit({ ...auditActor(actor), action: "news.create", targetType: "newsPost", targetId: row.id, metadata: { slug, kind: input.kind ?? "brief" } });
+  await writeAudit({ ...auditActor(actor), action: "news.create", targetType: "newsPost", targetId: row.id, metadata: { slug, kind: input.kind ?? "brief", ...(input.columnSlug ? { columnSlug: input.columnSlug } : {}) } });
   return { ok: true, id: row.id, slug };
 }
 
@@ -55,6 +65,8 @@ export async function updateNewsPost(id: string, input: NewsInput, actor: { user
   if (!existing) return { ok: false, issues: [{ code: "not_found", message: "No news post with that id." }] };
   const issues = validateNewsInput(input);
   if (issues.length) return { ok: false, issues };
+  const column = await resolveColumn(input.columnSlug);
+  if (!column.ok) return { ok: false, issues: [column.issue] };
   await prisma.newsPost.update({
     where: { id },
     data: {
@@ -64,9 +76,10 @@ export async function updateNewsPost(id: string, input: NewsInput, actor: { user
       bodyZh: clean(input.bodyZh),
       bodyEn: clean(input.bodyEn),
       sourceUrl: clean(input.sourceUrl),
+      columnId: column.id,
     },
   });
-  await writeAudit({ ...auditActor(actor), action: "news.update", targetType: "newsPost", targetId: id, metadata: { slug: existing.slug } });
+  await writeAudit({ ...auditActor(actor), action: "news.update", targetType: "newsPost", targetId: id, metadata: { slug: existing.slug, ...(input.columnSlug ? { columnSlug: input.columnSlug } : {}) } });
   return { ok: true, id, slug: existing.slug };
 }
 
@@ -101,5 +114,86 @@ export async function setNewsPinned(id: string, pinned: boolean, actor: { userId
   if (!existing) return { ok: false };
   await prisma.newsPost.update({ where: { id }, data: { pinned } });
   await writeAudit({ ...auditActor(actor), action: pinned ? "news.pin" : "news.unpin", targetType: "newsPost", targetId: id, metadata: { slug: existing.slug } });
+  return { ok: true };
+}
+
+export interface NewsColumnInput {
+  slug: string;
+  nameZh: string;
+  nameEn?: string;
+  descriptionZh?: string;
+  descriptionEn?: string;
+  cadence?: string;
+}
+
+/** Create a recurring desk. Columns are created once and then filed into by slug. */
+export async function createNewsColumn(input: NewsColumnInput, actor: { userId: string; keyId?: string }): Promise<NewsWriteResult> {
+  const slug = input.slug.trim().toLowerCase();
+  const nameZh = input.nameZh.trim();
+  const issues: NewsIssue[] = [];
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length < 2 || slug.length > 60) {
+    issues.push({ code: "column.slug_invalid", message: "Column slug must be 2-60 characters of lowercase letters, digits and single hyphens." });
+  }
+  if (nameZh.length < 2 || nameZh.length > 80) issues.push({ code: "column.name_required", message: "A Chinese column name of 2-80 characters is required." });
+  if ((input.nameEn ?? "").trim().length > 80) issues.push({ code: "column.name_en_long", message: "The English column name is too long." });
+  if ((input.descriptionZh ?? "").trim().length > 500 || (input.descriptionEn ?? "").trim().length > 500) {
+    issues.push({ code: "column.description_long", message: "A column description is limited to 500 characters." });
+  }
+  if (issues.length) return { ok: false, issues };
+
+  try {
+    const row = await prisma.newsColumn.create({
+      data: {
+        slug,
+        nameZh,
+        nameEn: clean(input.nameEn),
+        descriptionZh: clean(input.descriptionZh),
+        descriptionEn: clean(input.descriptionEn),
+        cadence: clean(input.cadence),
+      },
+      select: { id: true },
+    });
+    await writeAudit({ ...auditActor(actor), action: "news.column.create", targetType: "newsColumn", targetId: row.id, metadata: { slug, name: nameZh } });
+    return { ok: true, id: row.id, slug };
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && (error as { code?: string }).code === "P2002") {
+      return { ok: false, issues: [{ code: "column.slug_taken", message: "A column with that slug already exists." }] };
+    }
+    throw error;
+  }
+}
+
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+
+/** Attach one image to a post. The bytes live here, not in the body text. */
+export async function addNewsImage(input: {
+  postId: string; position: number; caption?: string; alt?: string;
+  mimeType: string; width?: number; height?: number; data: Uint8Array;
+}, actor: { userId: string; keyId?: string }): Promise<NewsWriteResult> {
+  if (!IMAGE_TYPES.has(input.mimeType)) return { ok: false, issues: [{ code: "image.type", message: "Images must be PNG, JPEG, WebP or GIF." }] };
+  const post = await prisma.newsPost.findUnique({ where: { id: input.postId }, select: { id: true, slug: true } });
+  if (!post) return { ok: false, issues: [{ code: "not_found", message: "No news post with that id." }] };
+  const row = await prisma.newsImage.create({
+    data: {
+      postId: post.id,
+      position: Math.max(0, Math.floor(input.position)),
+      caption: clean(input.caption),
+      alt: clean(input.alt),
+      mimeType: input.mimeType,
+      width: input.width ?? null,
+      height: input.height ?? null,
+      data: Buffer.from(input.data),
+    },
+    select: { id: true },
+  });
+  await writeAudit({ ...auditActor(actor), action: "news.image.add", targetType: "newsImage", targetId: row.id, metadata: { postId: post.id, slug: post.slug, position: input.position, mimeType: input.mimeType } });
+  return { ok: true, id: row.id, slug: post.slug };
+}
+
+export async function deleteNewsImage(id: string, actor: { userId: string; keyId?: string }): Promise<{ ok: boolean }> {
+  const row = await prisma.newsImage.findUnique({ where: { id }, select: { id: true, postId: true } });
+  if (!row) return { ok: false };
+  await prisma.newsImage.delete({ where: { id } });
+  await writeAudit({ ...auditActor(actor), action: "news.image.delete", targetType: "newsImage", targetId: id, metadata: { postId: row.postId } });
   return { ok: true };
 }

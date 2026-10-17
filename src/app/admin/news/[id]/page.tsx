@@ -8,7 +8,8 @@ import { getAdminLocale, localePath, tr } from "@/lib/i18n";
 import { isNewsKind, NEWS_KIND_LABEL } from "@/lib/news";
 import { when } from "@/app/admin/_components/format";
 import NewsForm from "../NewsForm";
-import { deleteNewsAction, pinNewsAction, publishNewsAction, unpublishNewsAction, updateNewsAction } from "../actions";
+import ImageUploadForm from "../ImageUploadForm";
+import { addNewsImageAction, deleteNewsAction, deleteNewsImageAction, pinNewsAction, publishNewsAction, unpublishNewsAction, updateNewsAction } from "../actions";
 
 export const metadata: Metadata = { title: "编辑新鲜事" };
 
@@ -17,8 +18,15 @@ export default async function AdminNewsEditPage(props: { params: Promise<{ id: s
   const user = await getSessionUser();
   if (!user || !can(user, "admin.review")) notFound();
   const locale = await getAdminLocale();
-  const post = await prisma.newsPost.findUnique({ where: { id } });
+  const post = await prisma.newsPost.findUnique({
+    where: { id },
+    include: {
+      column: { select: { slug: true, nameZh: true, nameEn: true } },
+      images: { orderBy: { position: "asc" }, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
+    },
+  });
   if (!post) notFound();
+  const columns = await prisma.newsColumn.findMany({ orderBy: { createdAt: "asc" }, select: { slug: true, nameZh: true, nameEn: true } });
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
   const published = post.status === "published";
 
@@ -43,13 +51,17 @@ export default async function AdminNewsEditPage(props: { params: Promise<{ id: s
       {query.created === "1" && <p className="chip bull" style={{ display: "inline-block", marginBottom: 12 }}>{tr(locale, "Draft created. It becomes public when you publish it.", "草稿已创建。发布后才会公开。")}</p>}
 
       <div className="admin-columns">
-        <section className="blk">
-          <div className="section-t">{tr(locale, "Content", "内容")}</div>
+        <div>
+          <section className="blk">
+            <div className="section-t">{tr(locale, "Content", "内容")}</div>
           <NewsForm
             action={updateNewsAction}
-            initial={{ id: post.id, kind, titleZh: post.titleZh ?? "", titleEn: post.titleEn ?? "", bodyZh: post.bodyZh ?? "", bodyEn: post.bodyEn ?? "", sourceUrl: post.sourceUrl ?? "" }}
+            columns={columns}
+            initial={{ id: post.id, kind, columnSlug: post.column?.slug ?? "", titleZh: post.titleZh ?? "", titleEn: post.titleEn ?? "", bodyZh: post.bodyZh ?? "", bodyEn: post.bodyEn ?? "", sourceUrl: post.sourceUrl ?? "" }}
             labels={{
               kind: tr(locale, "Kind", "类型"),
+              column: tr(locale, "Column", "栏目"),
+              noColumn: tr(locale, "No column (standalone item)", "不归属栏目（独立内容）"),
               titleZh: tr(locale, "Chinese title", "中文标题"),
               titleEn: tr(locale, "English title", "英文标题"),
               bodyZh: tr(locale, "Chinese body", "中文正文"),
@@ -62,6 +74,48 @@ export default async function AdminNewsEditPage(props: { params: Promise<{ id: s
             }}
           />
         </section>
+
+        <section className="blk">
+          <div className="section-t">
+            <span>{tr(locale, "Images", "图片")}</span>
+            <span className="chip gray">{post.images.length}</span>
+          </div>
+          {post.images.length > 0 && (
+            <div className="news-image-list">
+              {post.images.map((image) => (
+                <div className="news-image-row" key={image.id}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- admin thumbnail from the image store */}
+                  <img src={`/api/news-images/${image.id}`} alt={image.alt ?? ""} width={140} loading="lazy" />
+                  <div>
+                    <small className="mono">{tr(locale, "after paragraph", "第几段之后")} {image.position} · {image.width}×{image.height} · {image.mimeType}</small>
+                    {image.caption ? <p>{image.caption}</p> : null}
+                  </div>
+                  <form action={deleteNewsImageAction}>
+                    <input type="hidden" name="id" value={image.id} />
+                    <input type="hidden" name="postId" value={post.id} />
+                    <input type="hidden" name="slug" value={post.slug} />
+                    <button className="minibtn danger" type="submit">{tr(locale, "Remove", "删除")}</button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
+          <ImageUploadForm
+            action={addNewsImageAction}
+            postId={post.id}
+            slug={post.slug}
+            labels={{
+              image: tr(locale, "Image file", "图片文件"),
+              position: tr(locale, "Insert after paragraph (0 = top)", "插入位置（第几段之后，0 = 开头）"),
+              caption: tr(locale, "Caption", "图注"),
+              alt: tr(locale, "Alt text", "替代文本"),
+              submit: tr(locale, "Upload image", "上传图片"),
+              submitting: tr(locale, "Uploading…", "上传中……"),
+              hint: tr(locale, "PNG, JPEG, WebP or GIF, up to 8MB. The image is stored with the post and served at a private address.", "PNG、JPEG、WebP 或 GIF，最大 8MB。图片与条目一起存储，通过独立地址提供。"),
+            }}
+          />
+        </section>
+        </div>
 
         <aside>
           <section className="blk">

@@ -105,13 +105,20 @@ function localizedEntries(
 const otherLocale = (locale: Locale): Locale => locale === "en" ? "zh-CN" : "en";
 
 export async function buildPagesSitemap(locale: Locale): Promise<SitemapEntry[]> {
-  const [latestArticle, latestConsensus, latestIndicator, latestRelease, indicators, liveThemes] = await Promise.all([
+  const [latestArticle, latestConsensus, latestIndicator, latestRelease, indicators, liveThemes, newsColumns] = await Promise.all([
     prisma.article.findFirst({ where: publicationReadyWhere(), orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
     prisma.consensusHistory.findFirst({ orderBy: { timestamp: "desc" }, select: { timestamp: true } }),
     prisma.macroIndicator.findFirst({ where: { enabled: true }, orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
     prisma.macroRelease.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
     prisma.macroIndicator.findMany({ where: { enabled: true }, select: { canonicalKey: true, updatedAt: true } }),
     loadPublicThemes(),
+    prisma.newsColumn.findMany({
+      where: { posts: { some: { status: "published", publishedAt: { lte: new Date() } } } },
+      select: {
+        slug: true, updatedAt: true,
+        posts: { where: { status: "published", publishedAt: { lte: new Date() } }, select: { titleZh: true, titleEn: true } },
+      },
+    }),
   ]);
   const articleChanged = latestArticle?.updatedAt;
   const macroChanged = later(changed("2026-09-27"), latestIndicator?.updatedAt, latestRelease?.updatedAt);
@@ -137,6 +144,15 @@ export async function buildPagesSitemap(locale: Locale): Promise<SitemapEntry[]>
     changeFrequency: "daily" as const,
     priority: 0.5,
   })));
+  // A recurring desk is a public hub; list it only in a language it actually publishes in.
+  pages.push(...newsColumns
+    .filter((column) => column.posts.some((post) => (locale === "zh-CN" ? post.titleZh : post.titleEn)))
+    .map((column) => ({
+      path: `/news/columns/${column.slug}`,
+      lastModified: column.updatedAt,
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    })));
   pages.push(...taxonomy.jurisdictions.map((jurisdiction) => ({
     path: `/economies/${jurisdiction.slug}`,
     lastModified: articleChanged ?? changed("2026-09-27"),

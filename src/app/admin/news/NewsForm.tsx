@@ -12,10 +12,12 @@ export default function NewsForm({
   action,
   labels,
   initial,
+  columns,
 }: {
   action: (previous: NewsFormState, formData: FormData) => Promise<NewsFormState>;
-  labels: { kind: string; titleZh: string; titleEn: string; bodyZh: string; bodyEn: string; sourceUrl: string; save: string; saving: string; hint: string; kinds: Record<string, string> };
-  initial?: { id?: string; kind?: string; titleZh?: string; titleEn?: string; bodyZh?: string; bodyEn?: string; sourceUrl?: string };
+  labels: { kind: string; column: string; noColumn: string; titleZh: string; titleEn: string; bodyZh: string; bodyEn: string; sourceUrl: string; save: string; saving: string; hint: string; kinds: Record<string, string> };
+  initial?: { id?: string; kind?: string; columnSlug?: string; titleZh?: string; titleEn?: string; bodyZh?: string; bodyEn?: string; sourceUrl?: string };
+  columns: Array<{ slug: string; nameZh: string; nameEn: string | null }>;
 }) {
   const [state, submit, pending] = useActionState<NewsFormState, FormData>(action, {});
   return (
@@ -25,6 +27,13 @@ export default function NewsForm({
         <span>{labels.kind}</span>
         <select name="kind" defaultValue={initial?.kind ?? "brief"}>
           {Object.entries(labels.kinds).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </label>
+      <label className="news-field">
+        <span>{labels.column}</span>
+        <select name="columnSlug" defaultValue={initial?.columnSlug ?? ""}>
+          <option value="">{labels.noColumn}</option>
+          {columns.map((column) => <option key={column.slug} value={column.slug}>{column.nameZh}{column.nameEn ? ` · ${column.nameEn}` : ""}</option>)}
         </select>
       </label>
       <label className="news-field">

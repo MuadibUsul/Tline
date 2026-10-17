@@ -15,7 +15,7 @@ import type { McpAuthContext } from "./auth";
  */
 
 const USER_TOOLS = ["get_macro_calendar", "get_macro_indicator", "get_research", "list_institutions", "search_research"];
-const PUBLISHER_TOOLS = ["create_news", "create_publication_draft", "delete_news", "feature_research", "list_news", "list_publication_drafts", "pin_news", "publish_news", "publish_publication_draft", "restore_research", "set_source_monitoring", "submit_publication_for_review", "unpublish_news", "update_news", "update_publication_draft", "validate_publication_draft", "withdraw_research"];
+const PUBLISHER_TOOLS = ["create_news", "create_news_column", "create_publication_draft", "delete_news", "feature_research", "list_news", "list_news_columns", "list_publication_drafts", "pin_news", "publish_news", "publish_publication_draft", "restore_research", "set_source_monitoring", "submit_publication_for_review", "unpublish_news", "update_news", "update_publication_draft", "validate_publication_draft", "withdraw_research"];
 
 function structured<T>(result: unknown): T {
   // callTool's return type is a union; the structured half is what every Tline tool returns.
@@ -112,8 +112,10 @@ const opsDeps: OpsToolDeps = {
   listNews: async () => [{
     id: "n1", slug: "fed-holds-rates-abc123", kind: "flash",
     titleZh: null, titleEn: "Fed holds rates", status: "published", pinned: true,
-    publishedAt: new Date("2026-10-17T02:00:00.000Z"),
+    publishedAt: new Date("2026-10-17T02:00:00.000Z"), columnSlug: "ukraine-war-brief",
   }],
+  createNewsColumn: async () => ({ ok: true, id: "c1", slug: "ukraine-war-brief" }),
+  listNewsColumns: async () => [{ id: "c1", slug: "ukraine-war-brief", nameZh: "俄乌战场简报", nameEn: "Ukraine War Brief", cadence: "daily", publishedCount: 1 }],
 };
 
 const publisherContext: McpAuthContext = {
@@ -262,6 +264,14 @@ test("site operations are refused without admin:manage and allowed with it", asy
   const withdrawn = await client.callTool({ name: "withdraw_research", arguments: { slug: "ubs-gold-outlook", reason: "legal" } });
   assert.ok(!withdrawn.isError);
   assert.equal(structured<{ withdrawn: boolean }>(withdrawn).withdrawn, true);
+
+  const columns = await client.callTool({ name: "list_news_columns", arguments: {} });
+  assert.ok(!columns.isError);
+  assert.equal(structured<{ columns: Array<{ slug: string; publishedCount: number }> }>(columns).columns[0]?.slug, "ukraine-war-brief");
+
+  const column = await client.callTool({ name: "create_news_column", arguments: { slug: "weekly-note", nameZh: "每周观察", cadence: "weekly" } });
+  assert.ok(!column.isError);
+  assert.equal(structured<{ slug: string }>(column).slug, "ukraine-war-brief");
 });
 
 test("an operations key cannot exceed the account's live permission", async () => {

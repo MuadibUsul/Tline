@@ -1,8 +1,9 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
-import { getPublishedNewsBySlug, newsBody, newsDateLabel, newsLocales, newsTitle, splitNewsParagraphs, NEWS_KIND_LABEL, isNewsKind } from "@/lib/news";
+import { getPublishedNewsBySlug, newsBody, newsColumnName, newsDateLabel, newsLocales, newsParagraphRole, newsTitle, splitNewsParagraphs, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, localizedUrl, ogImage } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 
@@ -27,6 +28,22 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   };
 }
 
+function NewsFigure({ image }: { image: NewsImageRecord }) {
+  return (
+    <figure className="news-figure">
+      {/* eslint-disable-next-line @next/next/no-img-element -- served from the newsroom's private image store */}
+      <img
+        src={`/api/news-images/${image.id}`}
+        alt={image.alt ?? image.caption ?? ""}
+        width={image.width ?? undefined}
+        height={image.height ?? undefined}
+        loading="lazy"
+      />
+      {image.caption ? <figcaption>{image.caption}</figcaption> : null}
+    </figure>
+  );
+}
+
 export default async function NewsItemPage(props: { params: Promise<{ slug: string }> }) {
   const { slug } = await props.params;
   const locale: Locale = await getLocale();
@@ -44,6 +61,8 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
   const body = newsBody(post, locale);
   const paragraphs = splitNewsParagraphs(body);
+  const images = post.images ?? [];
+  const imagesAt = (position: number) => images.filter((image) => image.position === position);
   const publishedAt = post.publishedAt;
 
   return (
@@ -58,6 +77,7 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
         mainEntityOfPage: localizedUrl(`/news/${post.slug}`, locale),
         inLanguage: locale,
         publisher: { "@type": "Organization", name: "Tlines", url: siteUrl() },
+        ...(post.column ? { isPartOf: { "@type": "Periodical", name: newsColumnName(post.column, locale), url: localizedUrl(`/news/columns/${post.column.slug}`, locale) } } : {}),
         ...(post.sourceUrl ? { isBasedOn: post.sourceUrl } : {}),
       }} />
       <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "News", "新鲜事"), path: "/news" }, { name: title, path: `/news/${post.slug}` }])} />
@@ -66,6 +86,11 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
       </nav>
       <header className="news-item-head">
         <div className="news-rail" style={{ marginBottom: 10 }}>
+          {post.column ? (
+            <Link className="news-column-tag" href={localePath(locale, `/news/columns/${post.column.slug}`)}>
+              {newsColumnName(post.column, locale)}
+            </Link>
+          ) : null}
           <span className={`chip ${kind === "flash" ? "bear" : kind === "article" ? "acc" : "gray"}`}>
             {locale === "zh-CN" ? NEWS_KIND_LABEL[kind].zh : NEWS_KIND_LABEL[kind].en}
           </span>
@@ -82,9 +107,26 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
         ) : null}
       </header>
       <article className="prose news-item-body">
-        {paragraphs.length ? paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p className="sub">{tr(locale, "This item has no further text.", "本条没有更多正文。")}</p>}
+        {imagesAt(0).map((image) => <NewsFigure key={image.id} image={image} />)}
+        {paragraphs.length ? paragraphs.map((paragraph, index) => (
+          <Fragment key={index}>
+            {newsParagraphRole(paragraph) === "heading"
+              ? <h2 className="news-section">{paragraph}</h2>
+              : <p>{paragraph}</p>}
+            {imagesAt(index + 1).map((image) => <NewsFigure key={image.id} image={image} />)}
+          </Fragment>
+        )) : <p className="sub">{tr(locale, "This item has no further text.", "本条没有更多正文。")}</p>}
+        {images.filter((image) => image.position > paragraphs.length).map((image) => <NewsFigure key={image.id} image={image} />)}
       </article>
       <p className="sub" style={{ marginTop: 26 }}>
+        {post.column ? (
+          <>
+            <Link href={localePath(locale, `/news/columns/${post.column.slug}`)}>
+              {tr(locale, "More from", "更多")}{newsColumnName(post.column, locale)} →
+            </Link>
+            {" · "}
+          </>
+        ) : null}
         <Link href={localePath(locale, "/news")}>{tr(locale, "All news", "全部新鲜事")} →</Link>
       </p>
     </main>

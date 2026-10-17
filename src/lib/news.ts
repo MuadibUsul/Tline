@@ -27,6 +27,23 @@ export function isNewsKind(value: unknown): value is NewsKind {
   return typeof value === "string" && (NEWS_KINDS as readonly string[]).includes(value);
 }
 
+export interface NewsColumnSummary {
+  slug: string;
+  nameZh: string;
+  nameEn: string | null;
+  cadence?: string | null;
+}
+
+export interface NewsImageRecord {
+  id: string;
+  position: number;
+  caption: string | null;
+  alt: string | null;
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+}
+
 export interface NewsRecord {
   id: string;
   slug: string;
@@ -40,6 +57,33 @@ export interface NewsRecord {
   pinned: boolean;
   publishedAt: Date | null;
   updatedAt: Date;
+  column?: NewsColumnSummary | null;
+  images?: NewsImageRecord[];
+}
+
+export function newsColumnName(column: NewsColumnSummary, locale: Locale): string {
+  return (locale === "zh-CN" ? column.nameZh : column.nameEn) || column.nameZh;
+}
+
+export function newsCadenceLabel(cadence: string | null | undefined, locale: Locale): string {
+  const zh = locale === "zh-CN";
+  switch (cadence) {
+    case "daily": return zh ? "每日更新" : "Daily";
+    case "weekly": return zh ? "每周更新" : "Weekly";
+    case "monthly": return zh ? "每月更新" : "Monthly";
+    default: return zh ? "长期更新" : "Ongoing";
+  }
+}
+
+/**
+ * Whether a paragraph is a section heading. The desk writes "二、战况" on its own line, but
+ * also opens the brief with "一、 俄 315 架…" as a full paragraph — so a numeral alone is
+ * not enough; a heading is short.
+ */
+export function newsParagraphRole(text: string): "heading" | "body" {
+  const value = text.trim();
+  if (value.length > 32) return "body";
+  return /^[一二三四五六七八九十]+、/.test(value) || /^【[^】]{2,20}】$/.test(value) ? "heading" : "body";
 }
 
 export function newsTitle(post: NewsRecord, locale: Locale): string | null {
@@ -126,6 +170,7 @@ export interface NewsInput {
   bodyZh?: string;
   bodyEn?: string;
   sourceUrl?: string;
+  columnSlug?: string;
 }
 
 const TITLE_MAX = 300;
@@ -169,11 +214,64 @@ export async function listPublishedNews(locale: Locale, take = 60): Promise<News
     where: { status: "published", publishedAt: { lte: new Date() } },
     orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
     take: take * 3,
+    include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } } },
   });
-  return rows.filter((row) => newsTitle(row as NewsRecord, locale) !== null).slice(0, take);
+  return rows.filter((row) => newsTitle(row as NewsRecord, locale) !== null).slice(0, take) as NewsRecord[];
 }
 
 export async function getPublishedNewsBySlug(slug: string): Promise<NewsRecord | null> {
-  const row = await prisma.newsPost.findFirst({ where: { slug, status: "published", publishedAt: { lte: new Date() } } });
+  const row = await prisma.newsPost.findFirst({
+    where: { slug, status: "published", publishedAt: { lte: new Date() } },
+    include: {
+      column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } },
+      images: { orderBy: { position: "asc" }, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
+    },
+  });
   return (row as NewsRecord | null) ?? null;
+}
+
+/**
+ * Columns that have at least one published edition in this language, with their editions.
+ *
+ * The post filter is applied in memory because it depends on which title column this locale
+ * reads; a column with no readable edition is not advertised in that language.
+ */
+export async function listPublishedColumns(locale: Locale): Promise<Array<NewsColumnSummary & {
+  descriptionZh: string | null;
+  descriptionEn: string | null;
+  posts: NewsRecord[];
+}>> {
+  const rows = await prisma.newsColumn.findMany({
+    orderBy: { createdAt: "asc" },
+    include: {
+      posts: {
+        where: { status: "published", publishedAt: { lte: new Date() } },
+        orderBy: { publishedAt: "desc" },
+        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } } },
+      },
+    },
+  });
+  return rows
+    .map((row) => ({ ...row, posts: row.posts.filter((post) => newsTitle(post as NewsRecord, locale) !== null) as NewsRecord[] }))
+    .filter((row) => row.posts.length > 0);
+}
+
+export async function getPublishedColumnBySlug(slug: string, locale: Locale): Promise<(NewsColumnSummary & {
+  descriptionZh: string | null;
+  descriptionEn: string | null;
+  posts: NewsRecord[];
+}) | null> {
+  const row = await prisma.newsColumn.findUnique({
+    where: { slug },
+    include: {
+      posts: {
+        where: { status: "published", publishedAt: { lte: new Date() } },
+        orderBy: { publishedAt: "desc" },
+        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } } },
+      },
+    },
+  });
+  if (!row) return null;
+  const posts = row.posts.filter((post) => newsTitle(post as NewsRecord, locale) !== null) as NewsRecord[];
+  return posts.length ? { ...row, posts } : null;
 }

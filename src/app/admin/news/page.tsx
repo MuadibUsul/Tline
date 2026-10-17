@@ -22,6 +22,7 @@ export default async function AdminNewsPage() {
   if (!user || !can(user, "admin.review")) notFound();
   const locale = await getAdminLocale();
   const posts = await prisma.newsPost.findMany({ orderBy: [{ pinned: "desc" }, { createdAt: "desc" }], take: 100 });
+  const columns = await prisma.newsColumn.findMany({ orderBy: { createdAt: "asc" }, select: { slug: true, nameZh: true, nameEn: true } });
 
   return (
     <>
@@ -32,7 +33,10 @@ export default async function AdminNewsPage() {
             {tr(locale, "Briefs, flashes and articles published at /news. Each item carries its own permalink and is written in either or both languages.", "发布于 /news 的短讯、快讯与文章。每条有独立链接，可只写一种语言或中英双语。")}
           </p>
         </div>
-        <div className="tag-row"><span className="chip acc">{posts.length}</span></div>
+        <div className="tag-row">
+          <span className="chip acc">{posts.length}</span>
+          <Link className="chip gray" href={localePath(locale, "/admin/news/columns")}>{tr(locale, "Columns", "栏目")} →</Link>
+        </div>
       </header>
 
       <div className="admin-columns">
@@ -88,8 +92,11 @@ export default async function AdminNewsPage() {
             <div className="section-t">{tr(locale, "New item", "新建条目")}</div>
             <NewsForm
               action={createNewsAction}
+              columns={columns}
               labels={{
                 kind: tr(locale, "Kind", "类型"),
+                column: tr(locale, "Column", "栏目"),
+                noColumn: tr(locale, "No column (standalone item)", "不归属栏目（独立内容）"),
                 titleZh: tr(locale, "Chinese title", "中文标题"),
                 titleEn: tr(locale, "English title", "英文标题"),
                 bodyZh: tr(locale, "Chinese body", "中文正文"),

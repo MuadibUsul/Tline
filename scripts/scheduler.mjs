@@ -230,5 +230,27 @@ async function dailyReportLoop() {
   }
 }
 
-await Promise.all([ingestLoop(), processingLoop(), analyticsLoop(), dailyReportLoop()]);
+/**
+ * Fragment repair, on its own slow cadence.
+ *
+ * Extraction occasionally stores a slice of the source's layout — a table header, a chart
+ * axis run — where a reader expects an opinion; the homepage's observation block refuses
+ * those rows, and scripts/rewrite-views.ts completes them through the analysis model.
+ * A small batch every few hours keeps the backlog from accumulating. The script stops
+ * itself on its numeric guard and on the analysis budget, so a failure here can never
+ * take the scheduler down: the exit code is logged and the loop waits for the next tick.
+ */
+async function rewriteViewsLoop() {
+  const intervalMs = Math.max(1, Number(process.env.VIEW_REWRITE_INTERVAL_HOURS || 6)) * 3600_000;
+  const limit = Math.max(1, Number(process.env.VIEW_REWRITE_LIMIT || 40));
+  for (;;) {
+    if (stopping) return;
+    const code = await runCommand(["run", "views:rewrite", "--", `--limit=${limit}`]);
+    if (code !== 0) console.error(JSON.stringify({ event: "scheduler.view_rewrite.failed", code }));
+    if (stopping) return;
+    await wait(intervalMs);
+  }
+}
+
+await Promise.all([ingestLoop(), processingLoop(), analyticsLoop(), dailyReportLoop(), rewriteViewsLoop()]);
 await stopHeartbeat();

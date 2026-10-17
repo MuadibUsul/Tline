@@ -91,7 +91,7 @@ export default async function MarketThemesPage() {
       )}
 
       {themes.map((theme) => (
-        <section className="blk" key={theme.key}>
+        <section className="blk theme-section" id={theme.key} key={theme.key}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
             <h2 style={{ margin: 0, fontSize: 17 }}>{zh ? theme.titleZh : theme.titleEn}</h2>
             <span className={`chip ${theme.direction === "bullish" ? "bull" : theme.direction === "bearish" ? "bear" : "neu"}`}>{directionLabel(theme.direction, locale)}</span>

@@ -1,16 +1,14 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import LiveFeed from "./LiveFeed";
 import NewsletterCTA from "./NewsletterCTA";
 import { Byline, cleanDisplayTitle } from "./editorial";
 import { assetPath } from "@/lib/assetPath";
 import { newsAgo, newsTitle, type NewsRecord } from "@/lib/news";
 import { domainTerm, institutionName, localePath, tr, type Locale } from "@/lib/i18n";
-import { beijingDateTime } from "@/lib/macro/presentation";
 import { researchPath } from "@/lib/researchPath";
 import { topicPath, type TopicStat } from "@/lib/topics";
 import { JsonLd, organizationJsonLd, siteJsonLd } from "@/lib/seo";
-import type { FeedPulse, featuredFeed, importantReleasesThisWeek } from "@/lib/queries";
+import type { FeedPulse, featuredFeed } from "@/lib/queries";
 import { Icon } from "./Icon";
 
 /**
@@ -58,7 +56,6 @@ export default function HomeFront({
   watch,
   topics,
   themes,
-  thisWeek,
   figure,
   assets,
   news,
@@ -70,7 +67,6 @@ export default function HomeFront({
   watch: FrontWatchRow[];
   topics: TopicStat[];
   themes: FrontTheme[];
-  thisWeek: Awaited<ReturnType<typeof importantReleasesThisWeek>>;
   figure: FrontFigure | null;
   assets: Array<{ ticker: string; name: string }>;
   news: NewsRecord[];
@@ -184,65 +180,43 @@ export default function HomeFront({
         </section>
       )}
 
-      {/* This week: each block renders only when it has content, so the band never shows
-          an empty column beside a full one. */}
-      {(() => {
-        const blocks: ReactNode[] = [];
-        if (themes.length > 0) {
-          blocks.push(
-            <div className="blk" key="themes">
-              <div className="section-t"><span>{tr(locale, "Themes in motion", "交易主线")}</span><Link className="chip gray" href={localePath(locale, "/market-themes")}>{tr(locale, "All", "全部")} →</Link></div>
-              <div className="front-watch">
-                {themes.slice(0, 3).map((theme) => (
-                  <div className="r" key={theme.key}>
-                    <span className="who">
-                      <span className={`chip ${theme.direction === "bullish" ? "bull" : theme.direction === "bearish" ? "bear" : "neu"}`}>
-                        {theme.direction === "bullish" ? tr(locale, "Bullish", "看多") : theme.direction === "bearish" ? tr(locale, "Bearish", "看跌") : tr(locale, "Neutral", "中性")}
-                      </span>
+      {/* Three ongoing desks side by side: market narratives, the subjects institutions
+          keep returning to, and the weekly letter. Every row/ chip links to its page. */}
+      <section className="front-band front-triptych" aria-label={tr(locale, "Ongoing desks", "常设栏目")}>
+        <div className="blk">
+          <div className="section-t"><span>{tr(locale, "Themes in motion", "交易主线")}</span><Link className="chip gray" href={localePath(locale, "/market-themes")}>{tr(locale, "All", "全部")} →</Link></div>
+          {themes.length > 0 ? (
+            <div className="front-watch">
+              {themes.slice(0, 3).map((theme) => (
+                <Link className="r" key={theme.key} href={`${localePath(locale, "/market-themes")}#${encodeURIComponent(theme.key)}`}>
+                  <span className="who">
+                    <span className={`chip ${theme.direction === "bullish" ? "bull" : theme.direction === "bearish" ? "bear" : "neu"}`}>
+                      {theme.direction === "bullish" ? tr(locale, "Bullish", "看多") : theme.direction === "bearish" ? tr(locale, "Bearish", "看跌") : tr(locale, "Neutral", "中性")}
                     </span>
-                    <span className="what">{zh ? theme.titleZh : theme.titleEn}</span>
-                    <span className="meta">{theme.institutionCount} {tr(locale, "institutions", "家机构")} · {theme.viewCount} {tr(locale, "views", "条观点")}</span>
-                  </div>
-                ))}
-              </div>
-            </div>,
-          );
-        }
-        if (thisWeek.length > 0) {
-          blocks.push(
-            <div className="blk" key="week">
-              <div className="section-t"><span>{tr(locale, "Key data this week", "本周重要数据")}</span><Link className="chip gray" href={localePath(locale, "/macro/calendar")}>{tr(locale, "Calendar", "日历")} →</Link></div>
-              <div className="front-watch">
-                {thisWeek.map((release) => (
-                  <div className="r" key={release.id}>
-                    <span className="who">{beijingDateTime(release.scheduledAt, locale)}</span>
-                    <span className="what">
-                      <Link href={localePath(locale, `/macro/release/${release.id}`)}>{zh ? release.titleZh ?? release.titleEn : release.titleEn}</Link>
-                    </span>
-                    <span className="meta">{release.countryCode} · {"●".repeat(release.importance)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>,
-          );
-        }
-        if (topics.length > 0) {
-          blocks.push(
-            <div className="blk" key="topics">
-              <div className="section-t"><span>{tr(locale, "Topics institutions write about", "机构正在讨论的主题")}</span><Link className="chip gray" href={localePath(locale, "/topics")}>{tr(locale, "All", "全部")} →</Link></div>
-              <div className="tag-row">
-                {topics.slice(0, 8).map((topic) => (
-                  <Link key={topic.key} href={localePath(locale, topicPath(topic.key))} className="chip gray">
-                    {zh ? topic.labelZh : topic.labelEn}
-                  </Link>
-                ))}
-              </div>
-            </div>,
-          );
-        }
-        if (!blocks.length) return null;
-        return <section className="front-band" aria-label={tr(locale, "This week", "本周")}>{blocks}</section>;
-      })()}
+                  </span>
+                  <span className="what">{zh ? theme.titleZh : theme.titleEn}</span>
+                  <span className="meta">{theme.institutionCount} {tr(locale, "institutions", "家机构")} · {theme.viewCount} {tr(locale, "views", "条观点")}</span>
+                </Link>
+              ))}
+            </div>
+          ) : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No active theme at the moment.", "当前暂无活跃主线。")}</p>}
+        </div>
+
+        <div className="blk">
+          <div className="section-t"><span>{tr(locale, "Institutional interests", "机构兴趣")}</span><Link className="chip gray" href={localePath(locale, "/topics")}>{tr(locale, "All", "全部")} →</Link></div>
+          {topics.length > 0 ? (
+            <div className="tag-row">
+              {topics.slice(0, 8).map((topic) => (
+                <Link key={topic.key} href={localePath(locale, topicPath(topic.key))} className="chip gray">
+                  {zh ? topic.labelZh : topic.labelEn}
+                </Link>
+              ))}
+            </div>
+          ) : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No subject has enough coverage yet.", "暂无达到覆盖门槛的主题。")}</p>}
+        </div>
+
+        <NewsletterCTA locale={locale} source="home" variant="column" />
+      </section>
 
       {/* One figure worth reading. */}
       {figure && (
@@ -258,8 +232,6 @@ export default function HomeFront({
           </figure>
         </section>
       )}
-
-      <NewsletterCTA locale={locale} source="home" />
 
       <section className="home-verification">
         <div><span><Icon name="check" /></span><p><strong>{tr(locale, "Built to be checked", "经得起核对")}</strong>{tr(locale, "Every view links back to its original report. Our extraction rules, accepted sources, AI use and correction process are public.", "每条观点都链接回原始研报；提取规则、来源标准、AI 使用方式与纠错流程全部公开。")}</p></div>

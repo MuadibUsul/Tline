@@ -60,8 +60,6 @@ export async function generateMetadata(props: { searchParams: Promise<ResearchSe
   };
 }
 
-const ASSET_CLASSES: Array<[string, string]> = [["equity", "股票"], ["rate", "利率"], ["fx", "外汇"], ["commodity", "大宗商品"], ["crypto", "加密资产"], ["macro", "宏观"]];
-
 export default async function ResearchIndex(
   props: {
     searchParams: Promise<ResearchSearchParams>;
@@ -116,7 +114,7 @@ export default async function ResearchIndex(
       },
     } : {}),
   }, locale);
-  const [articles, institutions, assets, countries, pulse] = await Promise.all([
+  const [articles, institutions, assets, pulse] = await Promise.all([
     prisma.article.findMany({
       where,
       orderBy: { id: "desc" },
@@ -124,7 +122,6 @@ export default async function ResearchIndex(
     }),
     prisma.institution.findMany({ where: { articles: { some: publicationReadyWhere() } }, orderBy: { name: "asc" }, select: { slug: true, name: true } }),
     prisma.asset.findMany({ where: { articleAssets: { some: { article: publicationReadyWhere() } } }, orderBy: { name: "asc" }, select: { ticker: true, name: true } }),
-    prisma.institution.findMany({ where: { country: { not: null }, articles: { some: publicationReadyWhere() } }, orderBy: { country: "asc" }, distinct: ["country"], select: { country: true } }),
     feedPulse(),
   ]);
   const total = articles.length;
@@ -230,45 +227,21 @@ export default async function ResearchIndex(
             <option value="">{tr(locale, "All economies", "全部经济体")}</option>
             {taxonomy.jurisdictions.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
           </select>
-          <select name="subjectInstitution" defaultValue={searchParams.subjectInstitution ?? ""} aria-label={tr(locale, "Subject institution", "内容涉及机构")}>
-            <option value="">{tr(locale, "All subject institutions", "全部内容涉及机构")}</option>
-            {taxonomy.institutions.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
+          <select name="institution" defaultValue={searchParams.institution ?? ""} aria-label={tr(locale, "Institution", "机构")}>
+            <option value="">{tr(locale, "All institutions", "全部机构")}</option>
+            {institutions.map((institution) => <option key={institution.slug} value={institution.slug}>{institutionName(institution.name, locale)}</option>)}
           </select>
           <select name="topic" defaultValue={searchParams.topic ?? ""} aria-label={tr(locale, "Topic", "主题")}>
             <option value="">{tr(locale, "All topics", "全部主题")}</option>
             {taxonomy.topics.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
           </select>
-          <select name="assetClass" defaultValue={searchParams.assetClass ?? ""} aria-label={tr(locale, "Asset class", "资产类别")}>
-            <option value="">{tr(locale, "All asset classes", "全部资产类别")}</option>
-            {taxonomy.assetClasses.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
-          </select>
-          <select name="event" defaultValue={searchParams.event ?? ""} aria-label={tr(locale, "Event", "事件")}>
-            <option value="">{tr(locale, "All events", "全部事件")}</option>
-            {taxonomy.events.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
-          </select>
-          {countries.length > 0 && (
-            <select name="country" defaultValue={searchParams.country ?? ""} aria-label={tr(locale, "Publisher country", "发布机构所在国")}>
-              <option value="">{tr(locale, "All publisher countries", "全部发布机构所在国")}</option>
-              {countries.map(({ country }) => <option key={country!} value={country!}>{country}</option>)}
-            </select>
-          )}
-          <select name="institution" defaultValue={searchParams.institution ?? ""} aria-label={tr(locale, "Institution", "投行")}>
-            <option value="">{tr(locale, "All institutions", "全部投行")}</option>
-            {institutions.map((institution) => <option key={institution.slug} value={institution.slug}>{institutionName(institution.name, locale)}</option>)}
-          </select>
-          <select name="category" defaultValue={searchParams.category ?? ""} aria-label={tr(locale, "Category", "类别")}>
-            <option value="">{tr(locale, "All categories", "全部类别")}</option>
-            {ASSET_CLASSES.map(([value, zh]) => <option key={value} value={value}>{locale === "zh-CN" ? zh : value}</option>)}
-          </select>
           <select name="ticker" defaultValue={searchParams.ticker ?? ""} aria-label={tr(locale, "Asset", "资产")}>
             <option value="">{tr(locale, "All assets", "全部资产")}</option>
             {assets.map((asset) => <option key={asset.ticker} value={asset.ticker}>{assetName(asset.name, locale, asset.ticker)} · {asset.ticker}</option>)}
           </select>
-          <select name="direction" defaultValue={searchParams.direction ?? ""} aria-label={tr(locale, "Direction", "方向")}>
-            <option value="">{tr(locale, "All asset-view directions", "全部资产观点方向")}</option>
-            <option value="bull">{tr(locale, "Bullish asset views", "看多的资产观点")}</option>
-            <option value="neutral">{tr(locale, "Neutral asset views", "中性的资产观点")}</option>
-            <option value="bear">{tr(locale, "Bearish asset views", "看空的资产观点")}</option>
+          <select name="event" defaultValue={searchParams.event ?? ""} aria-label={tr(locale, "Event", "事件")}>
+            <option value="">{tr(locale, "All events", "全部事件")}</option>
+            {taxonomy.events.map((item) => <option key={item.key} value={item.key}>{locale === "zh-CN" ? item.nameZh : item.nameEn}</option>)}
           </select>
           <button className="minibtn p" type="submit">{tr(locale, "Apply filters", "应用筛选")}</button>
         </form>

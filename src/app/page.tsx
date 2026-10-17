@@ -107,7 +107,6 @@ export default async function Home() {
         }))}
         topics={topics}
         themes={themes}
-        thisWeek={thisWeek}
         figure={figureRow ? { id: figureRow.id, caption: figureRow.caption, slug: figureRow.article.slug, title: figureRow.article.title } : null}
         assets={coveredAssets}
         news={news}

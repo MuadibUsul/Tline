@@ -1090,7 +1090,11 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .citation-card h2{font:600 17px var(--sans)}
 .citation-card p{color:var(--ink-2)}
 
-.citation-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
+/* Four facts on one row: institution, date, topic, horizon. Three columns left the
+   fourth alone on a second row, so the block read as two different grids. */
+.citation-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+
+@media(max-width:1040px){.citation-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .citation-facts div{padding:10px;background:var(--panel-2);border-radius:8px}
 .citation-facts dt{font:10px var(--mono);color:var(--faint);text-transform:uppercase}

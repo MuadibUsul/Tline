@@ -12,9 +12,9 @@ export default function ShareCiteButton({
   labels,
 }: {
   citation: string;
-  labels: { cite: string; copied: string; copyLink: string; linkCopied: string };
+  labels: { cite: string; copied: string; copyLink: string; linkCopied: string; copyFailed: string };
 }) {
-  const [state, setState] = useState<"idle" | "cite" | "link">("idle");
+  const [state, setState] = useState<"idle" | "cite" | "link" | "failed">("idle");
 
   const copy = async (text: string, which: "cite" | "link") => {
     try {
@@ -22,17 +22,20 @@ export default function ShareCiteButton({
       setState(which);
       setTimeout(() => setState("idle"), 1800);
     } catch {
-      /* clipboard unavailable (insecure context): leave the buttons as they were */
+      // Clipboard permission can be denied even on HTTPS. Silence made the button look
+      // dead; say so instead.
+      setState("failed");
+      setTimeout(() => setState("idle"), 2400);
     }
   };
 
   return (
     <span className="ed-actions">
       <button type="button" className="minibtn ed-cite" onClick={() => void copy(citation, "cite")}>
-        {state === "cite" ? labels.copied : labels.cite}
+        {state === "cite" ? labels.copied : state === "failed" ? labels.copyFailed : labels.cite}
       </button>
       <button type="button" className="minibtn ed-cite" onClick={() => void copy(window.location.href, "link")}>
-        {state === "link" ? labels.linkCopied : labels.copyLink}
+        {state === "link" ? labels.linkCopied : state === "failed" ? labels.copyFailed : labels.copyLink}
       </button>
     </span>
   );

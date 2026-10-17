@@ -1105,6 +1105,11 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 
 .citation-evidence section,.citation-conditions,.citation-arguments{padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
 
+/* Long-form sections are not cards. They span the brief and are separated by a rule, so
+   every boxed card in the brief keeps the same two-column width; only its height changes
+   with the amount of text. */
+.citation-arguments,.citation-conditions{padding:18px 0 0;border:0;border-top:1px solid var(--border);border-radius:0;background:transparent}
+
 .citation-evidence h3,.citation-evidence h2,.citation-conditions h3,.citation-conditions h2,.citation-arguments h3,.citation-arguments h2{margin:0 0 10px;font:600 13px var(--sans);color:var(--ink)}
 
 /* Full width and ahead of the evidence grid: the arguments are what the report claims,

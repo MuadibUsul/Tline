@@ -302,15 +302,17 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const primarySafeForecast = primaryAssetView
     ? validateStructuredResearch({}, a.rawText ?? "", [{ ticker: primaryAssetView.asset.ticker, target: primaryAssetView.target, previousTarget: primaryAssetView.previousTarget, timeHorizon: primaryAssetView.timeHorizon }]).forecasts[0]
     : null;
-  const [articleTopics, peerReports] = await Promise.all([
-    getArticleTopics(a.id, locale),
-    primaryTicker ? getPeerReports({ articleId: a.id, ticker: primaryTicker, institutionId: a.institution.id, locale }) : Promise.resolve([]),
-  ]);
   // The editorial reading layer (PRD P03), gated by the redesign flag. Everything below
   // that is not in this branch — gate, metadata, JSON-LD, evidence, downloads — is
   // identical in both modes.
   const redesigned = redesignAtLeast("article");
-  const user = redesigned ? await getSessionUser() : null;
+  const [articleTopics, peerReports, user] = await Promise.all([
+    getArticleTopics(a.id, locale),
+    primaryTicker ? getPeerReports({ articleId: a.id, ticker: primaryTicker, institutionId: a.institution.id, locale }) : Promise.resolve([]),
+    // The session is independent of the topics and peers; waiting for them before asking
+    // added a second round trip to every article open.
+    redesigned ? getSessionUser() : Promise.resolve(null),
+  ]);
   const bookmarked = user
     ? Boolean(await prisma.articleBookmark.findUnique({ where: { userId_articleId: { userId: user.id, articleId: a.id } }, select: { id: true } }))
     : false;
@@ -362,6 +364,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
                   copied: tr(locale, "Citation copied", "引文已复制"),
                   copyLink: tr(locale, "Copy link", "复制链接"),
                   linkCopied: tr(locale, "Link copied", "链接已复制"),
+                  copyFailed: tr(locale, "Copy failed — select the address manually", "复制失败，请手动选择地址"),
                 }}
               />
             </div>

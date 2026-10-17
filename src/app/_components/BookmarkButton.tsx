@@ -23,8 +23,8 @@ import type { Locale } from "@/lib/i18n";
  * the same strings the server would have rendered.
  */
 const TXT = {
-  en: { signIn: "Sign in to save", save: "Bookmark", saved: "Bookmarked", unauthorised: "Sign in first.", failed: "That did not work. Try again." },
-  "zh-CN": { signIn: "登录后收藏", save: "收藏", saved: "已收藏", unauthorised: "请先登录。", failed: "操作失败，请重试。" },
+  en: { signIn: "Sign in to save", save: "Bookmark", saved: "Bookmarked", saving: "Saving…", unauthorised: "Sign in first.", failed: "That did not work. Try again." },
+  "zh-CN": { signIn: "登录后收藏", save: "收藏", saved: "已收藏", saving: "保存中…", unauthorised: "请先登录。", failed: "操作失败，请重试。" },
 } as const;
 
 export default function BookmarkButton({
@@ -61,9 +61,10 @@ export default function BookmarkButton({
         className={bookmarked ? "minibtn" : "minibtn p"}
         type="submit"
         aria-pressed={bookmarked}
+        aria-busy={pending}
         disabled={pending}
       >
-        {bookmarked ? t.saved : t.save}
+        {pending ? t.saving : bookmarked ? t.saved : t.save}
       </button>
       {state.error && (
         <p className="chip bear" role="alert" style={{ display: "inline-block", marginLeft: 8 }}>

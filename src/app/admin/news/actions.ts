@@ -1,7 +1,6 @@
 "use server";
 
 import "server-only";
-import sharp from "sharp";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
@@ -138,12 +137,16 @@ export async function addNewsImageAction(_previous: NewsFormState, formData: For
   if (file.size > IMAGE_MAX_BYTES) return { error: "图片不能超过 8MB。" };
   if (!IMAGE_TYPES.has(file.type)) return { error: "仅支持 PNG、JPEG、WebP 或 GIF。" };
   const buffer = Buffer.from(await file.arrayBuffer());
-  let meta;
-  try {
-    meta = await sharp(buffer).metadata();
-  } catch {
-    return { error: "无法读取这张图片。" };
-  }
+  // Validate the bytes, not the browser-supplied mime: a renamed HTML file must not be
+  // served from the image route. Dimensions are optional here; the browser sizes the img.
+  const signature = file.type === "image/png"
+    ? buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47
+    : file.type === "image/jpeg"
+      ? buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+      : file.type === "image/gif"
+        ? buffer.length > 6 && buffer.toString("ascii", 0, 4) === "GIF8"
+        : buffer.length > 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
+  if (!signature) return { error: "文件内容与图片格式不符。" };
   const position = Number(formData.get("position") ?? 0);
   const result = await addNewsImage({
     postId,
@@ -151,8 +154,6 @@ export async function addNewsImageAction(_previous: NewsFormState, formData: For
     caption: formData.get("caption")?.toString(),
     alt: formData.get("alt")?.toString(),
     mimeType: file.type,
-    width: meta.width,
-    height: meta.height,
     data: buffer,
   }, { userId: user.id });
   if (!result.ok) return { issues: result.issues };

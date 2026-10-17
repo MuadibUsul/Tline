@@ -87,7 +87,7 @@ export default async function AdminNewsEditPage(props: { params: Promise<{ id: s
                   {/* eslint-disable-next-line @next/next/no-img-element -- admin thumbnail from the image store */}
                   <img src={`/api/news-images/${image.id}`} alt={image.alt ?? ""} width={140} loading="lazy" />
                   <div>
-                    <small className="mono">{tr(locale, "after paragraph", "第几段之后")} {image.position} · {image.width}×{image.height} · {image.mimeType}</small>
+                    <small className="mono">{tr(locale, "after paragraph", "第几段之后")} {image.position} · {image.width && image.height ? `${image.width}×${image.height} · ` : ""}{image.mimeType}</small>
                     {image.caption ? <p>{image.caption}</p> : null}
                   </div>
                   <form action={deleteNewsImageAction}>

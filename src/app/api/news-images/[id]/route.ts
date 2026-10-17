@@ -18,6 +18,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       "content-type": row.mimeType,
       "content-length": String(row.data.length),
       "cache-control": "public, max-age=31536000, immutable",
+      "x-content-type-options": "nosniff",
       "x-robots-tag": "noindex, noimageindex, nofollow",
     },
   });

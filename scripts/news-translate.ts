@@ -35,8 +35,10 @@ async function main() {
       id: true, titleZh: true, titleEn: true, bodyZh: true, bodyEn: true, publishedAt: true,
       images: { select: { id: true, caption: true, alt: true, captionZh: true, captionEn: true, altZh: true, altEn: true } },
     },
+    // The newsroom is small (a few items a day), so filter the complete set rather than a
+    // sample of the newest rows: a run of bilingual posts must not hide an older item that
+    // still lacks one edition.
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
-    take: ids.length ? undefined : limit * 4,
   });
   const work = candidates
     .filter((post) => missingNewsTranslation(post) || newsImagesNeedTranslation(post.images))

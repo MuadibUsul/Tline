@@ -103,14 +103,21 @@ export function newsCadenceLabel(cadence: string | null | undefined, locale: Loc
  * Whether a paragraph is a section heading. The desk writes "二、战况" on its own line, but
  * also opens the brief with "一、 俄 315 架…" as a full paragraph — so a numeral alone is
  * not enough; a heading is short.
+ *
+ * The English edition is a translation of the same paragraphs, so its headings keep the
+ * numeral in Latin form ("II. Combat Situation"). Recognising only Chinese numerals made
+ * every English section label a body paragraph — the text was there, but the page lost the
+ * structure the Chinese edition has.
  */
 export function newsParagraphRole(text: string): "heading" | "body" {
   const value = text.trim();
   if (value.length > 32) return "body";
   // A section label is a label, not a sentence: "二、战况" is a heading, "一、 一段话。" is
   // the opening paragraph even when it is short.
-  if (/[。；！？]$/.test(value)) return "body";
-  return /^[一二三四五六七八九十]+、/.test(value) || /^【[^】]{2,20}】$/.test(value) ? "heading" : "body";
+  if (/[。；！？.]$/.test(value)) return "body";
+  if (/^(?:[一二三四五六七八九十]+、|【[^】]{2,20}】$)/.test(value)) return "heading";
+  if (/^[IVXLC]{1,5}[.)]\s+\S/.test(value)) return "heading";
+  return "body";
 }
 
 /** A list excerpt made of body paragraphs only, so section labels never run into the prose. */

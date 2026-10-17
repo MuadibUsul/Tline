@@ -38,6 +38,11 @@ const ROBOTS_NOINDEX = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
 
 const nextConfig = {
   reactStrictMode: true,
+  // Newsroom figures are stored with the post. The 1MB default would reject a map-sized
+  // PNG before the action ever saw it; the action itself caps files at 8MB.
+  experimental: {
+    serverActions: { bodySizeLimit: "10mb" },
+  },
   // Prisma client is a server-only dependency. This option is stable in Next 15.
   serverExternalPackages: ["@prisma/client", "prisma"],
   // Allow an isolated build dir so a second dev server (e.g. another tool on the same

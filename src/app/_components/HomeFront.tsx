@@ -164,7 +164,7 @@ export default function HomeFront({
               <aside className="front-news-rail" aria-label={tr(locale, "Latest news", "最新新鲜事")}>
                 <div className="front-news-head">
                   <span className="section-t" style={{ margin: 0 }}>{tr(locale, "Newsroom", "新鲜事")}</span>
-                  <Link href={localePath(locale, "/news")}>{tr(locale, "All", "全部")} →</Link>
+                  <Link className="chip gray" href={localePath(locale, "/news")}>{tr(locale, "All", "全部")} →</Link>
                 </div>
                 <div className="front-news-list">
                   {news.map((post) => {

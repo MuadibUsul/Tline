@@ -1402,6 +1402,12 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 /* ---- Header / search overlay ---- */
 .topbar{transition:transform .18s ease}
 .topbar.hide{transform:translateY(-102%)}
+/* Instant click acknowledgement without a Suspense boundary (which would force a 200
+   shell before notFound() can answer 404). */
+.nav-progress{position:fixed;top:0;left:0;right:0;height:2px;background:var(--accent);z-index:120;opacity:0;transform:scaleX(0);transform-origin:left;pointer-events:none}
+.nav-progress.on{opacity:1;animation:nav-progress 12s cubic-bezier(.1,.7,.3,1) forwards}
+@keyframes nav-progress{0%{transform:scaleX(0)}12%{transform:scaleX(.72)}100%{transform:scaleX(.92)}}
+@media (prefers-reduced-motion:reduce){.nav-progress.on{animation:none;transform:scaleX(.8)}}
 @media (prefers-reduced-motion: reduce){.topbar{transition:none}}
 .search-trigger{display:inline-flex;align-items:center;gap:7px;font:12px var(--mono);color:var(--muted);border:1px solid var(--border);background:var(--panel);border-radius:8px;padding:5px 11px}
 .search-trigger kbd{font:10px var(--mono);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--faint);background:var(--bg)}

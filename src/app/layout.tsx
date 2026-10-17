@@ -12,6 +12,7 @@ import MobileNav, { type MobileNavItem } from "./_components/MobileNav";
 import SearchOverlay from "./_components/SearchOverlay";
 import { TlinesMark } from "./_components/Icon";
 import TopbarScroll from "./_components/TopbarScroll";
+import NavigationProgress from "./_components/NavigationProgress";
 import Analytics from "./_components/Analytics";
 import { redesignAtLeast } from "@/lib/redesign";
 import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
@@ -132,6 +133,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale}>
       <body>
+        <NavigationProgress />
         <div className="topbar">
           <div className="wrap inner">
             <Link href={localePath(locale, "/")} className="brand">

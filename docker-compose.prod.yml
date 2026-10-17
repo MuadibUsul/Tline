@@ -47,6 +47,10 @@ services:
       # (or remove the line) in .env and recreate the app container to roll back.
       # Default off so a deployment that never opted in keeps the previous appearance.
       TL_REDESIGN: ${TL_REDESIGN:-off}
+      # Optional ownership proofs for Search Console / Bing Webmaster. Blank means the
+      # verification tag is omitted; set the code in .env and recreate the app.
+      GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+      BING_SITE_VERIFICATION: ${BING_SITE_VERIFICATION:-}
     networks:
       - default
       - web

@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
+  const posts = await listPublishedNews(locale, 1);
   const title = tr(locale, "News", "新鲜事");
   const description = clamp(tr(
     locale,
@@ -23,6 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
   ), 158);
   return {
     ...canonical("/news", locale),
+    // An empty stream is a shell, not a page; English has no newsroom edition yet.
+    ...(posts.length ? {} : { robots: { index: false, follow: true } }),
     title: { absolute: `${title} · Tlines` },
     description,
     openGraph: { type: "website", title, description, url: localizedUrl("/news", locale), locale, images: [{ url: ogImage("News", title, tr(locale, "Briefs, flashes and articles", "快讯、短讯与文章")), width: 1200, height: 630 }] },

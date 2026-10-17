@@ -52,6 +52,7 @@ interface ReportSchema {
   author?: string | null;
   about?: string[];
   hasTranslation?: boolean;
+  image?: string;
 }
 
 export const brandName = (locale: Locale) => locale === "zh-CN" ? SITE_NAME_ZH : SITE_NAME;
@@ -249,6 +250,7 @@ export function reportJsonLd(report: ReportSchema) {
     url,
     headline: report.title.slice(0, 110),
     description: report.description.slice(0, 300),
+    ...(report.image ? { image: report.image } : {}),
     datePublished: report.publishedAt.toISOString(),
     dateModified: (report.updatedAt ?? report.publishedAt).toISOString(),
     inLanguage: report.locale,

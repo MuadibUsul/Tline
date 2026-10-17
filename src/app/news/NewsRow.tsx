@@ -48,7 +48,7 @@ export default function NewsRow({ post, locale, showColumn = false }: { post: Ne
       {cover ? (
         <Link className="news-thumb" href={localePath(locale, `/news/${post.slug}`)} tabIndex={-1} aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element -- stored in the news image table */}
-          <img src={`/api/news-images/${cover.id}`} alt={cover.alt ?? cover.caption ?? ""} loading="lazy" />
+          <img src={`/api/news-images/${cover.id}?variant=thumb`} alt={cover.alt ?? cover.caption ?? ""} loading="lazy" />
         </Link>
       ) : null}
     </article>

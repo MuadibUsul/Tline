@@ -1731,6 +1731,11 @@ model NewsImage {
   width     Int?
   height    Int?
   data      Bytes
+  // A 360px JPEG for list thumbnails; the full image stays for the article.
+  thumbData     Bytes?
+  thumbMimeType String?
+  thumbWidth    Int?
+  thumbHeight   Int?
   createdAt DateTime @default(now())
 
   @@index([postId, position])

@@ -79,7 +79,8 @@
     "decision:policy": "tsx scripts/decision-shadow.ts policy",
     "decision:views": "tsx scripts/decision-shadow.ts views",
     "baseline:redesign": "node scripts/redesign-baseline.mjs",
-    "views:rewrite": "tsx scripts/rewrite-views.ts"
+    "views:rewrite": "tsx scripts/rewrite-views.ts",
+    "news:thumbs": "tsx scripts/news-thumbs.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -93,6 +94,7 @@
     "@prisma/client": "^5.22.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
+    "jimp": "^0.22.12",
     "next": "^15.5.27",
     "next-auth": "^4.24.15",
     "nodemailer": "^9.1.1",

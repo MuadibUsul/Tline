@@ -34,6 +34,14 @@ export async function generateMetadata(): Promise<Metadata> {
     // composed title. Pages that own their full width pass `absolute` instead — see TITLE_SUFFIX.
     title: { default: title, template: `%s${TITLE_SUFFIX}` },
     description,
+    // Search-engine ownership proofs are optional; the codes are deployment values, not
+    // markup that should be guessed here.
+    ...(process.env.GOOGLE_SITE_VERIFICATION || process.env.BING_SITE_VERIFICATION ? {
+      verification: {
+        ...(process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : {}),
+        ...(process.env.BING_SITE_VERIFICATION ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } } : {}),
+      },
+    } : {}),
     applicationName: title,
     openGraph: { type: "website", siteName: title, title, description, locale, url: localizedUrl("/", locale), images: [{ url: ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal"), width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal")] },

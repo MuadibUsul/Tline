@@ -11,12 +11,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const row = await prisma.newsImage.findUnique({ where: { id }, select: { data: true, mimeType: true } });
+  const row = await prisma.newsImage.findUnique({ where: { id }, select: { data: true, mimeType: true, thumbData: true, thumbMimeType: true } });
   if (!row) return new Response("Not Found", { status: 404 });
-  return new Response(new Uint8Array(row.data), {
+  const thumb = new URL(_request.url).searchParams.get("variant") === "thumb" && row.thumbData && row.thumbMimeType;
+  const body = thumb ? row.thumbData! : row.data;
+  return new Response(new Uint8Array(body), {
     headers: {
-      "content-type": row.mimeType,
-      "content-length": String(row.data.length),
+      "content-type": thumb ? row.thumbMimeType! : row.mimeType,
+      "content-length": String(body.length),
       "cache-control": "public, max-age=31536000, immutable",
       "x-content-type-options": "nosniff",
       "x-robots-tag": "noindex, noimageindex, nofollow",

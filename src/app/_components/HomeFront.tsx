@@ -173,7 +173,7 @@ export default function HomeFront({
                         <span className="headline">{headline}</span>
                         {cover ? (
                           // eslint-disable-next-line @next/next/no-img-element -- stored in the news image table
-                          <img className="front-news-thumb" src={`/api/news-images/${cover.id}`} alt={cover.alt ?? cover.caption ?? ""} loading="lazy" />
+                          <img className="front-news-thumb" src={`/api/news-images/${cover.id}?variant=thumb`} alt={cover.alt ?? cover.caption ?? ""} loading="lazy" />
                         ) : null}
                       </Link>
                     );

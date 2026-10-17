@@ -32,7 +32,7 @@ export async function GET(request: Request, context: { params: Promise<{ shard: 
   const sitemap = parseSitemapShard(shard);
   if (!sitemap) return new Response("Not Found", { status: 404 });
   if (sitemap.kind === "research" && sitemap.index > await researchShardCount(sitemap.locale)) return new Response("Not Found", { status: 404 });
-  if (sitemap.kind === "news" && sitemap.index > await newsShardCount()) return new Response("Not Found", { status: 404 });
+  if (sitemap.kind === "news" && sitemap.index > await newsShardCount(sitemap.locale)) return new Response("Not Found", { status: 404 });
 
   const entries = await buildSitemap(sitemap);
   return new Response(renderUrlset(entries), {

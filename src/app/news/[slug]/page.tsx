@@ -77,8 +77,10 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
         url: localizedUrl(`/news/${post.slug}`, locale),
         mainEntityOfPage: localizedUrl(`/news/${post.slug}`, locale),
         inLanguage: locale,
-        publisher: { "@type": "Organization", name: "Tlines", url: siteUrl() },
-        ...(post.column ? { isPartOf: { "@type": "Periodical", name: newsColumnName(post.column, locale), url: localizedUrl(`/news/columns/${post.column.slug}`, locale) } } : {}),
+        image: images[0] ? `${siteUrl()}/api/news-images/${images[0].id}` : new URL(ogImage("News", title, tr(locale, "From the newsroom", "来自新闻编辑部")), siteUrl()).toString(),
+        author: { "@type": "Organization", name: tr(locale, "Tlines Newsroom", "Tlines 编辑部"), url: siteUrl() },
+        publisher: { "@type": "Organization", name: "Tlines", url: siteUrl(), logo: { "@type": "ImageObject", url: `${siteUrl()}/icon.svg` } },
+        ...(post.column ? { isPartOf: { "@type": "Periodical", name: newsColumnName(post.column, locale), url: localizedUrl(`/news/columns/${post.column.slug}`, locale) }, articleSection: newsColumnName(post.column, locale) } : {}),
         ...(post.sourceUrl ? { isBasedOn: sources.length > 1 ? sources : post.sourceUrl } : {}),
       }} />
       <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "News", "新鲜事"), path: "/news" }, { name: title, path: `/news/${post.slug}` }])} />

@@ -13,6 +13,13 @@ export function GET() {
 - [中文首页](${base}/zh)
 - [Markets](${base}/en/markets)
 - [Research](${base}/en/research)
+- [Newsroom 中文](${base}/zh/news)
+- [Newsroom English](${base}/en/news)
+- [Ukraine brief column](${base}/zh/news/columns/ukraine-war-brief)
+- [Categories](${base}/en/categories)
+- [Institution directory](${base}/en/institutions-directory)
+- [MCP for AI](${base}/en/mcp)
+- [About](${base}/en/about)
 - [Institutions](${base}/en/institutions)
 - [Economic data](${base}/en/macro)
 - [Market themes](${base}/en/market-themes)
@@ -29,6 +36,7 @@ Tlines structures public institutional research; it does not republish private r
 ## Expanded index
 - [llms-full.txt](${base}/llms-full.txt)
 - [RSS](${base}/rss.xml)
+- [Newsroom RSS](${base}/news/rss.xml)
 `;
   return new Response(body, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
 }

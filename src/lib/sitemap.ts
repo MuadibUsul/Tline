@@ -107,7 +107,7 @@ function localizedEntries(
 const otherLocale = (locale: Locale): Locale => locale === "en" ? "zh-CN" : "en";
 
 export async function buildPagesSitemap(locale: Locale): Promise<SitemapEntry[]> {
-  const [latestArticle, latestConsensus, latestIndicator, latestRelease, indicators, liveThemes, newsColumns] = await Promise.all([
+  const [latestArticle, latestConsensus, latestIndicator, latestRelease, indicators, liveThemes, newsColumns, latestNewsRows] = await Promise.all([
     prisma.article.findFirst({ where: publicationReadyWhere(), orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
     prisma.consensusHistory.findFirst({ orderBy: { timestamp: "desc" }, select: { timestamp: true } }),
     prisma.macroIndicator.findFirst({ where: { enabled: true }, orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
@@ -121,7 +121,9 @@ export async function buildPagesSitemap(locale: Locale): Promise<SitemapEntry[]>
         posts: { where: { status: "published", publishedAt: { lte: new Date() } }, select: { titleZh: true, titleEn: true } },
       },
     }),
+    prisma.newsPost.findMany({ where: { status: "published", publishedAt: { lte: new Date() } }, orderBy: { publishedAt: "desc" }, take: 50, select: { publishedAt: true, titleZh: true, titleEn: true } }),
   ]);
+  const latestNews = latestNewsRows.find((post) => locale === "zh-CN" ? post.titleZh : post.titleEn) ?? null;
   const articleChanged = latestArticle?.updatedAt;
   const macroChanged = later(changed("2026-09-27"), latestIndicator?.updatedAt, latestRelease?.updatedAt);
   const dynamicDates: Record<string, Date | undefined> = {
@@ -133,8 +135,9 @@ export async function buildPagesSitemap(locale: Locale): Promise<SitemapEntry[]>
     "/macro/calendar": latestRelease?.updatedAt,
     "/topics": articleChanged,
     "/economies": articleChanged,
+    "/news": latestNews?.publishedAt ?? undefined,
   };
-  const pages = STATIC_ROUTES.map((route) => ({
+  const pages = STATIC_ROUTES.filter((route) => route.path !== "/news" || latestNews).map((route) => ({
     path: route.path,
     lastModified: later(route.changedAt, dynamicDates[route.path]),
     changeFrequency: route.changeFrequency,
@@ -242,8 +245,13 @@ export async function buildTopicsSitemap(locale: Locale): Promise<SitemapEntry[]
 }
 
 /** The newsroom stream, sharded at the same size as reports; only items this language can read. */
-export async function newsShardCount(): Promise<number> {
-  return Math.max(1, Math.ceil(await prisma.newsPost.count({ where: { status: "published", publishedAt: { lte: new Date() } } }) / SHARD_SIZE));
+export async function newsShardCount(locale: Locale): Promise<number> {
+  const rows = await prisma.newsPost.findMany({
+    where: { status: "published", publishedAt: { lte: new Date() } },
+    select: { titleZh: true, titleEn: true },
+  });
+  const readable = rows.filter((post) => locale === "zh-CN" ? post.titleZh : post.titleEn).length;
+  return Math.ceil(readable / SHARD_SIZE);
 }
 
 export async function buildNewsSitemap(locale: Locale, index: number): Promise<SitemapEntry[]> {
@@ -316,10 +324,10 @@ export function parseSitemapShard(value: string): SitemapRequest | null {
 
 export async function buildSitemapIndex(): Promise<SitemapIndexEntry[]> {
   const base = siteUrl();
-  const [enCount, zhCount, newsCount] = await Promise.all([researchShardCount("en"), researchShardCount("zh-CN"), newsShardCount()]);
+  const [enCount, zhCount, newsEn, newsZh] = await Promise.all([researchShardCount("en"), researchShardCount("zh-CN"), newsShardCount("en"), newsShardCount("zh-CN")]);
   const requests: SitemapRequest[] = LOCALES.flatMap((locale) => [
     ...GROUPS.map((kind) => ({ kind, locale, index: 1 })),
-    ...Array.from({ length: newsCount }, (_, index) => ({ kind: "news" as const, locale, index: index + 1 })),
+    ...Array.from({ length: locale === "en" ? newsEn : newsZh }, (_, index) => ({ kind: "news" as const, locale, index: index + 1 })),
     ...Array.from({ length: locale === "en" ? enCount : zhCount }, (_, index) => ({ kind: "research" as const, locale, index: index + 1 })),
   ]);
   return requests.map((request) => ({ url: base + sitemapPath(request) }));

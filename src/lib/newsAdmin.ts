@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import Jimp from "jimp";
 import { prisma } from "./db";
 import { writeAudit } from "./audit";
 import { buildNewsSlug, validateNewsInput, type NewsInput } from "./news";
@@ -179,6 +180,21 @@ export async function createNewsColumn(input: NewsColumnInput, actor: { userId: 
   }
 }
 
+async function makeThumb(data: Uint8Array) {
+  try {
+    const image = await Jimp.read(Buffer.from(data));
+    const width = image.bitmap.width;
+    const height = image.bitmap.height;
+    const thumb = image.clone();
+    if (thumb.bitmap.width > 360) thumb.resize(360, Jimp.AUTO);
+    const thumbData = await thumb.quality(82).getBufferAsync(Jimp.MIME_JPEG);
+    return { width, height, thumbData, thumbMimeType: "image/jpeg", thumbWidth: thumb.bitmap.width, thumbHeight: thumb.bitmap.height };
+  } catch {
+    // An image Jimp cannot decode still serves at full size; the list falls back to it.
+    return null;
+  }
+}
+
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 /** Attach one image to a post. The bytes live here, not in the body text. */
@@ -189,6 +205,7 @@ export async function addNewsImage(input: {
   if (!IMAGE_TYPES.has(input.mimeType)) return { ok: false, issues: [{ code: "image.type", message: "Images must be PNG, JPEG, WebP or GIF." }] };
   const post = await prisma.newsPost.findUnique({ where: { id: input.postId }, select: { id: true, slug: true } });
   if (!post) return { ok: false, issues: [{ code: "not_found", message: "No news post with that id." }] };
+  const thumb = await makeThumb(input.data);
   const row = await prisma.newsImage.create({
     data: {
       postId: post.id,
@@ -196,9 +213,13 @@ export async function addNewsImage(input: {
       caption: clean(input.caption),
       alt: clean(input.alt),
       mimeType: input.mimeType,
-      width: input.width ?? null,
-      height: input.height ?? null,
+      width: thumb?.width ?? input.width ?? null,
+      height: thumb?.height ?? input.height ?? null,
       data: Buffer.from(input.data),
+      thumbData: thumb ? Buffer.from(thumb.thumbData) : null,
+      thumbMimeType: thumb?.thumbMimeType ?? null,
+      thumbWidth: thumb?.thumbWidth ?? null,
+      thumbHeight: thumb?.thumbHeight ?? null,
     },
     select: { id: true },
   });

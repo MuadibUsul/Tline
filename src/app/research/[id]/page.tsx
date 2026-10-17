@@ -7,6 +7,7 @@ import { articleBlocks, stripTrailingDisclaimer, stripTrailingDisclaimerSegments
 import { prisma } from "@/lib/db";
 import PdfPreview from "@/app/_components/PdfPreview";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, displayTitle, localizedUrl, ogImage, reportJsonLd, stripPublisherPrefix } from "@/lib/seo";
+import { siteUrl } from "@/lib/site";
 import { preferredEnglishDocuments, publicationReadyWhere } from "@/lib/publication";
 import { researchLookupWhere, researchPath, researchRedirectPath } from "@/lib/researchPath";
 import { contentQuality, isNativeChineseArticle } from "@/lib/contentQuality";
@@ -334,6 +335,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         author: a.author,
         about: [...new Set(a.atomicViews.flatMap((view) => [view.topic, view.asset]).filter(Boolean))],
         hasTranslation: Boolean(usableTranslation),
+        image: a.figures[0] ? `${siteUrl()}/api/figures/${a.figures[0].id}` : new URL(ogImage("Research", heading, institutionName(a.institution.name, locale)), siteUrl()).toString(),
       })} />
       <JsonLd data={breadcrumbJsonLd(locale, [
         { name: tr(locale, "Research", "研报"), path: "/research" },

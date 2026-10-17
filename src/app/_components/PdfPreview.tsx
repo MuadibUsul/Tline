@@ -93,9 +93,11 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
           cMapUrl: "/pdfjs/cmaps/",
           cMapPacked: true,
           standardFontDataUrl: "/pdfjs/standard_fonts/",
-          // The route answers Range requests. Without these pdf.js fetches the whole file
-          // before drawing page one; with them the first page arrives in a few chunks.
+          // The route answers Range requests. Without these pdf.js streams the whole file
+          // on its opening request before drawing page one; with them it cancels that
+          // stream after the headers and fetches only the chunks a page needs.
           disableAutoFetch: true,
+          disableStream: true,
           rangeChunkSize: 262144,
         }) as unknown as PdfLoadingTask;
         loaded = (await task.promise) as PdfDocument;

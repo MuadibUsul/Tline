@@ -12,6 +12,11 @@ test("a slug is readable, transliterated when needed, and stable per id", () => 
   const zh = buildNewsSlug("美联储维持利率不变", "id-1");
   assert.match(zh, /^[a-z0-9-]+-[0-9a-f]{6}$/);
   assert.ok(zh.startsWith("mei-lian-chu"));
+  // A Chinese headline carrying a date and numbers must still transliterate its subject;
+  // "2026-10-17-315" is not a slug for a story about a drone attack.
+  const dated = buildNewsSlug("俄乌战场简报 2026-10-17：俄315架无人机夜袭乌能源设施", "id-2");
+  assert.ok(dated.startsWith("e-wu-zhan-chang"), dated);
+  assert.ok(!dated.startsWith("2026"), dated);
   // Same id, same suffix — the address cannot change when the title is edited afterwards.
   assert.equal(buildNewsSlug("美联储维持利率不变", "id-1"), buildNewsSlug("完全不同的标题", "id-1").replace(/^[a-z0-9-]+(?=-[0-9a-f]{6}$)/, zh.replace(/-[0-9a-f]{6}$/, "")));
   assert.notEqual(buildNewsSlug("同样的标题", "id-1").slice(-6), buildNewsSlug("同样的标题", "id-2").slice(-6));

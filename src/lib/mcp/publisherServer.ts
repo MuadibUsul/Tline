@@ -69,7 +69,7 @@ function settle<T>(outcome: DraftOutcome<T>) {
 export function createPublisherServer(context: McpAuthContext, deps: PublisherToolDeps = defaultPublisherDeps, opsDeps: OpsToolDeps = defaultOpsDeps): McpServer {
   const server = new McpServer(
     { name: "tline-publisher-mcp", version: "1.2.0" },
-    { instructions: "Drafting, publishing and operations access to Tline. Without extra scopes you can create, revise and submit drafts for review; with publisher:publish on your key you can publish a draft as a public report (judged by the same gate as every other report); with admin:manage on a reviewer or admin key you can run the site: withdraw/restore reports, set editorial picks, pause or resume sources, and write, edit, publish, unpublish, pin or delete newsroom items. Every action is audited and gated by the account's live permissions — the account's role is re-checked on every call. Always read validationIssues before submitting or publishing." },
+    { instructions: "Drafting, publishing and operations access to Tline. Publishing a publication draft creates an institutional research report attributed to a registered publisher — it is not the newsroom and must not carry original news. Original newsroom items (article, brief or flash) belong in create_news / publish_news, which require admin:manage. Without extra scopes you can create, revise and submit drafts for review; with publisher:publish on your key you can publish a draft as a public report (judged by the same gate as every other report); with admin:manage on a reviewer or admin key you can run the site: withdraw/restore reports, set editorial picks, pause or resume sources, and write, edit, publish, unpublish, pin or delete newsroom items. Every action is audited and gated by the account's live permissions — the account's role is re-checked on every call. Always read validationIssues before submitting or publishing." },
   );
   const actor = { userId: context.actorId, keyId: context.key.id };
 
@@ -108,7 +108,7 @@ export function createPublisherServer(context: McpAuthContext, deps: PublisherTo
   server.registerTool("publish_publication_draft", {
     title: "Publish draft",
     description: [
-      "Publish a draft as a public report on Tline. Requires a key carrying the publisher:publish scope.",
+      "Publish a draft as an institutional research report on Tline. Requires a key carrying the publisher:publish scope. Use this only for research attributed to a registered publisher; original newsroom items belong in create_news / publish_news and must never become a research article.",
       "The whole publishable set must be present: sourceUrl, institutionSlug, at least 300 characters of content, and a summary (it becomes the report's analysis on the site).",
       "Pass the contentHash from the draft you read — the preview hash; publishing anything other than what was read is refused.",
       "The article is created and then judged by the same public gate as every other report: the reply carries the gate's verdict (indexableEn/indexableZh and any issues) so you can verify what actually went live. A draft that fails the gate is reported as withheld, not forced live.",

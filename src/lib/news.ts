@@ -104,12 +104,15 @@ export function buildNewsSlug(title: string, id: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  const transliterated = ascii.length >= 3
-    ? ascii
-    : pinyin(title, { toneType: "none", type: "string", nonZh: "consecutive" })
+  // A Chinese title that happens to contain a date or a number ("2026-10-17-315") used to
+  // win on ascii length and produce a slug with no subject in it. The presence of Han text,
+  // not the count of Latin characters, decides whether the title is transliterated.
+  const transliterated = /\p{Script=Han}/u.test(title)
+    ? pinyin(title, { toneType: "none", type: "string", nonZh: "consecutive" })
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
+        .replace(/^-+|-+$/g, "")
+    : ascii;
   const stem = (transliterated || "news").slice(0, 60).replace(/-+$/g, "");
   return `${stem}-${createHash("sha256").update(id).digest("hex").slice(0, 6)}`;
 }

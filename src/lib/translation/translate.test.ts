@@ -157,6 +157,28 @@ test("preserves numeric PDF tables verbatim instead of letting the model reshape
   assert.equal(result.quality.passed, true);
 });
 
+test("an operator can ask a table-only report to be translated in full", async () => {
+  let translatedTable = false;
+  const provider: LLMProvider = {
+    name: "layout-test",
+    model: "layout-test-v1",
+    async complete(input) {
+      const payload = JSON.parse(input.user) as { segments: Array<{ position: number; heading: string | null; text: string }> };
+      translatedTable ||= payload.segments.some((segment) => segment.text.includes("__TL_NUM_"));
+      return { provider: this.name, model: this.model, text: JSON.stringify({ title: "市场展望", segments: payload.segments }) };
+    },
+  };
+  const table = "GDP 2024 2.1 2025 1.9 2026 2.2\nCPI 2024 2.8 2025 2.4 2026 2.1";
+  await translateArticle(
+    "Test Bank", "Market outlook",
+    [{ id: "table", position: 0, heading: "Page 2", text: table }],
+    provider, provider, false, 0,
+    { contentHash: "table-only" },
+    false,
+  );
+  assert.equal(translatedTable, true);
+});
+
 test("an unsampled review is not a failed one: the article still reads as reviewed", async () => {
   class CountingProvider extends FakeProvider {
     reviews = 0;

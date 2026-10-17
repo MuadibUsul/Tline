@@ -204,7 +204,7 @@ function splitText(text: string, maxChars = CHUNK_CHARS): string[] {
   return parts;
 }
 
-function translationParts(segments: SourceSegment[]): TranslationPart[] {
+function translationParts(segments: SourceSegment[], preserveVerbatim = true): TranslationPart[] {
   let position = 0;
   return segments.flatMap((segment) => splitText(segment.text).map((text, part) => ({
     id: `${segment.id}:${part}`,
@@ -212,7 +212,7 @@ function translationParts(segments: SourceSegment[]): TranslationPart[] {
     sourcePosition: segment.position,
     heading: part === 0 ? segment.heading : null,
     text,
-    passthrough: shouldPreserveVerbatim(text),
+    passthrough: preserveVerbatim && shouldPreserveVerbatim(text),
   })));
 }
 
@@ -358,6 +358,15 @@ export async function translateArticle(
   enableReview = true,
   reviewSampleRate = defaultReviewSampleRate(),
   execution?: { contentId?: string; contentHash: string },
+  /**
+   * Tables and contact blocks normally stay in the source language so a translated table
+   * cannot invent a figure. A table-only report then has no Chinese body at all, and its
+   * /zh page is correctly withheld — but that also removes the report from the Chinese
+   * edition. An operator can ask for those documents to be translated in full; the numbers
+   * are still checked by the same deterministic pass and the page still has to clear the
+   * gate.
+   */
+  preserveVerbatim = true,
 ): Promise<TranslationResult> {
   const provider = injected ?? await resolveLLMProvider("translation");
   if (!provider) throw new Error("No LLM provider is configured for translation.");
@@ -381,7 +390,7 @@ export async function translateArticle(
     originalEstimatedTokens: estimatedTokens,
     optimizedEstimatedTokens: estimatedTokens,
   };
-  const parts = translationParts(segments);
+  const parts = translationParts(segments, preserveVerbatim);
   const translatedParts: DraftSegment[] = parts
     .filter((part) => part.passthrough)
     .map((part) => ({ position: part.position, heading: preservedHeading(part.heading), text: part.text }));
@@ -482,7 +491,7 @@ export async function translateArticle(
   };
 }
 
-export async function translateAndPersist(articleId: string, provider?: LLMProvider, expectedContentHash?: string, options: { force?: boolean } = {}) {
+export async function translateAndPersist(articleId: string, provider?: LLMProvider, expectedContentHash?: string, options: { force?: boolean; preserveVerbatim?: boolean } = {}) {
   let article = await prisma.article.findUnique({
     where: { id: articleId },
     include: {
@@ -534,7 +543,17 @@ export async function translateAndPersist(articleId: string, provider?: LLMProvi
   const important = article.institution.rating >= 5
     || (article.analysis?.importanceScore ?? 0) >= 0.6
     || (article.atomicViews[0]?.importance ?? 0) >= 4;
-  const result = await translateArticle(article.institution.name, article.title, article.segments, translationProvider, reviewer, important, defaultReviewSampleRate(), { contentId: article.id, contentHash: sourceContentHash });
+  const result = await translateArticle(
+    article.institution.name,
+    article.title,
+    article.segments,
+    translationProvider,
+    reviewer,
+    important,
+    defaultReviewSampleRate(),
+    { contentId: article.id, contentHash: sourceContentHash },
+    options.preserveVerbatim !== false,
+  );
   const persisted = await prisma.$transaction(async (tx) => {
     if (expectedContentHash) {
       const claimed = await tx.article.updateMany({

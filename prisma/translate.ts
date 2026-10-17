@@ -97,7 +97,12 @@ async function main() {
   for (let offset = 0; offset < candidates.length; offset += concurrency) {
     await Promise.all(candidates.slice(offset, offset + concurrency).map(async (article) => {
       try {
-        const result = await translateAndPersist(article.id, provider, article.contentHash, { force: operatorSelected });
+        const result = await translateAndPersist(article.id, provider, article.contentHash, {
+          force: operatorSelected,
+          // A table-only document is otherwise passed through verbatim and has no Chinese
+          // body at all. Operators can ask for the whole document, tables included.
+          preserveVerbatim: !flag("translate-tables"),
+        });
         await generateArticleDocuments(article.id);
         if (result.translation.status === "needs_review") {
           /**

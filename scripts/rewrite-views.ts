@@ -88,7 +88,9 @@ async function main() {
       outputTokens += meta.usage?.outputTokens ?? 0;
       const zh = (value.zh ?? "").trim();
       const en = (value.en ?? "").trim();
-      const anchor = `${fragment}\n${row.sourceQuote ?? ""}`;
+      // The article title is part of the source context: a rewrite may use a year or unit
+      // stated there, but nothing beyond it.
+      const anchor = `${fragment}\n${row.sourceQuote ?? ""}\n${row.article.title}`;
       const allowed = new Set(numericTokens(anchor));
       const invented = [...numericTokens(`${zh}\n${en}`)].filter((token) => token.length > 0 && !allowed.has(token));
       const valid = zh.length >= 20 && en.length >= 20 && /[\u4e00-\u9fff]/.test(zh) && zh.length <= 500 && en.length <= 700 && invented.length === 0;

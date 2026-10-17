@@ -15,7 +15,7 @@ import type { McpAuthContext } from "./auth";
  */
 
 const USER_TOOLS = ["get_macro_calendar", "get_macro_indicator", "get_research", "list_institutions", "search_research"];
-const PUBLISHER_TOOLS = ["create_news", "create_news_column", "create_publication_draft", "delete_news", "feature_research", "list_news", "list_news_columns", "list_publication_drafts", "pin_news", "publish_news", "publish_publication_draft", "restore_research", "set_source_monitoring", "submit_publication_for_review", "unpublish_news", "update_news", "update_publication_draft", "validate_publication_draft", "withdraw_research"];
+const PUBLISHER_TOOLS = ["create_news", "create_news_column", "create_publication_draft", "delete_news", "feature_research", "get_news", "list_news", "list_news_columns", "list_publication_drafts", "pin_news", "publish_news", "publish_publication_draft", "restore_research", "set_source_monitoring", "submit_publication_for_review", "unpublish_news", "update_news", "update_publication_draft", "validate_publication_draft", "withdraw_research"];
 
 function structured<T>(result: unknown): T {
   // callTool's return type is a union; the structured half is what every Tline tool returns.
@@ -114,6 +114,12 @@ const opsDeps: OpsToolDeps = {
     titleZh: null, titleEn: "Fed holds rates", status: "published", pinned: true,
     publishedAt: new Date("2026-10-17T02:00:00.000Z"), columnSlug: "ukraine-war-brief",
   }],
+  getNews: async () => ({
+    id: "n1", slug: "fed-holds-rates-abc123", kind: "flash", titleZh: null, titleEn: "Fed holds rates",
+    bodyZh: null, bodyEn: "Fed holds rates.", sourceUrl: null, status: "published", pinned: true,
+    publishedAt: new Date("2026-10-17T02:00:00.000Z"), columnSlug: "ukraine-war-brief",
+    images: [{ position: 1, caption: "Chart", alt: "Chart", mimeType: "image/png", width: 1200, height: 800 }],
+  }),
   createNewsColumn: async () => ({ ok: true, id: "c1", slug: "ukraine-war-brief" }),
   listNewsColumns: async () => [{ id: "c1", slug: "ukraine-war-brief", nameZh: "俄乌战场简报", nameEn: "Ukraine War Brief", cadence: "daily", publishedCount: 1 }],
 };
@@ -260,6 +266,13 @@ test("site operations are refused without admin:manage and allowed with it", asy
   const items = structured<{ items: Array<{ pinned: boolean; publishedAt: string | null }> }>(listed).items;
   assert.equal(items[0]?.pinned, true);
   assert.equal(items[0]?.publishedAt, "2026-10-17T02:00:00.000Z");
+
+  const item = await client.callTool({ name: "get_news", arguments: { id: "n1" } });
+  assert.ok(!item.isError);
+  const detail = structured<{ bodyEn: string | null; columnSlug: string | null; images: Array<{ position: number }> }>(item);
+  assert.equal(detail.bodyEn, "Fed holds rates.");
+  assert.equal(detail.columnSlug, "ukraine-war-brief");
+  assert.equal(detail.images[0]?.position, 1);
 
   const withdrawn = await client.callTool({ name: "withdraw_research", arguments: { slug: "ubs-gold-outlook", reason: "legal" } });
   assert.ok(!withdrawn.isError);

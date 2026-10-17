@@ -34,6 +34,12 @@ export interface OpsToolDeps {
   deleteNews: typeof deleteNewsPost;
   pinNews: typeof setNewsPinned;
   listNews: (status: string | undefined, limit: number) => Promise<Array<{ id: string; slug: string; kind: string; titleZh: string | null; titleEn: string | null; status: string; pinned: boolean; publishedAt: Date | null; columnSlug: string | null }>>;
+  getNews: (ref: { id?: string; slug?: string }) => Promise<{
+    id: string; slug: string; kind: string; titleZh: string | null; titleEn: string | null;
+    bodyZh: string | null; bodyEn: string | null; sourceUrl: string | null;
+    status: string; pinned: boolean; publishedAt: Date | null; columnSlug: string | null;
+    images: Array<{ position: number; caption: string | null; alt: string | null; mimeType: string; width: number | null; height: number | null }>;
+  } | null>;
   createNewsColumn: typeof createNewsColumn;
   listNewsColumns: () => Promise<Array<{ id: string; slug: string; nameZh: string; nameEn: string | null; cadence: string | null; publishedCount: number }>>;
 }
@@ -88,6 +94,16 @@ export const defaultOpsDeps: OpsToolDeps = {
         column: { select: { slug: true } },
       },
     }).then((rows) => rows.map((row) => ({ ...row, columnSlug: row.column?.slug ?? null }))),
+  getNews: ({ id, slug }) =>
+    prisma.newsPost.findFirst({
+      where: id ? { id } : { slug },
+      select: {
+        id: true, slug: true, kind: true, titleZh: true, titleEn: true,
+        bodyZh: true, bodyEn: true, sourceUrl: true, status: true, pinned: true, publishedAt: true,
+        column: { select: { slug: true } },
+        images: { orderBy: { position: "asc" }, select: { position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
+      },
+    }).then((row) => row ? { ...row, columnSlug: row.column?.slug ?? null } : null),
   createNewsColumn,
   listNewsColumns: () =>
     prisma.newsColumn.findMany({
@@ -275,6 +291,34 @@ export function registerOpsTools(server: McpServer, context: McpAuthContext, dep
     if (denied) return denied;
     const done = await deps.pinNews(args.id, args.pinned, actor);
     return done.ok ? ok({ id: args.id, pinned: args.pinned }) : fail("NOT_FOUND", "No news item with that id.");
+  }));
+
+  server.registerTool("get_news", {
+    title: "Get a news item",
+    description: "Read one newsroom item in full — both languages, source URL, column and the list of images with their insertion positions — so an update can be based on what is actually stored. Identify it by id or slug.",
+    inputSchema: {
+      id: z.string().optional().describe("News item id."),
+      slug: z.string().optional().describe("News item slug, when the id is not known."),
+    },
+    outputSchema: {
+      id: z.string(), slug: z.string(), kind: z.string(),
+      titleZh: z.string().nullable(), titleEn: z.string().nullable(),
+      bodyZh: z.string().nullable(), bodyEn: z.string().nullable(),
+      sourceUrl: z.string().nullable(), status: z.string(), pinned: z.boolean(),
+      publishedAt: z.string().nullable(), columnSlug: z.string().nullable(),
+      images: z.array(z.object({
+        position: z.number(), caption: z.string().nullable(), alt: z.string().nullable(),
+        mimeType: z.string(), width: z.number().nullable(), height: z.number().nullable(),
+      })),
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, toolGuard("get_news", async (args) => {
+    const denied = gate("admin.review");
+    if (denied) return denied;
+    if (!args.id && !args.slug) return fail("VALIDATION_FAILED", "Pass either id or slug.", { issues: [{ code: "news.identity_required", message: "id or slug is required." }] });
+    const row = await deps.getNews({ id: args.id, slug: args.slug });
+    if (!row) return fail("NOT_FOUND", "No news item matches that id or slug.");
+    return ok({ ...row, publishedAt: row.publishedAt?.toISOString() ?? null });
   }));
 
   server.registerTool("list_news", {

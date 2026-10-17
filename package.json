@@ -78,7 +78,8 @@
     "decision:consistency": "tsx scripts/decision-shadow.ts consistency",
     "decision:policy": "tsx scripts/decision-shadow.ts policy",
     "decision:views": "tsx scripts/decision-shadow.ts views",
-    "baseline:redesign": "node scripts/redesign-baseline.mjs"
+    "baseline:redesign": "node scripts/redesign-baseline.mjs",
+    "views:rewrite": "tsx scripts/rewrite-views.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

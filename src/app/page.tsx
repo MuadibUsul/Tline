@@ -14,6 +14,7 @@ import { isLegacyNonAssetAlias } from "@/lib/classification/taxonomy";
 import { listIndexableTopicsFor, topicPath } from "@/lib/topics";
 import { loadPublicThemes } from "@/lib/marketThemesPublic";
 import { redesignAtLeast } from "@/lib/redesign";
+import { selectDiverseObservations } from "@/lib/observations";
 import { JsonLd, canonical, clamp, homeSeoTitle, localizedUrl, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 import { Icon } from "./_components/Icon";
 
@@ -64,13 +65,14 @@ export default async function Home() {
   if (redesignAtLeast("home")) {
     const [featured, watchRows, themes, figureRow] = await Promise.all([
       featuredFeed(5, locale),
+      // A wide window in, a diverse selection out: one clean view per house (lib/observations).
       prisma.atomicView.findMany({
         where: { reviewStatus: "ok", article: publicationReadyWhere() },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 80,
         select: {
           id: true, viewEn: true, viewZh: true, assetTicker: true,
-          article: { select: { slug: true, publishedAt: true, institution: { select: { slug: true, name: true } } } },
+          article: { select: { slug: true, publishedAt: true, institutionId: true, institution: { select: { slug: true, name: true } } } },
         },
       }),
       loadPublicThemes(),
@@ -90,7 +92,7 @@ export default async function Home() {
         pulse={pulse}
         lead={lead}
         secondary={secondary}
-        watch={watchRows.map((row) => ({
+        watch={selectDiverseObservations(watchRows.map((row) => ({ ...row, institutionId: row.article.institutionId })), { take: 5, zh: locale === "zh-CN" }).map((row) => ({
           id: row.id,
           view: (locale === "zh-CN" ? row.viewZh || row.viewEn : row.viewEn || row.viewZh) ?? "",
           viewIsFallback: locale === "zh-CN" && !row.viewZh,

@@ -59,6 +59,8 @@ const STATIC_ROUTES: Array<{ path: string; changedAt: Date; changeFrequency: Sit
   // The institution directory (redesign P05). Additive: a new address, listed once it exists.
   { path: "/institutions-directory", changedAt: changed("2026-10-17"), changeFrequency: "daily", priority: 0.7 },
   { path: "/about", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.5 },
+  // The public MCP landing page; key issuance itself requires an account.
+  { path: "/mcp", changedAt: changed("2026-10-17"), changeFrequency: "monthly", priority: 0.5 },
   { path: "/methodology", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.6 },
   { path: "/editorial-policy", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.5 },
   { path: "/ai-usage", changedAt: changed("2026-09-13"), changeFrequency: "monthly", priority: 0.5 },

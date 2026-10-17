@@ -15,16 +15,18 @@ test("a suspended account loses its MCP keys immediately", () => {
   assert.equal(entitlementRefusal(owner({ role: "admin", suspendedAt: new Date() }), "publisher")?.code, "account_suspended");
 });
 
-test("the User MCP follows the permission matrix: paid entitlement or operations role", () => {
-  assert.equal(entitlementRefusal(owner({ tier: "free" }), "user")?.code, "plan_required");
+test("the User MCP is open to every registered account, not a tier", () => {
+  // Registration is the gate (owner decision 2026-10-17): a free member may issue a
+  // read-only MCP key from /mcp. Paid tiers and operations roles are not required.
+  assert.equal(entitlementRefusal(owner({ tier: "free" }), "user"), null);
   assert.equal(entitlementRefusal(owner({ tier: "professional" }), "user"), null);
-  // Founding holds the highest entitlement: every commercial gate clears for them, including one added later.
   assert.equal(entitlementRefusal(owner({ tier: "founding" }), "user"), null);
-  // Reviewer and admin are admitted through the operations door, not the commercial one.
+  assert.equal(entitlementRefusal(owner({ tier: "enterprise" }), "user"), null);
   assert.equal(entitlementRefusal(owner({ role: "reviewer" }), "user"), null);
   assert.equal(entitlementRefusal(owner({ role: "admin" }), "user"), null);
-  // Enterprise is a dashboard tier, not an API entitlement — same rule the site applies.
-  assert.equal(entitlementRefusal(owner({ tier: "enterprise" }), "user")?.code, "plan_required");
+  // Suspension and an unbound key still close the door.
+  assert.equal(entitlementRefusal(owner({ tier: "free", suspendedAt: new Date() }), "user")?.code, "account_suspended");
+  assert.equal(entitlementRefusal(null, "user")?.code, "unbound_key");
 });
 
 test("the Publisher MCP requires the editorial role itself", () => {

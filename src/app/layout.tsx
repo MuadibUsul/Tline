@@ -109,6 +109,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         ["watchlist", tr(locale, "Market Themes", "交易主线")],
         ["dashboards", tr(locale, "Dashboards", "看板")],
         ["newsletter", tr(locale, "Newsletter", "订阅")],
+        ["mcp", tr(locale, "MCP for AI", "MCP 接入")],
         ...(user ? [["account/bookmarks", tr(locale, "Saved", "我的收藏")] as [string, string]] : []),
       ]
     : [];

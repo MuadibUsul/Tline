@@ -54,10 +54,9 @@ const FAILURE_RESPONSE: Record<AuthFailure, { status: 401 | 403 | 429; code: str
 /**
  * The entitlement half of the check, pure so it can be tested without a database.
  *
- * `user` follows the permission matrix: the paid entitlement (`api.use` — professional or
- * founding) or an operations role (`admin.access` — reviewer or admin). `publisher`
- * requires the editorial role itself (`admin.review`), because drafting into the review
- * queue is review-adjacent work, not a reader feature.
+ * `user` requires a bound, active account — registration is the entitlement (owner
+ * decision 2026-10-17). `publisher` requires the editorial role itself (`admin.review`),
+ * because drafting into the review queue is review-adjacent work, not a reader feature.
  */
 export function entitlementRefusal(
   owner: (PermissionUser & { suspendedAt?: Date | null }) | null,
@@ -69,9 +68,11 @@ export function entitlementRefusal(
   if (owner.suspendedAt) {
     return { code: "account_suspended", message: "The account this API key belongs to is suspended." };
   }
-  if (audience === "user" && !(can(owner, "api.use") || can(owner, "admin.access"))) {
-    return { code: "plan_required", message: "The Tline User MCP is currently open to professional, founding, reviewer and admin accounts." };
-  }
+  /**
+   * The User MCP is open to every registered account (owner decision, 2026-10-17):
+   * registration is the entitlement, not a paid plan or an operations role. The key is
+   * still bound to the account, so a suspended account loses it on the next call.
+   */
   if (audience === "publisher" && !can(owner, "admin.review")) {
     return { code: "role_required", message: `The Tline Publisher MCP requires a reviewer or admin account (this key's account is ${effectiveRole(owner) ?? "unrecognised"}).` };
   }

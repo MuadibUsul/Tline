@@ -1767,3 +1767,10 @@ td{padding-block:13px}
 .page-home .site-footer{margin-top:0;border-top:0;padding-top:22px}
 @media(max-width:900px){.site-footer-top{grid-template-columns:1fr;gap:32px}.site-footer-cols{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 18px}}
 @media(max-width:520px){.site-footer-cols{grid-template-columns:1fr 1fr}.site-footer-bottom{align-items:flex-start;flex-direction:column}}
+/* The shorter English brand and the navigation must never wrap mid-label. */
+.brand{white-space:nowrap;flex:none}
+.nav a{white-space:nowrap}
+@media(max-width:1120px){.topbar .inner{gap:14px}.nav{gap:0}.nav a{padding:7px 6px;font-size:12px}}
+/* Keep every topbar control on one line between the desktop and phone layouts. */
+.minibtn{white-space:nowrap}
+@media(max-width:1160px){.topbar .inner{gap:12px}.nav a{padding:7px 6px;font-size:12px}.control-label{display:none}.brand{font-size:15px}}

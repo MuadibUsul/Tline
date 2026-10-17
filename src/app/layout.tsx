@@ -43,8 +43,8 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     } : {}),
     applicationName: title,
-    openGraph: { type: "website", siteName: title, title, description, locale, url: localizedUrl("/", locale), images: [{ url: ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal"), width: 1200, height: 630 }] },
-    twitter: { card: "summary_large_image", title, description, images: [ogImage("Institutional Intelligence", "Tlines Institutional Intelligence", "Research / Data / Signal")] },
+    openGraph: { type: "website", siteName: title, title, description, locale, url: localizedUrl("/", locale), images: [{ url: ogImage("Institutional Intelligence", "Tlines Intelligence", "Research / Data / Signal"), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage("Institutional Intelligence", "Tlines Intelligence", "Research / Data / Signal")] },
     robots: { index: true, follow: true },
   };
 }

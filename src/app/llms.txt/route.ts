@@ -4,7 +4,7 @@ export const revalidate = 3600;
 
 export function GET() {
   const base = siteUrl();
-  const body = `# Tlines Institutional Intelligence
+  const body = `# Tlines Intelligence
 
 > Institutional Research, Consensus & Market Signals. Public institutional research is structured into traceable, searchable market views.
 

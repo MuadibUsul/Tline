@@ -25,6 +25,6 @@ export async function GET() {
     },
   });
   const items = articles.map((article) => { const url = `${base}/en${researchPath(article)}`; return `<item><title>${xml(article.title)}</title><link>${url}</link><guid isPermaLink="true">${url}</guid><pubDate>${article.publishedAt.toUTCString()}</pubDate><dc:creator>${xml(article.institution.name)}</dc:creator><description>${xml(article.analysis?.summary ?? article.title)}</description><source url="${xml(article.sourceUrl)}">${xml(article.institution.name)}</source></item>`; }).join("");
-  const body = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>Tlines Institutional Intelligence</title><link>${base}/en</link><description>Verified public institutional research transformed into traceable signals.</description><language>en</language>${items}</channel></rss>`;
+  const body = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>Tlines Intelligence</title><link>${base}/en</link><description>Verified public institutional research transformed into traceable signals.</description><language>en</language>${items}</channel></rss>`;
   return new Response(body, { headers: { "content-type": "application/rss+xml; charset=utf-8", "cache-control": "public, s-maxage=900, stale-while-revalidate=3600" } });
 }

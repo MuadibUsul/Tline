@@ -1,4 +1,4 @@
-export const SITE_NAME = "Tlines Institutional Intelligence";
+export const SITE_NAME = "Tlines Intelligence";
 export const SITE_NAME_ZH = "Tlines 全球机构情报";
 export const ORGANIZATION_ID_PATH = "/#organization";
 

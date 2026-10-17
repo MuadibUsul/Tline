@@ -60,8 +60,8 @@ test("a Chinese-only page points x-default at Chinese, not a redirecting English
 
 test("home, asset and institution metadata use localized entity templates", () => {
   // The home title leads with the brand and states the category inside the visible width
-  // rather than running past it: "Tlines Institutional Intelligence | Bank Research &
-  // Market Consensus" was 68 characters, and a search result shows about 60.
+  // rather than running past it: a full brand-plus-category title ran to 68 characters,
+  // and a search result shows about 60.
   assert.match(homeSeoTitle("en"), /^Tlines — Institutional Research/);
   assert.equal(assetSeoTitle("黄金", "zh-CN"), "黄金机构展望、目标价与共识");
   assert.equal(assetSeoTitle("Gold", "en", "XAUUSD"), "Gold (XAUUSD) Institutional Outlook & Bank Forecasts");

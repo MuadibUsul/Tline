@@ -34,8 +34,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { absolute: homeSeoTitle(locale) },
     description,
     ...canonical("/", locale),
-    openGraph: { type: "website", title: tr(locale, "Tlines Institutional Intelligence", "Tlines 全球机构情报"), description, url: localizedUrl("/", locale), locale, images: [{ url: ogImage("Institutional Intelligence", "Institutional Research & Market Signals", "Traceable, source-linked views"), width: 1200, height: 630 }] },
-    twitter: { card: "summary_large_image", title: tr(locale, "Tlines Institutional Intelligence", "Tlines 全球机构情报"), description, images: [ogImage("Institutional Intelligence", "Institutional Research & Market Signals", "Traceable, source-linked views")] },
+    openGraph: { type: "website", title: tr(locale, "Tlines Intelligence", "Tlines 全球机构情报"), description, url: localizedUrl("/", locale), locale, images: [{ url: ogImage("Institutional Intelligence", "Institutional Research & Market Signals", "Traceable, source-linked views"), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title: tr(locale, "Tlines Intelligence", "Tlines 全球机构情报"), description, images: [ogImage("Institutional Intelligence", "Institutional Research & Market Signals", "Traceable, source-linked views")] },
   };
 }
 

@@ -47,7 +47,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
       translations: { where: { locale: "zh-CN" }, take: 1, select: { title: true, text: true, qualityScore: true, status: true } },
     },
   });
-  if (!article) return { title: tr(locale, "Report not found", "研报未找到") };
+  if (!article) notFound();
   const zh = locale === "zh-CN";
   const title = zh && article.translations[0] ? localizeChineseContent(article.translations[0].title) : article.title;
   // What search sees. Publisher titles name the series — "The Commodities Feed", "EcoWeek 2"

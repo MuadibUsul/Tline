@@ -45,6 +45,9 @@ const changed = (date: string) => new Date(`${date}T00:00:00.000Z`);
 const STATIC_ROUTES: Array<{ path: string; changedAt: Date; changeFrequency: SitemapEntry["changeFrequency"]; priority: number }> = [
   { path: "/", changedAt: changed("2026-09-23"), changeFrequency: "hourly", priority: 1 },
   { path: "/research", changedAt: changed("2026-10-04"), changeFrequency: "hourly", priority: 0.9 },
+  // The merged subject/institution entrance. The two standalone hubs keep their addresses
+  // and remain listed below.
+  { path: "/categories", changedAt: changed("2026-10-17"), changeFrequency: "daily", priority: 0.8 },
   // The newsroom stream. Additive: listed once items exist; empty shards are valid.
   { path: "/news", changedAt: changed("2026-10-17"), changeFrequency: "daily", priority: 0.7 },
   { path: "/markets", changedAt: changed("2026-09-20"), changeFrequency: "daily", priority: 0.8 },

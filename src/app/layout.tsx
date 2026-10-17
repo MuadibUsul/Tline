@@ -65,8 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         { href: "/", label: tr(locale, "Home", "首页") },
         { href: "/news", label: tr(locale, "News", "新鲜事") },
         { href: "/research", label: tr(locale, "Latest research", "最新研究") },
-        { href: "/topics", label: tr(locale, "Topics", "主题") },
-        { href: "/institutions-directory", label: tr(locale, "Institutions", "机构") },
+        { href: "/categories", label: tr(locale, "Categories", "分类") },
         { href: "/macro", label: tr(locale, "Data & charts", "数据与图表") },
         { href: "/about", label: tr(locale, "About", "关于") },
       ]

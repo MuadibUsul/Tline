@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { publicationReadyWhere } from "@/lib/publication";
+import { listPublicInstitutions } from "@/lib/institutionDirectory";
 import { getLocale, institutionName, localePath, tr, type Locale } from "@/lib/i18n";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, localizedUrl, ogImage } from "@/lib/seo";
 
@@ -37,17 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function InstitutionsDirectory() {
   const locale: Locale = await getLocale();
-  const institutions = await prisma.institution.findMany({
-    where: { articles: { some: publicationReadyWhere() } },
-    orderBy: { name: "asc" },
-    select: {
-      slug: true,
-      name: true,
-      country: true,
-      authorityScore: true,
-      _count: { select: { articles: { where: publicationReadyWhere() } } },
-    },
-  });
+  const institutions = await listPublicInstitutions();
   const total = institutions.reduce((sum, institution) => sum + institution._count.articles, 0);
 
   return (

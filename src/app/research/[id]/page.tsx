@@ -443,10 +443,6 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             labels={{
               loading: tr(locale, "Loading the document…", "正在载入文档……"),
               failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
-              page: tr(locale, "Page", "第"),
-              of: tr(locale, "of", "/"),
-              zoomIn: tr(locale, "Zoom in", "放大"),
-              zoomOut: tr(locale, "Zoom out", "缩小"),
             }}
           />
         )}
@@ -497,13 +493,9 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             <PdfPreview
               src={`/api/documents/${previewDocument.id}?inline=1`}
               labels={{
-                loading: tr(locale, "Loading the document…", "正在载入文档……"),
-                failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
-                page: tr(locale, "Page", "第"),
-                of: tr(locale, "of", "/"),
-                zoomIn: tr(locale, "Zoom in", "放大"),
-                zoomOut: tr(locale, "Zoom out", "缩小"),
-              }}
+              loading: tr(locale, "Loading the document…", "正在载入文档……"),
+              failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
+            }}
             />
           </details>
         )}

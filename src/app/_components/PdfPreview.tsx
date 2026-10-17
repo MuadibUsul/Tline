@@ -1,33 +1,23 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Icon } from "./Icon";
 
 /**
- * Reads a report's PDF on the page.
+ * Reads a report's PDF as part of the article, not as a viewer beside it.
  *
- * The document is drawn with pdf.js rather than handed to an <iframe>: an embedded PDF
- * relies on the browser having a viewer of its own, and where there is none — some mobile
- * browsers, and any environment with the plugin disabled — the frame shows a broken file
- * instead of the report. Drawing to a canvas works the same everywhere.
+ * There is no toolbar, page counter, zoom control or inner scrollbar: the pages stack in
+ * the normal document flow at the article's width, so the report reads like the page it
+ * belongs to. Pages are drawn only as they come near the viewport, and the document starts
+ * loading while the reader is still in the analysis above, so arriving at the report rarely
+ * meets a spinner.
  *
- * Pages are stacked and scrolled through, the way a document is read. Each is drawn only
- * as it comes near the viewport, so opening a fifty-page report costs one page of work
- * rather than fifty, and each draw renders into a canvas of its own: two renders aimed at
- * one canvas deadlock inside pdf.js, resolving neither way.
- *
- * The worker and font data are served from this origin because the content policy admits
- * no other source, and because pdf.js otherwise looks for them beside its own bundled
- * module, where they are not — a document whose fonts never arrive renders as a blank
- * sheet with nothing logged to explain it.
+ * pdf.js is used rather than an <iframe> because an embedded PDF relies on the browser's
+ * viewer; where there is none, the frame shows a broken file. The worker and font data are
+ * served from this origin because the content policy admits no other source.
  */
 
 interface Labels {
   loading: string;
   failed: string;
-  page: string;
-  of: string;
-  zoomIn: string;
-  zoomOut: string;
 }
 
 type PdfDocument = {
@@ -43,38 +33,60 @@ type PdfPage = {
   render: (options: { canvas: HTMLCanvasElement; viewport: unknown }) => { promise: Promise<void>; cancel: () => void };
 };
 
-const MIN_SCALE = 0.5;
-const MAX_SCALE = 2.5;
 // Start drawing a page before it is on screen, so scrolling meets a drawn page.
-const PRELOAD_MARGIN = "600px";
+const PRELOAD_MARGIN = "900px";
+// The document also starts loading after the article becomes idle, rather than waiting
+// for the reader to reach the report. A report page is part of the article, and fetching
+// its first chunks while someone reads the analysis is what removes the visible wait.
+const IDLE_TIMEOUT_MS = 2200;
 
 export default function PdfPreview({ src, labels }: { src: string; labels: Labels }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const documentRef = useRef<PdfDocument | null>(null);
   const holders = useRef(new Map<number, HTMLDivElement>());
   const drawn = useRef(new Map<number, number>());
   const [sizes, setSizes] = useState<{ width: number; height: number }[]>([]);
-  const [scale, setScale] = useState(1.25);
-  const [current, setCurrent] = useState(1);
+  const [width, setWidth] = useState(0);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [enabled, setEnabled] = useState(false);
 
-  // The viewer sits far below the article's analysis. Starting a 19MB fetch on mount made
-  // the page compete with a document nobody had scrolled to yet; the first byte is only
-  // requested when the viewer is within a screen of the viewport.
+  // Two starts, whichever comes first: the page is near, or the article has gone idle.
   useEffect(() => {
-    const node = scrollRef.current;
-    if (!node) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setEnabled(true);
-      return;
+    const start = () => setEnabled(true);
+    const node = containerRef.current;
+    let observer: IntersectionObserver | undefined;
+    if (node && typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          start();
+          observer?.disconnect();
+        }
+      }, { rootMargin: PRELOAD_MARGIN });
+      observer.observe(node);
     }
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setEnabled(true);
-        observer.disconnect();
-      }
-    }, { rootMargin: "900px" });
+    const requestIdle = (window as Window & { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number }).requestIdleCallback;
+    const cancelIdle = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
+    let idle: number;
+    if (typeof requestIdle === "function") idle = requestIdle(start, { timeout: IDLE_TIMEOUT_MS });
+    else idle = window.setTimeout(start, IDLE_TIMEOUT_MS);
+    return () => {
+      observer?.disconnect();
+      if (typeof requestIdle === "function" && cancelIdle) cancelIdle(idle);
+      else clearTimeout(idle);
+    };
+  }, []);
+
+  // The report fills the article column; measure it so each page is drawn at its width.
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    const measure = () => setWidth(node.clientWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
+    const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -98,7 +110,7 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
           // stream after the headers and fetches only the chunks a page needs.
           disableAutoFetch: true,
           disableStream: true,
-          rangeChunkSize: 262144,
+          rangeChunkSize: 524288,
         }) as unknown as PdfLoadingTask;
         loaded = (await task.promise) as PdfDocument;
         if (cancelled) return;
@@ -117,9 +129,6 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
     return () => {
       cancelled = true;
       if (documentRef.current === loaded) documentRef.current = null;
-      // Guarded because this runs while the browser is navigating away: anything thrown
-      // here surfaces as a failed navigation rather than as a viewer that failed to tidy
-      // up, which is how the back button came to land on an error page.
       try {
         void task?.destroy().catch(() => {});
       } catch {
@@ -131,39 +140,34 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
   const drawPage = useCallback(async (index: number) => {
     const source = documentRef.current;
     const holder = holders.current.get(index);
-    if (!source || !holder || drawn.current.get(index) === scale) return;
-    drawn.current.set(index, scale);
+    if (!source || !holder || width <= 0 || drawn.current.get(index) === width) return;
+    drawn.current.set(index, width);
 
     const page = await source.getPage(index);
     const natural = page.getViewport({ scale: 1 });
     setSizes((current) => current[index - 1]?.width === natural.width && current[index - 1]?.height === natural.height
       ? current
       : current.map((size, position) => position === index - 1 ? { width: natural.width, height: natural.height } : size));
-    // A CSS-sized canvas at 1x is visibly soft on ordinary desktop displays. Render at
-    // least two physical pixels per CSS pixel, while bounding memory on high-DPI screens.
-    const density = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
-    const viewport = page.getViewport({ scale: scale * density });
+    // Draw at the article width, with enough physical pixels to stay crisp on ordinary
+    // desktop displays. The sheet itself is sized by CSS.
+    const density = Math.min(2.5, Math.max(1.5, window.devicePixelRatio || 1));
+    const viewport = page.getViewport({ scale: (width / natural.width) * density });
     const canvas = document.createElement("canvas");
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
     canvas.style.width = "100%";
     canvas.style.height = "auto";
-    // The canvas itself, not its 2D context: given both, pdf.js paints the page
-    // background and nothing else.
     await page.render({ canvas, viewport }).promise;
     holder.replaceChildren(canvas);
-  }, [scale]);
+  }, [width]);
 
-  // Zooming invalidates what is drawn; the observer redraws whatever is on screen.
+  // A width change invalidates every drawn page; the observer redraws what is on screen.
   useEffect(() => {
     drawn.current.clear();
-  }, [scale]);
+  }, [width]);
 
   useEffect(() => {
-    if (state !== "ready" || sizes.length === 0) return;
-    const root = scrollRef.current;
-    if (!root) return;
-
+    if (state !== "ready" || sizes.length === 0 || width <= 0) return;
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -179,47 +183,34 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
           });
         }
       },
-      { root, rootMargin: PRELOAD_MARGIN },
+      { rootMargin: PRELOAD_MARGIN, root: null },
     );
     for (const holder of holders.current.values()) observer.observe(holder);
     // The first page is drawn outright rather than waited for: an observer that never
     // fires would otherwise leave the reader looking at an empty sheet.
     void drawPage(1).catch(() => drawn.current.delete(1));
-
-    // The page number follows the scroll rather than a button. Measured against the
-    // scroll box itself: offsetTop is relative to whichever ancestor happens to be
-    // positioned, which is not necessarily this one.
-    const onScroll = () => {
-      const marker = root.getBoundingClientRect().top + root.clientHeight * 0.3;
-      let page = 1;
-      for (const [index, holder] of holders.current) {
-        if (holder.getBoundingClientRect().top <= marker) page = Math.max(page, index);
-      }
-      setCurrent(page);
-    };
-    root.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      observer.disconnect();
-      root.removeEventListener("scroll", onScroll);
-    };
-  }, [state, sizes.length, drawPage]);
+    return () => observer.disconnect();
+  }, [state, sizes.length, width, drawPage]);
 
   if (state === "failed") return <p className="pdf-viewer-state">{labels.failed}</p>;
 
   return (
-    <div className="pdf-viewer">
-      <div className="pdf-viewer-bar">
-        <span className="pdf-viewer-page">
-          {labels.page} {current} {labels.of} {sizes.length || "…"}
-        </span>
-        <span className="pdf-viewer-spacer" />
-        <button type="button" className="minibtn" onClick={() => setScale((s) => Math.max(MIN_SCALE, +(s - 0.2).toFixed(2)))} disabled={scale <= MIN_SCALE} aria-label={labels.zoomOut}>−</button>
-        <span className="pdf-viewer-zoom">{Math.round(scale * 100)}%</span>
-        <button type="button" className="minibtn" onClick={() => setScale((s) => Math.min(MAX_SCALE, +(s + 0.2).toFixed(2)))} disabled={scale >= MAX_SCALE} aria-label={labels.zoomIn}><Icon name="plus" /></button>
-      </div>
-      <div className="pdf-viewer-page-area" ref={scrollRef}>
-        {state === "loading" && <p className="pdf-viewer-state">{labels.loading}</p>}
-        <div className="pdf-viewer-pages" style={{ width: `${Math.round(Math.max(1, ...sizes.map((size) => size.width)) * scale)}px` }}>
+    <div className="pdf-viewer" ref={containerRef}>
+      {state === "loading" && (
+        <div className="pdf-viewer-loading" aria-live="polite">
+          <div className="pdf-viewer-loading-page" aria-hidden="true">
+            <span className="skeleton" style={{ width: "34%", height: 20, marginBottom: 8 }} />
+            <span className="skeleton" style={{ width: "88%", height: 11 }} />
+            <span className="skeleton" style={{ width: "94%", height: 11 }} />
+            <span className="skeleton" style={{ width: "82%", height: 11 }} />
+            <span className="skeleton" style={{ width: "90%", height: 11, marginTop: 18 }} />
+            <span className="skeleton" style={{ width: "86%", height: 11 }} />
+          </div>
+          <p className="pdf-viewer-state">{labels.loading}</p>
+        </div>
+      )}
+      {state === "ready" && (
+        <div className="pdf-viewer-pages">
           {sizes.map((size, position) => {
             const index = position + 1;
             return (
@@ -237,7 +228,7 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
             );
           })}
         </div>
-      </div>
+      )}
     </div>
   );
 }

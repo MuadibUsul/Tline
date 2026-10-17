@@ -13,6 +13,44 @@ export const dynamic = "force-dynamic";
 const CACHE_PREVIEW = "private, max-age=86400, stale-while-revalidate=604800";
 const CACHE_DOWNLOAD = "private, max-age=3600";
 
+type DocumentMeta = {
+  id: string;
+  status: string;
+  kind: string;
+  locale: string;
+  storageKey: string;
+  mimeType: string;
+  byteSize: number | null;
+  updatedAt: Date;
+  articleId: string;
+  article: { title: string };
+};
+
+/**
+ * A PDF preview is several range requests. Each one used to look the document up in
+ * Postgres again; a short in-process cache keeps the document's immutable metadata out of
+ * the hot path without holding the file itself.
+ */
+const documentCache = new Map<string, { value: DocumentMeta; expires: number }>();
+async function getDocumentMeta(id: string): Promise<DocumentMeta | null> {
+  const now = Date.now();
+  const hit = documentCache.get(id);
+  if (hit && hit.expires > now) return hit.value;
+  const value = await prisma.articleDocument.findUnique({
+    where: { id },
+    select: {
+      id: true, status: true, kind: true, locale: true, storageKey: true,
+      mimeType: true, byteSize: true, updatedAt: true, articleId: true,
+      article: { select: { title: true } },
+    },
+  });
+  if (value) {
+    if (documentCache.size > 500) documentCache.clear();
+    documentCache.set(id, { value, expires: now + 60_000 });
+  }
+  return value;
+}
+
 /**
  * Previews are page interactions, not downloads: count one per document/reader per ten
  * minutes rather than once per byte range. pdf.js asks for many ranges, and an analytics
@@ -51,10 +89,7 @@ function safeFilename(title: string, locale: string) {
 
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const document = await prisma.articleDocument.findUnique({
-    where: { id: params.id },
-    include: { article: { select: { title: true } } },
-  });
+  const document = await getDocumentMeta(params.id);
   if (!document || document.status !== "ready") {
     return new Response("Document not found.", { status: 404, headers: DOCUMENT_ROBOTS });
   }

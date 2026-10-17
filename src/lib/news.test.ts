@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsLocales, newsParagraphRole, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
+import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsLocales, newsParagraphRole, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
 
 const record = (overrides: Partial<Parameters<typeof newsTitle>[0]> = {}) => ({
   id: "p1", slug: "s", kind: "brief", titleZh: null, titleEn: null, bodyZh: null, bodyEn: null,
@@ -51,6 +51,9 @@ test("short numbered lines are section headings; the opening paragraph is not", 
   assert.equal(newsParagraphRole("普通正文。"), "body");
   assert.equal(newsCadenceLabel("daily", "zh-CN"), "每日更新");
   assert.equal(newsCadenceLabel(null, "en"), "Ongoing");
+  // The list excerpt must not splice "二、战况" into the prose it follows.
+  const post = record({ bodyZh: "一、 一篇足够长的开场段落，说明今天最重要的变化。\n\n二、战况\n\n正文第一段。\n\n正文第二段。" });
+  assert.equal(newsExcerpt(post, "zh-CN"), "一、 一篇足够长的开场段落，说明今天最重要的变化。 正文第一段。 正文第二段。");
 });
 
 test("the front-page rail counts minutes, then hours, then falls back to the date", () => {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { localePath, tr, type Locale } from "@/lib/i18n";
-import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsTitle, type NewsRecord } from "@/lib/news";
+import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsExcerpt, newsTitle, type NewsRecord } from "@/lib/news";
 
 /** Beijing time for the desk's clock, the same source the front-page rail uses. */
 export function newsClock(date: Date, locale: Locale) {
@@ -17,8 +17,7 @@ export function newsClock(date: Date, locale: Locale) {
 export default function NewsRow({ post, locale, showColumn = false }: { post: NewsRecord; locale: Locale; showColumn?: boolean }) {
   const title = newsTitle(post, locale) ?? "";
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
-  const body = (locale === "zh-CN" ? post.bodyZh : post.bodyEn) ?? "";
-  const excerpt = body.replace(/\s+/g, " ").trim();
+  const excerpt = newsExcerpt(post, locale);
 
   return (
     <article className={`news-row ${kind}`}>

@@ -26,7 +26,10 @@ export function canonical(path: string, locale?: Locale, availableLocales: reado
   for (const other of availableLocales) {
     languages[other] = new URL(localePath(other, path), base).toString();
   }
-  languages["x-default"] = new URL(localePath("en", path), base).toString();
+  // x-default points at the default reading experience; when English is not one of the
+  // available versions, the first available language is the honest default.
+  const fallback = availableLocales.includes("en") ? "en" : availableLocales[0] ?? locale;
+  languages["x-default"] = new URL(localePath(fallback, path), base).toString();
   return {
     alternates: { canonical: new URL(localePath(locale, path), base).toString(), languages },
   };

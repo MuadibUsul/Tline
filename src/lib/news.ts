@@ -83,7 +83,20 @@ export function newsCadenceLabel(cadence: string | null | undefined, locale: Loc
 export function newsParagraphRole(text: string): "heading" | "body" {
   const value = text.trim();
   if (value.length > 32) return "body";
+  // A section label is a label, not a sentence: "二、战况" is a heading, "一、 一段话。" is
+  // the opening paragraph even when it is short.
+  if (/[。；！？]$/.test(value)) return "body";
   return /^[一二三四五六七八九十]+、/.test(value) || /^【[^】]{2,20}】$/.test(value) ? "heading" : "body";
+}
+
+/** A list excerpt made of body paragraphs only, so section labels never run into the prose. */
+export function newsExcerpt(post: NewsRecord, locale: Locale, limit = 220): string {
+  const text = splitNewsParagraphs(newsBody(post, locale))
+    .filter((paragraph) => newsParagraphRole(paragraph) === "body")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text;
 }
 
 export function newsTitle(post: NewsRecord, locale: Locale): string | null {

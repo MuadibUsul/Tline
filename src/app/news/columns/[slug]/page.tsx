@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { getLocale, localePath, tr } from "@/lib/i18n";
+import { notFound, permanentRedirect } from "next/navigation";
+import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
 import { getPublishedColumnBySlug, newsCadenceLabel, newsColumnName, newsDateLabel } from "@/lib/news";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, collectionPageJsonLd, localizedUrl, ogImage } from "@/lib/seo";
 import NewsRow from "../../NewsRow";
@@ -11,8 +11,13 @@ export const dynamic = "force-dynamic";
 /** A recurring desk page: every published edition of one column, newest first. */
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([props.params, getLocale()]);
-  const column = await getPublishedColumnBySlug(slug, locale);
+  const otherLocale: Locale = locale === "zh-CN" ? "en" : "zh-CN";
+  const [column, other] = await Promise.all([
+    getPublishedColumnBySlug(slug, locale),
+    getPublishedColumnBySlug(slug, otherLocale),
+  ]);
   if (!column) return { title: tr(locale, "Not found", "未找到") };
+  const availableLocales: Locale[] = [locale, ...(other ? [otherLocale] : [])];
   const name = newsColumnName(column, locale);
   const description = clamp(
     (locale === "zh-CN" ? column.descriptionZh : column.descriptionEn) || tr(
@@ -23,7 +28,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
     158,
   );
   return {
-    ...canonical(`/news/columns/${column.slug}`, locale),
+    ...canonical(`/news/columns/${column.slug}`, locale, availableLocales),
     title: { absolute: `${name} · Tlines` },
     description,
     openGraph: { type: "website", title: name, description, url: localizedUrl(`/news/columns/${column.slug}`, locale), locale, images: [{ url: ogImage("Column", name, tr(locale, "An ongoing Tlines desk", "Tlines 长期栏目")), width: 1200, height: 630 }] },
@@ -33,7 +38,14 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
 
 export default async function NewsColumnPage(props: { params: Promise<{ slug: string }> }) {
   const [{ slug }, locale] = await Promise.all([props.params, getLocale()]);
-  const column = await getPublishedColumnBySlug(slug, locale);
+  const otherLocale: Locale = locale === "zh-CN" ? "en" : "zh-CN";
+  const [column, other] = await Promise.all([
+    getPublishedColumnBySlug(slug, locale),
+    getPublishedColumnBySlug(slug, otherLocale),
+  ]);
+  // A column with no edition in this language is not an empty page: send the reader to the
+  // language it does publish in, rather than a 404 next to a working alternate.
+  if (!column && other) permanentRedirect(localePath(otherLocale, `/news/columns/${slug}`));
   if (!column) notFound();
   const name = newsColumnName(column, locale);
   const description = (locale === "zh-CN" ? column.descriptionZh : column.descriptionEn)?.trim();

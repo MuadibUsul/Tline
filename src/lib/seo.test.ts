@@ -50,6 +50,14 @@ test("missing translations do not emit a nonexistent Chinese alternate", () => {
   });
 });
 
+test("a Chinese-only page points x-default at Chinese, not a redirecting English URL", () => {
+  const metadata = canonical("/news/zh-only", "zh-CN", ["zh-CN"]);
+  assert.deepEqual(metadata.alternates?.languages, {
+    "zh-CN": "https://tlines.tech/zh/news/zh-only",
+    "x-default": "https://tlines.tech/zh/news/zh-only",
+  });
+});
+
 test("home, asset and institution metadata use localized entity templates", () => {
   // The home title leads with the brand and states the category inside the visible width
   // rather than running past it: "Tlines Institutional Intelligence | Bank Research &

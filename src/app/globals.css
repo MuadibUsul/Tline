@@ -1620,3 +1620,6 @@ td{padding-block:13px}
 @media(prefers-reduced-motion:reduce){
   .nav a,.search-trigger,.minibtn,.front-mast-stats a,.research-card,.dashboard-plaza-cta{transition:none}
 }
+/* About-page coverage: the signal-ledger stat grid, standalone, without the hero's link underline. */
+.coverage-grid{grid-column:auto;grid-row:auto;margin-top:14px;border:1px solid var(--border);border-radius:var(--radius)}
+.coverage-grid a{text-decoration:none}

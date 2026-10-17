@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
 import { canonical, clamp, JsonLd, localizedUrl, ogImage, webPageJsonLd } from "@/lib/seo";
+import { coverageCounts } from "@/lib/queries";
 
 const PAGES = {
   about: { en: ["About Tlines", "Tlines turns public institutional research into comparable, traceable market intelligence. It preserves the original source while adding structured entities, asset links, consensus and change history."], zh: ["关于 Tlines", "Tlines 将公开机构研报转化为可比较、可追踪的市场情报，并保留原始来源，同时补充结构化实体、资产关系、共识和变化历史。"] },
@@ -78,10 +79,26 @@ export async function generateMetadata({ params }: { params: Promise<{ policy: s
 export default async function PolicyPage({ params }: { params: Promise<{ policy: string }> }) {
   const { policy } = await params; const locale = await getLocale(); const content = page(policy, locale); if (!content) notFound();
   const applies = APPLIES_TO[policy as PolicySlug] ?? [];
+  // The site's coverage numbers live here rather than on the front page (2026-10-17): a
+  // reader who wants to know how much is behind the reporting finds them where the
+  // standards are stated, and the homepage opens on content instead of a scoreboard.
+  const coverage = policy === "about" ? await coverageCounts(locale) : null;
   return <main className="wrap policy-page">
     <JsonLd data={webPageJsonLd(locale, `/${policy}`, content[0], content[1])} />
     <div className="page-head"><div className="eyebrow">Tlines</div><h1>{content[0]}</h1></div>
     <section className="card prose"><p>{content[1]}</p><p>{tr(locale, "Financial content is informational, may contain errors, and is not investment advice.", "金融内容仅供信息参考，可能存在错误，不构成投资建议。")}</p></section>
+    {coverage && <section className="card prose">
+      <h2>{tr(locale, "Coverage", "收录概览")}</h2>
+      <div className="front-mast-stats coverage-grid">
+        <Link className="macro-stat" href={localePath(locale, "/research")}><span className="k">{tr(locale, "Reports", "篇可溯源研报")}</span><span className="v tnum">{coverage.reports.toLocaleString(locale)}</span></Link>
+        <Link className="macro-stat" href={localePath(locale, "/institutions-directory")}><span className="k">{tr(locale, "Publishing institutions", "家发布机构")}</span><span className="v tnum">{coverage.institutions}</span></Link>
+        <Link className="macro-stat" href={localePath(locale, "/markets")}><span className="k">{tr(locale, "Covered assets", "个覆盖资产")}</span><span className="v tnum">{coverage.assets}</span></Link>
+        <Link className="macro-stat" href={localePath(locale, "/topics")}><span className="k">{tr(locale, "Research topics", "个研究主题")}</span><span className="v tnum">{coverage.topics}</span></Link>
+      </div>
+      <p className="sub" style={{ marginTop: 10, fontSize: 12 }}>
+        {tr(locale, "Counted live on every visit. Only reports the publication gate admits are included.", "每次访问实时统计；仅计入通过公开闸门、可对外展示的研报。")}
+      </p>
+    </section>}
     {applies.length > 0 && <section className="card prose">
       <h2>{tr(locale, "Where this applies", "这条规则体现在哪里")}</h2>
       <ul>{applies.map((item) => <li key={item.path}><Link href={localePath(locale, item.path)}>{locale === "zh-CN" ? item.zh : item.en}</Link></li>)}</ul>

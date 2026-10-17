@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import SearchBox from "./SearchBox";
 import LiveFeed from "./LiveFeed";
 import NewsletterCTA from "./NewsletterCTA";
 import { Byline, cleanDisplayTitle } from "./editorial";
@@ -60,7 +59,6 @@ export default function HomeFront({
   themes,
   thisWeek,
   figure,
-  counts,
   assets,
 }: {
   locale: Locale;
@@ -72,7 +70,6 @@ export default function HomeFront({
   themes: FrontTheme[];
   thisWeek: Awaited<ReturnType<typeof importantReleasesThisWeek>>;
   figure: FrontFigure | null;
-  counts: { reports: number; institutions: number; assets: number };
   assets: Array<{ ticker: string; name: string }>;
 }) {
   const zh = locale === "zh-CN";
@@ -89,27 +86,9 @@ export default function HomeFront({
         ariaLabel={tr(locale, "Load newly published research", "载入新发布的研报")}
       />
 
-      {/* Masthead: a compact editorial proposition with the corpus itself as proof. */}
-      <section className="front-mast">
-        <div className="front-mast-copy">
-          <div className="eyebrow">{tr(locale, "Institutional intelligence · verified at source", "机构情报 · 源头可核验")}</div>
-          <h1>{tr(locale, "See the market through institutional research", "从机构研报，看见市场共识与分歧")}</h1>
-          <p className="sub">{tr(locale, "Source reports, comparable views and market signals — built for decisions, not information overload.", "连接原始研报、可比较观点与市场信号，为判断服务，而不是制造信息噪音。")}</p>
-        </div>
-        <div className="front-mast-search">
-          <SearchBox
-            locale={locale}
-            placeholder={tr(locale, "Search an institution, asset, topic or view…", "搜索机构、资产、主题或观点……")}
-            ariaLabel={tr(locale, "Search the site", "全站搜索")}
-          />
-        </div>
-        <div className="front-mast-stats" aria-label={tr(locale, "Coverage", "内容覆盖") }>
-          <Link href={localePath(locale, "/research")}><strong>{counts.reports.toLocaleString(locale)}</strong><span>{tr(locale, "source-linked reports", "篇可溯源研报")}</span></Link>
-          <Link href={localePath(locale, "/institutions-directory")}><strong>{counts.institutions}</strong><span>{tr(locale, "publishing houses", "家发布机构")}</span></Link>
-          <Link href={localePath(locale, "/markets")}><strong>{counts.assets}</strong><span>{tr(locale, "covered assets", "个覆盖资产")}</span></Link>
-          <Link href={localePath(locale, "/topics")}><strong>{topics.length}</strong><span>{tr(locale, "research topics", "个研究主题")}</span></Link>
-        </div>
-      </section>
+      {/* The page opens on content: the masthead that used to sit here (statement, search,
+          coverage numbers) was removed 2026-10-17. Search lives in the header; the numbers
+          moved to the About page. */}
 
       {/* The editorial cover: one lead story, the rest of the picks beside it. */}
       <div className="front-section-head">

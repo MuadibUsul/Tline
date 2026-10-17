@@ -4,6 +4,8 @@ import { computeConsensus, consensusDeltas, type ConsensusResult } from "./conse
 import { directionLabel } from "./assets";
 import { publicationReadyWhere } from "./publication";
 import { articleTimestamp, type Locale } from "./i18n";
+import { isLegacyNonAssetAlias } from "./classification/taxonomy";
+import { listIndexableTopicsFor } from "./topics";
 import { researchLookupWhere } from "./researchPath";
 import { buildTargetDistribution } from "./targetDistribution";
 import { validateStructuredResearch } from "./ingest/researchQuality";
@@ -161,6 +163,34 @@ export async function featuredFeed(limit = 5, locale?: Locale) {
     take: limit,
     select: cardArticleSelect,
   }), locale);
+}
+
+/**
+ * The four coverage numbers, in one place with one set of rules: a report counts when the
+ * gate admits it, an institution when it has at least one such report, an asset when at
+ * least two institutions hold views on it (the same rule the markets hub applies), and a
+ * topic when it clears the topic thresholds for this language. The About page shows these;
+ * a homepage no longer does (2026-10-17), so this is the one口径.
+ */
+export async function coverageCounts(locale: Locale) {
+  const [reports, institutions, assetRows, topics] = await Promise.all([
+    prisma.article.count({ where: publicationReadyWhere() }),
+    prisma.institution.count({ where: { articles: { some: publicationReadyWhere() } } }),
+    prisma.asset.findMany({
+      where: { articleAssets: { some: { article: publicationReadyWhere() } } },
+      select: {
+        ticker: true,
+        articleAssets: { where: { article: publicationReadyWhere() }, select: { article: { select: { institutionId: true } } } },
+      },
+    }),
+    listIndexableTopicsFor(locale),
+  ]);
+  const assets = assetRows.filter((asset) =>
+    !isLegacyNonAssetAlias(asset.ticker)
+    && asset.articleAssets.length >= 2
+    && new Set(asset.articleAssets.map((row) => row.article.institutionId)).size >= 2,
+  ).length;
+  return { reports, institutions, assets, topics: topics.length };
 }
 
 export async function mostActive(days = 7, limit = 6) {

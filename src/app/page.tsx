@@ -104,7 +104,6 @@ export default async function Home() {
         themes={themes}
         thisWeek={thisWeek}
         figure={figureRow ? { id: figureRow.id, caption: figureRow.caption, slug: figureRow.article.slug, title: figureRow.article.title } : null}
-        counts={{ reports: reportCount, institutions: institutionCount, assets: coveredAssets.length }}
         assets={coveredAssets}
       />
     );

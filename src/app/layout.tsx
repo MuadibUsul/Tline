@@ -96,24 +96,49 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   ) : (
     <Link href={localePath(locale, "/signin")} className="minibtn">{tr(locale, "Sign in", "登录")}</Link>
   );
-  const policyLinks = [
-    ["about", tr(locale, "About", "关于")], ["methodology", tr(locale, "Methodology", "方法论")],
-    ["editorial-policy", tr(locale, "Editorial policy", "编辑政策")], ["ai-usage", tr(locale, "AI usage", "AI 使用说明")],
-    ["sources", tr(locale, "Sources", "来源说明")], ["privacy", tr(locale, "Privacy", "隐私政策")],
-    ["corrections", tr(locale, "Corrections", "更正机制")], ["financial-disclaimer", tr(locale, "Financial disclaimer", "金融免责声明")],
-  ];
-  // Under the redesign the primary nav is the editorial IA; the legacy tools (themes,
-  // dashboards) and the newsletter keep their addresses in the footer so nothing becomes
-  // unreachable just because it left the top bar.
-  const toolLinks: Array<[string, string]> = redesign
-    ? [
-        ["watchlist", tr(locale, "Market Themes", "交易主线")],
-        ["dashboards", tr(locale, "Dashboards", "看板")],
-        ["newsletter", tr(locale, "Newsletter", "订阅")],
+  const footerColumns: Array<{ title: string; links: Array<[string, string]> }> = [
+    {
+      title: tr(locale, "Product", "产品"),
+      links: [
+        ["research", tr(locale, "Latest research", "最新研究")],
+        ["news", tr(locale, "News", "新鲜事")],
+        ["categories", tr(locale, "Categories", "分类")],
+        ["market-themes", tr(locale, "Market themes", "交易主线")],
+      ],
+    },
+    {
+      title: tr(locale, "Data", "数据"),
+      links: [
+        ["markets", tr(locale, "Markets", "资产")],
+        ["macro", tr(locale, "Macro", "宏观")],
+        ["macro/calendar", tr(locale, "Calendar", "经济日历")],
+        ["institutions-directory", tr(locale, "Institutions", "机构目录")],
+      ],
+    },
+    {
+      title: tr(locale, "Company", "关于"),
+      links: [
+        ["about", tr(locale, "About", "关于")],
+        ["methodology", tr(locale, "Methodology", "方法论")],
+        ["editorial-policy", tr(locale, "Editorial policy", "编辑政策")],
+        ["ai-usage", tr(locale, "AI usage", "AI 使用说明")],
+      ],
+    },
+    {
+      title: tr(locale, "Connect", "接入"),
+      links: [
         ["mcp", tr(locale, "MCP for AI", "MCP 接入")],
+        ["newsletter", tr(locale, "Newsletter", "订阅")],
         ...(user ? [["account/bookmarks", tr(locale, "Saved", "我的收藏")] as [string, string]] : []),
-      ]
-    : [];
+        ["sources", tr(locale, "Sources", "来源说明")],
+      ],
+    },
+  ];
+  const legalLinks: Array<[string, string]> = [
+    ["privacy", tr(locale, "Privacy", "隐私政策")],
+    ["corrections", tr(locale, "Corrections", "更正机制")],
+    ["financial-disclaimer", tr(locale, "Financial disclaimer", "金融免责声明")],
+  ];
   // A plain <a>, not <Link>: the two languages share this root layout, and a client-side
   // navigation across locales would swap the page content but leave the chrome (nav, this
   // button, <html lang>) rendered in the previous language — the reader ends up on /zh with
@@ -174,12 +199,36 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Mounted last and rendering nothing: the beacon must never be on the path to
             first paint of the page it is measuring. */}
         {process.env.ANALYTICS_ENABLED !== "false" && <Analytics />}
-        <footer className="footer wrap">
-          <span>{brandName(locale)} · {tr(locale, "Research → Data → Signal", "研报 → 数据 → 信号")}</span>
-          <nav className="footer-links" aria-label={tr(locale, "Site", "站点")}>
-            {toolLinks.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}
-          </nav>
-          <nav className="footer-links" aria-label={tr(locale, "Policies", "政策说明")}>{policyLinks.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}</nav>
+        <footer className="site-footer">
+          <div className="wrap site-footer-inner">
+            <div className="site-footer-top">
+              <div className="site-footer-brand">
+                <Link href={localePath(locale, "/")} className="site-footer-logo">
+                  <TlinesMark />
+                  <span>{brandName(locale)}</span>
+                </Link>
+                <p>{tr(locale, "Institutional research, made traceable. Every view keeps its source, its date and the report behind it.", "可核验的机构研究。每条观点都保留来源、日期与原始研报。")}</p>
+                <Link className="site-footer-cta" href={localePath(locale, "/research")}>
+                  {tr(locale, "Browse the latest research", "浏览最新研报")} <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+              <div className="site-footer-cols">
+                {footerColumns.map((column) => (
+                  <div className="site-footer-col" key={column.title}>
+                    <h2>{column.title}</h2>
+                    {column.links.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="site-footer-bottom">
+              <span>© {new Date().getFullYear()} Tlines</span>
+              <span>{tr(locale, "Research → Data → Signal", "研报 → 数据 → 信号")}</span>
+              <nav aria-label={tr(locale, "Legal", "法律与政策")}>
+                {legalLinks.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}
+              </nav>
+            </div>
+          </div>
         </footer>
       </body>
     </html>

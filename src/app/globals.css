@@ -1118,6 +1118,10 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 
 .key-number-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
 
+/* An odd number of figures in a two-column grid leaves one tile alone on its row. The
+   single-column variant keeps every tile the same width and lets the card grow vertically. */
+.key-number-grid.single{grid-template-columns:1fr}
+
 .key-number-grid div{padding:9px 10px;border-radius:8px;background:var(--panel)}
 
 .key-number-grid dt{font:10px var(--mono);color:var(--muted)}

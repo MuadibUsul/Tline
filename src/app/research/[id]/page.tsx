@@ -405,7 +405,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         <div className="citation-evidence">
           <section aria-labelledby="key-numbers-heading">
             <h2 id="key-numbers-heading">{tr(locale, "Key numbers", "关键数字")}</h2>
-            {keyNumbers.length > 0 ? <dl className="key-number-grid">
+            {keyNumbers.length > 0 ? <dl className={`key-number-grid${keyNumbers.length % 2 === 1 ? " single" : ""}`}>
               {keyNumbers.map((item, index) => <div key={`${item.label}-${item.value}-${index}`}>
                 <dt>{item.label || tr(locale, "Value", "数值")}</dt>
                 <dd>{item.value}</dd>

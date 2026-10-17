@@ -15,6 +15,7 @@ import { listIndexableTopicsFor, topicPath } from "@/lib/topics";
 import { loadPublicThemes } from "@/lib/marketThemesPublic";
 import { redesignAtLeast } from "@/lib/redesign";
 import { JsonLd, canonical, clamp, homeSeoTitle, localizedUrl, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
+import { Icon } from "./_components/Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -242,7 +243,7 @@ export default async function Home() {
         </div>
 
         <div className="home-verification">
-          <div><span aria-hidden="true">✓</span><p><strong>{tr(locale, "Built to be checked", "经得起核对")}</strong>{tr(locale, "Every view links back to its original report. Our extraction rules, accepted sources, AI use and correction process are public.", "每条观点都链接回原始研报；提取规则、来源标准、AI 使用方式与纠错流程全部公开。")}</p></div>
+          <div><span><Icon name="check" /></span><p><strong>{tr(locale, "Built to be checked", "经得起核对")}</strong>{tr(locale, "Every view links back to its original report. Our extraction rules, accepted sources, AI use and correction process are public.", "每条观点都链接回原始研报；提取规则、来源标准、AI 使用方式与纠错流程全部公开。")}</p></div>
           <nav aria-label={tr(locale, "Verification policies", "验证与政策")}>
             <Link href={localePath(locale, "/methodology")}>{tr(locale, "Methodology", "方法论")}</Link>
             <Link href={localePath(locale, "/sources")}>{tr(locale, "Sources", "来源政策")}</Link>

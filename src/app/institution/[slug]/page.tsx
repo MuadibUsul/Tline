@@ -14,6 +14,7 @@ import { queryClassifiedArticleIds } from "@/lib/classification/query";
 import { taxonomy } from "@/lib/classification/taxonomy";
 import { institutionSeoProfile, subjectInstitutionSeoProfile } from "@/lib/seoLanding";
 import { formatAssetTarget } from "@/lib/assetTarget";
+import { Icon } from "@/app/_components/Icon";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -138,7 +139,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
             <input type="hidden" name="kind" value="institution" />
             <input type="hidden" name="refId" value={inst.slug} />
             <input type="hidden" name="back" value={`/institution/${inst.slug}`} />
-            <button type="submit" className="minibtn">＋ {tr(locale, "Watch", "关注")}</button>
+            <button type="submit" className="minibtn"><Icon name="plus" /> {tr(locale, "Watch", "关注")}</button>
           </form>
         </div>
       </div>

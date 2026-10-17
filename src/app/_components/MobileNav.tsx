@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Icon } from "./Icon";
 
 export interface MobileNavItem {
   href: string;
@@ -69,7 +70,7 @@ export default function MobileNav({
         aria-label={open ? closeLabel : openLabel}
         onClick={() => setOpen((value) => !value)}
       >
-        <span aria-hidden="true">{open ? "✕" : "☰"}</span>
+        <Icon name={open ? "close" : "menu"} />
       </button>
 
       <div

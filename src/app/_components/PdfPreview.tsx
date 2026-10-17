@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Icon } from "./Icon";
 
 /**
  * Reads a report's PDF on the page.
@@ -186,7 +187,7 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
         <span className="pdf-viewer-spacer" />
         <button type="button" className="minibtn" onClick={() => setScale((s) => Math.max(MIN_SCALE, +(s - 0.2).toFixed(2)))} disabled={scale <= MIN_SCALE} aria-label={labels.zoomOut}>−</button>
         <span className="pdf-viewer-zoom">{Math.round(scale * 100)}%</span>
-        <button type="button" className="minibtn" onClick={() => setScale((s) => Math.min(MAX_SCALE, +(s + 0.2).toFixed(2)))} disabled={scale >= MAX_SCALE} aria-label={labels.zoomIn}>＋</button>
+        <button type="button" className="minibtn" onClick={() => setScale((s) => Math.min(MAX_SCALE, +(s + 0.2).toFixed(2)))} disabled={scale >= MAX_SCALE} aria-label={labels.zoomIn}><Icon name="plus" /></button>
       </div>
       <div className="pdf-viewer-page-area" ref={scrollRef}>
         {state === "loading" && <p className="pdf-viewer-state">{labels.loading}</p>}

@@ -4,6 +4,7 @@ import { directionLabel } from "@/lib/assets";
 import { articleTimestamp, assetName, institutionName, localizeChineseContent, relativeTime, tr, type Locale, localePath } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
 import { taxonomy } from "@/lib/classification/taxonomy";
+import { Icon } from "./Icon";
 
 export const relTime = (d: Date, locale: Locale = "en") => relativeTime(d, locale);
 
@@ -93,7 +94,7 @@ export function FeedCard({ a, locale = "en" }: { a: FeedArticle; locale?: Locale
       )}
       <div className="act">
         <Link href={localePath(locale, researchPath(a))} className="minibtn p">{tr(locale, "View analysis", "查看分析")}</Link>
-        <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Official source ↗", "官网原文 ↗")}</a>
+        <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Official source", "官网原文")} <Icon name="external" /></a>
       </div>
     </article>
   );
@@ -145,7 +146,7 @@ export function ResearchCard({ a, locale = "en" }: { a: FeedArticle; locale?: Lo
       </div>
       <div className="research-card-actions">
         <Link href={localePath(locale, researchPath(a))} className="minibtn p">{tr(locale, "Read", "阅读")}</Link>
-        <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Source ↗", "官网 ↗")}</a>
+        <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Source", "官网")} <Icon name="external" /></a>
       </div>
     </article>
   );

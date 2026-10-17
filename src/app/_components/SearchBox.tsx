@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
 import { track } from "./Analytics";
+import { Icon } from "./Icon";
 
 interface Result {
   id: string;
@@ -79,7 +80,7 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
     }}>
       <form className="searchbar" role="search" onSubmit={(event) => { event.preventDefault(); choose(results[active] ?? results[0]); }}>
-        <span aria-hidden="true">⌕</span>
+        <span className="search-leading"><Icon name="search" /></span>
         <input
           value={q}
           onChange={(event) => { setQ(event.target.value); setOpen(true); }}
@@ -98,7 +99,7 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
           aria-activedescendant={results[active] ? `search-result-${results[active].id}` : undefined}
           autoComplete="off"
         />
-        {q && <button className="search-clear" type="button" onClick={() => { setQ(""); setResults([]); }} aria-label={locale === "zh-CN" ? "清除搜索" : "Clear search"}>×</button>}
+        {q && <button className="search-clear" type="button" onClick={() => { setQ(""); setResults([]); }} aria-label={locale === "zh-CN" ? "清除搜索" : "Clear search"}><Icon name="close" /></button>}
       </form>
 
       {open && q.trim().length >= 2 && (
@@ -121,7 +122,7 @@ export default function SearchBox({ placeholder, ariaLabel, locale }: { placehol
                 <small>{result.subtitle}{result.matchKind === "content" && <em>{labels.content}</em>}</small>
                 {result.snippet && <span><Highlight text={result.snippet} query={result.snippetMatch || q} /></span>}
               </span>
-              <span className="search-arrow" aria-hidden="true">→</span>
+              <span className="search-arrow"><Icon name="arrow-right" /></span>
             </Link>
           ))}
         </div>

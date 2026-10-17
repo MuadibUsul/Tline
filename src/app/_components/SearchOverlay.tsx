@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "./Icon";
 
 /**
  * The ⌘K / Ctrl+K search overlay (PRD P07).
@@ -92,7 +93,7 @@ export default function SearchOverlay({
   return (
     <>
       <button type="button" className="search-trigger" onClick={() => setOpen(true)} aria-label={labels.aria}>
-        <span aria-hidden="true">⌕</span>
+        <Icon name="search" />
         {labels.trigger}
         <kbd>⌘K</kbd>
       </button>
@@ -129,7 +130,7 @@ export default function SearchOverlay({
               {query.trim().length >= 2 && hits.length === 0 && <div className="empty-state">{labels.none}</div>}
               {query.trim().length >= 2 && (
                 <a href={`${zh ? "/zh" : "/en"}/search?q=${encodeURIComponent(query.trim())}`} className={hits.length === cursor ? "on" : undefined} onMouseEnter={() => setCursor(hits.length)}>
-                  <span className="k">↗</span>
+                  <span className="k"><Icon name="external" /></span>
                   <span className="t">{labels.all}</span>
                 </a>
               )}

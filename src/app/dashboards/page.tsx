@@ -8,6 +8,7 @@ import { DASHBOARD_TEMPLATES } from "@/lib/dashboards";
 import { getLocale, localePath, tr } from "@/lib/i18n";
 import { noIndex } from "@/lib/seo";
 import { createDashboard, deleteDashboard } from "./actions";
+import { Icon } from "@/app/_components/Icon";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Dashboards", ...noIndex };
@@ -35,15 +36,15 @@ export default async function DashboardsPage() {
           <p className="sub">{tr(locale, "Build a live desk for a central bank, macro theme or asset. Place data, research and alerts on one infinite canvas.", "围绕央行、宏观主题或具体品种搭建实时工作台，在一张无限画布上自由组合数据、研报与提醒。")}</p>
           <Link className="dashboard-plaza-cta" href={localePath(locale, "/dashboards/explore")}>
             <span>{tr(locale, "Community", "社区精选")}</span>
-            <strong>{tr(locale, "Dashboard plaza", "看板广场")} <i>→</i></strong>
-            <small>{tr(locale, "Discover public dashboards", "发现并使用公开看板")}</small>
+            <strong>{tr(locale, "Dashboard plaza", "看板广场")} <i><Icon name="arrow-right" /></i></strong>
+            <small>{tr(locale, "Public workspaces, ready to reuse", "公开看板，一键复用")}</small>
           </Link>
         </div>
         <div className="dashboard-feature-row">
-          <span>{tr(locale, "Infinite canvas", "无限画布")}</span>
-          <span>{tr(locale, "Live data cards", "实时数据卡片")}</span>
-          <span>{tr(locale, "Per-widget alerts", "卡片级提醒")}</span>
-          <span>{tr(locale, "Custom wallpaper", "自定义壁纸")}</span>
+          <span><Icon name="canvas" />{tr(locale, "Infinite canvas", "无限画布")}</span>
+          <span><Icon name="pulse" />{tr(locale, "Live data cards", "实时数据卡片")}</span>
+          <span><Icon name="bell" />{tr(locale, "Per-widget alerts", "卡片级提醒")}</span>
+          <span><Icon name="image" />{tr(locale, "Custom wallpaper", "自定义壁纸")}</span>
         </div>
       </header>
 
@@ -54,7 +55,7 @@ export default async function DashboardsPage() {
         <div className="dashboards-section-head"><h2>{tr(locale, "Your dashboards", "我的看板")}</h2><span>{dashboards.length}</span></div>
         <div className="dashboard-grid">{dashboards.map((dashboard) => <article className={`dashboard-tile wallpaper-${dashboard.wallpaper}`} key={dashboard.id} style={{ "--dashboard-accent": dashboard.accent } as CSSProperties}>
           <Link href={localePath(locale, `/dashboards/${dashboard.id}`)}><span className="dashboard-tile-kicker">{dashboard.templateKey ?? tr(locale, "Custom", "自定义")}</span><h3>{dashboard.name}</h3><small>{tr(locale, `${dashboard._count.rules} alerts`, `${dashboard._count.rules} 条提醒`)} · {tr(locale, "Updated", "更新于")} {dashboard.updatedAt.toLocaleDateString(locale === "zh-CN" ? "zh-CN" : "en-US")}</small></Link>
-          <form action={deleteDashboard}><input type="hidden" name="id" value={dashboard.id} /><button className="dashboard-delete" type="submit" aria-label={tr(locale, "Delete dashboard", "删除看板")}>×</button></form>
+          <form action={deleteDashboard}><input type="hidden" name="id" value={dashboard.id} /><button className="dashboard-delete" type="submit" aria-label={tr(locale, "Delete dashboard", "删除看板")}><Icon name="trash" /></button></form>
         </article>)}</div>
       </section>}
 
@@ -67,7 +68,7 @@ export default async function DashboardsPage() {
             {entitled ? <form action={createDashboard}><input type="hidden" name="template" value={template.builtinKey} /><button className="minibtn p" type="submit">{tr(locale, "Use template", "使用模板")}</button></form> : <Link className="minibtn p" href={localePath(locale, "/signin?next=/dashboards")}>{tr(locale, "Sign in to use", "登录后使用")}</Link>}
           </article>)}
           <article className="dashboard-template wallpaper-grid dashboard-custom-template">
-            <div className="dashboard-template-preview"><b>＋</b></div>
+            <div className="dashboard-template-preview"><b><Icon name="plus" /></b></div>
             <div><span className="dashboard-tile-kicker">blank</span><h3>{tr(locale, "Blank canvas", "空白画布")}</h3><p>{tr(locale, "Start empty and add any supported data, research, note or source card.", "从空白开始，自由添加数据、研报、笔记或外部来源卡片。")}</p></div>
             {entitled ? <form action={createDashboard} className="dashboard-blank-form"><input name="name" maxLength={80} placeholder={tr(locale, "Dashboard name", "看板名称")} required /><button className="minibtn p" type="submit">{tr(locale, "Create", "创建")}</button></form> : <Link className="minibtn p" href={localePath(locale, "/signin?next=/dashboards")}>{tr(locale, "Sign in", "登录")}</Link>}
           </article>

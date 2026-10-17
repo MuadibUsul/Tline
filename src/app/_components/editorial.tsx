@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatDate, institutionName, localePath, tr, type Locale } from "@/lib/i18n";
 import { stripPublisherPrefix } from "@/lib/seo";
+import { Icon } from "./Icon";
 
 /**
  * The editorial component set (PRD §6.3). Server components throughout — they only shape
@@ -47,7 +48,7 @@ export function SourceBadge({ href, locale }: { href: string; locale: Locale }) 
   }
   return (
     <a className="ed-source" href={href} target="_blank" rel="noopener noreferrer">
-      {tr(locale, "Read the original", "阅读官网原文")} · {domain} <span aria-hidden="true">↗</span>
+      {tr(locale, "Read the original", "阅读官网原文")} · {domain} <Icon name="external" />
     </a>
   );
 }
@@ -111,7 +112,7 @@ export function EvidenceEntry({
       </small>
       {view.sourceQuote ? <blockquote>{view.sourceQuote}</blockquote> : null}
       <small style={{ marginTop: 6 }}>
-        <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Locate in source", "前往原文定位")} ↗</a>
+        <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Locate in source", "前往原文定位")} <Icon name="external" /></a>
       </small>
     </article>
   );

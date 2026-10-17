@@ -10,6 +10,7 @@ import { isFormalAuthConfigured } from "@/lib/auth-config";
 import OAuthSignOutButton from "./_components/OAuthSignOutButton";
 import MobileNav, { type MobileNavItem } from "./_components/MobileNav";
 import SearchOverlay from "./_components/SearchOverlay";
+import { TlinesMark } from "./_components/Icon";
 import TopbarScroll from "./_components/TopbarScroll";
 import Analytics from "./_components/Analytics";
 import { redesignAtLeast } from "@/lib/redesign";
@@ -132,7 +133,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="topbar">
           <div className="wrap inner">
             <Link href={localePath(locale, "/")} className="brand">
-              <span className="glyph">II</span> <span className="brand-name">{brandName(locale)}</span>
+              <span className="glyph"><TlinesMark /></span> <span className="brand-name">{brandName(locale)}</span>
             </Link>
             <nav className="nav" aria-label={tr(locale, "Primary", "主导航")}>
               {navItems.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}

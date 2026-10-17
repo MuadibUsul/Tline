@@ -11,6 +11,7 @@ import { researchPath } from "@/lib/researchPath";
 import { topicPath, type TopicStat } from "@/lib/topics";
 import { JsonLd, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 import type { FeedPulse, featuredFeed, importantReleasesThisWeek } from "@/lib/queries";
+import { Icon } from "./Icon";
 
 /**
  * The editorial front page (PRD P01): what is worth reading today, where to verify it, and
@@ -88,29 +89,33 @@ export default function HomeFront({
         ariaLabel={tr(locale, "Load newly published research", "载入新发布的研报")}
       />
 
-      {/* Masthead: what this is, how to search, how much is here — one quiet row. */}
+      {/* Masthead: a compact editorial proposition with the corpus itself as proof. */}
       <section className="front-mast">
-        <h1>{tr(locale, "Institutional research, made legible", "读懂机构怎样看市场")}</h1>
-        <p className="sub">{tr(locale, "From source reports to verifiable market judgement.", "从原始研报到可核验的市场判断。")}</p>
-        <div style={{ flexBasis: "100%", maxWidth: 560 }}>
+        <div className="front-mast-copy">
+          <div className="eyebrow">{tr(locale, "Institutional intelligence · verified at source", "机构情报 · 源头可核验")}</div>
+          <h1>{tr(locale, "See the market through institutional research", "从机构研报，看见市场共识与分歧")}</h1>
+          <p className="sub">{tr(locale, "Source reports, comparable views and market signals — built for decisions, not information overload.", "连接原始研报、可比较观点与市场信号，为判断服务，而不是制造信息噪音。")}</p>
+        </div>
+        <div className="front-mast-search">
           <SearchBox
             locale={locale}
             placeholder={tr(locale, "Search an institution, asset, topic or view…", "搜索机构、资产、主题或观点……")}
             ariaLabel={tr(locale, "Search the site", "全站搜索")}
           />
         </div>
-        <p className="sub mono" style={{ flexBasis: "100%", fontSize: 11.5, margin: "2px 0 0" }}>
-          <Link href={localePath(locale, "/research")}>{counts.reports.toLocaleString(locale)} {tr(locale, "source-linked reports", "篇可溯源研报")}</Link>
-          {" · "}
-          <Link href={localePath(locale, "/institutions-directory")}>{counts.institutions} {tr(locale, "publishing houses", "家发布机构")}</Link>
-          {" · "}
-          <Link href={localePath(locale, "/markets")}>{counts.assets} {tr(locale, "covered assets", "个覆盖资产")}</Link>
-          {" · "}
-          <Link href={localePath(locale, "/topics")}>{topics.length} {tr(locale, "research topics", "个研究主题")}</Link>
-        </p>
+        <div className="front-mast-stats" aria-label={tr(locale, "Coverage", "内容覆盖") }>
+          <Link href={localePath(locale, "/research")}><strong>{counts.reports.toLocaleString(locale)}</strong><span>{tr(locale, "source-linked reports", "篇可溯源研报")}</span></Link>
+          <Link href={localePath(locale, "/institutions-directory")}><strong>{counts.institutions}</strong><span>{tr(locale, "publishing houses", "家发布机构")}</span></Link>
+          <Link href={localePath(locale, "/markets")}><strong>{counts.assets}</strong><span>{tr(locale, "covered assets", "个覆盖资产")}</span></Link>
+          <Link href={localePath(locale, "/topics")}><strong>{topics.length}</strong><span>{tr(locale, "research topics", "个研究主题")}</span></Link>
+        </div>
       </section>
 
       {/* The editorial cover: one lead story, the rest of the picks beside it. */}
+      <div className="front-section-head">
+        <div><span className="eyebrow">{tr(locale, "Editorial desk", "编辑台")}</span><h2>{tr(locale, "What matters now", "此刻值得关注")}</h2></div>
+        <Link href={localePath(locale, "/research")}>{tr(locale, "Browse all research", "浏览全部研报")} <Icon name="arrow-right" /></Link>
+      </div>
       <section className="front-grid" aria-label={tr(locale, "Today's cover", "今日封面")}>
         {top ? (
           <article className="ed-feature">
@@ -125,7 +130,7 @@ export default function HomeFront({
               : null}
             <p className="ed-actions">
               <Link className="minibtn p" href={localePath(locale, researchPath(top))}>
-                {tr(locale, "Read the analysis", "阅读深度分析")} <span aria-hidden="true">→</span>
+                {tr(locale, "Read the analysis", "阅读深度分析")} <Icon name="arrow-right" />
               </Link>
             </p>
           </article>
@@ -139,13 +144,13 @@ export default function HomeFront({
               <p className="sub mono">{institutionName(row.institution.name, locale)} · {new Date(row.publishedAt).toISOString().slice(0, 10)}</p>
             </Link>
           ))}
-          <Link href={localePath(locale, "/research")}><p className="sub mono" style={{ margin: 0 }}>{tr(locale, "All research", "全部研报")} →</p></Link>
+          <Link className="front-more" href={localePath(locale, "/research")}>{tr(locale, "All research", "全部研报")} →</Link>
         </div>
       </section>
 
       {/* Institutions changed their minds about… */}
       {watch.length > 0 && (
-        <section className="blk" style={{ marginTop: 30 }} aria-label={tr(locale, "Today's institutional observations", "今日机构观察")}>
+        <section className="blk front-observations" aria-label={tr(locale, "Today's institutional observations", "今日机构观察")}>
           <div className="section-t">
             <span>{tr(locale, "Today's institutional observations", "今日机构观察")}</span>
             <Link className="chip gray" href={localePath(locale, "/institutions")}>{tr(locale, "All views", "更多观点")} →</Link>
@@ -163,7 +168,7 @@ export default function HomeFront({
                 <span className="meta">
                   <time dateTime={row.publishedAt}>{new Date(row.publishedAt).toISOString().slice(0, 10)}</time>
                   {row.assetTicker ? <Link className="chip acc" href={localePath(locale, assetPath(row.assetTicker))}>{row.assetTicker}</Link> : null}
-                  <Link href={localePath(locale, `/research/${row.slug}`)} style={{ color: "var(--faint)" }}>{tr(locale, "source report", "原始研报")} →</Link>
+                  <Link className="source-link" href={localePath(locale, `/research/${row.slug}`)}>{tr(locale, "source report", "原始研报")} →</Link>
                 </span>
               </div>
             ))}
@@ -235,9 +240,9 @@ export default function HomeFront({
       {figure && (
         <section className="blk" aria-label={tr(locale, "Chart of the day", "一张值得读的图")}>
           <div className="section-t">{tr(locale, "A figure worth reading", "一张值得读的图")}</div>
-          <figure className="ed-figure" style={{ margin: "6px 0 0" }}>
+          <figure className="ed-figure front-figure">
             {/* eslint-disable-next-line @next/next/no-img-element -- served from the private figure store, not a static asset */}
-            <img src={`/api/figures/${figure.id}`} alt={figure.caption ?? figure.title} loading="lazy" style={{ maxWidth: "100%", borderRadius: 10, border: "1px solid var(--border)" }} />
+            <img src={`/api/figures/${figure.id}`} alt={figure.caption ?? figure.title} loading="lazy" />
             <figcaption>
               <span>{figure.caption ?? figure.title}</span>
               <Link href={localePath(locale, `/research/${figure.slug}`)}>{tr(locale, "From the report", "出自研报")}：{figure.title} →</Link>
@@ -248,8 +253,8 @@ export default function HomeFront({
 
       <NewsletterCTA locale={locale} source="home" />
 
-      <section className="home-verification" style={{ marginTop: 8 }}>
-        <div><span aria-hidden="true">✓</span><p><strong>{tr(locale, "Built to be checked", "经得起核对")}</strong>{tr(locale, "Every view links back to its original report. Our extraction rules, accepted sources, AI use and correction process are public.", "每条观点都链接回原始研报；提取规则、来源标准、AI 使用方式与纠错流程全部公开。")}</p></div>
+      <section className="home-verification">
+        <div><span><Icon name="check" /></span><p><strong>{tr(locale, "Built to be checked", "经得起核对")}</strong>{tr(locale, "Every view links back to its original report. Our extraction rules, accepted sources, AI use and correction process are public.", "每条观点都链接回原始研报；提取规则、来源标准、AI 使用方式与纠错流程全部公开。")}</p></div>
         <nav aria-label={tr(locale, "Verification policies", "验证与政策")}>
           <Link href={localePath(locale, "/methodology")}>{tr(locale, "Methodology", "方法论")}</Link>
           <Link href={localePath(locale, "/sources")}>{tr(locale, "Sources", "来源政策")}</Link>

@@ -14,6 +14,7 @@ import { publicationReadyWhere } from "@/lib/publication";
 import { getAssetMarketSnapshot } from "@/lib/macro/market/read";
 import { assetSeoProfile } from "@/lib/seoLanding";
 import { formatAssetTarget } from "@/lib/assetTarget";
+import { Icon } from "@/app/_components/Icon";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(props: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
@@ -100,7 +101,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
           <input type="hidden" name="kind" value="asset" />
           <input type="hidden" name="refId" value={asset.ticker} />
           <input type="hidden" name="back" value={assetPath(asset.ticker)} />
-          <button type="submit" className="minibtn">＋ {tr(locale, "Watch", "关注")}</button>
+          <button type="submit" className="minibtn"><Icon name="plus" /> {tr(locale, "Watch", "关注")}</button>
         </form>
       </div>
 

@@ -1,4 +1,5 @@
 "use client";
+import { Icon } from "./Icon";
 
 export default function ThemeToggle({ label, ariaLabel }: { label: string; ariaLabel: string }) {
   function toggle() {
@@ -17,7 +18,7 @@ export default function ThemeToggle({ label, ariaLabel }: { label: string; ariaL
       className="minibtn"
       aria-label={ariaLabel}
     >
-      ◐ <span className="control-label">{label}</span>
+      <Icon name="theme" /> <span className="control-label">{label}</span>
     </button>
   );
 }

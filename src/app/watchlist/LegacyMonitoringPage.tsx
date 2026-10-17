@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { assetName, formatDate, getLocale, institutionName, localeSafeText, tr, type Locale, localePath } from "@/lib/i18n";
 import { publicationReadyWhere } from "@/lib/publication";
 import { researchPath } from "@/lib/researchPath";
+import { Icon } from "@/app/_components/Icon";
 
 // Kept off-route so the former personal monitoring UI can be restored if needed.
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ function RemoveButton({ kind, refId, locale }: { kind: string; refId: string; lo
     <form action={removeWatch}>
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="refId" value={refId} />
-      <button className="iconbtn" title={tr(locale, "Remove", "移除")} type="submit">✕</button>
+      <button className="iconbtn" title={tr(locale, "Remove", "移除")} type="submit"><Icon name="close" /></button>
     </form>
   );
 }
@@ -153,7 +154,7 @@ export default async function WatchlistPage() {
 
       <section className="blk monitor-object-grid">
         <div><div className="section-t">{tr(locale, "Active rules", "监控规则")} · {rules.length}</div><div className="rowlist">
-          {rules.map((rule) => <div key={rule.id} className="r monitor-rule-row"><span><b>{localeSafeText(rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><small>{describeRule(rule, locale)}</small></span><span className="monitor-actions"><form action={toggleRule}><input type="hidden" name="id" value={rule.id} /><button className={`chip ${rule.active ? "acc" : "gray"}`}>{rule.active ? tr(locale, "active", "启用") : tr(locale, "paused", "暂停")}</button></form><form action={deleteRule}><input type="hidden" name="id" value={rule.id} /><button className="iconbtn" title={tr(locale, "Delete", "删除")}>✕</button></form></span></div>)}
+          {rules.map((rule) => <div key={rule.id} className="r monitor-rule-row"><span><b>{localeSafeText(rule.name, locale, tr(locale, "Monitoring rule", "监控规则"))}</b><small>{describeRule(rule, locale)}</small></span><span className="monitor-actions"><form action={toggleRule}><input type="hidden" name="id" value={rule.id} /><button className={`chip ${rule.active ? "acc" : "gray"}`}>{rule.active ? tr(locale, "active", "启用") : tr(locale, "paused", "暂停")}</button></form><form action={deleteRule}><input type="hidden" name="id" value={rule.id} /><button className="iconbtn" title={tr(locale, "Delete", "删除")}><Icon name="trash" /></button></form></span></div>)}
           {rules.length === 0 && <div className="r monitor-empty">{tr(locale, "No monitoring rules yet.", "尚未创建监控规则。")}</div>}
         </div></div>
         <div><div className="section-t">{tr(locale, "Recent triggers", "近期触发")} · {events.length}</div><div className="feed">

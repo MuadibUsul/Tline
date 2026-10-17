@@ -89,9 +89,8 @@ export default async function MacroPage() {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Macro", "宏观")}</div>
         <h1>{tr(locale, "Economic Data", "经济数据")}</h1>
-        <p className="sub">{tr(locale, `${rows.length} indicators with their release history, and the scheduled prints ahead.`, `${rows.length} 个指标的历史发布序列，以及接下来的发布日程。`)}</p>
-        <p className="sub" style={{ color: "var(--muted)", maxWidth: "72ch" }}>
-          {tr(locale, "Every release page shows what institutions expected before the print, what was published, and how the figure was revised afterwards. ", "每个发布页都展示发布前机构预期、实际公布值，以及之后的修订情况。")}
+        <p className="sub page-dek">
+          {tr(locale, `${rows.length} indicators with release history, upcoming prints, pre-release institutional expectations and subsequent revisions. `, `覆盖 ${rows.length} 个指标的历史序列、后续日程、发布前机构预期与公布后的修订。`)}
           <Link href={localePath(locale, "/topics")}>{tr(locale, "Browse by topic", "按主题浏览")}</Link>
           {" · "}
           <Link href={localePath(locale, "/macro/calendar")}>{tr(locale, "Full calendar", "完整日历")}</Link>

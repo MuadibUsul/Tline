@@ -22,7 +22,7 @@ export type SpotlightRelease = {
 
 const WIN = 15 * 60 * 1000; // magnify window: 15 min before → 15 min after release
 const POPUP_TTL = 3 * 60 * 1000; // auto-dissolve an unclosed read-out popup after 3 minutes
-const DISSOLVE_MS = 1100; // length of the dissolve animation before the node is removed
+const DISSOLVE_MS = 220; // short exit keeps the read-out responsive
 const SHOWN_KEY = "spotlight-readout-shown-v1"; // release ids whose popup was already surfaced
 
 function beijing(iso: string, zh: boolean) {
@@ -189,39 +189,34 @@ export default function ReleaseSpotlight({ releases, locale, initialNow }: { rel
       )}
 
       <style>{`
-        .spotlight{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0 0}
-        .spot-flank{display:block;padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:var(--panel);opacity:.5;text-decoration:none;transition:opacity .3s;filter:saturate(.7)}
-        .spot-flank:hover{opacity:.85}
-        .spot-recent{opacity:.42}
+        .spotlight{display:grid;grid-template-columns:1fr;gap:9px;margin:30px 0 4px}
+        .spot-flank{display:block;padding:13px 18px;border:1px solid var(--border);border-radius:10px;background:color-mix(in srgb,var(--panel) 72%,transparent);opacity:.72;text-decoration:none;transition:opacity 160ms ease-out,border-color 160ms ease-out,background-color 160ms ease-out}
+        .spot-recent{opacity:.56}
         .spot-flank-top{font:10px var(--mono);color:var(--faint);letter-spacing:1px}
         .spot-flank-name{font:600 14px var(--sans);color:var(--ink-2);margin:3px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .spot-flank-meta{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted)}
         .spot-flank-meta .spot-val{color:var(--ink)}
-        .spot-focal{position:relative;display:block;padding:22px 24px;border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border));border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--panel) 96%,var(--accent)),var(--panel) 48%);text-decoration:none;transform:translateY(-3px);box-shadow:0 18px 45px rgba(0,0,0,.22),0 0 32px color-mix(in srgb,var(--accent) 14%,transparent);transition:transform 180ms cubic-bezier(.23,1,.32,1),border-color 180ms ease}
-        .spot-focal::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;box-shadow:0 0 20px color-mix(in srgb,var(--accent) 22%,transparent),0 0 64px color-mix(in srgb,var(--accent) 12%,transparent);opacity:.62;animation:spotglow 5s ease-in-out infinite}
-        .spot-focal::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(115deg,color-mix(in srgb,#fff 8%,transparent),transparent 24%,transparent 72%,color-mix(in srgb,var(--accent) 7%,transparent))}
-        .spot-focal.spot-live{border-color:color-mix(in srgb,var(--accent) 72%,white);box-shadow:0 20px 52px rgba(0,0,0,.25),0 0 42px color-mix(in srgb,var(--accent) 26%,transparent)}
+        .spot-focal{position:relative;display:block;padding:26px 28px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--border));border-left:4px solid var(--accent);border-radius:14px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent-wash) 48%,var(--panel)),var(--panel) 56%);text-decoration:none;box-shadow:var(--shadow-lift);transition:transform 160ms cubic-bezier(.2,.8,.2,1),border-color 160ms ease-out,box-shadow 160ms ease-out}
+        .spot-focal.spot-live{border-color:color-mix(in srgb,var(--accent) 65%,var(--border));border-left-color:var(--accent)}
         .spot-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);gap:26px;align-items:start}
         .spot-side{position:relative;z-index:1;border-left:1px solid color-mix(in srgb,var(--accent) 26%,var(--border));padding-left:22px}
         .spot-side-t,.spot-pop-t{font:11px var(--mono);letter-spacing:1px;color:var(--accent-ink);text-transform:uppercase}
         .spot-side .spot-analysis{margin:8px 0 0}
-        @keyframes spotglow{0%,100%{opacity:.48}50%{opacity:.9}}
         .spot-eyebrow{display:flex;justify-content:space-between;align-items:center;font:10.5px var(--mono);color:var(--faint);letter-spacing:1px}
         .spot-status{padding:2px 9px;border:1px solid var(--border);border-radius:99px;color:var(--muted)}
-        .spot-status.on{background:var(--accent);border-color:var(--accent);color:#fff;animation:spotpulse 2s ease-in-out infinite}
-        @keyframes spotpulse{0%,100%{opacity:1}50%{opacity:.55}}
-        .spot-name{font:600 22px/1.3 var(--sans);color:var(--ink);margin:10px 0 12px}
+        .spot-status.on{background:var(--accent);border-color:var(--accent);color:#fff}
+        .spot-name{font:600 25px/1.25 var(--serif-display);letter-spacing:-.018em;color:var(--ink);margin:11px 0 14px}
         .spot-figure{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px}
         .spot-actual{font:700 40px var(--mono);letter-spacing:-.02em;color:var(--ink)}
-        .spot-countdown{font:700 30px var(--mono);color:var(--accent-ink)}
+        .spot-countdown{font:650 30px var(--mono);letter-spacing:-.04em;color:var(--accent-ink)}
         .spot-unit{font:13px var(--mono);color:var(--muted)}
         .spot-chg{font:600 15px var(--mono)}.spot-chg.up{color:var(--bull)}.spot-chg.down{color:var(--bear)}
         .spot-prev{font:12px var(--mono);color:var(--faint)}
         .spot-analysis{margin:14px 0 0;font:14px/1.7 var(--sans);color:var(--ink-2)}
-        .spot-pop-back{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;background:color-mix(in srgb,#05070c 62%,transparent);backdrop-filter:blur(4px);animation:spotFade .28s ease}
-        .spot-pop{position:relative;width:min(560px,100%);max-height:min(80vh,680px);overflow:auto;padding:24px 26px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:16px;background:var(--panel);box-shadow:0 34px 90px rgba(0,0,0,.55),0 0 48px color-mix(in srgb,var(--accent) 22%,transparent);animation:spotRise .34s cubic-bezier(.2,1,.3,1)}
-        .spot-pop-back.dissolve{animation:spotFade .9s ease forwards reverse}
-        .spot-pop.dissolve{animation:spotDissolve ${DISSOLVE_MS}ms ease forwards}
+        .spot-pop-back{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;background:color-mix(in srgb,#05070c 62%,transparent);backdrop-filter:blur(4px);animation:spotFade 180ms ease-out}
+        .spot-pop{position:relative;width:min(560px,100%);max-height:min(80vh,680px);overflow:auto;padding:24px 26px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:16px;background:var(--panel);box-shadow:0 34px 90px rgba(0,0,0,.48);animation:spotRise 220ms cubic-bezier(.2,.8,.2,1)}
+        .spot-pop-back.dissolve{animation:spotFade ${DISSOLVE_MS}ms ease-out forwards reverse}
+        .spot-pop.dissolve{animation:spotDissolve ${DISSOLVE_MS}ms ease-out forwards}
         .spot-pop-x{position:absolute;top:12px;right:14px;width:30px;height:30px;border:1px solid var(--border);border-radius:99px;background:var(--panel);color:var(--muted);font:18px/1 var(--sans);cursor:pointer;transition:color .2s,border-color .2s}
         .spot-pop-x:hover{color:var(--ink);border-color:var(--accent)}
         .spot-pop-t{margin:18px 0 0}
@@ -231,8 +226,8 @@ export default function ReleaseSpotlight({ releases, locale, initialNow }: { rel
         @keyframes spotFade{from{opacity:0}to{opacity:1}}
         @keyframes spotRise{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
         @keyframes spotDissolve{0%{opacity:1;filter:blur(0);transform:scale(1)}100%{opacity:0;filter:blur(9px);transform:scale(.95) translateY(-8px)}}
-        @media(hover:hover) and (pointer:fine){.spot-focal:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--accent) 52%,var(--border))}}
-        @media(prefers-reduced-motion:reduce){.spot-focal::before,.spot-status.on,.spot-pop,.spot-pop-back{animation:none}.spot-pop.dissolve{opacity:0;transition:opacity ${DISSOLVE_MS}ms linear}}
+        @media(hover:hover) and (pointer:fine){.spot-flank:hover{opacity:1;border-color:var(--border-strong);background:var(--panel)}.spot-focal:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 58%,var(--border));box-shadow:var(--shadow-lift)}}
+        @media(prefers-reduced-motion:reduce){.spot-pop,.spot-pop-back{animation:none}.spot-pop.dissolve{opacity:0;transition:opacity ${DISSOLVE_MS}ms linear}}
         @media(max-width:720px){.spot-split{grid-template-columns:1fr}.spot-side{border-left:0;border-top:1px solid color-mix(in srgb,var(--accent) 26%,var(--border));padding-left:0;padding-top:16px}}
       `}</style>
     </section>

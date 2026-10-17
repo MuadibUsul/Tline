@@ -203,7 +203,6 @@ export default async function ResearchIndex(
         ariaLabel={tr(locale, "Load newly published research", "载入新发布的研报")}
       />
       <div className="page-head"><div className="eyebrow">{tr(locale, "Feed", "研报流")}</div><h1>{filtered ? tr(locale, `${total} matching institutional reports`, `${total}篇匹配的机构研报`) : tr(locale, `${total} source-linked institutional research reports`, `${total}篇可溯源机构研报`)}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, `${total} structured institutional reports.`, `共 ${total} 篇结构化机构研报。`)}</p>
       </div>
       {/* The list itself is an ItemList: the items are exactly the cards rendered below, so
           the markup and the structured data cannot drift apart. Paginated and filtered views
@@ -214,7 +213,7 @@ export default async function ResearchIndex(
           path: researchPath(article),
         })))} />
       )}
-      <p className="sub" style={{ maxWidth: "72ch", color: "var(--muted)" }}>
+      <p className="sub page-dek">
         {tr(locale, "Reports are admitted only from public, source-verifiable pages. ", "仅收录公开发布、来源可核验的研报。")}
         <Link href={localePath(locale, "/methodology")}>{tr(locale, "How Tlines structures a report", "Tlines 如何结构化一篇研报")}</Link>
         {tr(locale, ", grouped by ", "，可按")}
@@ -225,7 +224,7 @@ export default async function ResearchIndex(
         <Link href={localePath(locale, "/topics")}>{tr(locale, "topic", "主题")}</Link>
         {tr(locale, " below.", "查看。")}
       </p>
-      <section style={{ paddingTop: 22 }}>
+      <section className="research-index">
         <form className="research-filters">
           <select name="jurisdiction" defaultValue={searchParams.jurisdiction ?? ""} aria-label={tr(locale, "Jurisdiction", "经济体")}>
             <option value="">{tr(locale, "All economies", "全部经济体")}</option>
@@ -274,9 +273,9 @@ export default async function ResearchIndex(
           <button className="minibtn p" type="submit">{tr(locale, "Apply filters", "应用筛选")}</button>
         </form>
         {feed.length ? <div className="research-grid">{feed.map((article) => (
-          <div key={article.id} style={{ position: "relative" }}>
+          <div key={article.id} className="research-card-wrap">
             {featuredIds.has(article.id) && (
-              <span className="chip acc" style={{ position: "absolute", top: 10, right: 10, zIndex: 2 }}>
+              <span className="chip acc editor-pick-badge">
                 {tr(locale, "Editor's pick", "编辑精选")}
               </span>
             )}

@@ -33,10 +33,28 @@ test("a machine endpoint under a language prefix collapses to its one address", 
   assert.equal(middleware(new NextRequest("https://tlines.tech/sitemap.xml")).status, 200);
 });
 
-test("unprefixed public pages permanently redirect to a canonical locale", () => {
+test("unprefixed public pages temporarily redirect to a negotiated locale", () => {
   const response = middleware(new NextRequest("https://tlines.tech/research", { headers: { "accept-language": "en" } }));
-  assert.equal(response.status, 308);
+  // 307: the language is a preference, not a permanent property of the bare address.
+  assert.equal(response.status, 307);
   assert.equal(response.headers.get("location"), "https://tlines.tech/en/research");
+});
+
+test("browser language is weighted, and an edge country is the fallback", () => {
+  const zhWeighted = middleware(new NextRequest("https://tlines.tech/research", { headers: { "accept-language": "zh-CN,zh;q=0.9,en;q=0.8" } }));
+  assert.equal(zhWeighted.headers.get("location"), "https://tlines.tech/zh/research");
+  const enWeighted = middleware(new NextRequest("https://tlines.tech/research", { headers: { "accept-language": "en-US,en;q=0.9,zh-CN;q=0.8" } }));
+  assert.equal(enWeighted.headers.get("location"), "https://tlines.tech/en/research");
+  // A header with no Chinese/English preference leaves the decision to the country header.
+  const cn = middleware(new NextRequest("https://tlines.tech/research", { headers: { "accept-language": "fr-FR", "cf-ipcountry": "CN" } }));
+  assert.equal(cn.headers.get("location"), "https://tlines.tech/zh/research");
+  const hk = middleware(new NextRequest("https://tlines.tech/", { headers: { "x-vercel-ip-country": "HK" } }));
+  assert.equal(hk.headers.get("location"), "https://tlines.tech/zh");
+  const us = middleware(new NextRequest("https://tlines.tech/research", { headers: { "x-country-code": "US" } }));
+  assert.equal(us.headers.get("location"), "https://tlines.tech/en/research");
+  // An explicit browser preference still wins over the network's country.
+  const explicit = middleware(new NextRequest("https://tlines.tech/research", { headers: { "accept-language": "en-US", "cf-ipcountry": "CN" } }));
+  assert.equal(explicit.headers.get("location"), "https://tlines.tech/en/research");
 });
 
 test("both explicit language prefixes serve the requested locale", () => {

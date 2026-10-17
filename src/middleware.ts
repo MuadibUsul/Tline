@@ -17,11 +17,42 @@ import { assetPath, legacyNonAssetRedirectPath, legacyTopicRedirectPath, tickerF
 const SEGMENTS = new Set(["en", "zh"]);
 const LOCALE_COOKIE = "tline_locale";
 const PRIVATE_PREFIXES = ["/admin", "/alerts", "/signin", "/account", "/watchlist"];
+const GEO_HEADERS = ["cf-ipcountry", "x-vercel-ip-country", "x-country-code", "x-geo-country"];
+const CHINESE_COUNTRIES = new Set(["CN", "TW", "HK", "MO"]);
+
+/**
+ * The reader's explicit choice wins; then the browser's weighted language preference;
+ * then a coarse country signal from an edge/CDN header. No IP address is looked up or
+ * stored here — a deployment without an edge country header falls through to the browser
+ * language and English.
+ */
+function browserLanguage(header: string | null): "zh" | "en" | null {
+  if (!header) return null;
+  const ranked = header.split(",").map((part) => {
+    const [tag, ...parameters] = part.trim().split(";");
+    const q = parameters.find((parameter) => parameter.trim().startsWith("q="));
+    const weight = q ? Number(q.split("=")[1]) : 1;
+    return { tag: tag.trim().toLowerCase(), weight: Number.isFinite(weight) ? weight : 0 };
+  }).filter((entry) => entry.tag && entry.weight > 0).sort((left, right) => right.weight - left.weight);
+  for (const { tag } of ranked) {
+    if (tag === "zh" || tag.startsWith("zh-")) return "zh";
+    if (tag === "en" || tag.startsWith("en-")) return "en";
+  }
+  return null;
+}
+
+function countrySegment(request: NextRequest): "zh" | null {
+  for (const header of GEO_HEADERS) {
+    const country = request.headers.get(header)?.trim().toUpperCase();
+    if (country && CHINESE_COUNTRIES.has(country)) return "zh";
+  }
+  return null;
+}
 
 function cacheHeaders(response: NextResponse, request: NextRequest, pathname: string) {
   const authenticated = request.cookies.get("ii_session") || request.cookies.get("next-auth.session-token") || request.cookies.get("__Secure-next-auth.session-token");
   const privatePage = PRIVATE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-  response.headers.set("Vary", "Cookie, Accept-Language");
+  response.headers.set("Vary", "Cookie, Accept-Language, CF-IPCountry, X-Vercel-IP-Country, X-Country-Code");
   response.headers.set("Cache-Control", request.method === "GET" && !authenticated && !privatePage
     ? "public, s-maxage=60, stale-while-revalidate=300"
     : "private, no-store");
@@ -66,7 +97,7 @@ function preferredSegment(request: NextRequest): string {
   const cookie = request.cookies.get(LOCALE_COOKIE)?.value;
   if (cookie === "zh-CN") return "zh";
   if (cookie === "en") return "en";
-  return /^zh\b/i.test(request.headers.get("accept-language")?.trim() ?? "") ? "zh" : "en";
+  return browserLanguage(request.headers.get("accept-language")) ?? countrySegment(request) ?? "en";
 }
 
 export function middleware(request: NextRequest) {
@@ -147,7 +178,10 @@ export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   url.pathname = `/${preferredSegment(request)}${pathname === "/" ? "" : pathname}`;
   url.search = search;
-  return NextResponse.redirect(url, 308);
+  // Temporary, not permanent: the bare address is a preference, and a browser or shared
+  // cache that pinned it would keep sending a reader to the wrong language after a switch
+  // or a change of network.
+  return NextResponse.redirect(url, 307);
 }
 
 export const config = {

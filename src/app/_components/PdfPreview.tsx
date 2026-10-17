@@ -57,8 +57,30 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
   const [scale, setScale] = useState(1.25);
   const [current, setCurrent] = useState(1);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [enabled, setEnabled] = useState(false);
+
+  // The viewer sits far below the article's analysis. Starting a 19MB fetch on mount made
+  // the page compete with a document nobody had scrolled to yet; the first byte is only
+  // requested when the viewer is within a screen of the viewport.
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setEnabled(true);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setEnabled(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "900px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     let task: PdfLoadingTask | null = null;
     let loaded: PdfDocument | null = null;
@@ -71,6 +93,10 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
           cMapUrl: "/pdfjs/cmaps/",
           cMapPacked: true,
           standardFontDataUrl: "/pdfjs/standard_fonts/",
+          // The route answers Range requests. Without these pdf.js fetches the whole file
+          // before drawing page one; with them the first page arrives in a few chunks.
+          disableAutoFetch: true,
+          rangeChunkSize: 262144,
         }) as unknown as PdfLoadingTask;
         loaded = (await task.promise) as PdfDocument;
         if (cancelled) return;
@@ -98,7 +124,7 @@ export default function PdfPreview({ src, labels }: { src: string; labels: Label
         /* the document is going away regardless */
       }
     };
-  }, [src]);
+  }, [src, enabled]);
 
   const drawPage = useCallback(async (index: number) => {
     const source = documentRef.current;

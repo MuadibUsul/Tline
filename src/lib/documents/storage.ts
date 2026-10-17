@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -6,6 +6,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 export interface DocumentStorage {
   put(key: string, data: Buffer): Promise<{ key: string; size: number }>;
   get(key: string): Promise<Buffer>;
+  getRange(key: string, start: number, end: number): Promise<Buffer>;
+  size(key: string): Promise<number>;
   exists(key: string): Promise<boolean>;
   remove(key: string): Promise<void>;
   signedDownloadUrl?(key: string, filename: string, mimeType: string): Promise<string>;
@@ -43,6 +45,26 @@ class LocalDocumentStorage implements DocumentStorage {
 
   get(key: string) {
     return readFile(resolveKey(key));
+  }
+
+  /**
+   * Read one byte range without loading the whole PDF. A 19 MB report would otherwise be
+   * read in full for a 256 KB page request, and pdf.js asks for ranges.
+   */
+  async getRange(key: string, start: number, end: number) {
+    const handle = await open(resolveKey(key), "r");
+    try {
+      const length = end - start + 1;
+      const buffer = Buffer.alloc(length);
+      await handle.read(buffer, 0, length, start);
+      return buffer;
+    } finally {
+      await handle.close();
+    }
+  }
+
+  async size(key: string) {
+    return (await stat(resolveKey(key))).size;
   }
 
   async exists(key: string) {
@@ -101,6 +123,21 @@ class S3DocumentStorage implements DocumentStorage {
     return Buffer.from(await response.Body.transformToByteArray());
   }
 
+  async getRange(key: string, start: number, end: number) {
+    const response = await this.client.send(new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: this.key(key),
+      Range: `bytes=${start}-${end}`,
+    }));
+    if (!response.Body) throw new Error("Stored object has no body.");
+    return Buffer.from(await response.Body.transformToByteArray());
+  }
+
+  async size(key: string) {
+    const response = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: this.key(key) }));
+    return response.ContentLength ?? 0;
+  }
+
   async exists(key: string) {
     try {
       await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: this.key(key) }));
@@ -147,6 +184,14 @@ export function writePrivateFile(key: string, data: Buffer) {
 
 export function readPrivateFile(key: string) {
   return getDocumentStorage().get(key);
+}
+
+export function readPrivateFileRange(key: string, start: number, end: number) {
+  return getDocumentStorage().getRange(key, start, end);
+}
+
+export function privateFileSize(key: string) {
+  return getDocumentStorage().size(key);
 }
 
 export function privateFileExists(key: string) {

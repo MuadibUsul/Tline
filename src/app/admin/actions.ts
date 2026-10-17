@@ -212,6 +212,7 @@ export async function createApiKey(_previous: CreateKeyResult, formData: FormDat
       name,
       prefix: tokenPrefix(token),
       tokenHash: hashToken(token),
+      secret: token,
       scopes: JSON.stringify(scopes),
       rateLimit,
       createdById: user.id,
@@ -239,7 +240,8 @@ export async function revokeApiKey(formData: FormData) {
  * Replaces a key with a new secret, keeping its name, scopes and limit.
  *
  * The old key is revoked rather than deleted, so its past usage stays attributable, and
- * the new secret is returned once through the action result exactly as a fresh key is.
+ * the new secret is returned through the action result and stored so it stays copyable in
+ * the console (owner decision 2026-10-17).
  * Rotation without this is "revoke, then retype the configuration from memory", which is
  * how a key ends up with wider scopes than the one it replaced.
  */
@@ -261,6 +263,7 @@ export async function rotateApiKey(_previous: CreateKeyResult, formData: FormDat
         name: existing.name,
         prefix: tokenPrefix(token),
         tokenHash: hashToken(token),
+        secret: token,
         scopes: existing.scopes,
         rateLimit: existing.rateLimit,
         createdById: user.id,

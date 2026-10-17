@@ -12,6 +12,7 @@ import { age, compact, plural, when } from "../_components/format";
 import { BarList, StatCard, TimeSeries } from "@/app/_components/charts";
 import CreateKeyForm from "./CreateKeyForm";
 import RotateKeyButton from "./RotateKeyButton";
+import CopyKeyButton from "@/app/_components/CopyKeyButton";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "API 与密钥" };
@@ -141,11 +142,17 @@ export default async function ApiPage() {
                       <small>{tr(locale, "created", "创建于")} {when(key.createdAt, locale)}{key.createdBy?.email ? ` · ${key.createdBy.email}` : ""}</small>
                     </td>
                     <td className="mono-cell">
-                      {key.prefix}…
+                      {key.secret ? (
+                        <span className="api-key-value">
+                          <code>{key.secret}</code>
+                          <CopyKeyButton value={key.secret} label={tr(locale, "Copy", "复制")} copiedLabel={tr(locale, "Copied", "已复制")} />
+                        </span>
+                      ) : <>{key.prefix}…</>}
                       <small>
                         {key.revokedAt
                           ? <span className="chip bear">{tr(locale, "revoked", "已吊销")} {when(key.revokedAt, locale)}</span>
                           : <span className="chip bull">{tr(locale, "active", "启用中")}</span>}
+                        {!key.secret && <span className="chip gray">{tr(locale, "not recoverable — rotate to copy", "不可恢复，轮换后可复制")}</span>}
                       </small>
                     </td>
                     <td>
@@ -180,7 +187,7 @@ export default async function ApiPage() {
                               rotating: tr(locale, "Rotating…", "轮换中……"),
                               confirm: tr(locale, `Rotate "${key.name}"? The current secret stops working immediately.`, `轮换「${key.name}」？当前密钥将立即失效。`),
                               issued: tr(locale, "New key", "新密钥"),
-                              warning: tr(locale, "Copy it now — this is the only time it is shown.", "请立即复制，离开本页后将无法再次查看。"),
+                              warning: tr(locale, "Saved — copy it again from the key list whenever needed.", "已保存，可随时在密钥列表中再次复制。"),
                               copy: tr(locale, "Copy", "复制"),
                               copied: tr(locale, "Copied", "已复制"),
                             }}
@@ -214,8 +221,8 @@ export default async function ApiPage() {
                 issued: tr(locale, "Key created", "密钥已创建"),
                 warning: tr(
                   locale,
-                  "Copy it now — this is the only time it is shown.",
-                  "请立即复制,离开本页后将无法再次查看。",
+                  "Saved — copy it again from the key list whenever needed.",
+                  "已保存，可随时在密钥列表中再次复制。",
                 ),
                 copy: tr(locale, "Copy", "复制"),
                 copied: tr(locale, "Copied", "已复制"),

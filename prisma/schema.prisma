@@ -1302,6 +1302,11 @@ model ApiKey {
   name         String // who the key was issued to
   prefix       String    @unique
   tokenHash    String    @unique
+  // Owner decision 2026-10-17: a key stays copyable from the console. The digest still
+  // authenticates; this stored value exists only so an operator can copy the key again.
+  // Null on keys issued before this column existed — those cannot be recovered and must be
+  // rotated before they are copyable.
+  secret       String?
   scopes       String    @default("[\"research:read\"]") // JSON array
   rateLimit    Int       @default(60) // requests per minute
   createdById  String?

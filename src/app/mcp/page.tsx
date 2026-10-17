@@ -7,6 +7,7 @@ import { parseScopes } from "@/lib/apiKeys";
 import { siteUrl } from "@/lib/site";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, localizedUrl, ogImage } from "@/lib/seo";
 import McpKeyForm from "./McpKeyForm";
+import CopyKeyButton from "@/app/_components/CopyKeyButton";
 import { revokeMyMcpKey } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export default async function McpPage() {
     ? (await prisma.apiKey.findMany({
         where: { createdById: user.id, revokedAt: null },
         orderBy: { createdAt: "desc" },
-        select: { id: true, name: true, prefix: true, scopes: true, rateLimit: true, createdAt: true, lastUsedAt: true, requestCount: true },
+        select: { id: true, name: true, prefix: true, secret: true, scopes: true, rateLimit: true, createdAt: true, lastUsedAt: true, requestCount: true },
       })).filter((key) => parseScopes(key.scopes).includes("mcp:user"))
     : [];
 
@@ -111,7 +112,7 @@ export default async function McpPage() {
                           <b>{key.name}</b>
                           <small>{tr(locale, "created", "创建于")} {formatDate(key.createdAt, locale)}</small>
                         </td>
-                        <td className="mono-cell">{key.prefix}…</td>
+                        <td className="mono-cell">{key.secret ? (<span className="api-key-value"><code>{key.secret}</code><CopyKeyButton value={key.secret} label={tr(locale, "Copy", "复制")} copiedLabel={tr(locale, "Copied", "已复制")} /></span>) : <>{key.prefix}… <span className="chip gray">{tr(locale, "not recoverable — rotate", "不可恢复，请轮换")}</span></>}</td>
                         <td className="mono-cell">
                           {key.requestCount.toLocaleString(locale)}
                           <small>{key.rateLimit}/min · {key.lastUsedAt ? `${tr(locale, "last used", "最近调用")} ${formatDate(key.lastUsedAt, locale)}` : tr(locale, "never used", "尚未使用")}</small>
@@ -139,7 +140,7 @@ export default async function McpPage() {
                 submit: tr(locale, "Create MCP key", "创建 MCP 密钥"),
                 submitting: tr(locale, "Creating…", "创建中……"),
                 issued: tr(locale, "Key created", "密钥已创建"),
-                warning: tr(locale, "Copy it now — the secret is shown only once.", "请立即复制——密钥只显示一次。"),
+                warning: tr(locale, "Saved — copy it again from the list below whenever needed.", "已保存，可随时在下方列表再次复制。"),
                 copy: tr(locale, "Copy", "复制"),
                 copied: tr(locale, "Copied", "已复制"),
               }}

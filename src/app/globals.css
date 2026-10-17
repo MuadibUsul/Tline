@@ -1727,3 +1727,7 @@ td{padding-block:13px}
 .news-image-row p{margin:4px 0 0;font-size:12.5px;color:var(--muted)}
 @media (max-width:720px){.news-image-row{grid-template-columns:90px minmax(0,1fr)}.news-image-row img{width:90px}.news-image-row form{grid-column:2}}
 @media (max-width:720px){.news-row,.news-row.has-image{grid-template-columns:1fr}.news-rail{flex-direction:row;align-items:center}.news-thumb{max-width:320px;width:100%}.front-news-item.has-image{grid-template-columns:62px minmax(0,1fr)}.front-news-thumb{display:none}}
+
+/* Full API keys stay copyable in the console (owner decision 2026-10-17). */
+.api-key-value{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.api-key-value code{font:11px var(--mono);word-break:break-all;color:var(--ink-2)}

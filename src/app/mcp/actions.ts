@@ -39,6 +39,7 @@ export async function createMyMcpKey(_previous: McpKeyState, formData: FormData)
       name,
       prefix: tokenPrefix(token),
       tokenHash: hashToken(token),
+      secret: token,
       scopes: JSON.stringify(["mcp:user"]),
       rateLimit: 60,
       createdById: user.id,

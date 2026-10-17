@@ -87,6 +87,9 @@ services:
       # is idempotent — it selects rows whose prompt, glossary or source hash has moved on —
       # so a tick with nothing stale spends nothing.
       TRANSLATION_BACKLOG_LIMIT: ${TRANSLATION_BACKLOG_LIMIT:-0}
+      # Published news items per pass that still lack the other language. 0 switches it off;
+      # the default keeps the two front pages carrying the same stream.
+      NEWS_TRANSLATION_LIMIT: ${NEWS_TRANSLATION_LIMIT:-3}
       INGEST_ARTICLE_LIMIT: ${INGEST_ARTICLE_LIMIT:-4}
       INGEST_WINDOW_HOURS: ${INGEST_WINDOW_HOURS:-168}
       INGEST_STALL_HOURS: ${INGEST_STALL_HOURS:-6}

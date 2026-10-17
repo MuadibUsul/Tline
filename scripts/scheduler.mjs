@@ -20,6 +20,10 @@ const translateLimit = Math.max(1, Number(process.env.TRANSLATION_ARTICLE_LIMIT 
 // leaving it on costs nothing once there is nothing stale, but the switch is honest about
 // what it is for.
 const translationBacklogLimit = Math.max(0, Number(process.env.TRANSLATION_BACKLOG_LIMIT || 0));
+// The newsroom is written in one language at a time. This keeps the other edition from
+// falling behind: each pass fills at most this many published items that still lack a title
+// or body, and translates nothing once both editions are complete.
+const newsTranslationLimit = Math.max(0, Number(process.env.NEWS_TRANSLATION_LIMIT || 3));
 const retryLimit = Math.max(1, Number(process.env.JOB_RETRY_LIMIT || 3));
 const retryBatch = Math.max(1, Number(process.env.CONTENT_RETRY_BATCH || 5));
 const retryDelayMs = Math.max(10_000, Number(process.env.JOB_RETRY_DELAY_MS || 60_000));
@@ -140,6 +144,10 @@ async function processPending() {
     // would hand back the same newest articles on every tick and force a rewrite of each,
     // which is a standing charge rather than a drain. This one finds nothing once swept.
     ...(translationBacklogLimit > 0 ? [["run", "translate", "--", "--backlog", `--limit=${translationBacklogLimit}`]] : []),
+    // The newsroom's other half. A brief written in Chinese would otherwise never appear on
+    // the English front page, and the same is true in reverse. The command selects only
+    // published items missing a title or body, so it spends nothing on a bilingual desk.
+    ...(newsTranslationLimit > 0 ? [["run", "news:translate", "--", `--limit=${newsTranslationLimit}`]] : []),
     ["run", "documents", "--", `--limit=${processLimit}`],
     // Last, so it judges the pass that has just finished. A non-zero exit here means the
     // pipeline is quiet rather than broken, which no other signal reports.

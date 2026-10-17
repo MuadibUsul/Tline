@@ -39,9 +39,25 @@ export interface NewsImageRecord {
   position: number;
   caption: string | null;
   alt: string | null;
+  captionZh: string | null;
+  captionEn: string | null;
+  altZh: string | null;
+  altEn: string | null;
   mimeType: string;
   width: number | null;
   height: number | null;
+}
+
+/** The caption for this edition, falling back to the desk's original text. */
+export function newsImageCaption(image: Pick<NewsImageRecord, "caption" | "captionZh" | "captionEn">, locale: Locale): string | null {
+  const localized = locale === "zh-CN" ? image.captionZh : image.captionEn;
+  return localized?.trim() || image.caption?.trim() || null;
+}
+
+/** The alt text for this edition; never empty when a caption exists. */
+export function newsImageAlt(image: Pick<NewsImageRecord, "caption" | "captionZh" | "captionEn" | "alt" | "altZh" | "altEn">, locale: Locale): string {
+  const localized = locale === "zh-CN" ? image.altZh : image.altEn;
+  return localized?.trim() || image.alt?.trim() || newsImageCaption(image, locale) || "";
 }
 
 export interface NewsRecord {
@@ -250,7 +266,7 @@ export async function listPublishedNews(locale: Locale, take = 60): Promise<News
     take: take * 3,
     include: {
       column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } },
-      images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
+      images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, captionZh: true, captionEn: true, altZh: true, altEn: true, mimeType: true, width: true, height: true } },
     },
   });
   return rows.filter((row) => newsTitle(row as NewsRecord, locale) !== null).slice(0, take) as NewsRecord[];
@@ -261,7 +277,7 @@ export async function getPublishedNewsBySlug(slug: string): Promise<NewsRecord |
     where: { slug, status: "published", publishedAt: { lte: new Date() } },
     include: {
       column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } },
-      images: { orderBy: { position: "asc" }, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } },
+      images: { orderBy: { position: "asc" }, select: { id: true, position: true, caption: true, alt: true, captionZh: true, captionEn: true, altZh: true, altEn: true, mimeType: true, width: true, height: true } },
       sources: { orderBy: { position: "asc" }, select: { url: true } },
     },
   });
@@ -285,7 +301,7 @@ export async function listPublishedColumns(locale: Locale): Promise<Array<NewsCo
       posts: {
         where: { status: "published", publishedAt: { lte: new Date() } },
         orderBy: { publishedAt: "desc" },
-        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } }, images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } } },
+        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } }, images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, captionZh: true, captionEn: true, altZh: true, altEn: true, mimeType: true, width: true, height: true } } },
       },
     },
   });
@@ -305,7 +321,7 @@ export async function getPublishedColumnBySlug(slug: string, locale: Locale): Pr
       posts: {
         where: { status: "published", publishedAt: { lte: new Date() } },
         orderBy: { publishedAt: "desc" },
-        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } }, images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, mimeType: true, width: true, height: true } } },
+        include: { column: { select: { slug: true, nameZh: true, nameEn: true, cadence: true } }, images: { orderBy: { position: "asc" }, take: 1, select: { id: true, position: true, caption: true, alt: true, captionZh: true, captionEn: true, altZh: true, altEn: true, mimeType: true, width: true, height: true } } },
       },
     },
   });

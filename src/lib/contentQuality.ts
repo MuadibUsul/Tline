@@ -134,8 +134,18 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
     if (!translation?.title.trim() || !translation.text?.trim()) issues.push("missing_translation");
     if (translation && !HAN.test(`${translation.title}\n${translation.text ?? ""}`)) issues.push("translation_language_mismatch");
     if (translation && (MOJIBAKE.test(`${translation.title}\n${translation.text ?? ""}`) || hasBrokenWord(`${translation.title}\n${translation.text ?? ""}`))) issues.push("translation_garbled");
-    if (translation?.status === "needs_review") issues.push("translation_needs_review");
-    if (translation?.qualityScore != null && translation.qualityScore < 0.8) issues.push("translation_below_threshold");
+    /**
+     * A complete translation is the Chinese page, even when the reviewer scored it below the
+     * old 0.8 bar or asked for a second look.
+     *
+     * Those two checks withheld the whole report from the Chinese listing over a translation
+     * that exists, is in Chinese, and is readable: at the last count 413 complete translations
+     * were below the score and 237 were `needs_review`, so the two editions did not carry the
+     * same reports. The score and status remain on `ArticleTranslation` for the review queue;
+     * they no longer decide whether the page exists. Missing, garbled and wrong-language
+     * translations still withhold it — those are cases where the Chinese page is not a
+     * Chinese reading of the report at all.
+     */
   }
 
   const essentialMissing = !title || !body || !article.sourceUrl;

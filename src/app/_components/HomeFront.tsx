@@ -3,7 +3,7 @@ import LiveFeed from "./LiveFeed";
 import NewsletterCTA from "./NewsletterCTA";
 import { Byline, cleanDisplayTitle } from "./editorial";
 import { assetPath } from "@/lib/assetPath";
-import { newsAgo, newsTitle, type NewsRecord } from "@/lib/news";
+import { newsAgo, newsImageAlt, newsTitle, type NewsRecord } from "@/lib/news";
 import { domainTerm, institutionName, localePath, tr, type Locale } from "@/lib/i18n";
 import { researchPath } from "@/lib/researchPath";
 import { topicPath, type TopicStat } from "@/lib/topics";
@@ -173,7 +173,7 @@ export default function HomeFront({
                         <span className="headline">{headline}</span>
                         {cover ? (
                           // eslint-disable-next-line @next/next/no-img-element -- stored in the news image table
-                          <img className="front-news-thumb" src={`/api/news-images/${cover.id}?variant=thumb`} alt={cover.alt ?? cover.caption ?? ""} loading="lazy" />
+                          <img className="front-news-thumb" src={`/api/news-images/${cover.id}?variant=thumb`} alt={newsImageAlt(cover, locale)} loading="lazy" />
                         ) : null}
                       </Link>
                     );

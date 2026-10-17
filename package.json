@@ -39,6 +39,8 @@
     "watchdog": "tsx scripts/watchdog.ts",
     "translate": "tsx prisma/translate.ts",
     "translate:eval": "tsx prisma/translate-eval.ts",
+    "news:translate": "tsx scripts/news-translate.ts",
+    "parity:audit": "tsx scripts/parity-audit.ts",
     "documents": "tsx prisma/documents.ts",
     "consensus": "tsx src/lib/ingest/recompute.ts",
     "forecasts": "tsx prisma/forecasts.ts",

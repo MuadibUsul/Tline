@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { localePath, tr, type Locale } from "@/lib/i18n";
-import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsExcerpt, newsTitle, type NewsRecord } from "@/lib/news";
+import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsExcerpt, newsImageAlt, newsTitle, type NewsRecord } from "@/lib/news";
 
 /** Beijing time for the desk's clock, the same source the front-page rail uses. */
 export function newsClock(date: Date, locale: Locale) {
@@ -48,7 +48,7 @@ export default function NewsRow({ post, locale, showColumn = false }: { post: Ne
       {cover ? (
         <Link className="news-thumb" href={localePath(locale, `/news/${post.slug}`)} tabIndex={-1} aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element -- stored in the news image table */}
-          <img src={`/api/news-images/${cover.id}?variant=thumb`} alt={cover.alt ?? cover.caption ?? ""} loading="lazy" />
+          <img src={`/api/news-images/${cover.id}?variant=thumb`} alt={newsImageAlt(cover, locale)} loading="lazy" />
         </Link>
       ) : null}
     </article>

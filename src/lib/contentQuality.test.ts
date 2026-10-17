@@ -16,11 +16,11 @@ test("quality gate opens only a complete, grounded locale version", () => {
   assert.equal(contentQuality(valid, "zh-CN").indexable, true);
 });
 
-test("index validation catches broken words and low translation quality", () => {
+test("index validation catches broken words without withholding a complete translation over its score", () => {
   const result = contentQuality({ ...valid, title: "Vi e wp oint markets", translations: [{ ...valid.translations[0], qualityScore: 0.4 }] }, "zh-CN");
   assert.equal(result.indexable, false);
   assert.ok(result.issues.includes("garbled_or_broken_words"));
-  assert.equal(result.issues.includes("translation_below_threshold"), true);
+  assert.equal(result.issues.includes("translation_below_threshold"), false);
   assert.equal(result.eligibility, "NOINDEX_FOLLOW");
 });
 
@@ -28,10 +28,22 @@ test("content requiring human review remains viewable but is noindex", () => {
   const result = contentQuality({
     ...valid,
     analysis: { ...valid.analysis, reviewStatus: "needs_review" },
-    translations: [{ ...valid.translations[0], qualityScore: 0, status: "needs_review" }],
   }, "zh-CN");
   assert.equal(result.indexable, false);
   assert.equal(result.eligibility, "NOINDEX_FOLLOW");
+});
+
+test("a complete translation is published even when the reviewer asked for a second look", () => {
+  // The status and score stay on the row for the review queue. They no longer decide
+  // whether the Chinese page exists: withholding it made the two editions carry different
+  // reports, which is the opposite of what the gate is for.
+  const result = contentQuality({
+    ...valid,
+    translations: [{ ...valid.translations[0], qualityScore: 0.57, status: "needs_review" }],
+  }, "zh-CN");
+  assert.equal(result.indexable, true);
+  assert.equal(result.issues.includes("translation_needs_review"), false);
+  assert.equal(result.issues.includes("translation_below_threshold"), false);
 });
 
 test("quality gate withholds call-to-action titles from indexing", () => {
@@ -80,17 +92,16 @@ test("a landed Chinese translation is not withheld over an analysis that has no 
   assert.equal(contentQuality({ ...valid, analysis }, "en").indexable, true);
 });
 
-test("a derived summary does not excuse a poor translation", () => {
-  // The derivation replaces only the missing-summary blocker. Every other reason to withhold
-  // the Chinese page still applies, which is what keeps this from being a way through the gate.
+test("a derived summary keeps a readable low-score translation publishable", () => {
+  // The derivation replaces only the missing-summary blocker; the translation still has to
+  // exist and be readably Chinese. Its review score is no longer a gate.
   const result = contentQuality({
     ...valid,
     analysis: { ...valid.analysis, summaryZh: null },
     translations: [{ ...valid.translations[0], qualityScore: 0.4 }],
   }, "zh-CN");
   assert.equal(result.issues.includes("empty_summary"), false);
-  assert.ok(result.issues.includes("translation_below_threshold"));
-  assert.equal(result.indexable, false);
+  assert.equal(result.indexable, true);
 });
 
 test("with no summary and no translation the page is still withheld", () => {

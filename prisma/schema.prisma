@@ -1725,8 +1725,15 @@ model NewsImage {
   postId    String
   post      NewsPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   position  Int      @default(0)
+  // The source-language caption the desk typed. The four localized fields are filled by the
+  // newsroom translation pass, so an English reader never gets a Chinese figcaption and a
+  // Chinese reader never gets an English one.
   caption   String?
   alt       String?
+  captionZh String?
+  captionEn String?
+  altZh     String?
+  altEn     String?
   mimeType  String
   width     Int?
   height    Int?

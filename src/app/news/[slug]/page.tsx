@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
-import { getPublishedNewsBySlug, newsBody, newsColumnName, newsDateLabel, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsParagraphs, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
+import { getPublishedNewsBySlug, newsBody, newsColumnName, newsDateLabel, newsImageAlt, newsImageCaption, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsParagraphs, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, localizedUrl, ogImage } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 
@@ -28,18 +28,19 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   };
 }
 
-function NewsFigure({ image }: { image: NewsImageRecord }) {
+function NewsFigure({ image, locale }: { image: NewsImageRecord; locale: Locale }) {
+  const caption = newsImageCaption(image, locale);
   return (
     <figure className="news-figure">
       {/* eslint-disable-next-line @next/next/no-img-element -- served from the newsroom's private image store */}
       <img
         src={`/api/news-images/${image.id}`}
-        alt={image.alt ?? image.caption ?? ""}
+        alt={newsImageAlt(image, locale)}
         width={image.width ?? undefined}
         height={image.height ?? undefined}
         loading="lazy"
       />
-      {image.caption ? <figcaption>{image.caption}</figcaption> : null}
+      {caption ? <figcaption>{caption}</figcaption> : null}
     </figure>
   );
 }
@@ -113,16 +114,16 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
         ) : null}
       </header>
       <article className="prose news-item-body">
-        {imagesAt(0).map((image) => <NewsFigure key={image.id} image={image} />)}
+        {imagesAt(0).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
         {paragraphs.length ? paragraphs.map((paragraph, index) => (
           <Fragment key={index}>
             {newsParagraphRole(paragraph) === "heading"
               ? <h2 className="news-section">{paragraph}</h2>
               : <p>{paragraph}</p>}
-            {imagesAt(index + 1).map((image) => <NewsFigure key={image.id} image={image} />)}
+            {imagesAt(index + 1).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
           </Fragment>
         )) : <p className="sub">{tr(locale, "This item has no further text.", "本条没有更多正文。")}</p>}
-        {images.filter((image) => image.position > paragraphs.length).map((image) => <NewsFigure key={image.id} image={image} />)}
+        {images.filter((image) => image.position > paragraphs.length).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
       </article>
       <p className="sub" style={{ marginTop: 26 }}>
         {post.column ? (

@@ -17,7 +17,7 @@ export interface SitemapEntry {
   alternates?: SitemapAlternate[];
 }
 
-export type SitemapKind = "pages" | "institutions" | "assets" | "topics" | "research";
+export type SitemapKind = "pages" | "institutions" | "assets" | "topics" | "research" | "news";
 export interface SitemapRequest { kind: SitemapKind; locale: Locale; index: number }
 export interface SitemapIndexEntry { url: string; lastModified?: Date }
 
@@ -45,6 +45,8 @@ const changed = (date: string) => new Date(`${date}T00:00:00.000Z`);
 const STATIC_ROUTES: Array<{ path: string; changedAt: Date; changeFrequency: SitemapEntry["changeFrequency"]; priority: number }> = [
   { path: "/", changedAt: changed("2026-09-23"), changeFrequency: "hourly", priority: 1 },
   { path: "/research", changedAt: changed("2026-10-04"), changeFrequency: "hourly", priority: 0.9 },
+  // The newsroom stream. Additive: listed once items exist; empty shards are valid.
+  { path: "/news", changedAt: changed("2026-10-17"), changeFrequency: "daily", priority: 0.7 },
   { path: "/markets", changedAt: changed("2026-09-20"), changeFrequency: "daily", priority: 0.8 },
   { path: "/institutions", changedAt: changed("2026-10-04"), changeFrequency: "daily", priority: 0.8 },
   { path: "/macro", changedAt: changed("2026-09-27"), changeFrequency: "hourly", priority: 0.8 },
@@ -218,6 +220,30 @@ export async function buildTopicsSitemap(locale: Locale): Promise<SitemapEntry[]
   })));
 }
 
+/** The newsroom stream, sharded at the same size as reports; only items this language can read. */
+export async function newsShardCount(): Promise<number> {
+  return Math.max(1, Math.ceil(await prisma.newsPost.count({ where: { status: "published", publishedAt: { lte: new Date() } } }) / SHARD_SIZE));
+}
+
+export async function buildNewsSitemap(locale: Locale, index: number): Promise<SitemapEntry[]> {
+  const posts = await prisma.newsPost.findMany({
+    where: { status: "published", publishedAt: { lte: new Date() } },
+    orderBy: { publishedAt: "desc" },
+    skip: (index - 1) * SHARD_SIZE,
+    take: SHARD_SIZE,
+    select: { slug: true, updatedAt: true, titleZh: true, titleEn: true },
+  });
+  return posts
+    .filter((post) => (locale === "zh-CN" ? post.titleZh : post.titleEn))
+    .map((post) => {
+      const readable = LOCALES.filter((candidate) => (candidate === "zh-CN" ? post.titleZh : post.titleEn));
+      const alternates = readable.length > 1
+        ? [...readable.map((candidate) => ({ hreflang: candidate, href: siteUrl() + localePath(candidate, `/news/${post.slug}`) })), { hreflang: "x-default", href: siteUrl() + localePath("en", `/news/${post.slug}`) }]
+        : undefined;
+      return { url: siteUrl() + localePath(locale, `/news/${post.slug}`), lastModified: post.updatedAt, changeFrequency: "daily" as const, priority: 0.6, alternates };
+    });
+}
+
 export async function researchShardCount(locale: Locale): Promise<number> {
   return Math.max(1, Math.ceil(await prisma.article.count({ where: publicationReadyWhere(undefined, locale) }) / SHARD_SIZE));
 }
@@ -245,10 +271,11 @@ export async function buildResearchSitemap(locale: Locale, index: number): Promi
   });
 }
 
-const GROUPS: Exclude<SitemapKind, "research">[] = ["pages", "institutions", "assets", "topics"];
+const GROUPS: Exclude<SitemapKind, "research" | "news">[] = ["pages", "institutions", "assets", "topics"];
 const segment = (locale: Locale) => locale === "zh-CN" ? "zh" : "en";
 export function sitemapPath(request: SitemapRequest) {
-  return `/sitemap/${request.kind}-${segment(request.locale)}${request.kind === "research" ? `-${request.index}` : ""}.xml`;
+  const paged = request.kind === "research" || request.kind === "news";
+  return `/sitemap/${request.kind}-${segment(request.locale)}${paged ? `-${request.index}` : ""}.xml`;
 }
 
 export function parseSitemapShard(value: string): SitemapRequest | null {
@@ -257,15 +284,21 @@ export function parseSitemapShard(value: string): SitemapRequest | null {
     const index = Number(research[2]);
     return index >= 1 ? { kind: "research", locale: research[1] === "zh" ? "zh-CN" : "en", index } : null;
   }
+  const news = /^news-(en|zh)-(\d+)\.xml$/.exec(value);
+  if (news) {
+    const index = Number(news[2]);
+    return index >= 1 ? { kind: "news", locale: news[1] === "zh" ? "zh-CN" : "en", index } : null;
+  }
   const group = /^(pages|institutions|assets|topics)-(en|zh)\.xml$/.exec(value);
-  return group ? { kind: group[1] as Exclude<SitemapKind, "research">, locale: group[2] === "zh" ? "zh-CN" : "en", index: 1 } : null;
+  return group ? { kind: group[1] as Exclude<SitemapKind, "research" | "news">, locale: group[2] === "zh" ? "zh-CN" : "en", index: 1 } : null;
 }
 
 export async function buildSitemapIndex(): Promise<SitemapIndexEntry[]> {
   const base = siteUrl();
-  const [enCount, zhCount] = await Promise.all([researchShardCount("en"), researchShardCount("zh-CN")]);
+  const [enCount, zhCount, newsCount] = await Promise.all([researchShardCount("en"), researchShardCount("zh-CN"), newsShardCount()]);
   const requests: SitemapRequest[] = LOCALES.flatMap((locale) => [
     ...GROUPS.map((kind) => ({ kind, locale, index: 1 })),
+    ...Array.from({ length: newsCount }, (_, index) => ({ kind: "news" as const, locale, index: index + 1 })),
     ...Array.from({ length: locale === "en" ? enCount : zhCount }, (_, index) => ({ kind: "research" as const, locale, index: index + 1 })),
   ]);
   return requests.map((request) => ({ url: base + sitemapPath(request) }));
@@ -276,6 +309,7 @@ export async function buildSitemap(request: SitemapRequest): Promise<SitemapEntr
   if (request.kind === "institutions") return buildInstitutionsSitemap(request.locale);
   if (request.kind === "assets") return buildAssetsSitemap(request.locale);
   if (request.kind === "topics") return buildTopicsSitemap(request.locale);
+  if (request.kind === "news") return buildNewsSitemap(request.locale, request.index);
   return buildResearchSitemap(request.locale, request.index);
 }
 

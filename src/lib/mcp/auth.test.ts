@@ -38,11 +38,13 @@ test("the MCP scopes exist, stay listed, and parse off a stored key", () => {
   assert.ok(API_SCOPES.includes("mcp:user"));
   assert.ok(API_SCOPES.includes("publisher:draft"));
   assert.ok(API_SCOPES.includes("publisher:publish"));
-  assert.deepEqual(MCP_SCOPES, ["mcp:user", "publisher:draft", "publisher:publish"]);
+  assert.ok(API_SCOPES.includes("admin:manage"));
+  assert.deepEqual(MCP_SCOPES, ["mcp:user", "publisher:draft", "publisher:publish", "admin:manage"]);
   // The two publisher scopes may share one key; the user scope may share with neither.
   assert.deepEqual(PUBLISHER_SCOPES, ["publisher:draft", "publisher:publish"]);
   assert.deepEqual(parseScopes(JSON.stringify(["mcp:user"])), ["mcp:user"]);
   assert.deepEqual(parseScopes(JSON.stringify(["publisher:draft", "publisher:publish"])), ["publisher:draft", "publisher:publish"]);
+  assert.deepEqual(parseScopes(JSON.stringify(["publisher:draft", "admin:manage"])), ["publisher:draft", "admin:manage"]);
   // An unknown scope in a stored row is dropped, not fatal.
   assert.deepEqual(parseScopes(JSON.stringify(["mcp:user", "mcp:admin"])), ["mcp:user"]);
 });

@@ -44,14 +44,14 @@ const SERVERS = [
   },
   {
     endpoint: "/api/mcp/publisher",
-    scope: "publisher:draft / publisher:publish",
+    scope: "publisher:draft / publisher:publish / admin:manage",
     en: "Publisher MCP",
     zh: "MCP 发布端",
-    purposeEn: "The drafting-and-publishing channel for AI clients: create, revise and validate drafts, submit them for review — and, when the key also carries publisher:publish, publish a draft as a public report. Publishing is judged by the same gate as every crawled report (the reply carries the verdict), and taking anything down stays an operations action, never an MCP one.",
-    purposeZh: "给 AI 客户端的投稿与发布通道:创建、修改、校验草稿并送审;密钥带 publisher:publish 时还可直接发布。发布与抓取的文章走同一道公开闸门(结果随响应返回可核验);下架始终是运营操作,MCP 不提供。",
-    audienceEn: "requires a reviewer / admin key; publishing additionally requires the publisher:publish scope, and the owner's role is re-checked on every call",
-    audienceZh: "需 reviewer / admin 密钥;直接发布另需 publisher:publish scope;每次调用复查持有人角色",
-    tools: ["create_publication_draft", "update_publication_draft", "validate_publication_draft", "submit_publication_for_review", "publish_publication_draft", "list_publication_drafts"],
+    purposeEn: "The drafting, publishing and operations channel for AI clients: create, revise and validate drafts, submit them for review — and, when the key also carries publisher:publish, publish a draft as a public report. With admin:manage on a reviewer or admin key the same endpoint runs the site: withdraw or restore reports, set editorial picks, pause or resume sources, and write, publish, unpublish, pin or delete newsroom items. Publishing is judged by the same gate as every crawled report, and every operation is audited and bounded by the account's live permissions.",
+    purposeZh: "给 AI 客户端的投稿、发布与运营通道:创建/修改/送审/发布研报;密钥带 admin:manage 时还可撤回与恢复研报、设置首页精选、启停采集源、撰写并发布新鲜事。每个动作都按密钥持有账号的实时权限判定并写入审计。",
+    audienceEn: "requires a reviewer / admin key; publishing additionally requires publisher:publish, site operations additionally require admin:manage, and the owner's role is re-checked on every call",
+    audienceZh: "需 reviewer / admin 密钥;直接发布另需 publisher:publish scope,站点运营另需 admin:manage;每次调用复查持有人角色",
+    tools: ["create_publication_draft", "update_publication_draft", "validate_publication_draft", "submit_publication_for_review", "publish_publication_draft", "list_publication_drafts", "withdraw_research", "restore_research", "feature_research", "set_source_monitoring", "create_news", "update_news", "publish_news", "unpublish_news", "delete_news", "pin_news", "list_news"],
   },
 ] as const;
 
@@ -136,7 +136,7 @@ export default async function McpPage() {
           <li>
             {tr(locale, "Issue a key on the ", "在「")}
             <Link href={localePath(locale, "/admin/api")}>{tr(locale, "API & keys", "API 与密钥")}</Link>
-            {tr(locale, " page and tick the scope of the server it is for. mcp:user must be issued on a key of its own; the two publisher scopes may share one key.", "」页签发密钥,勾选对应端点的 scope。mcp:user 必须单独签发;publisher:draft 与 publisher:publish 可签在同一把密钥上。")}
+            {tr(locale, " page and tick the scope of the server it is for. mcp:user must be issued on a key of its own; the publisher scopes, including admin:manage, may share one key. admin:manage is never ticked by default.", "」页签发密钥,勾选对应端点的 scope。mcp:user 必须单独签发;publisher:draft、publisher:publish 与 admin:manage 可签在同一把密钥上。admin:manage 默认不勾选。")}
           </li>
           <li>
             {tr(locale, "In the AI client, add a remote MCP server: the endpoint URL above, with header ", "在 AI 客户端里添加远程 MCP Server:填上方端点 URL,请求头 ")}

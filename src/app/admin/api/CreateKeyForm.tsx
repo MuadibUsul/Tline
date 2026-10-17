@@ -43,7 +43,9 @@ export default function CreateKeyForm({
           <legend>{labels.scopes}</legend>
           {scopes.map((scope) => (
             <label key={scope} className="apikey-scope">
-              <input type="checkbox" name="scopes" value={scope} defaultChecked />
+              {/* Only the public read scope is pre-ticked: every extra capability — and
+                  especially an MCP audience or operations — is a deliberate choice. */}
+              <input type="checkbox" name="scopes" value={scope} defaultChecked={scope === "research:read"} />
               <code>{scope}</code>
               {labels.scopeNotes?.[scope] && <small>{labels.scopeNotes[scope]}</small>}
             </label>

@@ -1094,6 +1094,7 @@ model User {
   sessions  Session[]
   apiKeys   ApiKey[]
   mcpDrafts McpPublicationDraft[]
+  newsPosts NewsPost[]
   bookmarks ArticleBookmark[]
 }
 
@@ -1664,4 +1665,31 @@ model ArticleBookmark {
 
   @@unique([userId, articleId])
   @@index([userId, createdAt])
+}
+
+// ---- 新鲜事 · the newsroom stream (2026-10-17) ----
+
+// An operator-written news item: an article, a brief or a flash. Deliberately its own
+// table — a news post is not a crawled report: it does not enter the ingest, translation,
+// classification or social pipelines, and the publication gate that decides whether a
+// report exists does not apply to it. Publishing is the operator's own action, audited.
+model NewsPost {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  kind        String    @default("brief") // article | brief | flash
+  titleZh     String?
+  titleEn     String?
+  bodyZh      String? // paragraphs separated by blank lines
+  bodyEn      String?
+  sourceUrl   String?
+  status      String    @default("draft") // draft | published
+  pinned      Boolean   @default(false)
+  publishedAt DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt])
 }

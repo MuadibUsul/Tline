@@ -22,10 +22,17 @@ test("rendered sitemap contains only the canonical URLs it is given", () => {
 test("sitemaps are split by content type and language", () => {
   assert.deepEqual(parseSitemapShard("research-zh-2.xml"), { kind: "research", locale: "zh-CN", index: 2 });
   assert.deepEqual(parseSitemapShard("assets-en.xml"), { kind: "assets", locale: "en", index: 1 });
+  // The index advertises news shards per language; the parser must recognise them, or the
+  // advertised URLs answer 404.
+  assert.deepEqual(parseSitemapShard("news-zh-1.xml"), { kind: "news", locale: "zh-CN", index: 1 });
+  assert.deepEqual(parseSitemapShard("news-en-2.xml"), { kind: "news", locale: "en", index: 2 });
+  assert.equal(parseSitemapShard("news-zh.xml"), null);
+  assert.equal(parseSitemapShard("news-en-0.xml"), null);
   assert.equal(parseSitemapShard("research-en-0.xml"), null);
   assert.equal(parseSitemapShard("unknown-en.xml"), null);
   assert.equal(sitemapPath({ kind: "institutions", locale: "zh-CN", index: 1 }), "/sitemap/institutions-zh.xml");
   assert.equal(sitemapPath({ kind: "research", locale: "en", index: 3 }), "/sitemap/research-en-3.xml");
+  assert.equal(sitemapPath({ kind: "news", locale: "en", index: 2 }), "/sitemap/news-en-2.xml");
   assert.ok(SHARD_SIZE <= 20_000 && SHARD_SIZE < SITEMAP_MAX_URLS);
 });
 

@@ -63,6 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // The premium-media IA (PRD §3.1). The legacy tools keep their addresses and move
         // to the footer: same pages, same URLs, quieter placement — nothing was removed.
         { href: "/", label: tr(locale, "Home", "首页") },
+        { href: "/news", label: tr(locale, "News", "新鲜事") },
         { href: "/research", label: tr(locale, "Latest research", "最新研究") },
         { href: "/topics", label: tr(locale, "Topics", "主题") },
         { href: "/institutions-directory", label: tr(locale, "Institutions", "机构") },
@@ -71,6 +72,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       ]
     : [
         { href: "/", label: tr(locale, "Home", "首页") },
+        { href: "/news", label: tr(locale, "News", "新鲜事") },
         { href: "/markets", label: tr(locale, "Markets", "资产") },
         { href: "/macro", label: tr(locale, "Economic Data", "经济数据") },
         { href: "/economies", label: tr(locale, "Economies", "经济体") },

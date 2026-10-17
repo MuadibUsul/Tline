@@ -224,6 +224,7 @@ export default async function ApiPage() {
                   "mcp:user": tr(locale, "MCP for AI clients — read-only research and macro queries", "MCP 用户端 · AI 只读查询研报与宏观数据"),
                   "publisher:draft": tr(locale, "MCP for AI clients — create drafts and submit for review", "MCP 发布端 · AI 写草稿并送审"),
                   "publisher:publish": tr(locale, "MCP for AI clients — publish drafts as public reports (gate-judged, withdrawable in the console)", "MCP 发布端 · AI 直接发布（经公开闸门裁决，可在后台撤回）"),
+                  "admin:manage": tr(locale, "MCP operations — withdraw/restore reports, editorial picks, source monitoring, the newsroom (reviewer/admin only)", "MCP 运营权 · 研报上下架、精选、采集监控、新鲜事发布（仅 reviewer/admin）"),
                 },
               }}
             />
@@ -239,7 +240,7 @@ export default async function ApiPage() {
                 <li><code>GET /api/v1/research/&#123;id&#125;</code> — <span>{tr(locale, "one report", "单篇研报")}</span></li>
                 <li><code>GET /api/v1/institutions</code> — <span>{tr(locale, "source list", "机构列表")}</span></li>
                 <li><code>POST /api/mcp/user</code> — <span>{tr(locale, "MCP, read-only (scope mcp:user)", "MCP 用户端,只读(scope mcp:user)")}</span></li>
-                <li><code>POST /api/mcp/publisher</code> — <span>{tr(locale, "MCP, drafts and publishing (scopes publisher:draft / publisher:publish)", "MCP 发布端,草稿与发布(scope publisher:draft / publisher:publish)")}</span></li>
+                <li><code>POST /api/mcp/publisher</code> — <span>{tr(locale, "MCP, drafts, publishing and site operations (scopes publisher:draft / publisher:publish / admin:manage)", "MCP 发布端,草稿、发布与站点运营(scope publisher:draft / publisher:publish / admin:manage)")}</span></li>
               </ul>
               <p className="apikey-note">
                 {tr(locale, "The MCP servers have their own overview: ", "MCP 两端的说明与调用统计见：")}

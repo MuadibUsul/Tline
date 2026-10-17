@@ -3,6 +3,7 @@ import { z } from "zod";
 import { fail, ok, toolGuard } from "./results";
 import { createDraft, listDrafts, publishDraft, submitDraft, updateDraft, validateDraft, type DraftOutcome } from "./publicationDrafts";
 import type { McpAuthContext } from "./auth";
+import { defaultOpsDeps, registerOpsTools, type OpsToolDeps } from "./opsServer";
 
 /**
  * The Tline Publisher MCP: draft creation, submission and — for keys carrying the
@@ -11,9 +12,10 @@ import type { McpAuthContext } from "./auth";
  * The blast radius is bounded by construction: publishing is a scope of its own, checked
  * per tool call; the published article goes through the same derive-and-store path the
  * crawler uses and is judged by the same public gate, so a publish that fails validation
- * or the gate is reported as withheld rather than forced live; and there is still no
- * withdraw, delete or social tool here — taking something down remains an operations
- * action, never an MCP one.
+ * or the gate is reported as withheld rather than forced live. Site operations — taking
+ * reports down, editorial picks, source monitoring and the newsroom — sit behind a
+ * separate `admin:manage` scope and the account's own live permission, so a drafting key
+ * and an operating key stay distinguishable.
  */
 
 export interface PublisherToolDeps {
@@ -64,10 +66,10 @@ function settle<T>(outcome: DraftOutcome<T>) {
   return ok(outcome.data as unknown as Record<string, unknown>);
 }
 
-export function createPublisherServer(context: McpAuthContext, deps: PublisherToolDeps = defaultPublisherDeps): McpServer {
+export function createPublisherServer(context: McpAuthContext, deps: PublisherToolDeps = defaultPublisherDeps, opsDeps: OpsToolDeps = defaultOpsDeps): McpServer {
   const server = new McpServer(
-    { name: "tline-publisher-mcp", version: "1.1.0" },
-    { instructions: "Drafting and publishing access to Tline. You can create, revise and submit drafts for review; with the publisher:publish scope on your key you can also publish a draft as a public report, judged by the same gate as every other report on the site. There is no unpublish, reject or delete over MCP — a human reviewer and the console handle those. Always read validationIssues before submitting or publishing, and quote the contentHash from the draft you actually read when publishing." },
+    { name: "tline-publisher-mcp", version: "1.2.0" },
+    { instructions: "Drafting, publishing and operations access to Tline. Without extra scopes you can create, revise and submit drafts for review; with publisher:publish on your key you can publish a draft as a public report (judged by the same gate as every other report); with admin:manage on a reviewer or admin key you can run the site: withdraw/restore reports, set editorial picks, pause or resume sources, and write, edit, publish, unpublish, pin or delete newsroom items. Every action is audited and gated by the account's live permissions — the account's role is re-checked on every call. Always read validationIssues before submitting or publishing." },
   );
   const actor = { userId: context.actorId, keyId: context.key.id };
 
@@ -138,5 +140,7 @@ export function createPublisherServer(context: McpAuthContext, deps: PublisherTo
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, toolGuard("list_publication_drafts", async (args) => settle(await deps.listDrafts({ status: args.status, cursor: args.cursor, limit: args.limit ?? 20 }, actor))));
 
+  // Site operations (admin:manage): report lifecycle, source monitoring, the newsroom.
+  registerOpsTools(server, context, opsDeps);
   return server;
 }

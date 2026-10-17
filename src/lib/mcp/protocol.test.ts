@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createUserServer, type UserToolDeps } from "./userServer";
 import { createPublisherServer, type PublisherToolDeps } from "./publisherServer";
+import type { OpsToolDeps } from "./opsServer";
 import type { McpAuthContext } from "./auth";
 
 /**
@@ -14,13 +15,23 @@ import type { McpAuthContext } from "./auth";
  */
 
 const USER_TOOLS = ["get_macro_calendar", "get_macro_indicator", "get_research", "list_institutions", "search_research"];
-const PUBLISHER_TOOLS = ["create_publication_draft", "list_publication_drafts", "publish_publication_draft", "submit_publication_for_review", "update_publication_draft", "validate_publication_draft"];
+const PUBLISHER_TOOLS = ["create_news", "create_publication_draft", "delete_news", "feature_research", "list_news", "list_publication_drafts", "pin_news", "publish_news", "publish_publication_draft", "restore_research", "set_source_monitoring", "submit_publication_for_review", "unpublish_news", "update_news", "update_publication_draft", "validate_publication_draft", "withdraw_research"];
 
 function structured<T>(result: unknown): T {
   // callTool's return type is a union; the structured half is what every Tline tool returns.
   const value = (result as { structuredContent?: Record<string, unknown> }).structuredContent;
   assert.ok(value, "expected structuredContent");
   return value as T;
+}
+
+/**
+ * The error envelope travels in the text half, not structuredContent: MCP clients validate
+ * structuredContent against the tool's outputSchema even on isError, so an error body there
+ * would be rejected as a protocol error rather than delivered as a tool outcome.
+ */
+function errorBody<T>(result: unknown): T {
+  const content = (result as { content: Array<{ type: "text"; text: string }> }).content;
+  return JSON.parse(content[0]!.text) as T;
 }
 
 const userDeps: UserToolDeps = {
@@ -81,6 +92,30 @@ const publisherDeps: PublisherToolDeps = {
   listDrafts: async () => ({ ok: true, data: { drafts: [{ ...publisherDto }], nextCursor: null } }),
 };
 
+const opsDeps: OpsToolDeps = {
+  resolveArticle: async (ref) => ({
+    id: ref.articleId ?? "a1",
+    slug: ref.slug ?? "ubs-gold-outlook",
+    title: "Gold outlook",
+    withdrawnAt: null,
+    featuredAt: null,
+  }),
+  setArticleWithdrawn: async () => {},
+  setArticleFeatured: async () => {},
+  setSourceMonitoring: async (slug) => slug === "ubs",
+  createNews: async () => ({ ok: true, id: "n1", slug: "fed-holds-rates-abc123" }),
+  updateNews: async (id) => ({ ok: true, id, slug: "fed-holds-rates-abc123" }),
+  publishNews: async (id) => ({ ok: true, id, slug: "fed-holds-rates-abc123" }),
+  unpublishNews: async (id) => ({ ok: true, id, slug: "fed-holds-rates-abc123" }),
+  deleteNews: async () => ({ ok: true }),
+  pinNews: async () => ({ ok: true }),
+  listNews: async () => [{
+    id: "n1", slug: "fed-holds-rates-abc123", kind: "flash",
+    titleZh: null, titleEn: "Fed holds rates", status: "published", pinned: true,
+    publishedAt: new Date("2026-10-17T02:00:00.000Z"),
+  }],
+};
+
 const publisherContext: McpAuthContext = {
   audience: "publisher",
   key: { id: "key_1", name: "ops", scopes: ["publisher:draft"], rateLimit: 60, owner: { id: "u1", email: "ops@tlines.tech", tier: "free", role: "reviewer", suspendedAt: null } },
@@ -92,6 +127,13 @@ const publisherContext: McpAuthContext = {
 const publishingContext: McpAuthContext = {
   ...publisherContext,
   key: { ...publisherContext.key, id: "key_2", scopes: ["publisher:draft", "publisher:publish"] },
+};
+
+/** An admin key that was granted site operations on top of drafting. */
+const operationsContext: McpAuthContext = {
+  ...publisherContext,
+  key: { ...publisherContext.key, id: "key_3", scopes: ["publisher:draft", "admin:manage"] },
+  owner: { ...publisherContext.owner, role: "admin" },
 };
 
 async function connect(server: ReturnType<typeof createUserServer>): Promise<Client> {
@@ -114,13 +156,15 @@ test("each MCP server lists only its own tools", async () => {
     assert.equal(tool.annotations?.destructiveHint, false, `${tool.name} must not be destructive`);
   }
 
-  const publisher = await connect(createPublisherServer(publisherContext, publisherDeps));
+  const publisher = await connect(createPublisherServer(publisherContext, publisherDeps, opsDeps));
   const publisherTools = (await publisher.listTools()).tools.map((tool) => tool.name).sort();
   assert.deepEqual(publisherTools, PUBLISHER_TOOLS);
   for (const name of USER_TOOLS) assert.ok(!publisherTools.includes(name), `publisher server exposed ${name}`);
-  // Taking content down stays an operations action: no withdraw/delete/reject tool exists.
-  for (const banned of ["withdraw", "delete", "reject", "unpublish"]) {
-    assert.ok(!publisherTools.some((name) => name.includes(banned)), `publisher server must not expose ${banned}`);
+  // Ops tools exist as of admin:manage, but each declares its own blast radius: the reads
+  // and reversible writes are not destructive, while withdrawal and deletion are.
+  for (const tool of (await publisher.listTools()).tools) {
+    if (!["withdraw_research", "delete_news"].includes(tool.name)) continue;
+    assert.equal(tool.annotations?.destructiveHint, true, `${tool.name} must declare its destructive intent`);
   }
 });
 
@@ -139,7 +183,7 @@ test("a user tool call returns the structured envelope end-to-end", async () => 
 
   const missing = await client.callTool({ name: "get_research", arguments: { identifier: "nope" } });
   assert.equal(missing.isError, true);
-  assert.equal(structured<{ error: { code: string } }>(missing).error.code, "NOT_FOUND");
+  assert.equal(errorBody<{ error: { code: string } }>(missing).error.code, "NOT_FOUND");
 });
 
 test("resources and prompts are discoverable and bounded by the same deps", async () => {
@@ -160,14 +204,14 @@ test("resources and prompts are discoverable and bounded by the same deps", asyn
 });
 
 test("a publisher submission conflict stays a tool-level error", async () => {
-  const client = await connect(createPublisherServer(publisherContext, publisherDeps));
+  const client = await connect(createPublisherServer(publisherContext, publisherDeps, opsDeps));
   const created = await client.callTool({ name: "create_publication_draft", arguments: { title: "Desk note on rates", content: "x".repeat(120) } });
   assert.ok(!created.isError);
   assert.equal(structured<{ id: string; version: number }>(created).id, "d1");
 
   const conflict = await client.callTool({ name: "submit_publication_for_review", arguments: { id: "d1", version: 1 } });
   assert.equal(conflict.isError, true);
-  const body = structured<{ error: { code: string; details?: { currentVersion?: number } } }>(conflict);
+  const body = errorBody<{ error: { code: string; details?: { currentVersion?: number } } }>(conflict);
   assert.equal(body.error.code, "VERSION_CONFLICT");
   assert.equal(body.error.details?.currentVersion, 2);
 
@@ -177,14 +221,14 @@ test("a publisher submission conflict stays a tool-level error", async () => {
 });
 
 test("publishing is refused without the publisher:publish scope", async () => {
-  const client = await connect(createPublisherServer(publisherContext, publisherDeps));
+  const client = await connect(createPublisherServer(publisherContext, publisherDeps, opsDeps));
   const denied = await client.callTool({ name: "publish_publication_draft", arguments: { id: "d1", version: 1, expectedContentHash: "a".repeat(64) } });
   assert.equal(denied.isError, true);
-  assert.equal(structured<{ error: { code: string } }>(denied).error.code, "SCOPE_DENIED");
+  assert.equal(errorBody<{ error: { code: string } }>(denied).error.code, "SCOPE_DENIED");
 });
 
 test("a publish-scoped key publishes and gets the gate verdict back", async () => {
-  const client = await connect(createPublisherServer(publishingContext, publisherDeps));
+  const client = await connect(createPublisherServer(publishingContext, publisherDeps, opsDeps));
   const published = await client.callTool({ name: "publish_publication_draft", arguments: { id: "d1", version: 1, expectedContentHash: "a".repeat(64) } });
   assert.ok(!published.isError);
   const data = structured<{ draft: { status: string }; article: { pageUrl: string; indexableEn: boolean; indexableZh: boolean; gateIssues: string[] } }>(published);
@@ -192,4 +236,45 @@ test("a publish-scoped key publishes and gets the gate verdict back", async () =
   assert.match(data.article.pageUrl, /^https:\/\/tlines\.tech\/en\/research\//);
   assert.equal(data.article.indexableEn, true);
   assert.deepEqual(data.article.gateIssues, ["missing_translation"]);
+});
+
+test("site operations are refused without admin:manage and allowed with it", async () => {
+  const deniedClient = await connect(createPublisherServer(publishingContext, publisherDeps, opsDeps));
+  const denied = await deniedClient.callTool({ name: "create_news", arguments: { titleEn: "Fed holds rates" } });
+  assert.equal(denied.isError, true);
+  assert.equal(errorBody<{ error: { code: string } }>(denied).error.code, "SCOPE_DENIED");
+
+  const client = await connect(createPublisherServer(operationsContext, publisherDeps, opsDeps));
+  const created = await client.callTool({ name: "create_news", arguments: { kind: "flash", titleEn: "Fed holds rates" } });
+  assert.ok(!created.isError);
+  assert.equal(structured<{ id: string; slug: string }>(created).id, "n1");
+
+  const published = await client.callTool({ name: "publish_news", arguments: { id: "n1" } });
+  assert.ok(!published.isError);
+  assert.equal(structured<{ slug: string }>(published).slug, "fed-holds-rates-abc123");
+
+  const listed = await client.callTool({ name: "list_news", arguments: {} });
+  assert.ok(!listed.isError);
+  const items = structured<{ items: Array<{ pinned: boolean; publishedAt: string | null }> }>(listed).items;
+  assert.equal(items[0]?.pinned, true);
+  assert.equal(items[0]?.publishedAt, "2026-10-17T02:00:00.000Z");
+
+  const withdrawn = await client.callTool({ name: "withdraw_research", arguments: { slug: "ubs-gold-outlook", reason: "legal" } });
+  assert.ok(!withdrawn.isError);
+  assert.equal(structured<{ withdrawn: boolean }>(withdrawn).withdrawn, true);
+});
+
+test("an operations key cannot exceed the account's live permission", async () => {
+  // The reviewer's key carries admin:manage, but source monitoring is an admin permission:
+  // the scope alone must not lift the account's role. The reviewer's own key has no
+  // admin:manage, so the newsroom call proves the scope gate, and the second key proves
+  // the role gate underneath it.
+  const scoped: McpAuthContext = { ...publisherContext, key: { ...publisherContext.key, id: "key_4", scopes: ["publisher:draft", "admin:manage"] } };
+  const client = await connect(createPublisherServer(scoped, publisherDeps, opsDeps));
+  const news = await client.callTool({ name: "create_news", arguments: { titleEn: "Fed holds rates" } });
+  assert.ok(!news.isError, "reviewers may run the newsroom");
+
+  const sources = await client.callTool({ name: "set_source_monitoring", arguments: { institutionSlug: "ubs", enabled: false } });
+  assert.equal(sources.isError, true);
+  assert.equal(errorBody<{ error: { code: string } }>(sources).error.code, "SCOPE_DENIED");
 });

@@ -35,11 +35,11 @@ const PREFIX_LENGTH = 8;
  * can be granted, audited and revoked separately. A publisher key that drafts all day does
  * not gain the power to put anything on the public site until someone ticks that box.
  */
-export type ApiScope = "research:read" | "consensus:read" | "mcp:user" | "publisher:draft" | "publisher:publish";
-export const API_SCOPES: ApiScope[] = ["research:read", "consensus:read", "mcp:user", "publisher:draft", "publisher:publish"];
+export type ApiScope = "research:read" | "consensus:read" | "mcp:user" | "publisher:draft" | "publisher:publish" | "admin:manage";
+export const API_SCOPES: ApiScope[] = ["research:read", "consensus:read", "mcp:user", "publisher:draft", "publisher:publish", "admin:manage"];
 
 /** The MCP scopes. `mcp:user` is mutually exclusive with every publisher scope. */
-export const MCP_SCOPES: ApiScope[] = ["mcp:user", "publisher:draft", "publisher:publish"];
+export const MCP_SCOPES: ApiScope[] = ["mcp:user", "publisher:draft", "publisher:publish", "admin:manage"];
 
 /** The publisher-side MCP scopes, which may share a key with each other. */
 export const PUBLISHER_SCOPES: ApiScope[] = ["publisher:draft", "publisher:publish"];

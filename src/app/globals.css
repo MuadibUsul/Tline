@@ -1818,7 +1818,7 @@ td{padding-block:13px}
 @media(max-width:720px){.cookie-consent{left:12px;right:12px;bottom:12px;width:auto;padding:16px}.cookie-consent-actions{justify-content:stretch}.cookie-consent-actions .minibtn{flex:1;justify-content:center}}
 
 /* Research article header: headline, series label, byline and actions are separate rows. */
-.art-head{max-width:860px}
+.art-head{max-width:none;margin:0;width:100%}
 .art-title{max-width:900px;font-size:clamp(24px,2.9vw,31px);line-height:1.32;text-wrap:balance;line-break:strict;word-break:keep-all;overflow-wrap:anywhere}
 .art-title-series{display:block;margin-top:12px;font:600 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent-ink)}
 .art-title-series::before{content:"";display:inline-block;width:18px;height:1.5px;background:var(--accent);vertical-align:middle;margin-right:8px}

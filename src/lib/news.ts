@@ -120,10 +120,22 @@ export function newsParagraphRole(text: string): "heading" | "body" {
   return "body";
 }
 
-/** A list excerpt made of body paragraphs only, so section labels never run into the prose. */
+/** A list excerpt made of body blocks only, with the Markdown syntax a reader should not see. */
 export function newsExcerpt(post: NewsRecord, locale: Locale, limit = 220): string {
-  const text = splitNewsParagraphs(newsBody(post, locale))
-    .filter((paragraph) => newsParagraphRole(paragraph) === "body")
+  const text = splitNewsMarkdownBlocks(newsBody(post, locale))
+    .filter((block) => !/^\s*\|/.test(block) && !/^(?:-{3,}|\*{3,}|_{3,})$/.test(block.trim()) && newsParagraphRole(block) === "body")
+    .map((block) => block
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^>\s?/gm, "")
+      .replace(/^\[!(?:note|warning)\]\s*/gim, "")
+      .replace(/^[-*+]\s+/gm, "")
+      .replace(/^\[[ xX]\]\s+/gm, "")
+      .replace(/==([^=]+)==/g, "$1")
+      .replace(/:badge\[([^\]]+)\]/g, "$1")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/__([^_]+)__/g, "$1")
+      .replace(/~~([^~]+)~~/g, "$1")
+      .replace(/`([^`]+)`/g, "$1"))
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
@@ -147,9 +159,9 @@ export function newsBody(post: NewsRecord, locale: Locale): string | null {
  * either is a click for nothing. An article is thousands of characters and keeps its
  * excerpt and its page.
  */
-export function newsInlineParagraphs(post: NewsRecord, locale: Locale): string[] {
+export function newsInlineMarkdownBlocks(post: NewsRecord, locale: Locale): string[] {
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
-  return kind === "flash" || kind === "brief" ? splitNewsParagraphs(newsBody(post, locale)) : [];
+  return kind === "flash" || kind === "brief" ? splitNewsMarkdownBlocks(newsBody(post, locale)) : [];
 }
 
 /** The languages this item can actually be read in. */
@@ -163,6 +175,36 @@ export function splitNewsParagraphs(body: string | null | undefined): string[] {
     .split(/\n\s*\n/)
     .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
     .filter(Boolean);
+}
+
+/**
+ * Top-level Markdown blocks, with blank lines inside fenced code kept together.
+ *
+ * The news page inserts its images between body blocks (`position` is the block after
+ * which an image belongs), so the renderer needs the same block boundaries the old plain
+ * paragraph renderer used — but it must not collapse newlines inside a table, list or
+ * fenced block the way the excerpt helper does.
+ */
+export function splitNewsMarkdownBlocks(body: string | null | undefined): string[] {
+  const lines = (body ?? "").replace(/\r\n?/g, "\n").split("\n");
+  const blocks: string[] = [];
+  let current: string[] = [];
+  let fence = false;
+  const flush = () => {
+    const block = current.join("\n").trim();
+    if (block) blocks.push(block);
+    current = [];
+  };
+  for (const line of lines) {
+    if (/^\s*(?:```|~~~)/.test(line)) fence = !fence;
+    if (!fence && !line.trim()) {
+      flush();
+      continue;
+    }
+    current.push(line);
+  }
+  flush();
+  return blocks;
 }
 
 /**

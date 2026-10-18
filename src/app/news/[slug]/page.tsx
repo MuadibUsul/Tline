@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
-import { getPublishedNewsBySlug, newsBody, newsColumnName, newsDateLabel, newsImageAlt, newsImageCaption, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsParagraphs, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
+import { getPublishedNewsBySlug, newsBody, newsColumnName, newsDateLabel, newsExcerpt, newsImageAlt, newsImageCaption, newsLocales, newsSources, newsTitle, splitNewsMarkdownBlocks, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
+import { renderNewsMarkdownBlocks } from "@/lib/newsMarkdown";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, localizedUrl, ogImage } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 
@@ -16,8 +17,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const post = await getPublishedNewsBySlug(slug);
   if (!post) return { title: tr(locale, "Not found", "未找到") };
   const title = newsTitle(post, locale) ?? newsTitle(post, "en") ?? "";
-  const body = newsBody(post, locale) ?? "";
-  const description = clamp(body.replace(/\s+/g, " ").trim() || title, 158);
+  const description = clamp(newsExcerpt(post, locale, 158) || title, 158);
   const locales = newsLocales(post);
   return {
     ...(locales.length ? canonical(`/news/${post.slug}`, locale, locales) : { alternates: { canonical: localizedUrl(`/news/${post.slug}`, locale) } }),
@@ -61,7 +61,8 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
   }
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
   const body = newsBody(post, locale);
-  const paragraphs = splitNewsParagraphs(body);
+  const blocks = splitNewsMarkdownBlocks(body);
+  const renderedBlocks = await renderNewsMarkdownBlocks(blocks, locale);
   const images = post.images ?? [];
   const imagesAt = (position: number) => images.filter((image) => image.position === position);
   const sources = newsSources(post);
@@ -115,15 +116,13 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
       </header>
       <article className="prose news-item-body">
         {imagesAt(0).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
-        {paragraphs.length ? paragraphs.map((paragraph, index) => (
+        {renderedBlocks.length ? renderedBlocks.map((block, index) => (
           <Fragment key={index}>
-            {newsParagraphRole(paragraph) === "heading"
-              ? <h2 className="news-section">{paragraph}</h2>
-              : <p>{paragraph}</p>}
+            {block}
             {imagesAt(index + 1).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
           </Fragment>
         )) : <p className="sub">{tr(locale, "This item has no further text.", "本条没有更多正文。")}</p>}
-        {images.filter((image) => image.position > paragraphs.length).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
+        {images.filter((image) => image.position > blocks.length).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
       </article>
       <p className="sub" style={{ marginTop: 26 }}>
         {post.column ? (

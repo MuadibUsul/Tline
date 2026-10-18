@@ -1,6 +1,8 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { localePath, tr, type Locale } from "@/lib/i18n";
-import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsExcerpt, newsImageAlt, newsInlineParagraphs, newsTitle, type NewsRecord } from "@/lib/news";
+import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsExcerpt, newsImageAlt, newsInlineMarkdownBlocks, newsTitle, type NewsRecord } from "@/lib/news";
+import { renderNewsMarkdownBlocks } from "@/lib/newsMarkdown";
 
 /** Beijing time for the desk's clock, the same source the front-page rail uses. */
 export function newsClock(date: Date, locale: Locale) {
@@ -14,12 +16,12 @@ export function newsClock(date: Date, locale: Locale) {
  * The whole row is not a link: the headline and the column chip are, and the rail carries
  * time, kind and pinned state.
  */
-export default function NewsRow({ post, locale, showColumn = false }: { post: NewsRecord; locale: Locale; showColumn?: boolean }) {
+export default async function NewsRow({ post, locale, showColumn = false }: { post: NewsRecord; locale: Locale; showColumn?: boolean }) {
   const title = newsTitle(post, locale) ?? "";
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
   const excerpt = newsExcerpt(post, locale);
   // Short items render their body in the stream; an article keeps its excerpt and page.
-  const inlineBody = newsInlineParagraphs(post, locale);
+  const inlineBody = await renderNewsMarkdownBlocks(newsInlineMarkdownBlocks(post, locale), locale);
   const cover = post.images?.[0] ?? null;
 
   return (
@@ -37,7 +39,7 @@ export default function NewsRow({ post, locale, showColumn = false }: { post: Ne
         </h2>
         {inlineBody.length > 0 ? (
           <div className="news-inline-body">
-            {inlineBody.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+            {inlineBody.map((block, index) => <Fragment key={index}>{block}</Fragment>)}
           </div>
         ) : excerpt ? <p className="news-excerpt">{excerpt}</p> : null}
         <p className="news-source">

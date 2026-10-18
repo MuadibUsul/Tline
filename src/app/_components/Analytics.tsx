@@ -93,8 +93,10 @@ function campaign(): Payload | undefined {
 
 function scrollPct(): number {
   const root = document.documentElement;
-  const height = Math.max(root.scrollHeight, window.innerHeight);
-  return Math.max(0, Math.min(100, Math.round(((window.scrollY + window.innerHeight) / height) * 100)));
+  const scrollable = Math.max(0, root.scrollHeight - window.innerHeight);
+  // Distance scrolled, not viewport coverage: a short page at the top is 0, not 100.
+  // Otherwise every short page looks fully read and a quick glance can never be detected.
+  return scrollable === 0 ? 0 : Math.max(0, Math.min(100, Math.round((window.scrollY / scrollable) * 100)));
 }
 
 function cleanLabel(value: string | null | undefined): string | null {

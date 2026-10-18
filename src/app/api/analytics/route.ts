@@ -1,7 +1,8 @@
 import { getSessionUser } from "@/lib/auth";
-import { isBot } from "@/lib/analytics/agent";
+import { classifyWithSignals } from "@/lib/analytics/agent";
+import { recordBotHit } from "@/lib/analytics/botHits";
 import { identify, record, type Beacon } from "@/lib/analytics/collect";
-import { clientAddress } from "@/lib/analytics/identity";
+import { clientAddress, readAnalyticsIdentity } from "@/lib/analytics/identity";
 import { rateLimit } from "@/lib/rateLimit";
 import { siteUrl } from "@/lib/site";
 
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
  */
 
 const LIMIT = Number(process.env.ANALYTICS_RATE_LIMIT || 120); // beacons per minute per address
-const MAX_BODY = 4000;
+const MAX_BODY = 12_000; // page-end payloads now carry section attention and scroll stops
 
 function enabled() {
   return process.env.ANALYTICS_ENABLED !== "false";
@@ -40,8 +41,6 @@ function sameOrigin(request: Request): boolean {
 export async function POST(request: Request) {
   if (!enabled() || !sameOrigin(request)) return accepted();
 
-  const userAgent = request.headers.get("user-agent");
-  if (isBot(userAgent)) return accepted();
   // Do-Not-Track is a request, not a requirement, and honouring it costs a fraction of a
   // percent of the numbers. Left configurable so a deployment can decide for its region.
   if (process.env.ANALYTICS_RESPECT_DNT === "true" && (request.headers.get("dnt") === "1" || request.headers.get("sec-gpc") === "1")) {
@@ -62,8 +61,25 @@ export async function POST(request: Request) {
     return accepted();
   }
 
+  const userAgent = request.headers.get("user-agent");
+  const agent = classifyWithSignals(userAgent, beacon.signals as Parameters<typeof classifyWithSignals>[1]);
+  if (agent.trafficClass !== "human") {
+    // A JS-capable crawler/agent is still not an audience. Keep it in the bot/agent table,
+    // and only count the pageview beacon once (duration/vital beacons would multiply it).
+    if ((beacon.type ?? "pageview") === "pageview") {
+      await recordBotHit({
+        path: beacon.path,
+        trafficClass: agent.trafficClass,
+        agentName: agent.agentName,
+        source: "beacon",
+      }).catch(() => {});
+    }
+    return accepted();
+  }
+
+  const identity = readAnalyticsIdentity(request.headers);
   const user = await getSessionUser().catch(() => null);
-  const visitor = identify(request.headers, beacon.session, user?.id ?? null);
+  const visitor = identify(request.headers, beacon.session, user?.id ?? null, identity, agent, beacon.signals);
   await record(beacon, visitor, request.headers).catch((error: unknown) => {
     console.warn(JSON.stringify({ event: "analytics.write_failed", error: String(error).slice(0, 300) }));
   });

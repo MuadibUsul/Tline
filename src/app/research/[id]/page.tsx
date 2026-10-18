@@ -212,7 +212,12 @@ function ArticleBody({ segments, fallback, locale, translated = false, figures =
       <Figures items={lead} />
       <Tables items={leadTables} />
       {sections.map((segment, index) => (
-        <section className="article-section" key={segment.id}>
+        <section
+          className="article-section"
+          key={segment.id}
+          data-track-section={`research-section-${index + 1}`}
+          data-track-title={segment.heading ? display(segment.heading) : `Section ${index + 1}`}
+        >
           {segment.heading && <h3>{display(segment.heading)}</h3>}
           <div className="article-body">
             {articleBlocks(display(segment.text)).map((block, blockIndex) =>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classify, isBot } from "./agent";
+import { classify, classifyWithSignals, isBot } from "./agent";
 
 const CHROME_WINDOWS = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const SAFARI_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1";
@@ -34,10 +34,25 @@ test("platforms come out of the same string", () => {
 test("automated callers are excluded, including the ones that dress as browsers", () => {
   assert.equal(isBot("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"), true);
   assert.equal(isBot("curl/8.4.0"), true);
-  assert.equal(isBot("node-fetch/1.0"), false); // not claimed by anything we have seen
+  assert.equal(isBot("node-fetch/1.0"), true);
   assert.equal(isBot("Mozilla/5.0 (compatible; ClaudeBot/1.0)"), true);
   assert.equal(isBot("Mozilla/5.0 AppleWebKit/537.36 HeadlessChrome/131.0.0.0"), true);
   assert.equal(isBot(CHROME_WINDOWS), false);
+});
+
+test("crawlers, AI agents and automation are not one bucket", () => {
+  assert.equal(classify("Mozilla/5.0 (compatible; Googlebot/2.1)").trafficClass, "crawler");
+  assert.equal(classify("Mozilla/5.0 (compatible; GPTBot/1.0)").trafficClass, "ai_agent");
+  assert.equal(classify("Mozilla/5.0 (compatible; ClaudeBot/1.0)").trafficClass, "ai_agent");
+  assert.equal(classify("curl/8.4.0").trafficClass, "automation");
+  assert.equal(classify("Mozilla/5.0 AppleWebKit/537.36 HeadlessChrome/131.0.0.0").trafficClass, "automation");
+  assert.equal(classify(CHROME_WINDOWS).trafficClass, "human");
+});
+
+test("client signals can expose a browser that claims to be human", () => {
+  assert.equal(classifyWithSignals(CHROME_WINDOWS, { webdriver: true }).trafficClass, "automation");
+  assert.equal(classifyWithSignals(CHROME_WINDOWS, { headless: true }).trafficClass, "automation");
+  assert.equal(classifyWithSignals(CHROME_WINDOWS, { webdriver: false }).trafficClass, "human");
 });
 
 test("a missing user agent is treated as automated rather than as a desktop reader", () => {

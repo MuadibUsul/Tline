@@ -6,21 +6,21 @@ import { dayKey, dayRange, shiftDay } from "./identity";
  * The dashboard's queries.
  *
  * These read the raw tables rather than the daily rollup. Every range the console offers
- * (24h through 90d) sits inside the raw retention window, so raw is both available and
+ * (24h through 180d) sits inside the raw retention window, so raw is both available and
  * exact — the rollup exists to outlive that window and to make pruning safe, not to
- * answer these. If the corpus grows to where a 90-day scan is slow, the fix is to read
+ * answer these. If the corpus grows to where a 180-day scan is slow, the fix is to read
  * `TrafficDaily` for whole days and raw only for today; the shapes returned here are the
  * same either way.
  */
 
-export const RANGES = ["24h", "7d", "30d", "90d"] as const;
+export const RANGES = ["24h", "7d", "30d", "90d", "180d"] as const;
 export type Range = (typeof RANGES)[number];
 
 export function isRange(value: unknown): value is Range {
   return typeof value === "string" && (RANGES as readonly string[]).includes(value);
 }
 
-export const RANGE_DAYS: Record<Range, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90 };
+export const RANGE_DAYS: Record<Range, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90, "180d": 180 };
 
 export interface Window {
   from: Date;
@@ -52,23 +52,37 @@ function change(current: number, previous: number): number | null {
 }
 
 /** Distinct values of one column in a time window, counted by the database. */
-async function distinct(field: "visitorId" | "sessionId", from: Date, to: Date): Promise<number> {
+async function distinct(field: "sessionId", from: Date, to: Date): Promise<number> {
   const rows = await prisma.pageView.groupBy({ by: [field], where: { ts: { gte: from, lte: to } } });
   return rows.length;
+}
+
+/**
+ * Unique visitors in a window.
+ *
+ * With consent, `visitorKey` is stable across days and one returning reader counts once.
+ * Without it, the fallback daily digest still counts one reader once per UTC day; a
+ * multi-day figure is therefore a mix of true cross-day uniques and daily uniques. The
+ * dashboard labels that distinction in the audience copy rather than pretending the two
+ * are identical.
+ */
+async function uniqueVisitors(from: Date, to: Date): Promise<number> {
+  const rows = await prisma.pageView.groupBy({ by: ["visitorId", "visitorKey"], where: { ts: { gte: from, lte: to } } });
+  return new Set(rows.map((row) => row.visitorKey ?? `d:${row.visitorId}`)).size;
 }
 
 export async function overview(window: Window): Promise<Overview> {
   const inWindow: Prisma.PageViewWhereInput = { ts: { gte: window.from, lte: window.to } };
   const [views, visitors, sessions, sessionSizes, duration, previousViews, previousVisitors] = await Promise.all([
     prisma.pageView.count({ where: inWindow }),
-    distinct("visitorId", window.from, window.to),
+    uniqueVisitors(window.from, window.to),
     distinct("sessionId", window.from, window.to),
     // A bounce is a session that produced exactly one view: the reader arrived and left
     // without going anywhere else.
     prisma.pageView.groupBy({ by: ["sessionId"], where: inWindow, _count: { _all: true } }),
     prisma.pageView.aggregate({ where: { ...inWindow, durationMs: { not: null } }, _avg: { durationMs: true } }),
     prisma.pageView.count({ where: { ts: { gte: window.previousFrom, lt: window.from } } }),
-    prisma.pageView.groupBy({ by: ["visitorId"], where: { ts: { gte: window.previousFrom, lt: window.from } } }),
+    uniqueVisitors(window.previousFrom, window.from),
   ]);
 
   const bounces = sessionSizes.filter((row) => row._count._all === 1).length;
@@ -79,7 +93,7 @@ export async function overview(window: Window): Promise<Overview> {
     bounceRate: sessions === 0 ? null : (bounces / sessions) * 100,
     avgDurationSec: duration._avg.durationMs === null ? null : duration._avg.durationMs / 1000,
     viewsChange: change(views, previousViews),
-    visitorsChange: change(visitors, previousVisitors.length),
+    visitorsChange: change(visitors, previousVisitors),
   };
 }
 
@@ -99,7 +113,7 @@ export async function timeseries(window: Window, now: Date = new Date()): Promis
   if (window.days === 1) {
     const rows = await prisma.pageView.findMany({
       where: { ts: { gte: window.from, lte: window.to } },
-      select: { ts: true, visitorId: true },
+      select: { ts: true, visitorId: true, visitorKey: true },
     });
     const buckets = Array.from({ length: 24 }, (_, index) => {
       const hour = new Date(now.getTime() - (23 - index) * 60 * 60 * 1000);
@@ -111,7 +125,7 @@ export async function timeseries(window: Window, now: Date = new Date()): Promis
         row.ts >= bucket.at && (position === buckets.length - 1 || row.ts < buckets[position + 1].at));
       if (index < 0) continue;
       buckets[index].views += 1;
-      buckets[index].visitors.add(row.visitorId);
+      buckets[index].visitors.add(row.visitorKey ?? `d:${row.visitorId}`);
     }
     return buckets.map((bucket) => ({ label: bucket.label, primary: bucket.views, secondary: bucket.visitors.size }));
   }
@@ -120,21 +134,21 @@ export async function timeseries(window: Window, now: Date = new Date()): Promis
   // One row per (day, visitor): views come from the count, visitors from the row count,
   // so a single grouped query answers both series.
   const rows = await prisma.pageView.groupBy({
-    by: ["day", "visitorId"],
+    by: ["day", "visitorId", "visitorKey"],
     where: { day: { gte: days[0] } },
     _count: { _all: true },
   });
-  const byDay = new Map(days.map((day) => [day, { views: 0, visitors: 0 }]));
+  const byDay = new Map(days.map((day) => [day, { views: 0, visitors: new Set<string>() }]));
   for (const row of rows) {
     const bucket = byDay.get(row.day);
     if (!bucket) continue;
     bucket.views += row._count._all;
-    bucket.visitors += 1;
+    bucket.visitors.add(row.visitorKey ?? `d:${row.visitorId}`);
   }
   return days.map((day) => ({
     label: day.slice(5), // MM-DD; the year is the same across every range offered
     primary: byDay.get(day)!.views,
-    secondary: byDay.get(day)!.visitors,
+    secondary: byDay.get(day)!.visitors.size,
   }));
 }
 
@@ -152,24 +166,24 @@ const NULLABLE: ReadonlySet<Dimension> = new Set(["referrerHost", "country", "ut
 /** Top values of one dimension, ranked by views, with the visitor count beside each. */
 export async function breakdown(dimension: Dimension, window: Window, limit = 10): Promise<BreakdownRow[]> {
   const rows = await prisma.pageView.groupBy({
-    by: [dimension, "visitorId"],
+    by: [dimension, "visitorId", "visitorKey"],
     where: {
       ts: { gte: window.from, lte: window.to },
       ...(NULLABLE.has(dimension) ? { NOT: { [dimension]: null } } : {}),
     },
     _count: { _all: true },
   });
-  const totals = new Map<string, { views: number; visitors: number }>();
+  const totals = new Map<string, { views: number; visitors: Set<string> }>();
   for (const row of rows) {
     const key = (row as Record<string, unknown>)[dimension];
     if (typeof key !== "string" || !key) continue;
-    const bucket = totals.get(key) ?? { views: 0, visitors: 0 };
+    const bucket = totals.get(key) ?? { views: 0, visitors: new Set<string>() };
     bucket.views += row._count._all;
-    bucket.visitors += 1;
+    bucket.visitors.add(row.visitorKey ?? `d:${row.visitorId}`);
     totals.set(key, bucket);
   }
   return [...totals.entries()]
-    .map(([value, counts]) => ({ value, ...counts }))
+    .map(([value, counts]) => ({ value, views: counts.views, visitors: counts.visitors.size }))
     .sort((a, b) => b.views - a.views)
     .slice(0, limit);
 }
@@ -182,19 +196,19 @@ export interface EventRow {
 
 export async function events(window: Window, limit = 15): Promise<EventRow[]> {
   const rows = await prisma.analyticsEvent.groupBy({
-    by: ["name", "visitorId"],
+    by: ["name", "visitorId", "visitorKey"],
     where: { ts: { gte: window.from, lte: window.to } },
     _count: { _all: true },
   });
-  const totals = new Map<string, { count: number; visitors: number }>();
+  const totals = new Map<string, { count: number; visitors: Set<string> }>();
   for (const row of rows) {
-    const bucket = totals.get(row.name) ?? { count: 0, visitors: 0 };
+    const bucket = totals.get(row.name) ?? { count: 0, visitors: new Set<string>() };
     bucket.count += row._count._all;
-    bucket.visitors += 1;
+    bucket.visitors.add(row.visitorKey ?? `d:${row.visitorId}`);
     totals.set(row.name, bucket);
   }
   return [...totals.entries()]
-    .map(([name, counts]) => ({ name, ...counts }))
+    .map(([name, counts]) => ({ name, count: counts.count, visitors: counts.visitors.size }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
 }
@@ -208,12 +222,12 @@ export interface Realtime {
 /** The last half hour: who is here now, and what they have open. */
 export async function realtime(now: Date = new Date()): Promise<Realtime> {
   const from = new Date(now.getTime() - 30 * 60_000);
-  const rows = await prisma.pageView.findMany({ where: { ts: { gte: from } }, select: { path: true, visitorId: true } });
+  const rows = await prisma.pageView.findMany({ where: { ts: { gte: from } }, select: { path: true, visitorId: true, visitorKey: true } });
   const pages = new Map<string, number>();
   const visitors = new Set<string>();
   for (const row of rows) {
     pages.set(row.path, (pages.get(row.path) ?? 0) + 1);
-    visitors.add(row.visitorId);
+    visitors.add(row.visitorKey ?? `d:${row.visitorId}`);
   }
   return {
     visitors: visitors.size,
@@ -291,14 +305,14 @@ export interface FunnelStep {
  */
 export async function funnel(now: Date = new Date()): Promise<FunnelStep[]> {
   const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const [visitors, signups, withWatchlist, withRules] = await Promise.all([
-    prisma.pageView.groupBy({ by: ["visitorId"], where: { ts: { gte: from } } }),
+  const [visitorRows, signups, withWatchlist, withRules] = await Promise.all([
+    prisma.pageView.groupBy({ by: ["visitorId", "visitorKey"], where: { ts: { gte: from } } }),
     prisma.user.count({ where: { createdAt: { gte: from } } }),
     prisma.user.count({ where: { createdAt: { gte: from }, watchlist: { some: {} } } }),
     prisma.user.count({ where: { createdAt: { gte: from }, rules: { some: {} } } }),
   ]);
   return [
-    { label: "visitors", count: visitors.length },
+    { label: "visitors", count: new Set(visitorRows.map((row) => row.visitorKey ?? `d:${row.visitorId}`)).size },
     { label: "accounts", count: signups },
     { label: "watchlist", count: withWatchlist },
     { label: "alerts", count: withRules },

@@ -94,7 +94,7 @@ export default function HomeFront({
         <div><span className="eyebrow">{tr(locale, "Editorial desk", "编辑台")}</span><h2>{tr(locale, "What matters now", "此刻值得关注")}</h2></div>
         <Link href={localePath(locale, "/research")}>{tr(locale, "Browse all research", "浏览全部研报")} <Icon name="arrow-right" /></Link>
       </div>
-      <section className="front-grid" aria-label={tr(locale, "Today's cover", "今日封面")}>
+      <section className="front-grid" aria-label={tr(locale, "Today's cover", "今日封面")} data-track-section="home-cover" data-track-title={tr(locale, "Today's cover", "今日封面")}>
         {top ? (
           <article className="ed-feature">
             <Byline locale={locale} institution={top.institution.name} institutionSlug={top.institution.slug} publishedAt={top.publishedAt} />
@@ -128,7 +128,7 @@ export default function HomeFront({
 
       {/* Institutions changed their minds about…, with the newsroom's latest beside them. */}
       {(watch.length > 0 || news.length > 0) && (
-        <section className="blk front-observations" aria-label={tr(locale, "Today's institutional observations", "今日机构观察")}>
+        <section className="blk front-observations" aria-label={tr(locale, "Today's institutional observations", "今日机构观察")} data-track-section="home-observations" data-track-title={tr(locale, "Institutional observations", "机构观察")}>
           <div className={`front-ob-grid${watch.length === 0 ? " solo-news" : ""}`}>
             {watch.length > 0 && (
               <div className="front-ob-main">
@@ -157,7 +157,7 @@ export default function HomeFront({
               </div>
             )}
             {news.length > 0 && (
-              <aside className="front-news-rail" aria-label={tr(locale, "Latest news", "最新新鲜事")}>
+              <aside className="front-news-rail" aria-label={tr(locale, "Latest news", "最新新鲜事")} data-track-section="home-news" data-track-title={tr(locale, "Newsroom", "新鲜事")}>
                 <div className="front-news-head">
                   <span className="section-t" style={{ margin: 0 }}>{tr(locale, "Newsroom", "新鲜事")}</span>
                   <Link className="chip gray" href={localePath(locale, "/news")}>{tr(locale, "All", "全部")} →</Link>
@@ -187,7 +187,7 @@ export default function HomeFront({
 
       {/* Three ongoing desks side by side: market narratives, the subjects institutions
           keep returning to, and the weekly letter. Every row/ chip links to its page. */}
-      <section className="front-band front-triptych" aria-label={tr(locale, "Ongoing desks", "常设栏目")}>
+      <section className="front-band front-triptych" aria-label={tr(locale, "Ongoing desks", "常设栏目")} data-track-section="home-desks" data-track-title={tr(locale, "Ongoing desks", "常设栏目")}>
         <div className="blk">
           <div className="section-t"><span>{tr(locale, "Themes in motion", "交易主线")}</span><Link className="chip gray" href={localePath(locale, "/market-themes")}>{tr(locale, "All", "全部")} →</Link></div>
           {themes.length > 0 ? (
@@ -225,7 +225,7 @@ export default function HomeFront({
 
       {/* One figure worth reading. */}
       {figure && (
-        <section className="blk" aria-label={tr(locale, "Chart of the day", "一张值得读的图")}>
+        <section className="blk" aria-label={tr(locale, "Chart of the day", "一张值得读的图")} data-track-section="home-chart" data-track-title={tr(locale, "Chart of the day", "一张值得读的图")}>
           <div className="section-t">{tr(locale, "A figure worth reading", "一张值得读的图")}</div>
           <figure className="ed-figure front-figure">
             {/* eslint-disable-next-line @next/next/no-img-element -- served from the private figure store, not a static asset */}

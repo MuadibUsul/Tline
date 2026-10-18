@@ -1,6 +1,7 @@
 import { prisma } from "../db";
 import { classify } from "./agent";
-import { clientAddress, dayKey, visitorHash } from "./identity";
+import { clientAddress, dayKey, readAnalyticsIdentity, visitorHash } from "./identity";
+import { normalizePath } from "./path";
 
 /**
  * Records an event from a server route rather than from the browser.
@@ -21,21 +22,26 @@ export function trackServerEvent(
 ) {
   if (process.env.ANALYTICS_ENABLED === "false") return;
   const userAgent = headers.get("user-agent") ?? "";
+  const agent = classify(userAgent);
   // A crawler fetching a PDF is not an audience, and it would otherwise be the loudest
   // "reader" in the table.
-  if (classify(userAgent).bot) return;
+  if (agent.trafficClass !== "human") return;
+  const identity = readAnalyticsIdentity(headers);
 
   void prisma.analyticsEvent
     .create({
       data: {
         day: dayKey(),
         name: name.slice(0, 80),
-        path: options.path?.slice(0, 300) ?? null,
+        path: normalizePath(options.path)?.path.slice(0, 300) ?? null,
         visitorId: visitorHash(clientAddress(headers), userAgent),
+        visitorKey: identity.visitorKey,
         // There is no tab to ask, so the visitor stands in for the session: a server-side
         // event belongs to a person on a day, which is all these are counted by.
         sessionId: "server",
         userId: options.userId ?? null,
+        trafficClass: agent.trafficClass,
+        consent: identity.consent,
         value: options.value ?? null,
         metadata: JSON.stringify(options.metadata ?? {}).slice(0, 1000),
       },

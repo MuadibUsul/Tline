@@ -28,6 +28,16 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   };
 }
 
+function blockLabel(block: string, index: number): string {
+  const first = block.split("\n")[0]
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^>\s?\[![^\]]+\]\s*/, "")
+    .replace(/^[-*+]\s+/, "")
+    .replace(/[*_`~]/g, "")
+    .trim();
+  return (first || `${index + 1}`).slice(0, 80);
+}
+
 function NewsFigure({ image, locale }: { image: NewsImageRecord; locale: Locale }) {
   const caption = newsImageCaption(image, locale);
   return (
@@ -117,10 +127,15 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
       <article className="prose news-item-body">
         {imagesAt(0).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
         {renderedBlocks.length ? renderedBlocks.map((block, index) => (
-          <Fragment key={index}>
+          <div
+            className="news-body-block"
+            key={index}
+            data-track-section={`news-block-${index + 1}`}
+            data-track-title={blockLabel(blocks[index] ?? "", index)}
+          >
             {block}
             {imagesAt(index + 1).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
-          </Fragment>
+          </div>
         )) : <p className="sub">{tr(locale, "This item has no further text.", "本条没有更多正文。")}</p>}
         {images.filter((image) => image.position > blocks.length).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
       </article>

@@ -65,6 +65,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       items: [
         ...item("admin.users", "/admin/users", "Accounts", "账户管理"),
         ...item("admin.analytics", "/admin/analytics", "Traffic", "流量分析"),
+        ...item("admin.analytics", "/admin/analytics/behavior", "Behavior", "行为分析"),
         ...item("admin.analytics", "/admin/analytics/audience", "Visitors & users", "访客与用户"),
       ],
     },

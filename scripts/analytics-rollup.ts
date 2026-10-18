@@ -27,7 +27,7 @@ runTrackedJob("analytics-rollup", { days, retentionDays: retentionDays() }, asyn
       views: rolled.reduce((total, day) => total + day.views, 0),
       rows: rolled.reduce((total, day) => total + day.rows, 0),
       prunedBefore: pruned.before,
-      pruned: pruned.pageViews + pruned.events + pruned.vitals,
+      pruned: pruned.pageViews + pruned.events + pruned.vitals + pruned.clicks + pruned.sections,
     },
   };
 }).catch((error: unknown) => {

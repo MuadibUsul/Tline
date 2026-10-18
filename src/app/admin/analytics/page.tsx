@@ -15,6 +15,7 @@ const RANGE_LABEL: Record<Range, [string, string]> = {
   "7d": ["7 days", "7 天"],
   "30d": ["30 days", "30 天"],
   "90d": ["90 days", "90 天"],
+  "180d": ["180 days", "180 天"],
 };
 
 function seconds(value: number | null, locale: string): string {
@@ -55,11 +56,12 @@ export default async function TrafficPage(props: { searchParams: Promise<{ range
         <h1>{tr(locale, "Traffic", "流量")}</h1>
         <p className="sub">{tr(
           locale,
-          "First-party and cookie-less. Visitors are counted by a digest that rotates every day, so nobody is followed from one day to the next.",
-          "自建统计，不使用 Cookie。访客身份摘要每日轮换，因此不会跨天追踪任何人。",
+          "First-party and cookie-optional. After consent a random visitor id makes returning readers countable across days; without it, the daily digest still counts a reader once per day. Crawlers and agents are kept in a separate request lane.",
+          "自建统计，Cookie 可选。同意后会使用随机访客标识统计跨天回访；拒绝则仍按每日轮换摘要统计。爬虫与 Agent 单独记录，不混入真人浏览量。",
         )}</p>
       </div>
       <div className="tag-row">
+        <a className="chip gray" href={localePath(locale, "/admin/analytics/behavior")}>{tr(locale, "Behavior →", "行为分析 →")}</a>
         <span className="chip bull" title={tr(locale, "Active in the last 30 minutes", "最近 30 分钟活跃")}>
           ● {live.visitors} {tr(locale, "online", "在线")}
         </span>

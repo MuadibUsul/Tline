@@ -4,6 +4,7 @@ import Link from "next/link";
 import ThemeToggle from "./_components/ThemeToggle";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { doSignOut } from "./actions";
 import { isFormalAuthConfigured } from "@/lib/auth-config";
@@ -14,6 +15,9 @@ import { TlinesMark } from "./_components/Icon";
 import TopbarScroll from "./_components/TopbarScroll";
 import NavigationProgress from "./_components/NavigationProgress";
 import Analytics from "./_components/Analytics";
+import CookieConsent from "./_components/CookieConsent";
+import { classify } from "@/lib/analytics/agent";
+import { recordBotHit } from "@/lib/analytics/botHits";
 import { redesignAtLeast } from "@/lib/redesign";
 import { getLocale, tr, localePath, stripLocale } from "@/lib/i18n";
 import { can } from "@/lib/permissions";
@@ -52,8 +56,30 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   const formalAuth = isFormalAuthConfigured();
-  const pathname = stripLocale((await headers()).get("x-pathname") ?? "");
+  const requestHeaders = await headers();
+  const requestedPath = requestHeaders.get("x-pathname") ?? "";
+  const pathname = stripLocale(requestedPath);
   const locale = pathname.startsWith("/admin") ? "zh-CN" : await getLocale();
+
+  /**
+   * Crawlers and agents mostly do not run JavaScript, so the beacon never sees them. The
+   * page render does. Record the HTML fetch after the response instead of blocking the
+   * reader's paint; human renders do no database work here.
+   */
+  if (process.env.ANALYTICS_ENABLED !== "false") {
+    const agent = classify(requestHeaders.get("user-agent"));
+    const accept = requestHeaders.get("accept") ?? "";
+    const acceptsHtml = !accept || accept.includes("text/html") || accept.includes("*/*");
+    const isRsc = requestHeaders.get("rsc") === "1" || requestHeaders.get("next-router-prefetch") === "1";
+    if (agent.trafficClass !== "human" && acceptsHtml && !isRsc && !pathname.startsWith("/admin")) {
+      after(() => recordBotHit({
+        path: requestedPath || "/",
+        trafficClass: agent.trafficClass,
+        agentName: agent.agentName,
+        source: "server",
+      }).catch(() => {}));
+    }
+  }
 
   // An account enrolled by email link has no password yet. Sending it straight to the
   // page that sets one is what keeps email down to enrolment and recovery: without this
@@ -207,6 +233,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Mounted last and rendering nothing: the beacon must never be on the path to
             first paint of the page it is measuring. */}
         {process.env.ANALYTICS_ENABLED !== "false" && <Analytics />}
+        {process.env.ANALYTICS_ENABLED !== "false" && !pathname.startsWith("/admin") && <CookieConsent locale={locale} />}
         <footer className="site-footer">
           <div className="wrap site-footer-inner">
             <div className="site-footer-top">

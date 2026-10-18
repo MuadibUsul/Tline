@@ -125,9 +125,9 @@ test("an unusable retention setting falls back rather than deleting everything",
   const previous = process.env.ANALYTICS_RAW_RETENTION_DAYS;
   try {
     process.env.ANALYTICS_RAW_RETENTION_DAYS = "0";
-    assert.equal(retentionDays(), 90);
+    assert.equal(retentionDays(), 180);
     process.env.ANALYTICS_RAW_RETENTION_DAYS = "not a number";
-    assert.equal(retentionDays(), 90);
+    assert.equal(retentionDays(), 180);
     process.env.ANALYTICS_RAW_RETENTION_DAYS = "30";
     assert.equal(retentionDays(), 30);
   } finally {

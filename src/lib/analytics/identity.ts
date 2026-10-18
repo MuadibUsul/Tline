@@ -1,17 +1,17 @@
 import { createHash } from "node:crypto";
+import { ANALYTICS_CONSENT_COOKIE, ANALYTICS_VISITOR_COOKIE } from "./cookieNames";
 
 /**
  * Who a visitor is, for counting purposes only.
  *
- * There is no analytics cookie and no stored address. A visitor is the digest of a
- * server-side secret, the UTC day, the caller's address and their user agent. Within one
- * day the same reader hashes to the same value, so "visitors" is a real count rather than
- * a count of page views; across days the value changes and cannot be joined back, so the
- * history here does not accumulate into a profile of anyone.
+ * `visitorHash` is the cookieless fallback: a digest of a server-side secret, the UTC day,
+ * the caller's address and their user agent. Within one day the same reader hashes to the
+ * same value; across days the value changes and cannot be joined back. It is used when a
+ * reader declines the analytics cookie.
  *
- * Rotating on the day is what makes the address unrecoverable in practice as well as in
- * principle: an attacker holding the table and the secret could still only test addresses
- * against the day they were seen, and the table itself is pruned.
+ * After opt-in, `readAnalyticsIdentity` returns a random first-party cookie id instead.
+ * That id is stable across days and is what makes returning anonymous readers countable;
+ * the address and raw UA are still never stored.
  */
 
 function secret(): string {
@@ -62,4 +62,45 @@ export function clientAddress(headers: Headers): string {
 export function clientCountry(headers: Headers): string | null {
   const country = headers.get("cf-ipcountry") || headers.get("x-vercel-ip-country") || headers.get("x-country-code");
   return country && /^[A-Za-z]{2}$/.test(country) && country.toUpperCase() !== "XX" ? country.toUpperCase() : null;
+}
+
+export type AnalyticsConsent = "granted" | "denied" | "unknown";
+
+export interface AnalyticsIdentity {
+  /** Stable first-party cookie id; null when consent was not granted. */
+  visitorKey: string | null;
+  consent: AnalyticsConsent;
+}
+
+function cookieValue(headers: Headers, name: string): string | null {
+  const raw = headers.get("cookie");
+  if (!raw) return null;
+  for (const part of raw.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (key === name) {
+      try {
+        return decodeURIComponent(rest.join("="));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * The opt-in identity. A cookie id is accepted only when the consent cookie says granted;
+ * a stray id left behind after a decline is ignored. Ids are random and bounded, never
+ * derived from the address.
+ */
+export function readAnalyticsIdentity(headers: Headers): AnalyticsIdentity {
+  const consent = cookieValue(headers, ANALYTICS_CONSENT_COOKIE);
+  const visitorKey = cookieValue(headers, ANALYTICS_VISITOR_COOKIE);
+  const granted = consent === "granted"
+    && Boolean(visitorKey)
+    && /^[A-Za-z0-9_-]{20,64}$/.test(visitorKey!);
+  return {
+    visitorKey: granted ? visitorKey : null,
+    consent: consent === "granted" || consent === "denied" ? consent : "unknown",
+  };
 }

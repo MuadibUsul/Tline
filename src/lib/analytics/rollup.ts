@@ -17,6 +17,8 @@ import { shiftDay } from "./identity";
 /** Every dimension the traffic dashboard breaks down by, and the column it reads. */
 const DIMENSIONS = {
   path: "path",
+  template: "template",
+  traffic_class: "trafficClass",
   referrer: "referrerHost",
   country: "country",
   device: "device",
@@ -77,12 +79,12 @@ export async function rollupDay(day: string): Promise<RollupResult> {
   const views = await prisma.pageView.findMany({
     where: { day },
     select: {
-      path: true, referrerHost: true, country: true, device: true, browser: true,
+      path: true, template: true, trafficClass: true, referrerHost: true, country: true, device: true, browser: true,
       os: true, locale: true, utmSource: true, utmMedium: true, utmCampaign: true,
-      visitorId: true, sessionId: true, durationMs: true,
+      visitorId: true, visitorKey: true, sessionId: true, durationMs: true,
     },
   });
-  const events = await prisma.analyticsEvent.findMany({ where: { day }, select: { name: true, visitorId: true, sessionId: true } });
+  const events = await prisma.analyticsEvent.findMany({ where: { day }, select: { name: true, visitorId: true, visitorKey: true, sessionId: true } });
 
   const buckets = new Buckets();
   // Sessions are counted once per day, and a bounce is a session with one view; both need
@@ -93,7 +95,7 @@ export async function rollupDay(day: string): Promise<RollupResult> {
     const seconds = Math.round((view.durationMs ?? 0) / 1000);
     const total = buckets.get("total", "");
     total.views += 1;
-    total.visitors.add(view.visitorId);
+    total.visitors.add(view.visitorKey ?? `d:${view.visitorId}`);
     total.sessions.add(view.sessionId);
     total.durationSec += seconds;
     sessionViews.set(view.sessionId, (sessionViews.get(view.sessionId) ?? 0) + 1);
@@ -103,7 +105,7 @@ export async function rollupDay(day: string): Promise<RollupResult> {
       if (typeof value !== "string" || !value) continue;
       const target = buckets.get(dimension, value);
       target.views += 1;
-      target.visitors.add(view.visitorId);
+      target.visitors.add(view.visitorKey ?? `d:${view.visitorId}`);
       target.sessions.add(view.sessionId);
       target.durationSec += seconds;
     }
@@ -112,7 +114,7 @@ export async function rollupDay(day: string): Promise<RollupResult> {
   for (const event of events) {
     const target = buckets.get("event", event.name);
     target.views += 1;
-    target.visitors.add(event.visitorId);
+    target.visitors.add(event.visitorKey ?? `d:${event.visitorId}`);
     target.sessions.add(event.sessionId);
   }
 
@@ -146,22 +148,26 @@ export interface PruneResult {
   pageViews: number;
   events: number;
   vitals: number;
+  clicks: number;
+  sections: number;
 }
 
 /** Deletes raw rows older than the retention window. Aggregates are never pruned. */
 export async function pruneRaw(retentionDays: number, now: Date = new Date()): Promise<PruneResult> {
   const before = shiftDay(now, -retentionDays);
-  const [pageViews, events, vitals] = await prisma.$transaction([
+  const [pageViews, events, vitals, clicks, sections] = await prisma.$transaction([
     prisma.pageView.deleteMany({ where: { day: { lt: before } } }),
     prisma.analyticsEvent.deleteMany({ where: { day: { lt: before } } }),
     prisma.webVital.deleteMany({ where: { day: { lt: before } } }),
+    prisma.clickEvent.deleteMany({ where: { day: { lt: before } } }),
+    prisma.sectionView.deleteMany({ where: { day: { lt: before } } }),
   ]);
-  return { before, pageViews: pageViews.count, events: events.count, vitals: vitals.count };
+  return { before, pageViews: pageViews.count, events: events.count, vitals: vitals.count, clicks: clicks.count, sections: sections.count };
 }
 
 export function retentionDays(): number {
-  const value = Number(process.env.ANALYTICS_RAW_RETENTION_DAYS || 90);
-  return Number.isFinite(value) && value >= 1 ? Math.trunc(value) : 90;
+  const value = Number(process.env.ANALYTICS_RAW_RETENTION_DAYS || 180);
+  return Number.isFinite(value) && value >= 1 ? Math.trunc(value) : 180;
 }
 
 /**

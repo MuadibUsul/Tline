@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizePath, referrerHost } from "./collect";
-import { dayKey, dayRange, shiftDay, visitorHash } from "./identity";
+import { pageMeta } from "./path";
+import { dayKey, dayRange, readAnalyticsIdentity, shiftDay, visitorHash } from "./identity";
 
 test("the query string never reaches the table", () => {
   // The one part of a URL that routinely carries a search term or an address.
@@ -56,4 +57,23 @@ test("day keys are UTC and walk backwards correctly across a month boundary", ()
   assert.equal(week.length, 7);
   assert.equal(week[0], "2026-09-01");
   assert.equal(week.at(-1), "2026-09-07");
+});
+
+test("page templates and content ids are derived from the public path", () => {
+  assert.deepEqual(pageMeta("/"), { template: "home", contentId: null });
+  assert.equal(pageMeta("/research").template, "research_index");
+  assert.equal(pageMeta("/research/abc").template, "article");
+  assert.equal(pageMeta("/news/some-item").template, "news_article");
+  assert.equal(pageMeta("/institution/ubs").template, "institution");
+  assert.equal(pageMeta("/markets/gold").template, "market");
+});
+
+test("a stable visitor id is only used after consent", () => {
+  const id = "12345678-1234-4234-8234-123456789abc";
+  const granted = readAnalyticsIdentity(new Headers({ cookie: `tline_consent=granted; tline_vid=${id}` }));
+  assert.deepEqual(granted, { visitorKey: id, consent: "granted" });
+  const denied = readAnalyticsIdentity(new Headers({ cookie: `tline_consent=denied; tline_vid=${id}` }));
+  assert.deepEqual(denied, { visitorKey: null, consent: "denied" });
+  const missing = readAnalyticsIdentity(new Headers());
+  assert.deepEqual(missing, { visitorKey: null, consent: "unknown" });
 });

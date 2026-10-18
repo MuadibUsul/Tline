@@ -28,21 +28,19 @@ export default function CookieConsent({ locale }: { locale: Locale }) {
 
   return (
     <section className="cookie-consent" aria-label={zh ? "Cookie 同意" : "Cookie consent"}>
-      <div className="cookie-consent-copy">
-        <b>{zh ? "关于分析 Cookie" : "About analytics cookies"}</b>
-        <p>
-          {zh
-            ? "我们使用第一方分析了解内容表现。接受会设置一个匿名访客 Cookie（180 天），用于跨天统计回访；拒绝则只保留不识别个人的汇总统计。"
-            : "We use first-party analytics to understand what is being read. Accepting sets a random visitor cookie for 180 days so returning readers can be counted; declining keeps only non-identifying aggregate counts."}
-        </p>
-        <Link href={`/${locale === "zh-CN" ? "zh" : "en"}/privacy`}>{zh ? "隐私说明" : "Privacy"}</Link>
-      </div>
+      <b>{zh ? "我们重视您的隐私" : "We value your privacy"}</b>
+      <p>
+        {zh
+          ? "我们使用 Cookie 改善浏览体验并统计访问情况。"
+          : "We use cookies to improve your browsing experience and measure traffic."}
+      </p>
+      <Link href={`/${locale === "zh-CN" ? "zh" : "en"}/privacy`}>{zh ? "Cookie 政策" : "Cookie Policy"}</Link>
       <div className="cookie-consent-actions">
         <button type="button" className="minibtn" onClick={() => choose("denied")}>
           {zh ? "仅必要" : "Essential only"}
         </button>
         <button type="button" className="minibtn p" onClick={() => choose("granted")}>
-          {zh ? "允许分析" : "Allow analytics"}
+          {zh ? "接受" : "Accept"}
         </button>
       </div>
     </section>

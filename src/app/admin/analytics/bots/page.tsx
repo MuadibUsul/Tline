@@ -69,6 +69,19 @@ export default async function BotTrafficPage(props: { searchParams: Promise<{ ra
       <StatCard label={tr(locale, "Agents", "Agent 数量")} value={String(traffic.agentsCount)} note={tr(locale, "distinct names", "不同标识")} />
       <StatCard label={tr(locale, "No-JS / JS", "无 JS / 有 JS")} value={`${compact(traffic.server)} / ${compact(traffic.beacon)}`} note={tr(locale, "server / beacon", "服务端 / beacon")} />
     </section>
+    <p className="admin-hint" style={{ marginTop: 8 }}>
+      {traffic.activeDays > 0
+        ? tr(
+          locale,
+          `Data covers ${traffic.activeDays} day(s), ${traffic.firstDay} to ${traffic.lastDay}. Bot requests are aggregated by UTC day, so ranges that contain only the same recorded day will show the same totals.`,
+          `数据覆盖 ${traffic.activeDays} 天（${traffic.firstDay} 至 ${traffic.lastDay}）。机器人请求按 UTC 自然日聚合；如果几个时间范围都只包含同一批有记录的日子，总数就会相同。`,
+        )
+        : tr(
+          locale,
+          "No bot request has been recorded in this period. Totals will change as new data arrives.",
+          "该时段还没有机器人请求记录，等新数据积累后总数才会变化。",
+        )}
+    </p>
 
     <div className="analytics-grid">
       <section className="blk">

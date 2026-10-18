@@ -44,6 +44,9 @@ export interface BotTraffic {
   server: number;
   beacon: number;
   agentsCount: number;
+  activeDays: number;
+  firstDay: string | null;
+  lastDay: string | null;
   byClass: BotClassCount[];
   agents: BotAgentRow[];
   paths: BotPathRow[];
@@ -102,9 +105,13 @@ export async function botTraffic(window: Window): Promise<BotTraffic> {
     }
   }
 
+  const active = [...daily.entries()].filter(([, row]) => row.total > 0).map(([day]) => day).sort();
   return {
     total,
     humanViews,
+    activeDays: active.length,
+    firstDay: active[0] ?? null,
+    lastDay: active.at(-1) ?? null,
     server,
     beacon,
     agentsCount: agentNames.size,

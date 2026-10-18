@@ -1733,8 +1733,8 @@ td{padding-block:13px}
 .research-filters select{min-width:0;font-size:12px}
 .research-filters .minibtn{grid-column:span 2;min-height:40px}
 .research-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.research-card-wrap{position:relative;min-width:0}
-.research-card{min-height:300px;padding:20px;border-radius:var(--radius);box-shadow:none;transition:border-color 160ms ease-out,transform 160ms cubic-bezier(.2,.8,.2,1),box-shadow 160ms ease-out}
+.research-card-wrap{display:flex;position:relative;min-width:0}
+.research-card{width:100%;min-height:300px;padding:20px;border-radius:var(--radius);box-shadow:none;transition:border-color 160ms ease-out,transform 160ms cubic-bezier(.2,.8,.2,1),box-shadow 160ms ease-out}
 .research-card h2{margin:14px 0 9px;font-family:var(--serif-display);font-size:18px;font-weight:600;line-height:1.38;letter-spacing:-.015em}
 .research-card p{font-size:12.5px;line-height:1.65}
 .editor-pick-badge{position:absolute;top:12px;right:12px;z-index:2;background:var(--signal-wash);color:var(--signal)}

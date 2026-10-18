@@ -140,6 +140,18 @@ export function newsBody(post: NewsRecord, locale: Locale): string | null {
   return value?.trim() || null;
 }
 
+/**
+ * The body the stream shows in place, rather than behind a permalink.
+ *
+ * A flash is a sentence and a brief is a paragraph; making a reader open a page to see
+ * either is a click for nothing. An article is thousands of characters and keeps its
+ * excerpt and its page.
+ */
+export function newsInlineParagraphs(post: NewsRecord, locale: Locale): string[] {
+  const kind = isNewsKind(post.kind) ? post.kind : "brief";
+  return kind === "flash" || kind === "brief" ? splitNewsParagraphs(newsBody(post, locale)) : [];
+}
+
 /** The languages this item can actually be read in. */
 export function newsLocales(post: NewsRecord): Locale[] {
   return LOCALES.filter((locale) => newsTitle(post, locale) !== null);

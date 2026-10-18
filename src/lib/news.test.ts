@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
+import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsInlineParagraphs, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsParagraphs, validateNewsInput } from "./news";
 
 const record = (overrides: Partial<Parameters<typeof newsTitle>[0]> = {}) => ({
   id: "p1", slug: "s", kind: "brief", titleZh: null, titleEn: null, bodyZh: null, bodyEn: null,
@@ -42,6 +42,15 @@ test("the desk calendar is Beijing time, not UTC", () => {
   const at = new Date("2026-10-16T17:30:00.000Z");
   assert.equal(newsDayKey(at), "2026-10-17");
   assert.match(newsDateLabel(at, "zh-CN"), /2026.*10.*17/);
+});
+
+test("the stream carries flash and brief bodies in place, but not an article body", () => {
+  const flash = record({ kind: "flash", bodyZh: "第一段。\n\n第二段。" });
+  assert.deepEqual(newsInlineParagraphs(flash, "zh-CN"), ["第一段。", "第二段。"]);
+  const brief = record({ kind: "brief", bodyEn: "First paragraph.\n\nSecond paragraph." });
+  assert.deepEqual(newsInlineParagraphs(brief, "en"), ["First paragraph.", "Second paragraph."]);
+  const article = record({ kind: "article", bodyZh: "长文第一段。\n\n长文第二段。" });
+  assert.deepEqual(newsInlineParagraphs(article, "zh-CN"), []);
 });
 
 test("short numbered lines are section headings; the opening paragraph is not", () => {

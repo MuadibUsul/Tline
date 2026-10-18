@@ -1849,6 +1849,6 @@ td{padding-block:13px}
 .policy-page .card li{line-height:1.6}
 .policy-page .card li::marker{color:var(--muted)}
 .policy-disclaimer{font-size:12.5px!important;line-height:1.65!important;color:var(--muted)!important;margin:14px 0 0!important;padding-top:12px;border-top:1px solid var(--border)}
-.policy-browse{margin-top:20px}
+.policy-main .policy-browse{align-self:flex-start;margin-top:0}
 @media(max-width:960px){.policy-layout{grid-template-columns:1fr}.policy-side{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.policy-side{grid-template-columns:1fr}.policy-page .policy-main .card{padding:20px}.policy-page .policy-main .card h2{font-size:18px}.policy-page .policy-head h1{font-size:clamp(32px,10vw,40px)}}

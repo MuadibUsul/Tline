@@ -104,6 +104,7 @@ export default async function PolicyPage({ params }: { params: Promise<{ policy:
             {tr(locale, "Counted live on every visit. Only reports the publication gate admits are included.", "每次访问实时统计；仅计入通过公开闸门、可对外展示的研报。")}
           </p>
         </section>}
+        <Link className="minibtn policy-browse" href={localePath(locale, "/research")}>{tr(locale, "Browse sourced research", "浏览有来源的研报")}</Link>
       </div>
       <aside className="policy-side">
         {applies.length > 0 && <section className="card policy-card">
@@ -118,6 +119,5 @@ export default async function PolicyPage({ params }: { params: Promise<{ policy:
         </section>
       </aside>
     </div>
-    <Link className="minibtn policy-browse" href={localePath(locale, "/research")}>{tr(locale, "Browse sourced research", "浏览有来源的研报")}</Link>
   </main>;
 }

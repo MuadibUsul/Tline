@@ -114,6 +114,19 @@ function parseJson<T>(s: string | undefined, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }
 }
 
+/**
+ * A trailing series name ("· 亚洲外汇周报") is a label, not another clause of the headline.
+ * Keep it inside the H1 for the full title, but set it on its own line so the headline can
+ * balance its lines instead of leaving a two-character widow.
+ */
+function splitResearchTitle(title: string): { main: string; series: string | null } {
+  const index = title.lastIndexOf("·");
+  if (index < 16) return { main: title, series: null };
+  const series = title.slice(index + 1).trim();
+  if (!series || series.length > 36 || /[。！？]/.test(series)) return { main: title, series: null };
+  return { main: title.slice(0, index).trim(), series };
+}
+
 function localizedDirection(value: number, locale: Locale) {
   const key = directionLabel(value).key;
   return ({
@@ -287,6 +300,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const previewDocument = publisherPdf ?? a.documents.find((document) => document.kind === "original_pdf");
 
   const heading = displayTitle(locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title);
+  const titleParts = splitResearchTitle(heading);
   // Same call the gate makes, so the conclusion the reader sees is the one that let the page
   // into the index: an analysis summary where there is one, the translation's opening where
   // there is not. Reading `summaryZh` alone showed the institution name on pages the gate had
@@ -356,27 +370,34 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
               <span>›</span>
               <Link href={localePath(locale, `/institution/${a.institution.slug}`)}>{institutionName(a.institution.name, locale)}</Link>
             </nav>
-            <h1 className="art-title">{heading}</h1>
+            <h1 className="art-title">
+              {titleParts.main}
+              {titleParts.series ? <span className="art-title-series">{titleParts.series}</span> : null}
+            </h1>
             {locale === "en" && usableTranslation?.title ? (
               <details className="art-sub" style={{ fontStyle: "normal", fontSize: 14 }}>
                 <summary style={{ cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" }}>中文标题</summary>
                 <p style={{ margin: "6px 0 0" }}>{localizeChineseContent(usableTranslation.title)}</p>
               </details>
             ) : null}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 14px", alignItems: "center", marginTop: 12 }}>
+            <div className="art-meta">
               <Byline locale={locale} institution={a.institution.name} institutionSlug={a.institution.slug} publishedAt={a.publishedAt} updatedAt={a.updatedAt} />
+            </div>
+            <div className="art-toolbar">
               <SourceBadge href={a.sourceUrl} locale={locale} />
-              <BookmarkButton articleId={a.id} initialBookmarked={bookmarked} signedIn={Boolean(user)} locale={locale} />
-              <ShareCiteButton
-                citation={`${heading} — ${institutionName(a.institution.name, locale)} — ${date} — ${localizedUrl(researchPath(a), locale)} — ${a.sourceUrl}`}
-                labels={{
-                  cite: tr(locale, "Copy citation", "复制引文"),
-                  copied: tr(locale, "Citation copied", "引文已复制"),
-                  copyLink: tr(locale, "Copy link", "复制链接"),
-                  linkCopied: tr(locale, "Link copied", "链接已复制"),
-                  copyFailed: tr(locale, "Copy failed — select the address manually", "复制失败，请手动选择地址"),
-                }}
-              />
+              <div className="art-toolbar-actions">
+                <BookmarkButton articleId={a.id} initialBookmarked={bookmarked} signedIn={Boolean(user)} locale={locale} />
+                <ShareCiteButton
+                  citation={`${heading} — ${institutionName(a.institution.name, locale)} — ${date} — ${localizedUrl(researchPath(a), locale)} — ${a.sourceUrl}`}
+                  labels={{
+                    cite: tr(locale, "Copy citation", "复制引文"),
+                    copied: tr(locale, "Citation copied", "引文已复制"),
+                    copyLink: tr(locale, "Copy link", "复制链接"),
+                    linkCopied: tr(locale, "Link copied", "链接已复制"),
+                    copyFailed: tr(locale, "Copy failed — select the address manually", "复制失败，请手动选择地址"),
+                  }}
+                />
+              </div>
             </div>
             <ClassificationChips classification={a.classification} locale={locale} />
           </header>

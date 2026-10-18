@@ -35,6 +35,13 @@ test("raw HTML, event handlers, style and javascript: links do not survive", asy
   assert.doesNotMatch(output, /<script|<iframe|<img|<span style|onerror|onclick|javascript:/i);
 });
 
+test("keeps the desk's pre-Markdown section headings", async () => {
+  const output = await html(["二、战况", "II. Combat Situation", "## Markdown heading"]);
+  assert.match(output, /<h2>二、战况<\/h2>/);
+  assert.match(output, /<h2>II\. Combat Situation<\/h2>/);
+  assert.match(output, /<h2>Markdown heading<\/h2>/);
+});
+
 test("a highlight inside inline code is left as code", async () => {
   const output = await html(["`==not a highlight==`"]);
   assert.match(output, /<code>==not a highlight==<\/code>/);

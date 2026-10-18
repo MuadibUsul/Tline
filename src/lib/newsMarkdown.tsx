@@ -11,6 +11,7 @@ import type { Handlers, State } from "mdast-util-to-hast";
 import type { Options as RehypeReactOptions } from "hast-util-to-jsx-runtime";
 import type { Schema } from "hast-util-sanitize";
 import type { Locale } from "./i18n";
+import { newsParagraphRole } from "./news";
 
 /**
  * The newsroom's Markdown subset.
@@ -193,6 +194,18 @@ function processorFor(locale: Locale) {
 
 const processors = new Map<Locale, ReturnType<typeof processorFor>>();
 
+/**
+ * The desk's own heading convention predates Markdown: a short "二、战况" or
+ * "II. Combat Situation" line is a section, not a paragraph. Keep that rule by turning the
+ * line into an h2 before Markdown sees it. A block that already starts with `##` is left
+ * alone.
+ */
+function promoteLegacyHeading(block: string): string {
+  const value = block.trim();
+  if (value.includes("\n") || /^#{1,6}\s/.test(value)) return block;
+  return newsParagraphRole(value) === "heading" ? `## ${value}` : block;
+}
+
 /** Render one or more Markdown blocks to React nodes, preserving block boundaries. */
 export async function renderNewsMarkdownBlocks(blocks: MarkdownBlock[], locale: Locale): Promise<ReactNode[]> {
   const processor = processors.get(locale) ?? processorFor(locale);
@@ -200,7 +213,7 @@ export async function renderNewsMarkdownBlocks(blocks: MarkdownBlock[], locale: 
   const rendered: ReactNode[] = [];
   for (const block of blocks) {
     try {
-      const file = await processor.process(block);
+      const file = await processor.process(promoteLegacyHeading(block));
       if (file.result !== undefined && file.result !== null) rendered.push(file.result as ReactNode);
     } catch {
       // Markdown is untrusted input. If a block cannot be parsed, show its text escaped

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsInlineMarkdownBlocks, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsMarkdownBlocks, structuredNewsBody, splitNewsParagraphs, validateNewsInput } from "./news";
+import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsInlineMarkdownBlocks, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsMarkdownBlocks, structuredNewsBody, structuredNewsExcerpt, splitNewsParagraphs, validateNewsInput } from "./news";
 
 const record = (overrides: Partial<Parameters<typeof newsTitle>[0]> = {}) => ({
   id: "p1", slug: "s", kind: "brief", titleZh: null, titleEn: null, bodyZh: null, bodyEn: null,
@@ -64,6 +64,11 @@ test("a flash dateline and closing note become separate fields", () => {
   assert.equal(en.dateline, "Oct. 17");
   assert.deepEqual(en.blocks, ["The Fed chair spoke."]);
   assert.equal(en.note, "Figures are provisional.");
+});
+
+test("an article excerpt drops the dateline and note", () => {
+  const post = record({ kind: "article", bodyZh: "上海，10月18日——## 核心观点\n\n这是文章导语。\n\n备注：这是一条备注。" });
+  assert.equal(structuredNewsExcerpt(post, "zh-CN"), "核心观点 这是文章导语。");
 });
 
 test("the list excerpt hides Markdown syntax", () => {

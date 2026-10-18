@@ -74,6 +74,10 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
   const blocks = structured.blocks;
   const renderedBlocks = await renderNewsMarkdownBlocks(blocks, locale);
   const renderedNote = structured.note ? await renderNewsMarkdownBlocks([structured.note], locale) : [];
+  const readingText = blocks.join(" ");
+  const hanCount = (readingText.match(/\p{Script=Han}/gu) ?? []).length;
+  const wordCount = (readingText.match(/[A-Za-z]+/g) ?? []).length;
+  const readingMinutes = kind === "article" ? Math.max(1, Math.ceil(hanCount ? hanCount / 400 : wordCount / 220)) : null;
   const images = post.images ?? [];
   const imagesAt = (position: number) => images.filter((image) => image.position === position);
   const sources = newsSources(post);
@@ -114,10 +118,11 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
           {post.pinned ? <span className="chip bull">{tr(locale, "Pinned", "置顶")}</span> : null}
         </div>
         <h1 className="art-title">{title}</h1>
-        {structured.location || structured.dateline ? (
+        {structured.location || structured.dateline || readingMinutes ? (
           <p className="news-dateline">
             {structured.location ? <span>{structured.location}</span> : null}
             {structured.dateline ? <time>{structured.dateline}</time> : null}
+            {readingMinutes ? <span className="news-reading-time">{tr(locale, `${readingMinutes} min read`, `约 ${readingMinutes} 分钟`)}</span> : null}
           </p>
         ) : null}
         {sources.length > 0 ? (
@@ -131,7 +136,7 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
           </p>
         ) : null}
       </header>
-      <article className="prose news-item-body">
+      <article className={`prose news-item-body${kind === "article" ? " news-item-article" : ""}`}>
         {imagesAt(0).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
         {renderedBlocks.length ? renderedBlocks.map((block, index) => (
           <div
@@ -147,7 +152,6 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
         {images.filter((image) => image.position > blocks.length).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
         {renderedNote.length > 0 ? (
           <aside className="news-note">
-            <span className="news-note-label">{tr(locale, "Note", "备注")}</span>
             {renderedNote.map((block, index) => <Fragment key={index}>{block}</Fragment>)}
           </aside>
         ) : null}

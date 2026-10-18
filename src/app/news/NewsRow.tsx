@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { localePath, tr, type Locale } from "@/lib/i18n";
-import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsExcerpt, newsImageAlt, newsTitle, structuredNewsBody, type NewsRecord } from "@/lib/news";
+import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsImageAlt, newsTitle, structuredNewsBody, structuredNewsExcerpt, type NewsRecord } from "@/lib/news";
 import { renderNewsMarkdownBlocks } from "@/lib/newsMarkdown";
 
 /** Beijing time for the desk's clock, the same source the front-page rail uses. */
@@ -19,11 +19,13 @@ export function newsClock(date: Date, locale: Locale) {
 export default async function NewsRow({ post, locale, showColumn = false }: { post: NewsRecord; locale: Locale; showColumn?: boolean }) {
   const title = newsTitle(post, locale) ?? "";
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
-  const excerpt = newsExcerpt(post, locale);
-  // Short items render their body in the stream; an article keeps its excerpt and page.
-  const structured = kind === "flash" || kind === "brief" ? structuredNewsBody(post, locale) : null;
-  const inlineBody = structured ? await renderNewsMarkdownBlocks(structured.blocks, locale) : [];
-  const inlineNote = structured?.note ? await renderNewsMarkdownBlocks([structured.note], locale) : [];
+  const isShort = kind === "flash" || kind === "brief";
+  const structured = structuredNewsBody(post, locale);
+  const excerpt = isShort ? "" : structuredNewsExcerpt(post, locale, 280);
+  // Short items render their body in the stream; an article keeps a structured lead and
+  // its own page. The note stays on the detail page for articles, so the stream stays lean.
+  const inlineBody = isShort ? await renderNewsMarkdownBlocks(structured.blocks, locale) : [];
+  const inlineNote = isShort && structured.note ? await renderNewsMarkdownBlocks([structured.note], locale) : [];
   const cover = post.images?.[0] ?? null;
 
   return (
@@ -49,10 +51,14 @@ export default async function NewsRow({ post, locale, showColumn = false }: { po
           <div className="news-inline-body">
             {inlineBody.map((block, index) => <Fragment key={index}>{block}</Fragment>)}
           </div>
-        ) : excerpt ? <p className="news-excerpt">{excerpt}</p> : null}
+        ) : excerpt ? (
+          <>
+            <p className="news-excerpt">{excerpt}</p>
+            {!isShort ? <Link className="news-read-more" href={localePath(locale, `/news/${post.slug}`)}>{tr(locale, "Read the article", "阅读全文")} →</Link> : null}
+          </>
+        ) : null}
         {inlineNote.length > 0 ? (
           <div className="news-inline-note">
-            <span className="news-inline-note-label">{tr(locale, "Note", "备注")}</span>
             {inlineNote.map((block, index) => <Fragment key={index}>{block}</Fragment>)}
           </div>
         ) : null}

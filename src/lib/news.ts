@@ -120,9 +120,8 @@ export function newsParagraphRole(text: string): "heading" | "body" {
   return "body";
 }
 
-/** A list excerpt made of body blocks only, with the Markdown syntax a reader should not see. */
-export function newsExcerpt(post: NewsRecord, locale: Locale, limit = 220): string {
-  const text = splitNewsMarkdownBlocks(newsBody(post, locale))
+function excerptFromBlocks(blocks: string[], limit: number): string {
+  const text = blocks
     .filter((block) => !/^\s*\|/.test(block) && !/^(?:-{3,}|\*{3,}|_{3,})$/.test(block.trim()) && newsParagraphRole(block) === "body")
     .map((block) => block
       .replace(/^#{1,6}\s+/gm, "")
@@ -140,6 +139,16 @@ export function newsExcerpt(post: NewsRecord, locale: Locale, limit = 220): stri
     .replace(/\s+/g, " ")
     .trim();
   return text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text;
+}
+
+/** A list excerpt made of body blocks only, with the Markdown syntax a reader should not see. */
+export function newsExcerpt(post: NewsRecord, locale: Locale, limit = 220): string {
+  return excerptFromBlocks(splitNewsMarkdownBlocks(newsBody(post, locale)), limit);
+}
+
+/** The same excerpt after the dateline and closing note have been separated from the prose. */
+export function structuredNewsExcerpt(post: NewsRecord, locale: Locale, limit = 260): string {
+  return excerptFromBlocks(structuredNewsBody(post, locale).blocks, limit);
 }
 
 export function newsTitle(post: NewsRecord, locale: Locale): string | null {

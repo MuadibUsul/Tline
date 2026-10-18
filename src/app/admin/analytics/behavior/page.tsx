@@ -41,17 +41,18 @@ function classLabel(value: string, locale: Locale): string {
   }
 }
 
-export default async function BehaviorPage(props: { searchParams: Promise<{ range?: string }> }) {
+export default async function BehaviorPage(props: { searchParams: Promise<{ range?: string; page?: string }> }) {
   const user = await getSessionUser();
   if (!user || !can(user, "admin.analytics")) notFound();
   const locale = await getAdminLocale();
   const params = await props.searchParams;
   const range: Range = isRange(params.range) ? params.range : "30d";
+  const requestedPage = Math.max(1, Math.round(Number(params.page) || 1));
   const window = windowFor(range);
 
-  const [overview, pages, scroll, sections, clicks, flow, loyal, quality] = await Promise.all([
+  const [overview, performance, scroll, sections, clicks, flow, loyal, quality] = await Promise.all([
     behaviorOverview(window),
-    pagePerformance(window, 30),
+    pagePerformance(window, requestedPage, 5),
     scrollDistribution(window),
     sectionHeat(window, 30),
     clickTargets(window, 25),
@@ -101,8 +102,8 @@ export default async function BehaviorPage(props: { searchParams: Promise<{ rang
             <th>{tr(locale, "Exit", "退出")}</th>
           </tr></thead>
           <tbody>
-            {pages.length === 0 && <tr><td colSpan={7}><div className="empty-state">{tr(locale, "No human page views in this period.", "该时段没有真人浏览记录。")}</div></td></tr>}
-            {pages.map((row) => <tr key={row.path}>
+            {performance.rows.length === 0 && <tr><td colSpan={7}><div className="empty-state">{tr(locale, "No human page views in this period.", "该时段没有真人浏览记录。")}</div></td></tr>}
+            {performance.rows.map((row) => <tr key={row.path}>
               <td className="inst"><a href={localePath(locale, row.path)}>{row.path}</a><small className="admin-hint">{row.template ?? "—"}</small></td>
               <td className="mono-cell">{row.views}</td>
               <td className="mono-cell">{percent(row.glanceRate)}</td>
@@ -113,6 +114,14 @@ export default async function BehaviorPage(props: { searchParams: Promise<{ rang
             </tr>)}
           </tbody>
         </table></div>
+        {performance.pages > 1 && (
+          <div className="admin-filter-row" style={{ justifyContent: "flex-end", alignItems: "center", marginTop: 10 }}>
+            {performance.page > 1 && <a className="minibtn" href={`?range=${range}&page=${performance.page - 1}`}>{tr(locale, "Previous", "上一页")}</a>}
+            <span className="chip gray">{performance.page} / {performance.pages}</span>
+            {performance.page < performance.pages && <a className="minibtn" href={`?range=${range}&page=${performance.page + 1}`}>{tr(locale, "Next", "下一页")}</a>}
+            <span className="admin-hint">{tr(locale, `${performance.total} pages`, `${performance.total} 个页面`)}</span>
+          </div>
+        )}
       </section>
 
       <section className="blk">

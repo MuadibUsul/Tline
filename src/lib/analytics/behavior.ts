@@ -29,7 +29,7 @@ export interface BehaviorOverview {
 }
 
 export async function behaviorOverview(window: Window): Promise<BehaviorOverview> {
-  const where = { ts: { gte: window.from, lte: window.to } };
+  const where = { ts: { gte: window.from, lte: window.to }, NOT: { path: { startsWith: "/admin" } } };
   const [rows, clicks] = await Promise.all([
     prisma.pageView.findMany({
       where,
@@ -70,9 +70,17 @@ export interface PagePerformance {
   clicks: number;
 }
 
-/** Per-page reading quality, ranked by views. */
-export async function pagePerformance(window: Window, limit = 50): Promise<PagePerformance[]> {
-  const where = { ts: { gte: window.from, lte: window.to } };
+export interface PagePerformancePage {
+  rows: PagePerformance[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pages: number;
+}
+
+/** Per-page reading quality, ranked by views; the console shows five rows per page. */
+export async function pagePerformance(window: Window, page = 1, pageSize = 5): Promise<PagePerformancePage> {
+  const where = { ts: { gte: window.from, lte: window.to }, NOT: { path: { startsWith: "/admin" } } };
   const [rows, clickRows] = await Promise.all([
     prisma.pageView.findMany({
       where,
@@ -101,7 +109,7 @@ export async function pagePerformance(window: Window, limit = 50): Promise<PageP
     if (row.isExit) bucket.exits += 1;
     byPath.set(row.path, bucket);
   }
-  return [...byPath.entries()]
+  const all = [...byPath.entries()]
     .map(([path, bucket]) => {
       const visible = median(bucket.visible);
       return {
@@ -120,8 +128,17 @@ export async function pagePerformance(window: Window, limit = 50): Promise<PageP
         clicks: clicks.get(path) ?? 0,
       };
     })
-    .sort((a, b) => b.views - a.views)
-    .slice(0, limit);
+    .sort((a, b) => b.views - a.views);
+  const size = Math.max(1, Math.min(50, Math.round(pageSize)));
+  const pages = Math.max(1, Math.ceil(all.length / size));
+  const current = Math.min(Math.max(1, Math.round(page)), pages);
+  return {
+    rows: all.slice((current - 1) * size, current * size),
+    total: all.length,
+    page: current,
+    pageSize: size,
+    pages,
+  };
 }
 
 export interface ScrollBucket {
@@ -132,7 +149,7 @@ export interface ScrollBucket {
 
 export async function scrollDistribution(window: Window): Promise<ScrollBucket[]> {
   const rows = await prisma.pageView.findMany({
-    where: { ts: { gte: window.from, lte: window.to }, maxScrollPct: { not: null } },
+    where: { ts: { gte: window.from, lte: window.to }, maxScrollPct: { not: null }, NOT: { path: { startsWith: "/admin" } } },
     select: { maxScrollPct: true },
   });
   const buckets = Array.from({ length: 10 }, (_, index) => ({ label: `${index * 10}–${index * 10 + 10}%`, views: 0 }));
@@ -157,7 +174,7 @@ export interface SectionHeat {
 
 /** Which blocks held attention, and which blocks were where readers left. */
 export async function sectionHeat(window: Window, limit = 40): Promise<SectionHeat[]> {
-  const where = { ts: { gte: window.from, lte: window.to } };
+  const where = { ts: { gte: window.from, lte: window.to }, NOT: { path: { startsWith: "/admin" } } };
   const [rows, exits] = await Promise.all([
     prisma.sectionView.groupBy({
       by: ["path", "section", "sectionTitle"],
@@ -196,7 +213,7 @@ export interface ClickTarget {
 export async function clickTargets(window: Window, limit = 30): Promise<ClickTarget[]> {
   const rows = await prisma.clickEvent.groupBy({
     by: ["path", "targetPath", "targetLabel", "targetType"],
-    where: { ts: { gte: window.from, lte: window.to } },
+    where: { ts: { gte: window.from, lte: window.to }, NOT: { path: { startsWith: "/admin" } } },
     _count: { _all: true },
     orderBy: { _count: { path: "desc" } },
     take: limit,
@@ -220,7 +237,7 @@ export interface FlowRow {
 export async function pageFlow(window: Window, limit = 25): Promise<FlowRow[]> {
   const rows = await prisma.pageView.groupBy({
     by: ["path", "nextPath"],
-    where: { ts: { gte: window.from, lte: window.to }, nextPath: { not: null } },
+    where: { ts: { gte: window.from, lte: window.to }, nextPath: { not: null }, NOT: { path: { startsWith: "/admin" } } },
     _count: { _all: true },
     orderBy: { _count: { path: "desc" } },
     take: limit,
@@ -248,7 +265,7 @@ export async function loyalAnonymous(window: Window): Promise<LoyalAnonymous> {
   if (window.days <= 1) return { visitors: 0, thresholdDays, views: 0, topPages: [], topTemplates: [] };
   const rows = await prisma.pageView.groupBy({
     by: ["visitorKey", "day"],
-    where: { ts: { gte: window.from, lte: window.to }, visitorKey: { not: null }, userId: null },
+    where: { ts: { gte: window.from, lte: window.to }, visitorKey: { not: null }, userId: null, NOT: { path: { startsWith: "/admin" } } },
     _count: { _all: true },
   });
   const byVisitor = new Map<string, { days: Set<string>; views: number }>();
@@ -263,7 +280,7 @@ export async function loyalAnonymous(window: Window): Promise<LoyalAnonymous> {
   if (!keys.length) return { visitors: 0, thresholdDays, views: 0, topPages: [], topTemplates: [] };
   const keySet = new Set(keys.map(([key]) => key));
   const detail = await prisma.pageView.findMany({
-    where: { ts: { gte: window.from, lte: window.to }, visitorKey: { in: [...keySet] }, userId: null },
+    where: { ts: { gte: window.from, lte: window.to }, visitorKey: { in: [...keySet] }, userId: null, NOT: { path: { startsWith: "/admin" } } },
     select: { path: true, template: true },
   });
   const pages = new Map<string, number>();
@@ -300,7 +317,7 @@ export interface TrafficQuality {
 export async function trafficQuality(window: Window, limit = 20): Promise<TrafficQuality> {
   const day = dayKey(window.from);
   const [humanViews, botRows, botPaths] = await Promise.all([
-    prisma.pageView.count({ where: { ts: { gte: window.from, lte: window.to } } }),
+    prisma.pageView.count({ where: { ts: { gte: window.from, lte: window.to }, NOT: { path: { startsWith: "/admin" } } } }),
     prisma.botHitDaily.groupBy({
       by: ["trafficClass", "agentName"],
       where: { day: { gte: day } },

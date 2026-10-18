@@ -1873,3 +1873,9 @@ td{padding-block:13px}
 .news-note p{margin:0;font-size:13px;line-height:1.7;color:var(--muted)}
 .news-note p+p{margin-top:6px}
 .news-copy h2{word-break:keep-all;overflow-wrap:anywhere}
+
+/* Newsroom split: the stream keeps an editorial measure; the right rail is reserved. */
+.news-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start}
+.news-main{min-width:0}
+.news-reserved{min-height:420px;align-self:stretch;border-left:1px solid var(--border)}
+@media(max-width:1100px){.news-layout{grid-template-columns:1fr;gap:0}.news-reserved{display:none}}

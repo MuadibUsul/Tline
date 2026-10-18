@@ -54,31 +54,38 @@ export default async function NewsIndex() {
           here repeated what the navigation already says. The accessible heading remains. */}
       <h1 className="sr-only">{tr(locale, "News", "新鲜事")}</h1>
 
-      {columns.length > 0 && (
-        <section className="news-columns" aria-label={tr(locale, "Ongoing columns", "长期栏目")}>
-          {columns.map((column) => (
-            <Link className="news-column-card" href={localePath(locale, `/news/columns/${column.slug}`)} key={column.slug}>
-              <span className="eyebrow">{newsCadenceLabel(column.cadence, locale)}</span>
-              <b>{newsColumnName(column, locale)}</b>
-              <small>
-                {column.posts.length} {tr(locale, "editions", "期")}
-                {column.posts[0]?.publishedAt ? ` · ${tr(locale, "latest", "最新")} ${newsDateLabel(column.posts[0].publishedAt, locale)}` : ""}
-              </small>
-            </Link>
+      <div className="news-layout">
+        <div className="news-main">
+          {columns.length > 0 && (
+            <section className="news-columns" aria-label={tr(locale, "Ongoing columns", "长期栏目")}>
+              {columns.map((column) => (
+                <Link className="news-column-card" href={localePath(locale, `/news/columns/${column.slug}`)} key={column.slug}>
+                  <span className="eyebrow">{newsCadenceLabel(column.cadence, locale)}</span>
+                  <b>{newsColumnName(column, locale)}</b>
+                  <small>
+                    {column.posts.length} {tr(locale, "editions", "期")}
+                    {column.posts[0]?.publishedAt ? ` · ${tr(locale, "latest", "最新")} ${newsDateLabel(column.posts[0].publishedAt, locale)}` : ""}
+                  </small>
+                </Link>
+              ))}
+            </section>
+          )}
+
+          {posts.length === 0 && <div className="empty-state">{tr(locale, "Nothing has been published yet.", "暂无已发布内容。")}</div>}
+
+          {[...groups.entries()].map(([key, group]) => (
+            <section className="blk news-day" key={key} aria-label={group.label}>
+              <div className="section-t"><span>{group.label}</span></div>
+              <div className="news-stream">
+                {group.items.map((post) => <NewsRow post={post} locale={locale} showColumn key={post.id} />)}
+              </div>
+            </section>
           ))}
-        </section>
-      )}
-
-      {posts.length === 0 && <div className="empty-state">{tr(locale, "Nothing has been published yet.", "暂无已发布内容。")}</div>}
-
-      {[...groups.entries()].map(([key, group]) => (
-        <section className="blk news-day" key={key} aria-label={group.label}>
-          <div className="section-t"><span>{group.label}</span></div>
-          <div className="news-stream">
-            {group.items.map((post) => <NewsRow post={post} locale={locale} showColumn key={post.id} />)}
-          </div>
-        </section>
-      ))}
+        </div>
+        {/* Reserved for the next rail (plans, rankings or a live module); the stream stops
+            at the editorial measure instead of stretching across the whole page. */}
+        <aside className="news-reserved" aria-hidden="true" />
+      </div>
     </main>
   );
 }

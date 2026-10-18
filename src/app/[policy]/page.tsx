@@ -85,30 +85,39 @@ export default async function PolicyPage({ params }: { params: Promise<{ policy:
   const coverage = policy === "about" ? await coverageCounts(locale) : null;
   return <main className="wrap policy-page">
     <JsonLd data={webPageJsonLd(locale, `/${policy}`, content[0], content[1])} />
-    <div className="page-head"><div className="eyebrow">Tlines</div><h1>{content[0]}</h1></div>
-    <section className="card prose"><p>{content[1]}</p><p>{tr(locale, "Financial content is informational, may contain errors, and is not investment advice.", "金融内容仅供信息参考，可能存在错误，不构成投资建议。")}</p></section>
-    {coverage && <section className="card prose">
-      <h2>{tr(locale, "Coverage", "收录概览")}</h2>
-      <div className="front-mast-stats coverage-grid">
-        <Link className="macro-stat" href={localePath(locale, "/research")}><span className="k">{tr(locale, "Reports", "篇可溯源研报")}</span><span className="v tnum">{coverage.reports.toLocaleString(locale)}</span></Link>
-        <Link className="macro-stat" href={localePath(locale, "/institutions-directory")}><span className="k">{tr(locale, "Publishing institutions", "家发布机构")}</span><span className="v tnum">{coverage.institutions}</span></Link>
-        <Link className="macro-stat" href={localePath(locale, "/markets")}><span className="k">{tr(locale, "Covered assets", "个覆盖资产")}</span><span className="v tnum">{coverage.assets}</span></Link>
-        <Link className="macro-stat" href={localePath(locale, "/topics")}><span className="k">{tr(locale, "Research topics", "个研究主题")}</span><span className="v tnum">{coverage.topics}</span></Link>
+    <div className="page-head policy-head"><div className="eyebrow">Tlines</div><h1>{content[0]}</h1></div>
+    <div className="policy-layout">
+      <div className="policy-main">
+        <section className="card prose policy-intro">
+          <p>{content[1]}</p>
+          <p className="policy-disclaimer">{tr(locale, "Financial content is informational, may contain errors, and is not investment advice.", "金融内容仅供信息参考，可能存在错误，不构成投资建议。")}</p>
+        </section>
+        {coverage && <section className="card prose">
+          <h2>{tr(locale, "Coverage", "收录概览")}</h2>
+          <div className="front-mast-stats coverage-grid">
+            <Link className="macro-stat" href={localePath(locale, "/research")}><span className="k">{tr(locale, "Reports", "篇可溯源研报")}</span><span className="v tnum">{coverage.reports.toLocaleString(locale)}</span></Link>
+            <Link className="macro-stat" href={localePath(locale, "/institutions-directory")}><span className="k">{tr(locale, "Publishing institutions", "家发布机构")}</span><span className="v tnum">{coverage.institutions}</span></Link>
+            <Link className="macro-stat" href={localePath(locale, "/markets")}><span className="k">{tr(locale, "Covered assets", "个覆盖资产")}</span><span className="v tnum">{coverage.assets}</span></Link>
+            <Link className="macro-stat" href={localePath(locale, "/topics")}><span className="k">{tr(locale, "Research topics", "个研究主题")}</span><span className="v tnum">{coverage.topics}</span></Link>
+          </div>
+          <p className="sub" style={{ marginTop: 10, fontSize: 12 }}>
+            {tr(locale, "Counted live on every visit. Only reports the publication gate admits are included.", "每次访问实时统计；仅计入通过公开闸门、可对外展示的研报。")}
+          </p>
+        </section>}
       </div>
-      <p className="sub" style={{ marginTop: 10, fontSize: 12 }}>
-        {tr(locale, "Counted live on every visit. Only reports the publication gate admits are included.", "每次访问实时统计；仅计入通过公开闸门、可对外展示的研报。")}
-      </p>
-    </section>}
-    {applies.length > 0 && <section className="card prose">
-      <h2>{tr(locale, "Where this applies", "这条规则体现在哪里")}</h2>
-      <ul>{applies.map((item) => <li key={item.path}><Link href={localePath(locale, item.path)}>{locale === "zh-CN" ? item.zh : item.en}</Link></li>)}</ul>
-    </section>}
-    <section className="card prose">
-      <h2>{tr(locale, "Other policies", "其他政策")}</h2>
-      <ul>{(Object.keys(PAGES) as PolicySlug[]).filter((slug) => slug !== policy).map((slug) => (
-        <li key={slug}><Link href={localePath(locale, `/${slug}`)}>{locale === "zh-CN" ? PAGES[slug].zh[0] : PAGES[slug].en[0]}</Link></li>
-      ))}</ul>
-    </section>
-    <Link className="minibtn" href={localePath(locale, "/research")}>{tr(locale, "Browse sourced research", "浏览有来源的研报")}</Link>
+      <aside className="policy-side">
+        {applies.length > 0 && <section className="card policy-card">
+          <h2>{tr(locale, "Where this applies", "这条规则体现在哪里")}</h2>
+          <ul>{applies.map((item) => <li key={item.path}><Link href={localePath(locale, item.path)}>{locale === "zh-CN" ? item.zh : item.en}</Link></li>)}</ul>
+        </section>}
+        <section className="card policy-card">
+          <h2>{tr(locale, "Other policies", "其他政策")}</h2>
+          <ul>{(Object.keys(PAGES) as PolicySlug[]).filter((slug) => slug !== policy).map((slug) => (
+            <li key={slug}><Link href={localePath(locale, `/${slug}`)}>{locale === "zh-CN" ? PAGES[slug].zh[0] : PAGES[slug].en[0]}</Link></li>
+          ))}</ul>
+        </section>
+      </aside>
+    </div>
+    <Link className="minibtn policy-browse" href={localePath(locale, "/research")}>{tr(locale, "Browse sourced research", "浏览有来源的研报")}</Link>
   </main>;
 }

@@ -1138,7 +1138,7 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 .citation-conditions{margin:12px 0}
 
 .citation-source{font-size:12px;color:var(--muted)!important}
-.policy-page{max-width:820px;padding-bottom:48px}
+.policy-page{max-width:1120px;padding-bottom:56px}
 .footer-links{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px 14px}
 .footer-links a{font-size:11px;text-transform:capitalize}
 
@@ -1829,3 +1829,26 @@ td{padding-block:13px}
 .art-head .research-card-assets{margin-top:14px}
 @media(max-width:720px){.art-title{font-size:23px;line-height:1.36}.art-head{padding-top:0}.art-toolbar-actions{margin-left:0}.art-toolbar{gap:8px}}
 @media(max-width:520px){.art-title{font-size:21px;line-height:1.4}.art-title-series{font-size:10px;margin-top:10px}.art-toolbar .ed-source{width:100%;justify-content:space-between}.art-toolbar-actions{width:100%;margin-left:0}.art-toolbar-actions .minibtn{flex:1;justify-content:center}}
+
+
+/* Policy pages: a readable main column with the rule's destinations and the policy index
+   beside it, instead of one narrow stack of full-width cards. */
+.policy-head{padding-top:20px;padding-bottom:24px}
+.policy-page .policy-head h1{font-size:clamp(34px,4.2vw,46px);line-height:1.1}
+.policy-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:30px;align-items:start;margin-top:20px}
+.policy-main{display:flex;flex-direction:column;gap:18px;min-width:0}
+.policy-side{display:flex;flex-direction:column;gap:14px;position:sticky;top:88px;min-width:0}
+.policy-page .policy-main .card{padding:24px 28px}
+.policy-page .policy-side .card{padding:18px 20px}
+.policy-page .policy-main .card p{font-size:15.5px;line-height:1.85;color:var(--ink-2);margin:0 0 12px}
+.policy-page .card p:last-child{margin-bottom:0}
+.policy-page .policy-side .card h2,.policy-page .policy-main .card h2{font-family:var(--sans);font-weight:650;letter-spacing:-.02em}
+.policy-page .policy-main .card h2{font-size:20px;margin:0 0 14px}
+.policy-page .policy-side .card h2{font-size:14px;margin:0 0 10px}
+.policy-page .card ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px}
+.policy-page .card li{line-height:1.6}
+.policy-page .card li::marker{color:var(--muted)}
+.policy-disclaimer{font-size:12.5px!important;line-height:1.65!important;color:var(--muted)!important;margin:14px 0 0!important;padding-top:12px;border-top:1px solid var(--border)}
+.policy-browse{margin-top:20px}
+@media(max-width:960px){.policy-layout{grid-template-columns:1fr}.policy-side{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.policy-side{grid-template-columns:1fr}.policy-page .policy-main .card{padding:20px}.policy-page .policy-main .card h2{font-size:18px}.policy-page .policy-head h1{font-size:clamp(32px,10vw,40px)}}

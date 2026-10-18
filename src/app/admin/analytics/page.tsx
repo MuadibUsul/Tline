@@ -61,7 +61,8 @@ export default async function TrafficPage(props: { searchParams: Promise<{ range
         )}</p>
       </div>
       <div className="tag-row">
-        <a className="chip gray" href={localePath(locale, "/admin/analytics/behavior")}>{tr(locale, "Behavior →", "行为分析 →")}</a>
+        <a className="chip gray" href={localePath(locale, "/admin/analytics/behavior")}>{tr(locale, "Human behavior →", "真人行为 →")}</a>
+        <a className="chip gray" href={localePath(locale, "/admin/analytics/bots")}>{tr(locale, "Bot traffic →", "机器人流量 →")}</a>
         <span className="chip bull" title={tr(locale, "Active in the last 30 minutes", "最近 30 分钟活跃")}>
           ● {live.visitors} {tr(locale, "online", "在线")}
         </span>

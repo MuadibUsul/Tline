@@ -18,6 +18,8 @@ function rate(part: number, total: number): number | null {
 export interface BehaviorOverview {
   views: number;
   visitors: number;
+  /** Views that carry the new behavior fields. Old rows only have views and time. */
+  measured: number;
   glances: number;
   reads: number;
   glanceRate: number | null;
@@ -38,15 +40,17 @@ export async function behaviorOverview(window: Window): Promise<BehaviorOverview
     prisma.clickEvent.count({ where }),
   ]);
   const visitors = new Set(rows.map((row) => row.visitorKey ?? `d:${row.visitorId}`)).size;
-  const glances = rows.filter((row) => row.isGlance).length;
-  const reads = rows.filter((row) => row.isRead).length;
+  const measuredRows = rows.filter((row) => row.visibleMs !== null || row.maxScrollPct !== null);
+  const glances = measuredRows.filter((row) => row.isGlance).length;
+  const reads = measuredRows.filter((row) => row.isRead).length;
   return {
     views: rows.length,
     visitors,
+    measured: measuredRows.length,
     glances,
     reads,
-    glanceRate: rate(glances, rows.length),
-    readRate: rate(reads, rows.length),
+    glanceRate: rate(glances, measuredRows.length),
+    readRate: rate(reads, measuredRows.length),
     medianVisibleSec: (() => { const value = median(rows.flatMap((row) => row.visibleMs === null ? [] : [row.visibleMs])); return value === null ? null : value / 1000; })(),
     medianScrollPct: median(rows.flatMap((row) => row.maxScrollPct === null ? [] : [row.maxScrollPct])),
     exits: rows.filter((row) => row.isExit).length,
@@ -59,6 +63,7 @@ export interface PagePerformance {
   template: string | null;
   views: number;
   visitors: number;
+  measured: number;
   glances: number;
   reads: number;
   glanceRate: number | null;
@@ -93,17 +98,21 @@ export async function pagePerformance(window: Window, page = 1, pageSize = 5): P
   ]);
   const clicks = new Map(clickRows.map((row) => [row.path, row._count._all]));
   const byPath = new Map<string, {
-    template: string | null; visitors: Set<string>; views: number; glances: number; reads: number;
+    template: string | null; visitors: Set<string>; views: number; measured: number; glances: number; reads: number;
     visible: number[]; scroll: number[]; exits: number;
   }>();
   for (const row of rows) {
     const bucket = byPath.get(row.path) ?? {
-      template: row.template, visitors: new Set<string>(), views: 0, glances: 0, reads: 0, visible: [], scroll: [], exits: 0,
+      template: row.template, visitors: new Set<string>(), views: 0, measured: 0, glances: 0, reads: 0, visible: [], scroll: [], exits: 0,
     };
     bucket.views += 1;
     bucket.visitors.add(row.visitorKey ?? `d:${row.visitorId}`);
-    if (row.isGlance) bucket.glances += 1;
-    if (row.isRead) bucket.reads += 1;
+    const measured = row.visibleMs !== null || row.maxScrollPct !== null;
+    if (measured) {
+      bucket.measured += 1;
+      if (row.isGlance) bucket.glances += 1;
+      if (row.isRead) bucket.reads += 1;
+    }
     if (row.visibleMs !== null) bucket.visible.push(row.visibleMs);
     if (row.maxScrollPct !== null) bucket.scroll.push(row.maxScrollPct);
     if (row.isExit) bucket.exits += 1;
@@ -117,10 +126,11 @@ export async function pagePerformance(window: Window, page = 1, pageSize = 5): P
         template: bucket.template,
         views: bucket.views,
         visitors: bucket.visitors.size,
+        measured: bucket.measured,
         glances: bucket.glances,
         reads: bucket.reads,
-        glanceRate: rate(bucket.glances, bucket.views),
-        readRate: rate(bucket.reads, bucket.views),
+        glanceRate: rate(bucket.glances, bucket.measured),
+        readRate: rate(bucket.reads, bucket.measured),
         medianVisibleSec: visible === null ? null : visible / 1000,
         medianScrollPct: median(bucket.scroll),
         exits: bucket.exits,
@@ -261,7 +271,7 @@ export interface LoyalAnonymous {
  * says so instead of silently shrinking the number.
  */
 export async function loyalAnonymous(window: Window): Promise<LoyalAnonymous> {
-  const thresholdDays = window.days <= 1 ? 1 : window.days <= 7 ? 4 : window.days <= 30 ? 8 : window.days <= 90 ? 12 : 20;
+  const thresholdDays = window.days <= 1 ? 2 : window.days <= 7 ? 4 : window.days <= 30 ? 8 : window.days <= 90 ? 12 : 20;
   if (window.days <= 1) return { visitors: 0, thresholdDays, views: 0, topPages: [], topTemplates: [] };
   const rows = await prisma.pageView.groupBy({
     by: ["visitorKey", "day"],

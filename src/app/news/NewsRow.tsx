@@ -26,6 +26,10 @@ export default async function NewsRow({ post, locale, showColumn = false }: { po
   // its own page. The note stays on the detail page for articles, so the stream stays lean.
   const inlineBody = isShort ? await renderNewsMarkdownBlocks(structured.blocks, locale) : [];
   const inlineNote = isShort && structured.note ? await renderNewsMarkdownBlocks([structured.note], locale) : [];
+  const readingText = structured.blocks.join(" ");
+  const hanCount = (readingText.match(/\p{Script=Han}/gu) ?? []).length;
+  const wordCount = (readingText.match(/[A-Za-z]+/g) ?? []).length;
+  const readingMinutes = !isShort ? Math.max(1, Math.ceil(hanCount ? hanCount / 400 : wordCount / 220)) : null;
   const cover = post.images?.[0] ?? null;
 
   return (
@@ -41,10 +45,11 @@ export default async function NewsRow({ post, locale, showColumn = false }: { po
         <h2>
           <Link href={localePath(locale, `/news/${post.slug}`)}>{title}</Link>
         </h2>
-        {structured && (structured.location || structured.dateline) ? (
+        {structured && (structured.location || structured.dateline || readingMinutes) ? (
           <p className="news-inline-meta">
             {structured.location ? <span className="news-inline-location">{structured.location}</span> : null}
             {structured.dateline ? <span className="news-inline-date">{structured.dateline}</span> : null}
+            {readingMinutes ? <span className="news-reading-time">{tr(locale, `${readingMinutes} min read`, `约 ${readingMinutes} 分钟`)}</span> : null}
           </p>
         ) : null}
         {inlineBody.length > 0 ? (

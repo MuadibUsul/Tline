@@ -1872,3 +1872,4 @@ td{padding-block:13px}
 .news-note-label{display:inline-block;margin-right:8px;font:600 10px var(--mono);letter-spacing:.08em;color:var(--warn);text-transform:uppercase;vertical-align:1px}
 .news-note p{margin:0;font-size:13px;line-height:1.7;color:var(--muted)}
 .news-note p+p{margin-top:6px}
+.news-copy h2{word-break:keep-all;overflow-wrap:anywhere}

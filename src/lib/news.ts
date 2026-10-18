@@ -201,7 +201,7 @@ export interface StructuredNewsBody {
   note: string | null;
 }
 
-const CN_DATE = String.raw`(?:\d{4}年)?\d{1,2}月\d{1,2}日`;
+const CN_DATE = String.raw`(?:\d{4}\s*年\s*)?\d{1,2}\s*月\s*\d{1,2}\s*日`;
 const EN_DATE = String.raw`(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2}(?:,\s*\d{4})?`;
 const DATELINE = new RegExp(String.raw`^([^，,：:\n]{2,40}?)[，,]\s*((?:${CN_DATE}|${EN_DATE}))\s*(?:——|—|–|-|：|:)\s*`, "i");
 const WIRE = /^([^，,：:\n]{2,30}?)电[：:]\s*/;
@@ -236,7 +236,7 @@ export function structuredNewsBody(post: NewsRecord, locale: Locale): Structured
     const match = first.match(DATELINE);
     if (match) {
       location = match[1].trim();
-      dateline = match[2].trim();
+      dateline = /[一-鿿]/.test(match[2]) ? match[2].replace(/\s+/g, "") : match[2].trim();
       const remainder = first.slice(match[0].length).trim();
       if (remainder) blocks[0] = remainder;
       else blocks.shift();
@@ -250,9 +250,19 @@ export function structuredNewsBody(post: NewsRecord, locale: Locale): Structured
       }
     }
   }
+  if (!location && post.kind !== "article" && first) {
+    const bracket = first.match(/^【([^】\n]{2,30})】\s*/);
+    if (bracket) {
+      location = bracket[1].trim();
+      const remainder = first.slice(bracket[0].length).trim();
+      if (remainder) blocks[0] = remainder;
+      else blocks.shift();
+    }
+  }
   if (location && !dateline) {
     const inlineDate = blocks.join(" ").slice(0, 220).match(new RegExp(`(?:${CN_DATE}|${EN_DATE})`, "i"));
-    dateline = inlineDate?.[0] ?? (post.publishedAt ? newsDateLabel(post.publishedAt, locale) : null);
+    const found = inlineDate?.[0];
+    dateline = found ? (/[一-鿿]/.test(found) ? found.replace(/\s+/g, "") : found) : (post.publishedAt ? newsDateLabel(post.publishedAt, locale) : null);
   }
   return { location, dateline, blocks, note };
 }

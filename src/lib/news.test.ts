@@ -66,6 +66,14 @@ test("a flash dateline and closing note become separate fields", () => {
   assert.equal(en.note, "Figures are provisional.");
 });
 
+test("a bracketed flash location and spaced date are separated too", () => {
+  const post = structuredNewsBody(record({ kind: "flash", bodyZh: "【圣彼得堡】乌克兰无人机于 10 月 18 日凌晨发动袭击。备注：未采用单一信源。" }), "zh-CN");
+  assert.equal(post.location, "圣彼得堡");
+  assert.equal(post.dateline, "10月18日");
+  assert.deepEqual(post.blocks, ["乌克兰无人机于 10 月 18 日凌晨发动袭击。"]);
+  assert.equal(post.note, "未采用单一信源。");
+});
+
 test("an article excerpt drops the dateline and note", () => {
   const post = record({ kind: "article", bodyZh: "上海，10月18日——## 核心观点\n\n这是文章导语。\n\n备注：这是一条备注。" });
   assert.equal(structuredNewsExcerpt(post, "zh-CN"), "核心观点 这是文章导语。");

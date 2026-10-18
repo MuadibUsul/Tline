@@ -46,7 +46,7 @@ export default async function NewsletterPage(props: { searchParams: Promise<{ st
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Newsletter", "每周通讯")}</div>
         <h1>{tr(locale, "The week in institutional research", "每周机构研报精选")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>
+        <p className="sub text-muted">
           {tr(
             locale,
             "One email a week, bilingual, a short read: the institutional research worth your attention, each item linked to the source report. Unsubscribe any time; nothing else is ever sent.",

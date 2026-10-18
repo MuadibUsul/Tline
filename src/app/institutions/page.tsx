@@ -101,7 +101,7 @@ export default async function ViewsPage(props: { searchParams: Promise<{ page?: 
         <div className="eyebrow">{tr(locale, "Institutional Wire", "机构短讯")}</div>
         <h1>{tr(locale, "Views", "观点")}</h1>
         <p className="sub">{tr(locale, `${total} evidence-backed views published in the latest 7 days, newest first with same-topic and same-event views grouped together.`, `共 ${total} 条最近7天发布的可追溯观点，最新优先，同主题、同事件的观点聚合在一起。`)}</p>
-        <p className="sub" style={{ color: "var(--muted)", maxWidth: "72ch" }}>
+        <p className="sub measure text-muted">
           {tr(locale, "Each line is one claim extracted from one report: what the publisher expects, in which direction, on which asset, over what horizon. ", "每一条都是从一篇研报中提取的具体主张：哪家机构、对哪个资产、什么方向、什么期限。")}
           <Link href={localePath(locale, "/methodology")}>{tr(locale, "How views are extracted", "观点如何提取")}</Link>
           {" · "}

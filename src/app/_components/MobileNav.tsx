@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
+import { trapFocus } from "./focusTrap";
 
 export interface MobileNavItem {
   href: string;
@@ -38,9 +39,12 @@ export default function MobileNav({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      toggleRef.current?.focus();
+      if (event.key === "Escape") {
+        setOpen(false);
+        toggleRef.current?.focus();
+        return;
+      }
+      trapFocus(event, panelRef.current);
     };
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;

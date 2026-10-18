@@ -60,7 +60,7 @@ export default async function CategoriesPage() {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Categories", "分类")}</div>
         <h1>{tr(locale, "Categories", "分类")}</h1>
-        <p className="sub" style={{ maxWidth: "72ch" }}>
+        <p className="sub measure">
           {tr(locale,
             `Two ways into the corpus: ${topics.length} subjects with cross-institution coverage, and ${institutions.length} publishing houses behind ${totalReports.toLocaleString(locale)} gate-admitted reports.`,
             `从这里进入全部内容：${topics.length} 个具备跨机构覆盖的研究主题，以及 ${institutions.length} 家发布机构、${totalReports.toLocaleString(locale)} 篇通过公开闸门的研报。`)}
@@ -68,8 +68,8 @@ export default async function CategoriesPage() {
       </div>
 
       <section className="blk" aria-label={tr(locale, "Research topics", "研究主题")}>
-        <div className="section-t" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
-          <span>{tr(locale, "Topics", "主题")} <span className="mono" style={{ color: "var(--faint)" }}>{topics.length}</span></span>
+        <div className="section-t section-row">
+          <span>{tr(locale, "Topics", "主题")} <span className="mono text-tertiary">{topics.length}</span></span>
           <Link href={localePath(locale, "/topics")}>{tr(locale, "Topic hub", "主题页")} →</Link>
         </div>
         <div className="ctiles">
@@ -88,8 +88,8 @@ export default async function CategoriesPage() {
       </section>
 
       <section className="blk" aria-label={tr(locale, "Publishing institutions", "发布机构")}>
-        <div className="section-t" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
-          <span>{tr(locale, "Institutions", "机构")} <span className="mono" style={{ color: "var(--faint)" }}>{institutions.length}</span></span>
+        <div className="section-t section-row">
+          <span>{tr(locale, "Institutions", "机构")} <span className="mono text-tertiary">{institutions.length}</span></span>
           <Link href={localePath(locale, "/institutions-directory")}>{tr(locale, "Institution directory", "机构目录")} →</Link>
         </div>
         <div className="ctiles">
@@ -108,7 +108,7 @@ export default async function CategoriesPage() {
         </div>
       </section>
 
-      <p className="sub" style={{ color: "var(--muted)", marginTop: 18 }}>
+      <p className="sub text-muted mt-18">
         <Link href={localePath(locale, "/markets")}>{tr(locale, "Browse by asset", "按资产浏览")}</Link>
         {" · "}
         <Link href={localePath(locale, "/institutions")}>{tr(locale, "Browse by view", "按观点浏览")}</Link>

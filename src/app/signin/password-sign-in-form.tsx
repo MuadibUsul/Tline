@@ -38,7 +38,7 @@ export function PasswordSignInForm({
   }
 
   return (
-    <form onSubmit={submit} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <form onSubmit={submit} className="card stack-12">
       <label className="field">
         <span>{labels.email}</span>
         <input name="email" type="email" autoComplete="username" required placeholder="you@example.com" />

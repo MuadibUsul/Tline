@@ -156,7 +156,7 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
           </aside>
         ) : null}
       </article>
-      <p className="sub" style={{ marginTop: 26 }}>
+      <p className="sub mt-26">
         {post.column ? (
           <>
             <Link href={localePath(locale, `/news/columns/${post.column.slug}`)}>

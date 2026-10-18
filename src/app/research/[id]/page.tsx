@@ -410,7 +410,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           </div>
           <h1 style={{ fontSize: "clamp(24px,3.4vw,32px)" }}>{heading}</h1>
           <ClassificationChips classification={a.classification} locale={locale} />
-          <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p" style={{ alignSelf: "flex-start" }}>{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
+          <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="minibtn p self-start">{tr(locale, "Official source ↗", "前往官网原文 ↗")}</a>
         </div>
       )}
 
@@ -480,20 +480,20 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         {publisherPdf && locale === "zh-CN" && usableTranslation && (
           // Kept, but behind a disclosure: the document above is the report, and this is
           // a reading aid beside it.
-          <details className="article-original" style={{ marginTop: 18 }}>
+          <details className="article-original mt-18">
             <summary>完整中文译文</summary>
             <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} tables={a.tables} />
           </details>
         )}
         {!publisherPdf && locale === "en" && a.rawText && (
-          <div style={{ marginBottom: 22 }}>
-            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>{nativeChinese ? "Complete Chinese original" : "Complete English original"}</div>
+          <div className="mb-22">
+            <div className="mono meta-muted mb-6">{nativeChinese ? "Complete Chinese original" : "Complete English original"}</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
         )}
         {!publisherPdf && locale === "zh-CN" && usableTranslation && (
-          <div style={{ marginBottom: 22 }}>
-            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
+          <div className="mb-22">
+            <div className="mono meta-muted mb-6">
               完整中文译文
             </div>
             <h2 style={{ fontSize: 20, marginBottom: 8 }}>{localizeChineseContent(usableTranslation.title)}</h2>
@@ -501,8 +501,8 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
           </div>
         )}
         {!publisherPdf && locale === "zh-CN" && !usableTranslation && a.rawText && (
-          <div style={{ marginBottom: 22 }}>
-            <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>{nativeChinese ? "完整中文原文" : "完整英文原文"}</div>
+          <div className="mb-22">
+            <div className="mono meta-muted mb-6">{nativeChinese ? "完整中文原文" : "完整英文原文"}</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
         )}
@@ -515,7 +515,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
         {a.disclaimerText && (
           <details className="article-original">
             <summary>{tr(locale, "Publisher disclaimer", "机构免责声明")}</summary>
-            <div className="prose article-body" style={{ marginTop: 12 }}>{a.disclaimerText}</div>
+            <div className="prose article-body mt-12">{a.disclaimerText}</div>
           </details>
         )}
         {!publisherPdf && previewDocument && (
@@ -590,7 +590,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             </tr>)}
           </tbody>
         </table></div>}
-        {primaryAssetView && peerReports.length === 0 && <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{tr(locale, "Only one institution is available, so Tlines does not label this as market consensus.", "目前仅有一家机构数据，因此 Tlines 不将其称为市场共识。")}</p>}
+        {primaryAssetView && peerReports.length === 0 && <p className="mono meta-muted">{tr(locale, "Only one institution is available, so Tlines does not label this as market consensus.", "目前仅有一家机构数据，因此 Tlines 不将其称为市场共识。")}</p>}
       </section>}
 
       {redesigned && <NewsletterCTA locale={locale} source="article" />}

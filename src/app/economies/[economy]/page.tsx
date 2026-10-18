@@ -93,7 +93,7 @@ export default async function EconomyPage(props: { params: Promise<Params> }) {
     <main className="wrap">
       <JsonLd data={collectionPageJsonLd(locale, `/economies/${economy.slug}`, name, tr(locale, `${name} macro and institutional intelligence.`, `${name}宏观与机构情报。`), name)} />
       <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "Economies", "经济体"), path: "/economies" }, { name, path: `/economies/${economy.slug}` }])} />
-      <nav aria-label={tr(locale, "Breadcrumb", "面包屑")} className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 12 }}>
+      <nav aria-label={tr(locale, "Breadcrumb", "面包屑")} className="mono meta-tertiary mb-12">
         <Link href={localePath(locale, "/economies")}>{tr(locale, "Economies", "经济体")}</Link>
       </nav>
       <div className="page-head">

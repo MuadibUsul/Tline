@@ -59,13 +59,13 @@ export default function NewsForm({
       <label className="news-field">
         <span>{labels.sources}</span>
         <textarea name="sources" defaultValue={(initial?.sources ?? []).join("\n")} rows={4} placeholder={"https://…\nhttps://…"} />
-        <small className="sub" style={{ fontSize: 11, color: "var(--faint)" }}>{labels.sourcesHint}</small>
+        <small className="sub meta-tertiary">{labels.sourcesHint}</small>
       </label>
       <p className="sub" style={{ margin: 0, fontSize: 11.5 }}>{labels.hint}</p>
       <button className="minibtn p" type="submit" disabled={pending}>{pending ? labels.saving : labels.save}</button>
       {state.error ? <p className="apikey-error" role="alert">{state.error}</p> : null}
       {state.issues?.length ? (
-        <ul className="apikey-error" role="alert" style={{ margin: 0, paddingLeft: 18 }}>
+        <ul className="apikey-error list-tight" role="alert">
           {state.issues.map((issue) => <li key={issue.code}>{issue.message}</li>)}
         </ul>
       ) : null}

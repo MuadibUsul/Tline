@@ -39,7 +39,7 @@ function SignInGate({ locale }: { locale: Locale }) {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Monitoring Center", "监控中心")}</div>
         <h1>{tr(locale, "Sign in to monitor the market", "登录后建立市场监控")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Track assets, institutions, themes and consensus signals in one place.", "在同一处关注资产、机构、交易主线与共识信号。")}</p>
+        <p className="sub text-muted">{tr(locale, "Track assets, institutions, themes and consensus signals in one place.", "在同一处关注资产、机构、交易主线与共识信号。")}</p>
         <Link href={localePath(locale, "/signin?next=/watchlist")} className="minibtn p" style={{ alignSelf: "flex-start", padding: "9px 14px" }}>{tr(locale, "Sign in", "登录")} →</Link>
       </div>
     </main>
@@ -91,7 +91,7 @@ export default async function WatchlistPage() {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Signal Monitoring", "信号监控")}</div>
         <h1>{tr(locale, "Monitoring Center", "监控中心")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "Follow what matters, then define exactly when it should surface.", "先关注重要对象，再定义何时需要提醒。")}</p>
+        <p className="sub text-muted">{tr(locale, "Follow what matters, then define exactly when it should surface.", "先关注重要对象，再定义何时需要提醒。")}</p>
       </div>
 
       <section className="blk">

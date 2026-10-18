@@ -43,7 +43,7 @@ export default function ColumnForm({
       <button className="minibtn p" type="submit" disabled={pending}>{pending ? labels.submitting : labels.submit}</button>
       {state.error ? <p className="apikey-error" role="alert">{state.error}</p> : null}
       {state.issues?.length ? (
-        <ul className="apikey-error" role="alert" style={{ margin: 0, paddingLeft: 18 }}>
+        <ul className="apikey-error list-tight" role="alert">
           {state.issues.map((issue) => <li key={issue.code}>{issue.message}</li>)}
         </ul>
       ) : null}

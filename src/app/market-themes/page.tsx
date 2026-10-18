@@ -66,13 +66,13 @@ export default async function MarketThemesPage() {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Live market narratives", "当前市场叙事")}</div>
         <h1>{tr(locale, "Market Themes", "交易主线")}</h1>
-        <p className="sub" style={{ maxWidth: "72ch" }}>
+        <p className="sub measure">
           {tr(locale,
             "A theme is a narrative that several institutions are writing about at once, in the same direction, on assets whose prices have moved with it. What follows is the current list with the breadth of support behind each one; the reasoning, the evidence links and the conditions that would invalidate a theme are on the desk.",
             "一条主线，是指多家机构在同一时间、朝同一方向讨论、且相关资产价格同步变动的叙事。以下是当前的主线清单与各自的支撑广度；具体逻辑、证据链接与失效条件在交易主线台内。")}
         </p>
         {themes.length > 0 && (
-          <p className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>
+          <p className="mono meta-tertiary">
             {tr(locale, "Updated ", "更新于 ")}
             <time dateTime={updatedAt.toISOString()}>{macroDateTime(updatedAt, locale, zh ? "Asia/Shanghai" : "UTC")}</time>
             {" · "}
@@ -84,7 +84,7 @@ export default async function MarketThemesPage() {
       {themes.length === 0 && (
         <section className="blk">
           <h2 className="section-t">{tr(locale, "No active theme at this moment", "当前暂无活跃主线")}</h2>
-          <p className="sub" style={{ color: "var(--muted)", maxWidth: "72ch" }}>
+          <p className="sub measure text-muted">
             {tr(locale, "A theme appears once reviewed institutional views enter the seven-day window and the market confirms the direction. The rules are published in the methodology.", "当通过审核的机构观点进入最近 7 天窗口、且行情确认方向后，主线会自动形成。判定规则见方法论。")}
           </p>
         </section>
@@ -98,7 +98,7 @@ export default async function MarketThemesPage() {
             <span className="chip gray">{zh ? STATUS[theme.status][1] : STATUS[theme.status][0]}</span>
             <span className="chip gray">{zh ? MARKET_STATUS[theme.marketStatus][1] : MARKET_STATUS[theme.marketStatus][0]}</span>
           </div>
-          <p className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8 }}>
+          <p className="mono meta-tertiary mb-8">
             {theme.institutionCount}{tr(locale, " institutions", "家机构")} · {theme.viewCount}{tr(locale, " views", "条观点")} · {tr(locale, "strength", "强度")} {theme.score} · {tr(locale, "market confirmation", "行情确认度")} {theme.marketConfirmation === null ? "—" : `${Math.round(theme.marketConfirmation * 100)}%`}
           </p>
           <div className="tag-row">

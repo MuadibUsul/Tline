@@ -55,7 +55,7 @@ export default async function McpPage() {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "For AI clients", "给 AI 客户端")}</div>
         <h1>{tr(locale, "MCP access", "MCP 接入")}</h1>
-        <p className="sub" style={{ maxWidth: "72ch" }}>
+        <p className="sub measure">
           {tr(locale,
             "Connect Claude, Cursor or any MCP-capable client to Tlines' published research and macro data. The connection is read-only, every answer carries its source and page URL, and it is available to every registered account.",
             "把 Claude、Cursor 或其他支持 MCP 的客户端接到 Tlines 的已发布研报与宏观数据。连接只读，每个结果都带来源与页面地址，所有注册账户均可使用。")}
@@ -64,7 +64,7 @@ export default async function McpPage() {
 
       <section className="blk">
         <div className="section-t">{tr(locale, "What the client can read", "客户端可以读什么")}</div>
-        <p className="sub" style={{ color: "var(--muted)", marginTop: 0 }}>
+        <p className="sub text-muted mt-0">
           {tr(locale,
             "Only reports that passed the publication gate. Article bodies, translations and PDFs are not served — the MCP returns Tlines' own structured analysis and metadata, with a link back to the page.",
             "仅限通过公开闸门的研报。不提供原文正文、译文与 PDF——MCP 返回的是 Tlines 自己的结构化分析与元数据，并附回链。")}
@@ -74,7 +74,7 @@ export default async function McpPage() {
             <span className="chip gray" key={tool.name} title={locale === "zh-CN" ? tool.zh : tool.en}>{tool.name}</span>
           ))}
         </div>
-        <div className="apikey-docs" style={{ marginTop: 16 }}>
+        <div className="apikey-docs mt-16">
           <p>{tr(locale, "Endpoint", "端点")}</p>
           <code>POST {base}/api/mcp/user</code>
           <p>{tr(locale, "Authentication header", "鉴权请求头")}</p>
@@ -132,7 +132,7 @@ export default async function McpPage() {
               </table>
             </div>
           )}
-          <div style={{ marginTop: 18 }}>
+          <div className="mt-18">
             <McpKeyForm
               labels={{
                 name: tr(locale, "Key name", "密钥名称"),
@@ -150,7 +150,7 @@ export default async function McpPage() {
       ) : (
         <section className="blk">
           <div className="section-t">{tr(locale, "Registration required", "需要注册后使用")}</div>
-          <p className="sub" style={{ color: "var(--muted)", marginTop: 0 }}>
+          <p className="sub text-muted mt-0">
             {tr(locale,
               "Sign in to issue a personal MCP key. New accounts are created with the same email sign-in; the key is bound to your account and stops working if the account is suspended.",
               "登录后即可签发个人 MCP 密钥。新账户通过同一邮箱登录流程创建；密钥绑定你的账户，账户停用后立即失效。")}

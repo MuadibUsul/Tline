@@ -31,14 +31,14 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
   const demoAuthEnabled = !formalAuth && (process.env.NODE_ENV !== "production" || process.env.ALLOW_INSECURE_DEMO_AUTH === "true");
 
   return (
-    <main className="wrap" style={{ maxWidth: 460 }}>
-      <div className="page-head" style={{ borderBottom: "none" }}>
+    <main className="wrap signin-page">
+      <div className="page-head signin-head">
         <div className="eyebrow">{tr(locale, "Account", "账户")}</div>
         <h1>{tr(locale, "Sign in", "登录")}</h1>
         {/* Describes the form actually offered first. The preview identity can be enabled
             alongside a password in development, and describing that one instead told a
             visitor looking at a password field that no password was needed. */}
-        <p className="sub" style={{ color: "var(--muted)" }}>{passwordAuth
+        <p className="sub signin-sub">{passwordAuth
           ? tr(locale, "Sign in with your email and password.", "使用邮箱和密码登录。")
           : demoAuthEnabled
             ? tr(locale, "Preview sign-in identifies your watchlist and alerts without a password.", "预览登录无需密码，用于识别你的关注列表和提醒。")
@@ -46,10 +46,10 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
       </div>
 
       {searchParams.error === "email" && (
-        <p className="chip bear" style={{ display: "inline-block" }}>{tr(locale, "Enter a valid email.", "请输入有效的电子邮箱。")}</p>
+        <p className="chip bear signin-error">{tr(locale, "Enter a valid email.", "请输入有效的电子邮箱。")}</p>
       )}
       {searchParams.error === "disabled" && (
-        <p className="chip bear" style={{ display: "inline-block" }}>{tr(locale, "Preview sign-in is disabled in production.", "生产环境已禁用预览登录。")}</p>
+        <p className="chip bear signin-error">{tr(locale, "Preview sign-in is disabled in production.", "生产环境已禁用预览登录。")}</p>
       )}
 
       {passwordAuth && <>
@@ -97,9 +97,9 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
         </details>
       </>}
 
-      {formalAuth && !passwordAuth && <a className="minibtn p" style={{ display: "block", padding: "10px 14px", textAlign: "center" }} href={localePath(locale, `/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`)}>{tr(locale, `Continue with ${formalAuthLabel()}`, `使用 ${formalAuthLabel()} 继续`)} →</a>}
+      {formalAuth && !passwordAuth && <a className="minibtn p signin-provider" href={localePath(locale, `/api/auth/signin?callbackUrl=${encodeURIComponent(next)}`)}>{tr(locale, `Continue with ${formalAuthLabel()}`, `使用 ${formalAuthLabel()} 继续`)} →</a>}
 
-      {demoAuthEnabled && <><form action={doSignIn} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {demoAuthEnabled && <><form action={doSignIn} className="card signin-demo">
         <input type="hidden" name="next" value={next} />
         <label className="field">
           <span>{tr(locale, "Email", "电子邮箱")}</span>
@@ -109,14 +109,14 @@ export default async function SignInPage(props: { searchParams: Promise<{ next?:
           <span>{tr(locale, "Name (optional)", "姓名（可选）")}</span>
           <input name="name" type="text" placeholder={tr(locale, "Jane Trader", "张三")} />
         </label>
-        <button type="submit" className="minibtn p" style={{ padding: "9px 14px", justifyContent: "center" }}>{tr(locale, "Continue", "继续")} →</button>
+        <button type="submit" className="minibtn p signin-demo-submit">{tr(locale, "Continue", "继续")} →</button>
       </form>
 
-      <form action={doSignIn} style={{ marginTop: 14, textAlign: "center" }}>
+      <form action={doSignIn} className="signin-demo-alt">
         <input type="hidden" name="email" value={DEMO_EMAIL} />
         <input type="hidden" name="name" value="Demo Trader" />
         <input type="hidden" name="next" value={next} />
-        <button type="submit" className="minibtn" style={{ padding: "8px 14px" }}>{tr(locale, "Continue as demo", "以演示用户继续")} →</button>
+        <button type="submit" className="minibtn">{tr(locale, "Continue as demo", "以演示用户继续")} →</button>
       </form></>}
     </main>
   );

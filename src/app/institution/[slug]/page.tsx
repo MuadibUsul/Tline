@@ -121,7 +121,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
         <div className="eyebrow">{tr(locale, "Institution", "机构")}</div>
         <h1>{profile.h1}</h1>
         {/* Required by the brand rules: this page must never read as the institution's own. */}
-        <p className="sub" style={{ color: "var(--muted)", maxWidth: "72ch" }}>
+        <p className="sub measure text-muted">
           {tr(locale,
             `Tlines indexes and structures research that ${inst.name} publishes publicly. Tlines is not affiliated with, endorsed by, or acting on behalf of ${inst.name}, and takes no position on the views shown.`,
             `Tlines 仅对 ${inst.name} 公开发布的研究进行索引与结构化整理，与 ${inst.name} 无关联、未经其授权或背书，也不对相关观点持立场。`)}
@@ -130,7 +130,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
           <span className="stars">{"★".repeat(inst.rating)}{"☆".repeat(5 - inst.rating)}</span>
           <span>{tr(locale, "Authority weight", "权威权重")} <b className="mono">{inst.authorityScore.toFixed(2)}</b></span>
           <span>{tr(locale, "Public views · 30d", "公开观点 · 30天")} <b className="mono">{count30}</b></span>
-          {coverage.length > 0 && <span style={{ color: "var(--faint)" }}>{coverage.map((item) => domainTerm(item, locale)).join(" · ")}</span>}
+          {coverage.length > 0 && <span className="text-tertiary">{coverage.map((item) => domainTerm(item, locale)).join(" · ")}</span>}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <a href={inst.researchUrl} target="_blank" rel="noopener noreferrer" className="minibtn">{tr(locale, "Research homepage ↗", "研报主页 ↗")}</a>
@@ -174,7 +174,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
           {mainTopics.length > 0 && <div className="tag-row">
             {mainTopics.map((topic) => <Link className="chip gray" key={topic.key} href={localePath(locale, topicHref(topic.key))}>{topic.label} · {topic.views}</Link>)}
           </div>}
-          <p className="sub" style={{ marginTop: 12, color: "var(--muted)" }}>
+          <p className="sub text-muted mt-12">
             {tr(locale, "Counted from this publisher's own indexed reports. ", "按该机构已收录研报统计。")}
             <Link href={localePath(locale, `/institution/${inst.slug}/accuracy`)}>{tr(locale, "Forecast record — how its settled calls turned out", "预测记录：已结算观点的实际结果")}</Link>
           </p>
@@ -187,7 +187,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
           {articles.slice(0, 10).map((a) => (
             <FeedCard key={a.id} a={{ ...a, institution: { name: inst.name, slug: inst.slug } }} locale={locale} />
           ))}
-          {articles.length === 0 && <p className="mono" style={{ color: "var(--muted)" }}>{tr(locale, "No ingested research yet for this source.", "该来源暂无已入库研报。")}</p>}
+          {articles.length === 0 && <p className="mono text-muted">{tr(locale, "No ingested research yet for this source.", "该来源暂无已入库研报。")}</p>}
         </div>
       </section>
     </main>

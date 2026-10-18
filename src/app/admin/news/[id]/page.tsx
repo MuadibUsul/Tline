@@ -128,7 +128,7 @@ export default async function AdminNewsEditPage(props: { params: Promise<{ id: s
               {" · "}{tr(locale, "created", "创建于")} {when(post.createdAt, locale)}
               {post.publishedAt ? <> · {tr(locale, "published", "发布于")} {when(post.publishedAt, locale)}</> : null}
             </p>
-            <div className="admin-actions" style={{ marginTop: 10 }}>
+            <div className="admin-actions mt-10">
               <form action={publishNewsAction}>
                 <input type="hidden" name="id" value={post.id} />
                 <button className="minibtn p" type="submit" disabled={published}>{tr(locale, "Publish", "发布")}</button>

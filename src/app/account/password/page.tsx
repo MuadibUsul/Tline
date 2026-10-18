@@ -24,7 +24,7 @@ export default async function PasswordPage() {
       <div className="page-head" style={{ borderBottom: "none" }}>
         <div className="eyebrow">{tr(locale, "Account", "账户")}</div>
         <h1>{hasPassword ? tr(locale, "Change password", "修改密码") : tr(locale, "Set a password", "设置密码")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>
+        <p className="sub text-muted">
           {hasPassword
             ? tr(locale, "Changing it signs out every other device.", "修改后,其他设备上的登录会全部失效。")
             : tr(

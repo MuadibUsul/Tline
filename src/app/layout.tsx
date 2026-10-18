@@ -53,6 +53,11 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// Read the reader's saved theme before the first paint. Without this the page renders
+// in the system scheme and only switches after hydration, which is a visible flash and
+// makes the toggle look like it did not persist.
+const THEME_INIT = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}})();`;
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   const formalAuth = isFormalAuthConfigured();
@@ -190,12 +195,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   );
 
   return (
-    <html lang={locale}>
+    <html lang={locale} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
       <body className={pathname === "/" ? "page-home" : undefined}>
         <NavigationProgress />
         <div className="topbar">
           <div className="wrap inner">
-            <Link href={localePath(locale, "/")} className="brand">
+            <Link href={localePath(locale, "/")} className="brand" aria-label={brandName(locale)}>
               <span className="glyph"><TlinesMark /></span> <span className="brand-name">{brandName(locale)}</span>
             </Link>
             <nav className="nav" aria-label={tr(locale, "Primary", "主导航")}>

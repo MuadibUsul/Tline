@@ -112,7 +112,7 @@ export default async function McpPage() {
             <div className="apikey-docs">
               <p>{tr(locale, server.purposeEn, server.purposeZh)}</p>
               <code>POST {base}{server.endpoint}</code>
-              <p style={{ margin: 0 }}>{tr(locale, "Tools this server exposes:", "此端点提供的工具:")}</p>
+              <p className="m-0">{tr(locale, "Tools this server exposes:", "此端点提供的工具:")}</p>
               <div className="tags">
                 {server.tools.map((tool) => <span key={tool} className="chip gray">{tool}</span>)}
               </div>

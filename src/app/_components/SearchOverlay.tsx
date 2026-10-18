@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
+import { trapFocus } from "./focusTrap";
 
 /**
  * The ⌘K / Ctrl+K search overlay (PRD P07).
@@ -41,29 +42,51 @@ export default function SearchOverlay({
   const [hits, setHits] = useState<Hit[]>([]);
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setOpen((value) => !value);
-      } else if (event.key === "Escape") {
-        setOpen(false);
+        if (open) close();
+        else setOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [close, open]);
 
   useEffect(() => {
-    if (open) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 20);
-      return () => clearTimeout(timer);
+    if (!open) {
+      setQuery("");
+      setHits([]);
+      setCursor(0);
+      return;
     }
-    setQuery("");
-    setHits([]);
-    setCursor(0);
-  }, [open]);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+      trapFocus(event, panelRef.current);
+    };
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const timer = setTimeout(() => inputRef.current?.focus(), 20);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [close, open]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -92,14 +115,14 @@ export default function SearchOverlay({
 
   return (
     <>
-      <button type="button" className="search-trigger" onClick={() => setOpen(true)} aria-label={labels.aria}>
+      <button ref={triggerRef} type="button" className="search-trigger" onClick={() => setOpen(true)} aria-label={labels.aria}>
         <Icon name="search" />
-        {labels.trigger}
+        <span className="search-trigger-label">{labels.trigger}</span>
         <kbd>⌘K</kbd>
       </button>
       {open && (
-        <div className="search-overlay" role="dialog" aria-modal="true" aria-label={labels.aria} onClick={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
-          <div className="panel">
+        <div className="search-overlay" role="dialog" aria-modal="true" aria-label={labels.aria} onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
+          <div className="panel" ref={panelRef}>
             <input
               ref={inputRef}
               value={query}
@@ -135,7 +158,7 @@ export default function SearchOverlay({
                 </a>
               )}
             </div>
-            <div style={{ padding: "8px 18px", font: "10.5px var(--mono)", color: "var(--faint)", borderTop: "1px solid var(--border)" }}>{labels.hint}</div>
+            <div className="search-hint">{labels.hint}</div>
           </div>
         </div>
       )}

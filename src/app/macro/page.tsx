@@ -130,7 +130,7 @@ export default async function MacroPage() {
                 </tr>
               );
             })}
-            {calendar.length === 0 && <tr><td colSpan={7} className="mono-cell" style={{ color: "var(--muted)" }}>{tr(locale, "No scheduled releases in this window.", "该时间窗内暂无计划发布。")}</td></tr>}
+            {calendar.length === 0 && <tr><td colSpan={7} className="mono-cell text-muted">{tr(locale, "No scheduled releases in this window.", "该时间窗内暂无计划发布。")}</td></tr>}
           </tbody>
         </table></div>
       </section>
@@ -149,9 +149,9 @@ export default async function MacroPage() {
               <tbody>
                 {rows.filter((row) => row.indicator.category === category).map(({ indicator, last, previous }) => (
                   <tr key={indicator.id}>
-                    <td className="inst"><Link href={localePath(locale, `/macro/indicator/${indicator.canonicalKey}`)}>{nm(indicator.nameEn, indicator.nameZh)}</Link><small className="mono" style={{ display: "block", color: "var(--faint)" }}>{unitLabel(indicator.unit, locale)}</small></td>
+                    <td className="inst"><Link href={localePath(locale, `/macro/indicator/${indicator.canonicalKey}`)}>{nm(indicator.nameEn, indicator.nameZh)}</Link><small className="mono block-tertiary">{unitLabel(indicator.unit, locale)}</small></td>
                     <td className="mono-cell num"><b>{dec(last?.value)}</b></td>
-                    <td className="mono-cell num" style={{ color: "var(--faint)" }}>{dec(previous?.value)}</td>
+                    <td className="mono-cell num text-tertiary">{dec(previous?.value)}</td>
                     <td className="mono-cell">{last ? formatDate(last.period, locale) : "—"}</td>
                   </tr>
                 ))}

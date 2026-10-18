@@ -157,11 +157,11 @@ export default async function Home() {
             <div className="rowlist">
               {thisWeek.map((release) => (
                 <Link key={release.id} href={localePath(locale, `/macro/release/${release.id}`)} className="r" style={{ textDecoration: "none" }}>
-                  <span className="inst">{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}<small className="mono" style={{ display: "block", color: "var(--faint)" }}>{release.countryCode} · {"●".repeat(release.importance)}</small></span>
-                  <span className="mono" style={{ whiteSpace: "nowrap", color: "var(--muted)" }}>{beijingDateTime(release.scheduledAt, locale)}</span>
+                  <span className="inst">{locale === "zh-CN" ? release.titleZh ?? release.titleEn : release.titleEn}<small className="mono block-tertiary">{release.countryCode} · {"●".repeat(release.importance)}</small></span>
+                  <span className="mono nowrap-muted">{beijingDateTime(release.scheduledAt, locale)}</span>
                 </Link>
               ))}
-              {thisWeek.length === 0 && <div className="r"><span style={{ color: "var(--muted)" }}>{tr(locale, "No high-impact releases left this week.", "本周暂无重要数据发布。")}</span></div>}
+              {thisWeek.length === 0 && <div className="r"><span className="text-muted">{tr(locale, "No high-impact releases left this week.", "本周暂无重要数据发布。")}</span></div>}
             </div>
           </div>
           <div className="side-block">

@@ -158,7 +158,7 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
           <span>{tr(locale, "Updated", "更新")}: {latest ? formatDate(latest.period, locale) : "N/A"}</span>
           {nextRelease && <span>{tr(locale, "Next release", "下次发布")}: {beijingDateTime(nextRelease.scheduledAt, locale)} ({tr(locale, "Beijing", "北京时间")})</span>}
         </div>
-        <Link href={localePath(locale, "/macro")} className="minibtn" style={{ alignSelf: "flex-start" }}>← {tr(locale, "Economic data", "经济数据")}</Link>
+        <Link href={localePath(locale, "/macro")} className="minibtn self-start">← {tr(locale, "Economic data", "经济数据")}</Link>
       </div>
 
       {/* PRD P06: one bar that states what the series measures and where it stands — unit,
@@ -219,7 +219,7 @@ export default async function MacroIndicatorPage(props: { params: Promise<{ key:
                   <tr key={row.period.getTime()}>
                     <td className="mono-cell">{formatDate(row.period, locale)}</td>
                     <td className="mono-cell num"><b>{row.value}</b></td>
-                    <td className="mono-cell num" style={{ color: "var(--faint)" }}>{row.previous ?? "—"}</td>
+                    <td className="mono-cell num text-tertiary">{row.previous ?? "—"}</td>
                     <td className={`mono-cell num ${change === null ? "" : change >= 0 ? "up" : "down"}`}>{change === null ? "—" : fmtChange(change)}</td>
                     <td className="mono-cell num">{dec(row.consensus)}</td>
                   </tr>

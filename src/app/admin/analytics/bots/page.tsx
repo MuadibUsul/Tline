@@ -69,7 +69,7 @@ export default async function BotTrafficPage(props: { searchParams: Promise<{ ra
       <StatCard label={tr(locale, "Agents", "Agent 数量")} value={String(traffic.agentsCount)} note={tr(locale, "distinct names", "不同标识")} />
       <StatCard label={tr(locale, "No-JS / JS", "无 JS / 有 JS")} value={`${compact(traffic.server)} / ${compact(traffic.beacon)}`} note={tr(locale, "server / beacon", "服务端 / beacon")} />
     </section>
-    <p className="admin-hint" style={{ marginTop: 8 }}>
+    <p className="admin-hint mt-8">
       {traffic.activeDays > 0
         ? tr(
           locale,
@@ -106,7 +106,7 @@ export default async function BotTrafficPage(props: { searchParams: Promise<{ ra
 
     <section className="blk">
       <div className="section-t"><span>{tr(locale, "Agents", "Agent 明细")}</span><span className="chip gray">{traffic.agents.length}</span></div>
-      <div className="tbl-wrap"><table className="admin-table">
+      <div className="tbl-wrap" tabIndex={0} role="region" aria-label={tr(locale, "Agent detail table", "Agent 明细表格")}><table className="admin-table">
         <thead><tr>
           <th>{tr(locale, "Agent", "Agent")}</th>
           <th>{tr(locale, "Class", "类型")}</th>
@@ -129,7 +129,7 @@ export default async function BotTrafficPage(props: { searchParams: Promise<{ ra
 
     <section className="blk">
       <div className="section-t">{tr(locale, "Most requested paths", "请求最多的页面")}</div>
-      <div className="tbl-wrap"><table className="admin-table">
+      <div className="tbl-wrap" tabIndex={0} role="region" aria-label={tr(locale, "Most requested paths table", "请求最多页面表格")}><table className="admin-table">
         <thead><tr><th>{tr(locale, "Path", "路径")}</th><th>{tr(locale, "Class", "类型")}</th><th>{tr(locale, "Requests", "请求")}</th></tr></thead>
         <tbody>
           {traffic.paths.length === 0 && <tr><td colSpan={3}><div className="empty-state">{tr(locale, "No path recorded.", "没有路径记录。")}</div></td></tr>}

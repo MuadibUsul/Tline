@@ -52,7 +52,7 @@ export function EmailSignInForm({
     }
   }
 
-  return <form onSubmit={submit} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+  return <form onSubmit={submit} className="card stack-12">
     <label className="field">
       <span>{emailLabel}</span>
       <input name="email" type="email" autoComplete="email" required placeholder={placeholder} />

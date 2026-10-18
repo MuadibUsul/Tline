@@ -91,7 +91,7 @@ export default function HomeFront({
 
       {/* The editorial cover: one lead story, the rest of the picks beside it. */}
       <div className="front-section-head">
-        <div><span className="eyebrow">{tr(locale, "Editorial desk", "编辑台")}</span><h2>{tr(locale, "What matters now", "此刻值得关注")}</h2></div>
+        <div><span className="eyebrow">{tr(locale, "Editorial desk", "编辑台")}</span><h1>{tr(locale, "What matters now", "此刻值得关注")}</h1></div>
         <Link href={localePath(locale, "/research")}>{tr(locale, "Browse all research", "浏览全部研报")} <Icon name="arrow-right" /></Link>
       </div>
       <section className="front-grid" aria-label={tr(locale, "Today's cover", "今日封面")} data-track-section="home-cover" data-track-title={tr(locale, "Today's cover", "今日封面")}>
@@ -159,7 +159,7 @@ export default function HomeFront({
             {news.length > 0 && (
               <aside className="front-news-rail" aria-label={tr(locale, "Latest news", "最新新鲜事")} data-track-section="home-news" data-track-title={tr(locale, "Newsroom", "新鲜事")}>
                 <div className="front-news-head">
-                  <span className="section-t" style={{ margin: 0 }}>{tr(locale, "Newsroom", "新鲜事")}</span>
+                  <span className="section-t newsroom-head">{tr(locale, "Newsroom", "新鲜事")}</span>
                   <Link className="chip gray" href={localePath(locale, "/news")}>{tr(locale, "All", "全部")} →</Link>
                 </div>
                 <div className="front-news-list">
@@ -204,7 +204,7 @@ export default function HomeFront({
                 </Link>
               ))}
             </div>
-          ) : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No active theme at the moment.", "当前暂无活跃主线。")}</p>}
+          ) : <p className="sub empty-copy">{tr(locale, "No active theme at the moment.", "当前暂无活跃主线。")}</p>}
         </div>
 
         <div className="blk">
@@ -217,7 +217,7 @@ export default function HomeFront({
                 </Link>
               ))}
             </div>
-          ) : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No subject has enough coverage yet.", "暂无达到覆盖门槛的主题。")}</p>}
+          ) : <p className="sub empty-copy">{tr(locale, "No subject has enough coverage yet.", "暂无达到覆盖门槛的主题。")}</p>}
         </div>
 
         <NewsletterCTA locale={locale} source="home" variant="column" />

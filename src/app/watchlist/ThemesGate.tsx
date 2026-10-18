@@ -46,7 +46,7 @@ export default function ThemesGate({ locale }: { locale: Locale }) {
           {bullets.map(([title, body]) => (
             <li key={title}>
               <b>{title}</b>
-              <span style={{ color: "var(--muted)" }}> — {body}</span>
+              <span className="text-muted"> — {body}</span>
             </li>
           ))}
         </ul>

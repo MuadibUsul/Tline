@@ -51,7 +51,7 @@ export default async function InstitutionsDirectory() {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Directory", "目录")}</div>
         <h1>{tr(locale, "Institutions", "机构目录")}</h1>
-        <p className="sub" style={{ maxWidth: "72ch" }}>
+        <p className="sub measure">
           {tr(locale,
             `${institutions.length} publishing houses and ${total.toLocaleString(locale)} reports that passed the publication gate. Each profile carries the house's own reports; an institution's view is its own, and Tlines reporting it is not Tlines agreeing with it.`,
             `${institutions.length} 家发布机构，共 ${total.toLocaleString(locale)} 篇通过公开闸门的研报。每个档案页只收录该机构自己的研报；机构观点不代表 Tlines 立场。`)}

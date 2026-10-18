@@ -80,7 +80,7 @@ export default async function BehaviorPage(props: { searchParams: Promise<{ rang
       <StatCard label={tr(locale, "Anonymous loyal", "匿名忠诚访客")} value={String(loyal.visitors)} note={tr(locale, `≥${loyal.thresholdDays} days, no account`, `≥${loyal.thresholdDays} 天，未注册`)} />
       <StatCard label={tr(locale, "Clicks", "点击")} value={compact(overview.clickEvents)} note={tr(locale, "human clicks", "真人点击")} />
     </section>
-    <p className="admin-hint" style={{ marginTop: 8 }}>
+    <p className="admin-hint mt-8">
       {tr(
         locale,
         `Rates use ${overview.measured} views with behavior data. Older page views only have views and time; they are counted in views and visitors but not in glance/read rates.`,
@@ -90,7 +90,7 @@ export default async function BehaviorPage(props: { searchParams: Promise<{ rang
 
     <section className="blk">
       <div className="section-t">{tr(locale, "Page performance", "页面表现")}</div>
-        <div className="tbl-wrap"><table className="admin-table">
+        <div className="tbl-wrap" tabIndex={0} role="region" aria-label={tr(locale, "Page performance table", "页面表现表格")}><table className="admin-table">
           <thead><tr>
             <th>{tr(locale, "Page", "页面")}</th>
             <th>{tr(locale, "Views", "浏览")}</th>
@@ -139,7 +139,7 @@ export default async function BehaviorPage(props: { searchParams: Promise<{ rang
         <span>{tr(locale, "Section attention", "区块注意力")}</span>
         <span className="chip gray">{tr(locale, "where they stayed / left", "停留与退出位置")}</span>
       </div>
-      <div className="tbl-wrap"><table className="admin-table">
+      <div className="tbl-wrap" tabIndex={0} role="region" aria-label={tr(locale, "Section attention table", "区块注意力表格")}><table className="admin-table">
         <thead><tr>
           <th>{tr(locale, "Page", "页面")}</th>
           <th>{tr(locale, "Section", "区块")}</th>
@@ -178,7 +178,7 @@ export default async function BehaviorPage(props: { searchParams: Promise<{ rang
     <div className="analytics-grid">
       <section className="blk">
         <div className="section-t">{tr(locale, "Clicked targets", "点击目标")}</div>
-        <div className="tbl-wrap"><table className="admin-table">
+        <div className="tbl-wrap" tabIndex={0} role="region" aria-label={tr(locale, "Clicked targets table", "点击目标表格")}><table className="admin-table">
           <thead><tr><th>{tr(locale, "Page", "页面")}</th><th>{tr(locale, "Target", "目标")}</th><th>{tr(locale, "Type", "类型")}</th><th>{tr(locale, "Clicks", "点击")}</th></tr></thead>
           <tbody>
             {clicks.length === 0 && <tr><td colSpan={4}><div className="empty-state">{tr(locale, "No clicks recorded yet.", "尚未记录到点击。")}</div></td></tr>}
@@ -194,7 +194,7 @@ export default async function BehaviorPage(props: { searchParams: Promise<{ rang
 
       <section className="blk">
         <div className="section-t">{tr(locale, "Page flow", "页面流转")}</div>
-        <div className="tbl-wrap"><table className="admin-table">
+        <div className="tbl-wrap" tabIndex={0} role="region" aria-label={tr(locale, "Page flow table", "页面流转表格")}><table className="admin-table">
           <thead><tr><th>{tr(locale, "From", "从")}</th><th>{tr(locale, "To", "到")}</th><th>{tr(locale, "Count", "次数")}</th></tr></thead>
           <tbody>
             {flow.length === 0 && <tr><td colSpan={3}><div className="empty-state">{tr(locale, "No next-page transitions yet.", "尚未记录到页面流转。")}</div></td></tr>}

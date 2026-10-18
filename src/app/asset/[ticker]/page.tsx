@@ -87,17 +87,17 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
         {consensus && consensus.institutionCount >= 2 ? <>
           <div className="big-score">
             <span className="num" style={{ color: toneColor }}>{consensus.score}</span>
-            <span className="mono" style={{ color: "var(--muted)" }}>/ 100</span>
+            <span className="mono text-muted">/ 100</span>
             <span className={`chip ${consensus.tone}`}>{consensus.tone === "bull" ? tr(locale, consensus.label, "看多") : consensus.tone === "bear" ? tr(locale, consensus.label, "看空") : tr(locale, consensus.label, "中性")}</span>
           </div>
           <div className="deltas">
             <span>1D <Delta v={d1} /></span>
             <span>7D <Delta v={d7} /></span>
             <span>30D <Delta v={d30} /></span>
-            <span style={{ color: "var(--faint)" }}>{tr(locale, `${consensus.institutionCount} institutions`, `${consensus.institutionCount} 家机构`)} · {consensus.bullishCount}↑ {consensus.neutralCount}→ {consensus.bearishCount}↓</span>
+            <span className="text-tertiary">{tr(locale, `${consensus.institutionCount} institutions`, `${consensus.institutionCount} 家机构`)} · {consensus.bullishCount}↑ {consensus.neutralCount}→ {consensus.bearishCount}↓</span>
           </div>
-        </> : consensus ? <div className="deltas"><span>{tr(locale, "Direction", "方向")} <b>{consensus.tone === "bull" ? tr(locale, "Bullish", "看多") : consensus.tone === "bear" ? tr(locale, "Bearish", "看空") : tr(locale, "Neutral", "中性")}</b></span><span>{tr(locale, "Coverage", "覆盖")} <b>{consensus.institutionCount} {tr(locale, "institution", "家机构")}</b></span><span>{tr(locale, "Confidence: insufficient coverage", "置信说明：覆盖不足")}</span><span>{tr(locale, "Freshness", "数据时间")} {formatDate(consensus.windowEnd, locale)}</span></div> : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, "No institutional view has been recorded for this asset yet.", "该资产尚未收录任何机构观点。")}</p>}
-        <form action={addWatch} style={{ alignSelf: "flex-start" }}>
+        </> : consensus ? <div className="deltas"><span>{tr(locale, "Direction", "方向")} <b>{consensus.tone === "bull" ? tr(locale, "Bullish", "看多") : consensus.tone === "bear" ? tr(locale, "Bearish", "看空") : tr(locale, "Neutral", "中性")}</b></span><span>{tr(locale, "Coverage", "覆盖")} <b>{consensus.institutionCount} {tr(locale, "institution", "家机构")}</b></span><span>{tr(locale, "Confidence: insufficient coverage", "置信说明：覆盖不足")}</span><span>{tr(locale, "Freshness", "数据时间")} {formatDate(consensus.windowEnd, locale)}</span></div> : <p className="sub text-muted">{tr(locale, "No institutional view has been recorded for this asset yet.", "该资产尚未收录任何机构观点。")}</p>}
+        <form action={addWatch} className="self-start">
           <input type="hidden" name="kind" value="asset" />
           <input type="hidden" name="refId" value={asset.ticker} />
           <input type="hidden" name="back" value={assetPath(asset.ticker)} />
@@ -107,7 +107,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
 
       {/* The paragraph a reader needs and a crawler reads first: what this page is, on what
           evidence, and where the rules live. Counts come from the rows rendered below. */}
-      <p className="sub" style={{ maxWidth: "72ch", color: "var(--muted)" }}>
+      <p className="sub measure text-muted">
         {tr(locale,
           `${assetName(asset.name, locale, asset.ticker)} (${asset.ticker}) is covered by ${new Set(consensus?.contributors.map((c) => c.slug) ?? []).size || 0} institutions in the current window, across ${articles.length} recent reports. Below: the balance of views, each published target with its date, every recorded change of view, and the original reports.`,
           `${assetName(asset.name, locale, asset.ticker)}（${asset.ticker}）当前窗口内由 ${new Set(consensus?.contributors.map((c) => c.slug) ?? []).size || 0} 家机构覆盖，涉及 ${articles.length} 篇近期研报。下方为多空分布、各家目标价与日期、记录到的观点变化，以及原始研报。`)}
@@ -129,7 +129,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
             <span>{tr(locale, "Site sampling", "本站采样")} {market.decision.samplingIntervalSeconds}s</span>
           </div>
           {marketPoints && <svg viewBox="0 0 100 42" role="img" aria-label={tr(locale, "Same-source 30-day price history", "同来源30日价格历史")} style={{ width: "100%", maxHeight: 180, marginTop: 18 }}><polyline points={marketPoints} fill="none" stroke="var(--accent)" strokeWidth="1.3" vectorEffect="non-scaling-stroke" /></svg>}
-        </> : <p className="sub" style={{ color: "var(--muted)" }}>{tr(locale, `Price unavailable: ${market.reason.replaceAll("_", " ")}. Research content remains available.`, `行情不可用：${market.reason === "authorization_pending" ? "授权依据待确认" : market.reason === "stale" ? "数据已过期" : market.reason === "unsupported" ? "暂无匹配标的" : "暂无合格数据"}。研报内容不受影响。`)}</p>}
+        </> : <p className="sub text-muted">{tr(locale, `Price unavailable: ${market.reason.replaceAll("_", " ")}. Research content remains available.`, `行情不可用：${market.reason === "authorization_pending" ? "授权依据待确认" : market.reason === "stale" ? "数据已过期" : market.reason === "unsupported" ? "暂无匹配标的" : "暂无合格数据"}。研报内容不受影响。`)}</p>}
       </section>
 
       {consensus && <section className="blk">
@@ -143,7 +143,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
                   <td className="inst"><Link href={localePath(locale, `/institution/${c.slug}`)}>{institutionName(c.institutionName, locale)}</Link></td>
                   <td><DirChip direction={c.direction} locale={locale} showLabel={false} /></td>
                   <td className="mono-cell">{c.target !== null ? formatAssetTarget(asset.ticker, c.target, locale) : "—"}</td>
-                  <td className="mono-cell" style={{ color: "var(--faint)" }}>{c.previousTarget !== null ? formatAssetTarget(asset.ticker, c.previousTarget, locale) : "—"}</td>
+                  <td className="mono-cell text-tertiary">{c.previousTarget !== null ? formatAssetTarget(asset.ticker, c.previousTarget, locale) : "—"}</td>
                   <td className="mono-cell">{relTime(c.publishedAt, locale)}</td>
                 </tr>
               ))}
@@ -181,7 +181,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
                     </div>
                   )}
                 </div>
-                <span className="mono" style={{ color: "var(--faint)", fontSize: 11 }}>{relTime(t.lastChange, locale)}</span>
+                <span className="mono meta-tertiary">{relTime(t.lastChange, locale)}</span>
               </div>
             ))}
           </div>
@@ -207,13 +207,13 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
             {assetTopics.map((topic) => <Link className="chip gray" key={topic.key} href={localePath(locale, topicHref(topic.key))}>{topic.label} · {topic.views}</Link>)}
           </div>}
           {assetIndicators.length > 0 && <div className="rowlist">
-            <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 6 }}>
+            <div className="mono meta-tertiary mb-6">
               {tr(locale, "Economic data this coverage forecasts", "这些研报涉及的经济数据")}
             </div>
             {assetIndicators.map((indicator) => (
               <Link className="r" key={indicator.canonicalKey} href={localePath(locale, `/macro/indicator/${indicator.canonicalKey}`)}>
                 <span className="inst">{indicator.name}</span>
-                <span className="mono" style={{ color: "var(--faint)", fontSize: 11 }}>{indicator.canonicalKey}</span>
+                <span className="mono meta-tertiary">{indicator.canonicalKey}</span>
               </Link>
             ))}
           </div>}

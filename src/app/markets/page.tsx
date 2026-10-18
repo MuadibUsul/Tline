@@ -50,7 +50,7 @@ export default async function MarketsPage() {
     <JsonLd data={itemListJsonLd(locale, "/markets", tr(locale, "Covered markets", "已覆盖资产"), qualified.map((asset) => ({ name: `${assetName(asset.name, locale, asset.ticker)} (${asset.ticker})`, path: assetPath(asset.ticker) })))} />
     <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "Markets", "资产市场"), path: "/markets" }])} />
     <div className="page-head"><div className="eyebrow">{tr(locale, "Institutional coverage", "机构覆盖")}</div><h1>{tr(locale, "Markets", "资产市场")}</h1><p className="sub">{tr(locale, "Only assets supported by multiple source-linked institutional reports are listed.", "仅展示由多家机构公开研报支持的资产页面。")}</p></div>
-    <p className="sub" style={{ maxWidth: "72ch", color: "var(--muted)" }}>
+    <p className="sub measure text-muted">
       {tr(locale,
         `${qualified.length} assets are covered by ${institutionTotal} institutions across ${assetClasses.map((item) => domainTerm(item, locale)).join(", ")}. Each asset page shows the current balance of bullish and bearish views, every published target with its horizon, the changes recorded in the last 30 days, and the reports behind them.`,
         `${qualified.length} 个资产由 ${institutionTotal} 家机构覆盖，涵盖${assetClasses.map((item) => domainTerm(item, locale)).join("、")}。每个资产页展示当前多空分布、各机构公布的目标价与期限、过去 30 天记录到的观点变化，以及背后的原始研报。`)}

@@ -48,7 +48,7 @@ export default async function TopicsPage() {
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Topics", "主题")}</div>
         <h1>{tr(locale, "What institutions are researching", "机构正在研究什么")}</h1>
-        <p className="sub" style={{ maxWidth: "72ch" }}>
+        <p className="sub measure">
           {tr(locale,
             `Every subject below is carried by at least ${TOPIC_MIN_INSTITUTIONS} publishing houses across at least ${TOPIC_MIN_ARTICLES} reports, taken from the views extracted from those reports. A subject that only one institution writes about is not listed — it has no cross-institution read to show.`,
             `下列每个主题都至少由 ${TOPIC_MIN_INSTITUTIONS} 家机构、${TOPIC_MIN_ARTICLES} 篇研报支撑，数据来自这些研报中提取的观点。只有一家机构讨论的主题不会列出——它没有可展示的跨机构视角。`)}
@@ -75,7 +75,7 @@ export default async function TopicsPage() {
         ))}
         {topics.length === 0 && <div className="empty-state">{tr(locale, "No subject has enough cross-institution coverage yet.", "暂无主题达到跨机构覆盖门槛。")}</div>}
       </section>
-      <p className="sub" style={{ color: "var(--muted)", marginTop: 18 }}>
+      <p className="sub text-muted mt-18">
         <Link href={localePath(locale, "/markets")}>{tr(locale, "Browse by asset", "按资产浏览")}</Link>
         {" · "}
         <Link href={localePath(locale, "/institutions")}>{tr(locale, "Browse by view", "按观点浏览")}</Link>

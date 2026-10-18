@@ -156,7 +156,7 @@ export default async function TopicPage(props: { params: Promise<TopicParams>; s
         { name: label, path: topicPath(stat.key) },
       ])} />
 
-      <nav aria-label={tr(locale, "Breadcrumb", "面包屑")} className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 12 }}>
+      <nav aria-label={tr(locale, "Breadcrumb", "面包屑")} className="mono meta-tertiary mb-12">
         <Link href={localePath(locale, "/topics")}>{tr(locale, "Topics", "主题")}</Link>
       </nav>
 
@@ -164,12 +164,12 @@ export default async function TopicPage(props: { params: Promise<TopicParams>; s
         <div className="eyebrow">{tr(locale, "Topic", "主题")}</div>
         <h1>{label}</h1>
         <TopicIntro topicKey={topic} locale={locale} />
-        <p className="sub" style={{ maxWidth: "72ch" }}>
+        <p className="sub measure">
           {tr(locale,
             `${stat.institutions} institutions have written about this across ${stat.articles} indexed reports, producing ${stat.views} extracted views. The claims below are quoted from those reports; each links to the report it came from and to the asset it concerns.`,
             `${stat.institutions} 家机构在 ${stat.articles} 篇已收录研报中讨论了该主题，共提取出 ${stat.views} 条观点。以下主张来自这些研报，每条都链接到原始研报与相关资产。`)}
         </p>
-        <p className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>
+        <p className="mono meta-tertiary">
           {tr(locale, "Last updated ", "最后更新 ")}
           {stat.lastAt ? <time dateTime={stat.lastAt.toISOString()}>{relativeTime(stat.lastAt, locale)}</time> : tr(locale, "awaiting classified coverage", "等待已分类内容")}
           {" · "}
@@ -203,7 +203,7 @@ export default async function TopicPage(props: { params: Promise<TopicParams>; s
                   </Link>
                   <span className={`chip ${directionTone(view.direction)}`}>{directionLabel(view.direction, locale)}</span>
                   {view.assetTicker && <Link href={localePath(locale, assetPath(view.assetTicker))} className="chip acc">{assetName(view.asset, locale, view.assetTicker, "相关资产")} · {view.assetTicker}</Link>}
-                  <time className="mono" style={{ fontSize: 11, color: "var(--faint)" }} dateTime={view.article.publishedAt.toISOString()}>{relativeTime(view.article.publishedAt, locale)}</time>
+                  <time className="mono meta-tertiary" dateTime={view.article.publishedAt.toISOString()}>{relativeTime(view.article.publishedAt, locale)}</time>
                 </div>
                 <Link href={localePath(locale, `/research/${view.article.slug}`)} style={{ color: "var(--ink)" }}>{view.view}</Link>
               </div>
@@ -244,7 +244,7 @@ export default async function TopicPage(props: { params: Promise<TopicParams>; s
           <div className="research-grid">
             {articles.map((article) => <ResearchCard key={article.id} a={article} locale={locale} />)}
           </div>
-          <p className="sub" style={{ marginTop: 12 }}>
+          <p className="sub mt-12">
             <Link href={localePath(locale, "/research")}>{tr(locale, "All research", "全部研报")}</Link>
             {" · "}
             <Link href={localePath(locale, "/topics")}>{tr(locale, "All topics", "全部主题")}</Link>

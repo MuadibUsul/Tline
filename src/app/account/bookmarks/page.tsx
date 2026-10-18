@@ -26,7 +26,7 @@ export default async function BookmarksPage() {
       <div className="page-head" style={{ borderBottom: "none" }}>
         <div className="eyebrow">{tr(locale, "Account", "账户")}</div>
         <h1>{tr(locale, "My bookmarks", "我的收藏")}</h1>
-        <p className="sub" style={{ color: "var(--muted)" }}>
+        <p className="sub text-muted">
           {tr(
             locale,
             "Reports you saved, newest first. A report that is no longer published leaves the list, so every link here opens.",

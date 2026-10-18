@@ -7,16 +7,29 @@ import { can } from "@/lib/permissions";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "设计系统" };
 
-// The palette, in the order the stylesheet declares it: surfaces, text, line, accent,
-// directional states. Both themes redefine the same names, so these swatches follow the
-// viewer's active theme without the page knowing which one that is. `--warn` is referenced
-// directly; the tokens are the contract, not the current hex values.
-const COLOR_TOKENS = [
-  "--bg", "--paper", "--panel", "--panel-2",
-  "--ink", "--ink-2", "--muted", "--faint",
-  "--border", "--accent", "--accent-wash",
-  "--bull", "--bear", "--warn",
+// The contract, in the order the stylesheet declares it. The first groups are the
+// design-system tokens; the final group is the legacy API that existing pages still use.
+// Both themes redefine the same semantic names, so these swatches follow the viewer's
+// active theme without the page knowing which one that is.
+const COLOR_GROUPS = [
+  {
+    label: "Primitive · neutral / indigo",
+    tokens: ["--neutral-0", "--neutral-2", "--neutral-4", "--neutral-6", "--neutral-8", "--neutral-9", "--indigo-2", "--indigo-9", "--indigo-10"],
+  },
+  {
+    label: "Semantic · surfaces / text / line",
+    tokens: ["--surface-canvas", "--surface-page", "--surface-subtle", "--surface-selected", "--text-primary", "--text-secondary", "--text-muted", "--text-tertiary", "--border-subtle", "--border-control"],
+  },
+  {
+    label: "Semantic · action / focus / status",
+    tokens: ["--action-primary-bg", "--action-primary-fg", "--focus-ring", "--status-positive", "--status-negative", "--status-warning", "--status-gold"],
+  },
+  {
+    label: "Legacy aliases",
+    tokens: ["--bg", "--paper", "--panel", "--panel-2", "--ink", "--ink-2", "--muted", "--faint", "--border", "--accent", "--accent-wash", "--bull", "--bear", "--warn"],
+  },
 ] as const;
+const COLOR_TOKEN_COUNT = COLOR_GROUPS.reduce((total, group) => total + group.tokens.length, 0);
 
 /**
  * The console's own reference sheet: the variables, typefaces and controls every page is
@@ -47,24 +60,32 @@ export default async function DesignSystemPage() {
       <section className="blk">
         <div className="section-t">
           <span>{tr(locale, "Colour tokens", "颜色 token")}</span>
-          <span className="chip gray">{COLOR_TOKENS.length}</span>
+          <span className="chip gray">{COLOR_TOKEN_COUNT}</span>
         </div>
-        <div className="macro-stats">
-          {COLOR_TOKENS.map((token) => (
-            <div className="macro-stat" key={token}>
-              <div
-                aria-hidden="true"
-                style={{ height: 34, borderRadius: 7, border: "1px solid var(--border)", background: `var(${token})` }}
-              />
-              <span className="k">{token}</span>
+        {COLOR_GROUPS.map((group) => (
+          <div key={group.label} className="mt-18">
+            <div className="section-t">
+              <span>{group.label}</span>
+              <span className="chip gray">{group.tokens.length}</span>
             </div>
-          ))}
-        </div>
+            <div className="macro-stats">
+              {group.tokens.map((token) => (
+                <div className="macro-stat" key={token}>
+                  <div
+                    aria-hidden="true"
+                    style={{ height: 34, borderRadius: 7, border: "1px solid var(--border)", background: `var(${token})` }}
+                  />
+                  <span className="k">{token}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
         <p className="sub">
           {tr(
             locale,
-            "Every surface, line and status colour resolves through these variables; the dark theme redefines the same names, so components never hard-code a value.",
-            "所有背景、描边与状态色都通过这些变量取值；深色主题只重定义同名变量，组件内不写死颜色值。",
+            "Components ask for a semantic name such as border-control or action-primary-fg; primitives hold the values and the legacy aliases keep older classes working. Text is checked at 4.5:1, control borders and the focus ring at 3:1.",
+            "组件使用 border-control、action-primary-fg 等语义名；基础变量保存色值，旧别名保证既有类继续工作。正文按 4.5:1 校验，控件边界与焦点环按 3:1 校验。",
           )}
         </p>
       </section>
@@ -89,15 +110,55 @@ export default async function DesignSystemPage() {
       </section>
 
       <section className="blk">
+        <div className="section-t"><span>{tr(locale, "Type, space and radius roles", "字号、间距与圆角角色")}</span></div>
+        <div className="tag-row" style={{ alignItems: "center" }}>
+          {["--text-h1", "--text-h2", "--text-h3", "--text-body", "--text-body-sm", "--text-meta", "--text-micro"].map((token) => (
+            <span className="chip gray" key={token}>{token}</span>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 14, marginTop: 14 }}>
+          {["--space-1", "--space-2", "--space-3", "--space-4", "--space-6", "--space-8", "--space-12", "--space-16"].map((token) => (
+            <div key={token}>
+              <div aria-hidden="true" style={{ width: `var(${token})`, height: 14, background: "var(--accent)", borderRadius: 2 }} />
+              <span className="k mono text-micro">{token}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
+          {["--radius-control", "--radius-chip", "--radius-card", "--radius-dialog", "--radius-pill"].map((token) => (
+            <div key={token} style={{ width: 96 }}>
+              <div aria-hidden="true" style={{ height: 44, border: "1px solid var(--border-control)", borderRadius: `var(${token})`, background: "var(--panel-2)" }} />
+              <span className="k mono text-micro">{token}</span>
+            </div>
+          ))}
+        </div>
+        <p className="sub">
+          {tr(
+            locale,
+            "Type is a role, not a page-specific size. Spacing follows 4px steps; radius is limited to control, chip, card, dialog and pill. Motion uses 120/180/280ms and yields to prefers-reduced-motion.",
+            "字号按角色取值，而不是每页临时决定；间距按 4px 步进；圆角只保留控件、chip、卡片、对话框和胶囊五种；动效使用 120/180/280ms，并遵守 prefers-reduced-motion。",
+          )}
+        </p>
+      </section>
+
+      <section className="blk">
         <div className="section-t"><span>{tr(locale, "Controls", "控件")}</span></div>
         <div className="tag-row" style={{ alignItems: "center" }}>
           <button className="minibtn" type="button">minibtn</button>
           <button className="minibtn p" type="button">minibtn p</button>
+          <button className="minibtn" type="button" disabled>disabled</button>
           <span className="chip">chip</span>
           <span className="chip acc">chip acc</span>
           <span className="chip bull">chip bull</span>
           <span className="chip bear">chip bear</span>
         </div>
+        <p className="sub mt-12">
+          {tr(
+            locale,
+            "Primary buttons use action-primary-fg, which is dark ink on the lighter dark-theme indigo. Inputs use border-control for a 3:1 boundary; keyboard focus always draws a solid 2px focus ring.",
+            "主按钮使用 action-primary-fg，深色主题下为亮靛蓝上的深墨字。输入框使用 border-control 保证 3:1 边界；键盘焦点始终绘制 2px 实色焦点环。",
+          )}
+        </p>
         <div className="empty-state">
           {tr(locale, "empty-state — a list that has nothing to show yet.", "empty-state · 列表暂无内容时的占位。")}
         </div>

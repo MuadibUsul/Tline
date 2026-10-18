@@ -65,7 +65,7 @@ export default async function NewsColumnPage(props: { params: Promise<{ slug: st
       <div className="page-head">
         <div className="eyebrow">{tr(locale, "Column", "栏目")} · {newsCadenceLabel(column.cadence, locale)}</div>
         <h1>{name}</h1>
-        {description ? <p className="sub" style={{ maxWidth: "72ch" }}>{description}</p> : null}
+        {description ? <p className="sub measure">{description}</p> : null}
         <p className="mono" style={{ fontSize: 11.5, color: "var(--faint)" }}>
           {column.posts.length} {tr(locale, "editions", "期")}
           {latest ? ` · ${tr(locale, "latest", "最新")} ${newsDateLabel(latest, locale)}` : ""}
@@ -76,7 +76,7 @@ export default async function NewsColumnPage(props: { params: Promise<{ slug: st
           {column.posts.map((post) => <NewsRow post={post} locale={locale} key={post.id} />)}
         </div>
       </section>
-      <p className="sub" style={{ marginTop: 18 }}>
+      <p className="sub mt-18">
         <Link href={localePath(locale, "/news")}>{tr(locale, "All news", "全部新鲜事")} →</Link>
       </p>
     </main>

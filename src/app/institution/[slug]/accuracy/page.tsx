@@ -64,7 +64,7 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
       ])} />
       {data.forecasts.length > 0 && <JsonLd data={datasetJsonLd(locale, `/institution/${params.slug}/accuracy`, tr(locale, `${data.institution.name} settled forecast record`, `${data.institution.name} 已结算预测记录`), tr(locale, `Published forecasts by ${data.institution.name}, settled against the first same-source observation on or after the target date. ${data.forecasts.length} settled calls.`, `${data.institution.name} 已发布预测，按目标日期当天或之后同一来源的首个观测值结算，共 ${data.forecasts.length} 条。`))} />}
 
-      <p className="sub" style={{ maxWidth: "72ch", color: "var(--muted)" }}>
+      <p className="sub measure text-muted">
         {tr(locale,
           `Every forecast below was published publicly by ${data.institution.name} with a stated target and date. Tlines records the first same-source observation on or after the target date, marks the call settled, and does not adjust the record afterwards. Calls that could not be settled are counted as excluded above rather than dropped silently.`,
           `下列每一条预测均由 ${data.institution.name} 公开发布，并带有明确的目标价与日期。Tlines 取目标日期当天或之后同一来源的首个观测值进行结算，且事后不调整记录；无法结算的判断计入上方"已排除"，而不是静默丢弃。`)}
@@ -88,8 +88,8 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
           </tr>)}</tbody>
         </table></div> : <div className="empty-state">{tr(locale, "No forecasts have enough licensed price observations to settle yet.", "暂无具备足够授权价格观测值、可供结算的预测。")}</div>}
       </section>
-      {data.directionInterval && <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{tr(locale, `Wilson 95% interval: ${(data.directionInterval.low * 100).toFixed(1)}%–${(data.directionInterval.high * 100).toFixed(1)}%. ${data.duplicateCount} repeated same-target report(s) are excluded from independent metrics.`, `Wilson 95% 区间：${(data.directionInterval.low * 100).toFixed(1)}%–${(data.directionInterval.high * 100).toFixed(1)}%。${data.duplicateCount} 条同目标重复报告不计入独立统计。`)}</p>}
-      {data.outOfScope > 0 && <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>
+      {data.directionInterval && <p className="mono meta-muted">{tr(locale, `Wilson 95% interval: ${(data.directionInterval.low * 100).toFixed(1)}%–${(data.directionInterval.high * 100).toFixed(1)}%. ${data.duplicateCount} repeated same-target report(s) are excluded from independent metrics.`, `Wilson 95% 区间：${(data.directionInterval.low * 100).toFixed(1)}%–${(data.directionInterval.high * 100).toFixed(1)}%。${data.duplicateCount} 条同目标重复报告不计入独立统计。`)}</p>}
+      {data.outOfScope > 0 && <p className="mono meta-muted">
         {tr(
           locale,
           `${data.outOfScope} rate and macro calls are excluded from this score. "Bullish on 10Y Treasuries" means yields fall, and a policy or inflation stance has no price to settle against, so scoring them against the available series would invert the verdict rather than measure it.`,
@@ -97,7 +97,7 @@ export default async function AccuracyPage(props: { params: Promise<{ slug: stri
         )}
       </p>}
 
-      <p className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>
+      <p className="mono meta-muted">
         {tr(locale, "Method: first same-source observation on/after target date, with a matching observation on/before forecast date; maximum gap is configurable and defaults to 7 days.", "方法：取目标日期当天或之后同一来源的首个观测值，并匹配预测日期当天或之前的观测值；最大间隔可配置，默认 7 天。")}
       </p>
     </main>

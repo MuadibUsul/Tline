@@ -127,7 +127,7 @@ export default async function McpPage() {
                     {tr(locale, "Publishing a draft creates an institutional research report attributed to a registered publisher. Original newsroom items (article, brief, flash) belong in create_news / publish_news, which require admin:manage — they must never be published as research articles.", "发布草稿会生成一篇归属已注册机构的研报。原创新闻(文章、短讯、快讯)必须走 create_news / publish_news,需要 admin:manage——不要把它们作为研报发布。")}
                   </p>
                   <p className="apikey-note">
-                    {tr(locale, "Every published draft is attributed to a registered institution: institutionSlug must match one exactly. The list and slugs are under Content → Sources & crawler.", "每篇发布的研报都必须归属一个已注册机构:institutionSlug 必须与注册表完全一致。名单与 slug 在「内容运营 → 来源与采集」,机构名下方即为 slug。")}
+                    {tr(locale, "Every published draft is attributed to a registered institution: institutionSlug must match one exactly. The list and slugs are under Infrastructure → Sources & crawler.", "每篇发布的研报都必须归属一个已注册机构:institutionSlug 必须与注册表完全一致。名单与 slug 在「基础设施 → 来源与采集」,机构名下方即为 slug。")}
                   </p>
                 </>
               )}

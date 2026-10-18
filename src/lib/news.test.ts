@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsInlineMarkdownBlocks, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsMarkdownBlocks, splitNewsParagraphs, validateNewsInput } from "./news";
+import { buildNewsSlug, newsAgo, newsCadenceLabel, newsDateLabel, newsDayKey, newsExcerpt, newsInlineMarkdownBlocks, newsLocales, newsParagraphRole, newsSources, newsTitle, splitNewsMarkdownBlocks, structuredNewsBody, splitNewsParagraphs, validateNewsInput } from "./news";
 
 const record = (overrides: Partial<Parameters<typeof newsTitle>[0]> = {}) => ({
   id: "p1", slug: "s", kind: "brief", titleZh: null, titleEn: null, bodyZh: null, bodyEn: null,
@@ -42,6 +42,28 @@ test("the desk calendar is Beijing time, not UTC", () => {
   const at = new Date("2026-10-16T17:30:00.000Z");
   assert.equal(newsDayKey(at), "2026-10-17");
   assert.match(newsDateLabel(at, "zh-CN"), /2026.*10.*17/);
+});
+
+test("a flash dateline and closing note become separate fields", () => {
+  const zh = structuredNewsBody(record({
+    kind: "flash",
+    bodyZh: "圣彼得堡电：乌克兰无人机袭击油库。备注：全文约 300 字，伤亡数字未采用。",
+  }), "zh-CN");
+  assert.equal(zh.location, "圣彼得堡");
+  assert.match(zh.dateline ?? "", /2026/);
+  assert.deepEqual(zh.blocks, ["乌克兰无人机袭击油库。"]);
+  assert.equal(zh.note, "全文约 300 字，伤亡数字未采用。");
+
+  const dated = structuredNewsBody(record({ kind: "flash", bodyZh: "莫斯科/基辅，10月18日——俄军与乌军各执一词。" }), "zh-CN");
+  assert.equal(dated.location, "莫斯科/基辅");
+  assert.equal(dated.dateline, "10月18日");
+  assert.deepEqual(dated.blocks, ["俄军与乌军各执一词。"]);
+
+  const en = structuredNewsBody(record({ kind: "flash", bodyEn: "BANGKOK, Oct. 17 — The Fed chair spoke. Note: Figures are provisional." }), "en");
+  assert.equal(en.location, "BANGKOK");
+  assert.equal(en.dateline, "Oct. 17");
+  assert.deepEqual(en.blocks, ["The Fed chair spoke."]);
+  assert.equal(en.note, "Figures are provisional.");
 });
 
 test("the list excerpt hides Markdown syntax", () => {

@@ -185,6 +185,69 @@ export function splitNewsParagraphs(body: string | null | undefined): string[] {
  * paragraph renderer used — but it must not collapse newlines inside a table, list or
  * fenced block the way the excerpt helper does.
  */
+export interface StructuredNewsBody {
+  location: string | null;
+  dateline: string | null;
+  blocks: string[];
+  note: string | null;
+}
+
+const CN_DATE = String.raw`(?:\d{4}年)?\d{1,2}月\d{1,2}日`;
+const EN_DATE = String.raw`(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2}(?:,\s*\d{4})?`;
+const DATELINE = new RegExp(String.raw`^([^，,：:\n]{2,40}?)[，,]\s*((?:${CN_DATE}|${EN_DATE}))\s*(?:——|—|–|-|：|:)\s*`, "i");
+const WIRE = /^([^，,：:\n]{2,30}?)电[：:]\s*/;
+
+/**
+ * Split a news item into the five things a reader scans for.
+ *
+ * Editors write a dateline ("莫斯科/基辅，10月18日——") and a closing "备注："; the stream
+ * should not bury those inside the first and last sentences. The dateline and note are
+ * removed from the prose and returned separately; the title and published time come from
+ * the record itself. A body without either convention is returned unchanged.
+ */
+export function structuredNewsBody(post: NewsRecord, locale: Locale): StructuredNewsBody {
+  const blocks = splitNewsMarkdownBlocks(newsBody(post, locale));
+  let note: string | null = null;
+  const last = blocks.at(-1);
+  if (last) {
+    const match = last.match(/(^|[\s。；;.!?])(?:备注|注|Note)\s*[：:]\s*([\s\S]+)$/i);
+    if (match) {
+      note = match[2].trim() || null;
+      const boundary = (match.index ?? 0) + match[1].length;
+      const remainder = last.slice(0, boundary).trim();
+      if (remainder) blocks[blocks.length - 1] = remainder;
+      else blocks.pop();
+    }
+  }
+
+  let location: string | null = null;
+  let dateline: string | null = null;
+  const first = blocks[0];
+  if (first) {
+    const match = first.match(DATELINE);
+    if (match) {
+      location = match[1].trim();
+      dateline = match[2].trim();
+      const remainder = first.slice(match[0].length).trim();
+      if (remainder) blocks[0] = remainder;
+      else blocks.shift();
+    } else {
+      const wire = first.match(WIRE);
+      if (wire) {
+        location = wire[1].trim();
+        const remainder = first.slice(wire[0].length).trim();
+        if (remainder) blocks[0] = remainder;
+        else blocks.shift();
+      }
+    }
+  }
+  if (location && !dateline) {
+    const inlineDate = blocks.join(" ").slice(0, 220).match(new RegExp(`(?:${CN_DATE}|${EN_DATE})`, "i"));
+    dateline = inlineDate?.[0] ?? (post.publishedAt ? newsDateLabel(post.publishedAt, locale) : null);
+  }
+  return { location, dateline, blocks, note };
+}
+
 export function splitNewsMarkdownBlocks(body: string | null | undefined): string[] {
   const lines = (body ?? "").replace(/\r\n?/g, "\n").split("\n");
   const blocks: string[] = [];

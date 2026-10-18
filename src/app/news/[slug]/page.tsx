@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
-import { getPublishedNewsBySlug, newsBody, newsColumnName, newsDateLabel, newsExcerpt, newsImageAlt, newsImageCaption, newsLocales, newsSources, newsTitle, splitNewsMarkdownBlocks, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
+import { getPublishedNewsBySlug, newsColumnName, newsDateLabel, newsExcerpt, newsImageAlt, newsImageCaption, newsLocales, newsSources, newsTitle, structuredNewsBody, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
 import { renderNewsMarkdownBlocks } from "@/lib/newsMarkdown";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, localizedUrl, ogImage } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
@@ -70,9 +70,10 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
     notFound();
   }
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
-  const body = newsBody(post, locale);
-  const blocks = splitNewsMarkdownBlocks(body);
+  const structured = structuredNewsBody(post, locale);
+  const blocks = structured.blocks;
   const renderedBlocks = await renderNewsMarkdownBlocks(blocks, locale);
+  const renderedNote = structured.note ? await renderNewsMarkdownBlocks([structured.note], locale) : [];
   const images = post.images ?? [];
   const imagesAt = (position: number) => images.filter((image) => image.position === position);
   const sources = newsSources(post);
@@ -113,6 +114,12 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
           {post.pinned ? <span className="chip bull">{tr(locale, "Pinned", "置顶")}</span> : null}
         </div>
         <h1 className="art-title">{title}</h1>
+        {structured.location || structured.dateline ? (
+          <p className="news-dateline">
+            {structured.location ? <span>{structured.location}</span> : null}
+            {structured.dateline ? <time>{structured.dateline}</time> : null}
+          </p>
+        ) : null}
         {sources.length > 0 ? (
           <p className="news-sources">
             <span>{tr(locale, "Sources", "来源")}</span>
@@ -138,6 +145,12 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
           </div>
         )) : <p className="sub">{tr(locale, "This item has no further text.", "本条没有更多正文。")}</p>}
         {images.filter((image) => image.position > blocks.length).map((image) => <NewsFigure key={image.id} image={image} locale={locale} />)}
+        {renderedNote.length > 0 ? (
+          <aside className="news-note">
+            <span className="news-note-label">{tr(locale, "Note", "备注")}</span>
+            {renderedNote.map((block, index) => <Fragment key={index}>{block}</Fragment>)}
+          </aside>
+        ) : null}
       </article>
       <p className="sub" style={{ marginTop: 26 }}>
         {post.column ? (

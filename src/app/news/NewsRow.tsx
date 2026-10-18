@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { localePath, tr, type Locale } from "@/lib/i18n";
-import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsExcerpt, newsImageAlt, newsInlineMarkdownBlocks, newsTitle, type NewsRecord } from "@/lib/news";
+import { NEWS_KIND_LABEL, isNewsKind, newsColumnName, newsExcerpt, newsImageAlt, newsTitle, structuredNewsBody, type NewsRecord } from "@/lib/news";
 import { renderNewsMarkdownBlocks } from "@/lib/newsMarkdown";
 
 /** Beijing time for the desk's clock, the same source the front-page rail uses. */
@@ -21,7 +21,9 @@ export default async function NewsRow({ post, locale, showColumn = false }: { po
   const kind = isNewsKind(post.kind) ? post.kind : "brief";
   const excerpt = newsExcerpt(post, locale);
   // Short items render their body in the stream; an article keeps its excerpt and page.
-  const inlineBody = await renderNewsMarkdownBlocks(newsInlineMarkdownBlocks(post, locale), locale);
+  const structured = kind === "flash" || kind === "brief" ? structuredNewsBody(post, locale) : null;
+  const inlineBody = structured ? await renderNewsMarkdownBlocks(structured.blocks, locale) : [];
+  const inlineNote = structured?.note ? await renderNewsMarkdownBlocks([structured.note], locale) : [];
   const cover = post.images?.[0] ?? null;
 
   return (
@@ -37,11 +39,23 @@ export default async function NewsRow({ post, locale, showColumn = false }: { po
         <h2>
           <Link href={localePath(locale, `/news/${post.slug}`)}>{title}</Link>
         </h2>
+        {structured && (structured.location || structured.dateline) ? (
+          <p className="news-inline-meta">
+            {structured.location ? <span className="news-inline-location">{structured.location}</span> : null}
+            {structured.dateline ? <span className="news-inline-date">{structured.dateline}</span> : null}
+          </p>
+        ) : null}
         {inlineBody.length > 0 ? (
           <div className="news-inline-body">
             {inlineBody.map((block, index) => <Fragment key={index}>{block}</Fragment>)}
           </div>
         ) : excerpt ? <p className="news-excerpt">{excerpt}</p> : null}
+        {inlineNote.length > 0 ? (
+          <div className="news-inline-note">
+            <span className="news-inline-note-label">{tr(locale, "Note", "备注")}</span>
+            {inlineNote.map((block, index) => <Fragment key={index}>{block}</Fragment>)}
+          </div>
+        ) : null}
         <p className="news-source">
           {showColumn && post.column ? (
             <Link className="news-column-tag" href={localePath(locale, `/news/columns/${post.column.slug}`)}>

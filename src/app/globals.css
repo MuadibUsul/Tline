@@ -1882,3 +1882,10 @@ td{padding-block:13px}
 .news-read-more:hover{color:var(--accent)}
 .news-reading-time{color:var(--faint)!important;font-weight:400!important}
 .news-item-article .news-body-block:first-child p:first-child{font-size:17.5px;line-height:1.9;color:var(--ink)}
+
+/* News detail meta reads as one line, not the list's vertical rail. */
+.news-item-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:14px 0 10px;font:11px/1.4 var(--mono);color:var(--faint)}
+.news-item-breadcrumb a{color:var(--muted)}
+.news-item-breadcrumb a:hover{color:var(--accent-ink)}
+.news-item-date{color:var(--faint);font:11px var(--mono)}
+.news-item-meta .news-column-tag{margin:0}

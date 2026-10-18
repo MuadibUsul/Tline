@@ -101,11 +101,11 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
         ...(post.sourceUrl ? { isBasedOn: sources.length > 1 ? sources : post.sourceUrl } : {}),
       }} />
       <JsonLd data={breadcrumbJsonLd(locale, [{ name: tr(locale, "Home", "首页"), path: "/" }, { name: tr(locale, "News", "新鲜事"), path: "/news" }, { name: title, path: `/news/${post.slug}` }])} />
-      <nav className="breadcrumbs" aria-label={tr(locale, "Breadcrumb", "面包屑")} style={{ margin: "16px 0 10px" }}>
-        <Link href={localePath(locale, "/news")}>{tr(locale, "News", "新鲜事")}</Link>
-      </nav>
       <header className="news-item-head">
-        <div className="news-rail" style={{ marginBottom: 10 }}>
+        <div className="news-item-meta">
+          <nav className="news-item-breadcrumb" aria-label={tr(locale, "Breadcrumb", "面包屑")}>
+            <Link href={localePath(locale, "/news")}>{tr(locale, "News", "新鲜事")}</Link>
+          </nav>
           {post.column ? (
             <Link className="news-column-tag" href={localePath(locale, `/news/columns/${post.column.slug}`)}>
               {newsColumnName(post.column, locale)}
@@ -114,7 +114,7 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
           <span className={`chip ${kind === "flash" ? "bear" : kind === "article" ? "acc" : "gray"}`}>
             {locale === "zh-CN" ? NEWS_KIND_LABEL[kind].zh : NEWS_KIND_LABEL[kind].en}
           </span>
-          {publishedAt ? <time className="mono" dateTime={publishedAt.toISOString()} style={{ fontSize: 11.5, color: "var(--faint)" }}>{newsDateLabel(publishedAt, locale)}</time> : null}
+          {publishedAt ? <time className="news-item-date" dateTime={publishedAt.toISOString()}>{newsDateLabel(publishedAt, locale)}</time> : null}
           {post.pinned ? <span className="chip bull">{tr(locale, "Pinned", "置顶")}</span> : null}
         </div>
         <h1 className="art-title">{title}</h1>

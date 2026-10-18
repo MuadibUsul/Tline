@@ -41,6 +41,7 @@
     "translate:eval": "tsx prisma/translate-eval.ts",
     "news:translate": "tsx scripts/news-translate.ts",
     "parity:audit": "tsx scripts/parity-audit.ts",
+    "analytics:purge-internal": "tsx scripts/analytics-purge-internal.ts",
     "documents": "tsx prisma/documents.ts",
     "consensus": "tsx src/lib/ingest/recompute.ts",
     "forecasts": "tsx prisma/forecasts.ts",

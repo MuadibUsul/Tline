@@ -3,6 +3,7 @@ import { classifyWithSignals } from "@/lib/analytics/agent";
 import { recordBotHit } from "@/lib/analytics/botHits";
 import { identify, record, type Beacon } from "@/lib/analytics/collect";
 import { clientAddress, readAnalyticsIdentity } from "@/lib/analytics/identity";
+import { isOperatorAccount } from "@/lib/analytics/operator";
 import { rateLimit } from "@/lib/rateLimit";
 import { siteUrl } from "@/lib/site";
 
@@ -79,6 +80,8 @@ export async function POST(request: Request) {
 
   const identity = readAnalyticsIdentity(request.headers);
   const user = await getSessionUser().catch(() => null);
+  // The operator signed in to run the site, not to be counted as a reader.
+  if (isOperatorAccount(user)) return accepted();
   const visitor = identify(request.headers, beacon.session, user?.id ?? null, identity, agent, beacon.signals);
   await record(beacon, visitor, request.headers).catch((error: unknown) => {
     console.warn(JSON.stringify({ event: "analytics.write_failed", error: String(error).slice(0, 300) }));

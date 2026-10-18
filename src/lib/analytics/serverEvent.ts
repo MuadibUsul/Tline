@@ -1,6 +1,7 @@
 import { prisma } from "../db";
 import { classify } from "./agent";
 import { clientAddress, dayKey, readAnalyticsIdentity, visitorHash } from "./identity";
+import { isOperatorUserId } from "./operator";
 import { normalizePath } from "./path";
 
 /**
@@ -28,8 +29,9 @@ export function trackServerEvent(
   if (agent.trafficClass !== "human") return;
   const identity = readAnalyticsIdentity(headers);
 
-  void prisma.analyticsEvent
-    .create({
+  void (async () => {
+    if (await isOperatorUserId(options.userId)) return;
+    await prisma.analyticsEvent.create({
       data: {
         day: dayKey(),
         name: name.slice(0, 80),
@@ -45,8 +47,8 @@ export function trackServerEvent(
         value: options.value ?? null,
         metadata: JSON.stringify(options.metadata ?? {}).slice(0, 1000),
       },
-    })
-    .catch((error: unknown) => {
-      console.warn(JSON.stringify({ event: "analytics.server_event_failed", name, error: String(error).slice(0, 300) }));
     });
+  })().catch((error: unknown) => {
+    console.warn(JSON.stringify({ event: "analytics.server_event_failed", name, error: String(error).slice(0, 300) }));
+  });
 }

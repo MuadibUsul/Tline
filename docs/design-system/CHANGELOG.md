@@ -1,5 +1,12 @@
 # 设计系统变更记录
 
+## 2026-10-18 · 生产发布
+
+- 发布 commit `da6feb0`，主机本地构建镜像 `sha-da6feb0`，`.deploy-tag` 已更新。
+- 六容器 healthy；`/api/health` 返回 `200 {"status":"ok"}`。
+- 生产复测：320/390/768/981/1440 无横向溢出；深色主按钮 6.58:1；主题刷新保持；首页/登录页 axe 0 violations。
+- 回滚镜像 `sha-33c21be` 保留在主机。
+
 ## 2026-10-18 · Phase C（核心组件，部分完成）
 
 - `.minibtn` / `.minibtn.p` / `.minibtn.p:hover` 从多轮覆盖收口为一条最终规则；保留旧 class 名称。

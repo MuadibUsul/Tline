@@ -3,13 +3,13 @@
 - 基线：`33c21be`
 - 日期：2026-10-18
 - 范围：公共站点主要页面 + 登录页 + 管理后台设计系统页
-- 环境：本地生产构建（`TL_REDESIGN=all`），未部署到 tlines.tech
+- 环境：本地生产构建 + 2026-10-18 生产发布（镜像 `sha-da6feb0`）
 
 ## 1. 结论
 
 Phase A（Token 层）与 Phase B（P0/P1 修复）已完成并通过本地验收。Phase C 已完成核心组件收口、完全重复规则清理、119 处 token 采用和静态内联样式回收。Phase D 已完成公开页 98 组合矩阵、640px 重排、forced-colors、axe，以及后台 16 页的 390/768/1440 响应式与 7 页 axe 检查；Pa11y 和 CI 视觉回归尚未完成。
 
-没有修改业务逻辑、数据库、路由、发布闸门、API 或品牌方向。
+没有修改业务逻辑、数据库、路由、发布闸门、API 或品牌方向。该版本已于 2026-10-18 发布到 tlines.tech。
 
 ## 2. 改动文件
 
@@ -116,12 +116,22 @@ Phase A（Token 层）与 Phase B（P0/P1 修复）已完成并通过本地验�
 
 ## 7. 部署状态与回滚
 
-**未部署**。本轮没有连接生产主机，也没有修改 tlines.tech 的运行镜像或数据库。验证使用的是本地生产构建。
+**已部署**。2026-10-18 在生产主机本地构建并发布：
+
+- 发布 commit：`da6feb0`
+- 运行镜像：`ghcr.io/muadibusul/tline:sha-da6feb0`
+- `.deploy-tag`：`sha-da6feb0`
+- 回滚镜像：`sha-33c21be`（保留在主机）
+- 六容器 healthy；`/api/health` 返回 `200 {"status":"ok"}`
+- 生产复测：320/390/768/981/1440 无横向溢出；首页唯一 h1；深色主按钮 `rgb(8,9,10)` on `rgb(124,138,255)`；主题刷新保持；首页/登录页 axe 0 violations。
 
 回滚方式：
 
-- 代码层：恢复上述文件到 `33c21be`；
-- 样式层：只需恢复 `globals.css` 的 token/规则即可回到原视觉；
-- 无数据库迁移，无需回滚数据。
+```bash
+cd /home/deploy/tline
+TAG=sha-33c21be docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+printf 'sha-33c21be' > .deploy-tag
+```
 
-部署前建议再执行一次 `npm test`、`npm run typecheck`、`npm run lint`、`npm run build`，并在目标环境复测 320px 登录页与深色主按钮。
+- 无数据库迁移，无需回滚数据；
+- 发布使用主机本地构建，未启用 GitHub Actions。

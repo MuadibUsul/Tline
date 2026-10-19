@@ -100,7 +100,7 @@ export default async function Home() {
         select: { id: true, caption: true, article: { select: { slug: true, title: true } } },
       }),
       // The rail beside the observations: the desk's latest, already limited to this language.
-      listPublishedNews(locale, 5),
+      listPublishedNews(locale, 6),
       // The slot above the newsroom. Only one placement is live at a time: the one with
       // the lowest sortOrder, so an editor can promote something without touching the rest.
       prisma.homeAnnouncement.findFirst({

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import RegistrationGate from "./RegistrationGate";
 import { usePathname } from "next/navigation";
 import { toggleBookmarkAction, type BookmarkFormState } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
@@ -32,21 +33,45 @@ export default function BookmarkButton({
   initialBookmarked,
   signedIn,
   locale,
+  gateEnabled = true,
 }: {
   articleId: string;
   initialBookmarked: boolean;
   signedIn: boolean;
   locale: Locale;
+  gateEnabled?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
+  const [gateOpen, setGateOpen] = useState(false);
   const t = TXT[locale];
   const [state, action, pending] = useActionState<BookmarkFormState, FormData>(toggleBookmarkAction, { bookmarked: initialBookmarked });
 
   if (!signedIn) {
+    if (!gateEnabled) {
+      return (
+        <Link className="minibtn" href={`/signin?next=${encodeURIComponent(pathname)}`}>
+          {t.signIn}
+        </Link>
+      );
+    }
     return (
-      <Link className="minibtn" href={`/signin?next=${encodeURIComponent(pathname)}`}>
-        {t.signIn}
-      </Link>
+      <>
+        <Link
+          className="minibtn"
+          href={`/signin?next=${encodeURIComponent(pathname)}`}
+          aria-haspopup="dialog"
+          onClick={(event) => { event.preventDefault(); setGateOpen(true); }}
+        >
+          {t.signIn}
+        </Link>
+        <RegistrationGate
+          open={gateOpen}
+          onClose={() => setGateOpen(false)}
+          locale={locale}
+          reason="bookmark"
+          next={pathname}
+        />
+      </>
     );
   }
 

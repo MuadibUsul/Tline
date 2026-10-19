@@ -17,6 +17,8 @@ import { getArticleTopics, getPeerReports, topicHref } from "@/lib/related";
 import { ClassificationChips } from "@/app/_components/ui";
 import ReadingProgress from "@/app/_components/ReadingProgress";
 import BookmarkButton from "@/app/_components/BookmarkButton";
+import InlineRegistrationCTA from "@/app/_components/InlineRegistrationCTA";
+import { registrationGateEnabled, registrationNudgeEnabled, registrationNudgeRollout } from "@/lib/registration";
 import ShareCiteButton from "@/app/_components/ShareCiteButton";
 import NewsletterCTA from "@/app/_components/NewsletterCTA";
 import { Byline, SourceBadge } from "@/app/_components/editorial";
@@ -388,7 +390,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             <div className="art-toolbar">
               <SourceBadge href={a.sourceUrl} locale={locale} />
               <div className="art-toolbar-actions">
-                <BookmarkButton articleId={a.id} initialBookmarked={bookmarked} signedIn={Boolean(user)} locale={locale} />
+                <BookmarkButton articleId={a.id} initialBookmarked={bookmarked} signedIn={Boolean(user)} locale={locale} gateEnabled={registrationGateEnabled()} />
                 <ShareCiteButton
                   citation={`${heading} — ${institutionName(a.institution.name, locale)} — ${date} — ${localizedUrl(researchPath(a), locale)} — ${a.sourceUrl}`}
                   labels={{
@@ -467,6 +469,8 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             : tr(locale, "Context: the conclusion is Tlines' automated extraction, not the institution's wording. Quoted evidence is publisher wording. Scope and date must travel with the conclusion.", "上下文：结论为 Tlines 自动提取，并非机构原话；带引号的证据为机构原文。引用时须同时保留机构、日期与时间范围。")}</p>
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer">{tr(locale, "Verify at the original source ↗", "在原始来源核验 ↗")}</a>
       </section>
+
+      <InlineRegistrationCTA locale={locale} enabled={registrationNudgeEnabled()} rollout={registrationNudgeRollout()} />
 
       <section className="blk">
         <div className="section-t section-t-report">

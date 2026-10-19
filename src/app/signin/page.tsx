@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { DEMO_EMAIL } from "@/lib/user";
 import { formalAuthLabel, isEmailAuthConfigured, isFormalAuthConfigured, isPasswordAuthConfigured } from "@/lib/auth-config";
 import { getLocale, tr, localePath } from "@/lib/i18n";
+import { safeReturnPath } from "@/lib/authReturn";
 import { EmailSignInForm } from "./email-sign-in-form";
 import { PasswordSignInForm } from "./password-sign-in-form";
 
@@ -19,7 +20,7 @@ export const metadata: Metadata = { title: "Sign in", ...noIndex };
 export default async function SignInPage(props: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const searchParams = await props.searchParams;
   const locale = await getLocale();
-  const next = searchParams.next?.startsWith("/") && !searchParams.next.startsWith("//") ? searchParams.next : "/watchlist";
+  const next = safeReturnPath(searchParams.next, "/watchlist");
   const user = await getSessionUser();
   if (user) redirect(next);
   const formalAuth = isFormalAuthConfigured();

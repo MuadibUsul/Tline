@@ -12,6 +12,9 @@ import { topicHref } from "@/lib/related";
 import { assetPath, canonicalAssetRedirectPath, legacyNonAssetRedirectPath, tickerFromAssetSlug } from "@/lib/assetPath";
 import { publicationReadyWhere } from "@/lib/publication";
 import { getAssetMarketSnapshot } from "@/lib/macro/market/read";
+import { getSessionUser } from "@/lib/auth";
+import RegistrationActionButton from "@/app/_components/RegistrationActionButton";
+import { registrationGateEnabled } from "@/lib/registration";
 import { assetSeoProfile } from "@/lib/seoLanding";
 import { formatAssetTarget } from "@/lib/assetTarget";
 import { Icon } from "@/app/_components/Icon";
@@ -55,7 +58,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
   const { asset, consensus, d1, d7, d30, dist, articles } = data;
   const canonicalRedirect = canonicalAssetRedirectPath(params.ticker, asset.ticker);
   if (canonicalRedirect) permanentRedirect(localePath(locale, canonicalRedirect));
-  const [timelineRows, market] = await Promise.all([getAssetTimeline(asset.id), getAssetMarketSnapshot(asset.ticker)]);
+  const [timelineRows, market, user] = await Promise.all([getAssetTimeline(asset.id), getAssetMarketSnapshot(asset.ticker), getSessionUser()]);
   // Topics and indicators come from the reports that mention this asset, so both blocks are
   // evidence about this asset rather than a hand-written list of plausible associations.
   const [assetTopics, assetIndicators] = await Promise.all([
@@ -101,7 +104,7 @@ export default async function AssetPage(props: { params: Promise<{ ticker: strin
           <input type="hidden" name="kind" value="asset" />
           <input type="hidden" name="refId" value={asset.ticker} />
           <input type="hidden" name="back" value={assetPath(asset.ticker)} />
-          <button type="submit" className="minibtn"><Icon name="plus" /> {tr(locale, "Watch", "关注")}</button>
+          <RegistrationActionButton signedIn={Boolean(user)} locale={locale} next={localePath(locale, assetPath(asset.ticker))} reason="watch" gateEnabled={registrationGateEnabled()} className="minibtn"><Icon name="plus" /> {tr(locale, "Watch", "关注")}</RegistrationActionButton>
         </form>
       </div>
 

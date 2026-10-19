@@ -12,14 +12,13 @@ import { can } from "@/lib/permissions";
 import { checkWebhookUrl } from "@/lib/alertDelivery";
 import { toggleBookmark } from "@/lib/bookmarks";
 import { getLocale } from "@/lib/i18n";
+import { safeReturnPath } from "@/lib/authReturn";
 
 function str(fd: FormData, key: string): string {
   return (fd.get(key)?.toString() ?? "").trim();
 }
 
-function localPath(value: string, fallback: string) {
-  return value.startsWith("/") && !value.startsWith("//") ? value : fallback;
-}
+
 
 // ---- auth ----
 export async function doSignIn(fd: FormData) {
@@ -39,7 +38,7 @@ export async function doSignIn(fd: FormData) {
   // tears down the page a client-side beacon would have fired from.
   trackServerEvent(user.createdAt.getTime() > Date.now() - 5_000 ? "account.created" : "account.signin", await headers(), { userId: user.id, path: "/signin" });
   (await cookies()).set(COOKIE, makeToken(user), SESSION_COOKIE_OPTS);
-  redirect(localPath(str(fd, "next"), "/watchlist"));
+  redirect(safeReturnPath(str(fd, "next"), "/watchlist"));
 }
 
 export async function doSignOut() {
@@ -203,6 +202,6 @@ export async function toggleBookmarkAction(_previous: BookmarkFormState, formDat
   if (!(await prisma.article.findUnique({ where: { id: articleId }, select: { id: true } }))) return { error: "invalid" };
   const state = await toggleBookmark(user.id, articleId, await getLocale());
   revalidatePath("/account/bookmarks");
-  revalidatePath(localPath(str(formData, "path"), "/account/bookmarks"));
+  revalidatePath(safeReturnPath(str(formData, "path"), "/account/bookmarks"));
   return state;
 }

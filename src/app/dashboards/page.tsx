@@ -9,6 +9,8 @@ import { getLocale, localePath, tr } from "@/lib/i18n";
 import { noIndex } from "@/lib/seo";
 import { createDashboard, deleteDashboard } from "./actions";
 import { Icon } from "@/app/_components/Icon";
+import RegistrationGateLink from "@/app/_components/RegistrationGateLink";
+import { registrationGateEnabled } from "@/lib/registration";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Dashboards", ...noIndex };
@@ -48,7 +50,7 @@ export default async function DashboardsPage() {
         </div>
       </header>
 
-      {!user && <section className="dashboard-upgrade"><div><b>{tr(locale, "Sign in to create a workspace", "登录后创建工作台")}</b><p>{tr(locale, "Dashboards are saved to your account and stay private.", "看板保存在你的账户中，并且仅你本人可见。")}</p></div><Link className="minibtn p" href={localePath(locale, "/signin?next=/dashboards")}>{tr(locale, "Sign in", "登录")} →</Link></section>}
+      {!user && <section className="dashboard-upgrade"><div><b>{tr(locale, "Sign in to create a workspace", "登录后创建工作台")}</b><p>{tr(locale, "Dashboards are saved to your account and stay private.", "看板保存在你的账户中，并且仅你本人可见。")}</p></div><RegistrationGateLink signedIn={false} locale={locale} href={localePath(locale, "/dashboards")} next={localePath(locale, "/dashboards")} reason="dashboard" gateEnabled={registrationGateEnabled()} className="minibtn p">{tr(locale, "Sign in", "登录")} →</RegistrationGateLink></section>}
       {user && !alertsEntitled && <section className="dashboard-upgrade"><div><b>{tr(locale, "Build and publish for free", "免费创建并发布模板")}</b><p>{tr(locale, "Every registered user can build and submit templates. Live alerts remain a Professional feature.", "所有注册用户都可以创建并投稿模板；实时提醒仍属于专业版功能。")}</p></div><span className="chip acc">{tr(locale, "Alerts · PRO", "提醒 · PRO")}</span></section>}
 
       {dashboards.length > 0 && <section className="dashboard-owned">
@@ -65,12 +67,12 @@ export default async function DashboardsPage() {
           {templates.map((template) => <article className={`dashboard-template wallpaper-${template.wallpaper}`} key={template.id} style={{ "--dashboard-accent": template.accent } as CSSProperties}>
             <div className="dashboard-template-preview">{template.widgets.slice(0, 5).map((item) => <i key={item.id} style={{ left: `${8 + (item.x % 500) / 8}%`, top: `${10 + (item.y % 300) / 5}%`, width: `${Math.min(34, item.w / 14)}%` }} />)}</div>
             <div><span className="dashboard-template-author"><i style={{ background: "#9e7a42" }}>TL</i>Tlines</span><h3>{template.name}</h3><p>{template.description}</p></div>
-            {entitled ? <form action={createDashboard}><input type="hidden" name="template" value={template.builtinKey} /><button className="minibtn p" type="submit">{tr(locale, "Use template", "使用模板")}</button></form> : <Link className="minibtn p" href={localePath(locale, "/signin?next=/dashboards")}>{tr(locale, "Sign in to use", "登录后使用")}</Link>}
+            {entitled ? <form action={createDashboard}><input type="hidden" name="template" value={template.builtinKey} /><button className="minibtn p" type="submit">{tr(locale, "Use template", "使用模板")}</button></form> : <RegistrationGateLink signedIn={Boolean(user)} locale={locale} href={localePath(locale, "/dashboards")} next={localePath(locale, "/dashboards")} reason="dashboard" gateEnabled={registrationGateEnabled()} className="minibtn p">{tr(locale, "Sign in to use", "登录后使用")}</RegistrationGateLink>}
           </article>)}
           <article className="dashboard-template wallpaper-grid dashboard-custom-template">
             <div className="dashboard-template-preview"><b><Icon name="plus" /></b></div>
             <div><span className="dashboard-tile-kicker">blank</span><h3>{tr(locale, "Blank canvas", "空白画布")}</h3><p>{tr(locale, "Start empty and add any supported data, research, note or source card.", "从空白开始，自由添加数据、研报、笔记或外部来源卡片。")}</p></div>
-            {entitled ? <form action={createDashboard} className="dashboard-blank-form"><input name="name" maxLength={80} placeholder={tr(locale, "Dashboard name", "看板名称")} required /><button className="minibtn p" type="submit">{tr(locale, "Create", "创建")}</button></form> : <Link className="minibtn p" href={localePath(locale, "/signin?next=/dashboards")}>{tr(locale, "Sign in", "登录")}</Link>}
+            {entitled ? <form action={createDashboard} className="dashboard-blank-form"><input name="name" maxLength={80} placeholder={tr(locale, "Dashboard name", "看板名称")} required /><button className="minibtn p" type="submit">{tr(locale, "Create", "创建")}</button></form> : <RegistrationGateLink signedIn={Boolean(user)} locale={locale} href={localePath(locale, "/dashboards")} next={localePath(locale, "/dashboards")} reason="dashboard" gateEnabled={registrationGateEnabled()} className="minibtn p">{tr(locale, "Sign in", "登录")}</RegistrationGateLink>}
           </article>
         </div>
       </section>

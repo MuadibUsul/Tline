@@ -2131,3 +2131,29 @@ td{padding-block:13px}
 
 /* The drawer trigger is part of the tablet/phone header only. */
 @media(min-width:981px){.mobile-nav-toggle{display:none}}
+
+/* Registration gate: a drawer on desktop, a bottom sheet on phones. It is only rendered
+   after a reader asks for an account-only action; it never covers article content on load. */
+.reg-gate-overlay{position:fixed;inset:0;z-index:1000;display:flex;justify-content:flex-end;align-items:stretch;background:rgba(8,9,10,.42);backdrop-filter:blur(2px)}
+.reg-gate-panel{position:relative;display:flex;flex-direction:column;width:min(430px,100%);padding:30px 28px;background:var(--surface-page);border-left:1px solid var(--border-subtle);box-shadow:var(--shadow-overlay);overflow-y:auto}
+.reg-gate-close{position:absolute;top:16px;right:16px;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--border-subtle);border-radius:50%;background:var(--surface-page);color:var(--text-muted);font:20px/1 var(--sans);cursor:pointer}
+.reg-gate-close:hover{color:var(--text-primary);border-color:var(--border-emphasis)}
+.reg-gate-kicker{margin:0 0 14px;font:10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink)}
+.reg-gate-panel h2{margin:0 0 12px;max-width:330px;font:600 25px/1.2 var(--serif-display);letter-spacing:-.02em;color:var(--text-primary)}
+.reg-gate-copy{margin:0 0 22px;font-size:14px;line-height:1.75;color:var(--text-secondary)}
+.reg-gate-primary{width:100%;min-height:42px;justify-content:center;text-align:center}
+.reg-gate-secondary{width:100%;min-height:38px;justify-content:center;margin-top:9px}
+.reg-gate-note{margin:16px 0 0;font-size:11.5px;line-height:1.6;color:var(--text-tertiary)}
+@media(max-width:640px){
+  .reg-gate-overlay{align-items:flex-end;justify-content:center;padding:0}
+  .reg-gate-panel{width:100%;max-height:75vh;border-left:0;border-top:1px solid var(--border-subtle);border-radius:16px 16px 0 0;padding:26px 22px calc(24px + env(safe-area-inset-bottom))}
+  .reg-gate-panel h2{font-size:23px}
+}
+
+/* The in-flow account prompt is a card, never an overlay. It only mounts after the
+   experiment component's conditions are met. */
+.inline-reg-gate{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:22px 0;padding:18px 20px;border:1px solid var(--border-subtle);border-radius:var(--radius-card);background:var(--surface-subtle)}
+.inline-reg-gate b{display:block;font-size:14px;color:var(--text-primary)}
+.inline-reg-gate p{margin:5px 0 0;max-width:62ch;font-size:12.5px;line-height:1.65;color:var(--text-muted)}
+.inline-reg-gate-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:none}
+@media(max-width:640px){.inline-reg-gate{align-items:flex-start;flex-direction:column;gap:14px}.inline-reg-gate-actions{width:100%}.inline-reg-gate-actions .minibtn{flex:1;justify-content:center}}

@@ -14,6 +14,9 @@ import { queryClassifiedArticleIds } from "@/lib/classification/query";
 import { taxonomy } from "@/lib/classification/taxonomy";
 import { institutionSeoProfile, subjectInstitutionSeoProfile } from "@/lib/seoLanding";
 import { formatAssetTarget } from "@/lib/assetTarget";
+import { getSessionUser } from "@/lib/auth";
+import RegistrationActionButton from "@/app/_components/RegistrationActionButton";
+import { registrationGateEnabled } from "@/lib/registration";
 import { Icon } from "@/app/_components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -103,6 +106,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
     );
   }
   const { inst, articles, count30, views, coverage } = data;
+  const user = await getSessionUser();
   // Where this publisher concentrates, and on what. Both are counted from its own rows.
   const [mainAssets, mainTopics] = await Promise.all([
     getInstitutionAssets(inst.slug),
@@ -139,7 +143,7 @@ export default async function InstitutionPage(props: { params: Promise<{ slug: s
             <input type="hidden" name="kind" value="institution" />
             <input type="hidden" name="refId" value={inst.slug} />
             <input type="hidden" name="back" value={`/institution/${inst.slug}`} />
-            <button type="submit" className="minibtn"><Icon name="plus" /> {tr(locale, "Watch", "关注")}</button>
+            <RegistrationActionButton signedIn={Boolean(user)} locale={locale} next={localePath(locale, `/institution/${inst.slug}`)} reason="watch" gateEnabled={registrationGateEnabled()} className="minibtn"><Icon name="plus" /> {tr(locale, "Watch", "关注")}</RegistrationActionButton>
           </form>
         </div>
       </div>

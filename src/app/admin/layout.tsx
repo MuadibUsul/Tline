@@ -49,6 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         ...item("admin.review", "/admin/review", "Editorial review", "内容审核"),
         ...item("admin.social", "/admin/social", "Publishing", "内容发布"),
         ...item("admin.review", "/admin/news", "Newsroom", "新鲜事"),
+        ...item("admin.review", "/admin/announcements", "Announcements", "公告与广告"),
       ],
     },
     {

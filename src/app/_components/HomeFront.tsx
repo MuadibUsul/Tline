@@ -48,6 +48,15 @@ export interface FrontFigure {
   title: string;
 }
 
+export interface FrontAnnouncement {
+  id: string;
+  label: string;
+  title: string;
+  body: string | null;
+  href: string;
+  external: boolean;
+}
+
 export default function HomeFront({
   locale,
   pulse,
@@ -59,6 +68,7 @@ export default function HomeFront({
   figure,
   assets,
   news,
+  announcement,
 }: {
   locale: Locale;
   pulse: FeedPulse;
@@ -70,6 +80,7 @@ export default function HomeFront({
   figure: FrontFigure | null;
   assets: Array<{ ticker: string; name: string }>;
   news: NewsRecord[];
+  announcement: FrontAnnouncement | null;
 }) {
   const zh = locale === "zh-CN";
   const [top, ...restLeads] = lead;
@@ -127,7 +138,7 @@ export default function HomeFront({
       </section>
 
       {/* Institutions changed their minds about…, with the newsroom's latest beside them. */}
-      {(watch.length > 0 || news.length > 0) && (
+      {(watch.length > 0 || news.length > 0 || announcement) && (
         <section className="blk front-observations" aria-label={tr(locale, "Today's institutional observations", "今日机构观察")} data-track-section="home-observations" data-track-title={tr(locale, "Institutional observations", "机构观察")}>
           <div className={`front-ob-grid${watch.length === 0 ? " solo-news" : ""}`}>
             {watch.length > 0 && (
@@ -156,29 +167,46 @@ export default function HomeFront({
                 </div>
               </div>
             )}
-            {news.length > 0 && (
-              <aside className="front-news-rail" aria-label={tr(locale, "Latest news", "最新新鲜事")} data-track-section="home-news" data-track-title={tr(locale, "Newsroom", "新鲜事")}>
-                <div className="front-news-head">
-                  <span className="section-t newsroom-head">{tr(locale, "Newsroom", "新鲜事")}</span>
-                  <Link className="chip gray" href={localePath(locale, "/news")}>{tr(locale, "All", "全部")} →</Link>
-                </div>
-                <div className="front-news-list">
-                  {news.map((post) => {
-                    const headline = newsTitle(post, locale);
-                    if (!headline) return null;
-                    const cover = post.images?.[0] ?? null;
-                    return (
-                      <Link className={`front-news-item${cover ? " has-image" : ""}`} key={post.id} href={localePath(locale, `/news/${post.slug}`)}>
-                        <time dateTime={post.publishedAt?.toISOString()}>{post.publishedAt ? newsAgo(post.publishedAt, locale) : ""}</time>
-                        <span className="headline">{headline}</span>
-                        {cover ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- stored in the news image table
-                          <img className="front-news-thumb" src={`/api/news-images/${cover.id}?variant=thumb`} alt={newsImageAlt(cover, locale)} loading="lazy" />
-                        ) : null}
-                      </Link>
-                    );
-                  })}
-                </div>
+            {(announcement || news.length > 0) && (
+              <aside className="front-news-rail" aria-label={tr(locale, "Announcements and latest news", "公告与最新新鲜事")} data-track-section="home-news" data-track-title={tr(locale, "Newsroom", "新鲜事")}>
+                {announcement && (
+                  <Link
+                    className="front-announcement"
+                    href={announcement.href}
+                    target={announcement.external ? "_blank" : undefined}
+                    rel={announcement.external ? "noreferrer" : undefined}
+                  >
+                    <span className="front-announcement-label">{announcement.label}</span>
+                    <strong>{announcement.title}</strong>
+                    {announcement.body ? <span className="front-announcement-body">{announcement.body}</span> : null}
+                    <span className="front-announcement-cta">{tr(locale, "Learn more", "了解详情")} <Icon name="arrow-right" /></span>
+                  </Link>
+                )}
+                {news.length > 0 && (
+                  <>
+                    <div className="front-news-head">
+                      <span className="section-t newsroom-head">{tr(locale, "Newsroom", "新鲜事")}</span>
+                      <Link className="chip gray" href={localePath(locale, "/news")}>{tr(locale, "All", "全部")} →</Link>
+                    </div>
+                    <div className="front-news-list">
+                      {news.map((post) => {
+                        const headline = newsTitle(post, locale);
+                        if (!headline) return null;
+                        const cover = post.images?.[0] ?? null;
+                        return (
+                          <Link className={`front-news-item${cover ? " has-image" : ""}`} key={post.id} href={localePath(locale, `/news/${post.slug}`)}>
+                            <time dateTime={post.publishedAt?.toISOString()}>{post.publishedAt ? newsAgo(post.publishedAt, locale) : ""}</time>
+                            <span className="headline">{headline}</span>
+                            {cover ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- stored in the news image table
+                              <img className="front-news-thumb" src={`/api/news-images/${cover.id}?variant=thumb`} alt={newsImageAlt(cover, locale)} loading="lazy" />
+                            ) : null}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </aside>
             )}
           </div>

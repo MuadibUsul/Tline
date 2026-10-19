@@ -1740,6 +1740,25 @@ model LlmBudget {
 
 // ---- Premium-media redesign (docs/redesign/) ----
 
+// The placement above the newsroom. One row is live at a time (the lowest active sortOrder);
+// the rest stay in the console so an editor can schedule or retire copy without deleting it.
+model HomeAnnouncement {
+  id        String   @id @default(cuid())
+  labelEn   String   @default("Announcement")
+  labelZh   String   @default("公告")
+  titleEn   String
+  titleZh   String
+  bodyEn    String?
+  bodyZh    String?
+  href      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
 // A newsletter subscription, double opt-in by construction: a row starts PENDING and the
 // confirmation link moves it to CONFIRMED; nothing is ever sent to a PENDING address. The
 // unsubscribe link (same token) moves it to UNSUBSCRIBED and keeps the row, so a re-subscribe

@@ -16,6 +16,7 @@ import { loadPublicThemes } from "@/lib/marketThemesPublic";
 import { redesignAtLeast } from "@/lib/redesign";
 import { selectDiverseObservations } from "@/lib/observations";
 import { listPublishedNews } from "@/lib/news";
+import { announcementLink } from "@/lib/homeAnnouncement";
 import { JsonLd, canonical, clamp, homeSeoTitle, localizedUrl, ogImage, organizationJsonLd, siteJsonLd } from "@/lib/seo";
 import { Icon } from "./_components/Icon";
 
@@ -64,7 +65,7 @@ export default async function Home() {
     .filter((asset) => !isLegacyNonAssetAlias(asset.ticker) && asset.reports >= 2 && asset.institutions >= 2);
 
   if (redesignAtLeast("home")) {
-    const [featured, watchInstitutions, themes, figureRow, news] = await Promise.all([
+    const [featured, watchInstitutions, themes, figureRow, news, announcementRow] = await Promise.all([
       featuredFeed(5, locale),
       // One candidate per institution, not the latest 80 views globally: a single report can
       // contain dozens of AtomicView rows and would otherwise fill the whole window.
@@ -99,8 +100,24 @@ export default async function Home() {
         select: { id: true, caption: true, article: { select: { slug: true, title: true } } },
       }),
       // The rail beside the observations: the desk's latest, already limited to this language.
-      listPublishedNews(locale, 6),
+      listPublishedNews(locale, 5),
+      // The slot above the newsroom. Only one placement is live at a time: the one with
+      // the lowest sortOrder, so an editor can promote something without touching the rest.
+      prisma.homeAnnouncement.findFirst({
+        where: { active: true },
+        orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+        select: { id: true, labelEn: true, labelZh: true, titleEn: true, titleZh: true, bodyEn: true, bodyZh: true, href: true },
+      }),
     ]);
+    const link = announcementRow ? announcementLink(announcementRow.href) : null;
+    const announcement = announcementRow && link ? {
+      id: announcementRow.id,
+      label: (locale === "zh-CN" ? announcementRow.labelZh : announcementRow.labelEn).trim(),
+      title: (locale === "zh-CN" ? announcementRow.titleZh : announcementRow.titleEn).trim(),
+      body: (locale === "zh-CN" ? announcementRow.bodyZh : announcementRow.bodyEn)?.trim() || null,
+      href: link.external ? link.href : localePath(locale, link.href),
+      external: link.external,
+    } : null;
     // Every house contributes only its latest eligible report's views for consideration.
     // Sort by report recency first so "today" stays today; within a house, the selector
     // then takes the highest-importance view that reads as a sentence, not table debris.
@@ -145,6 +162,7 @@ export default async function Home() {
         figure={figureRow ? { id: figureRow.id, caption: figureRow.caption, slug: figureRow.article.slug, title: figureRow.article.title } : null}
         assets={coveredAssets}
         news={news}
+        announcement={announcement}
       />
     );
   }

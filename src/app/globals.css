@@ -1918,6 +1918,15 @@ td{padding-block:13px}
 .front-news-thumb{display:block;width:58px;height:44px;object-fit:cover;border:1px solid var(--border);border-radius:5px}
 .front-news-item .headline{font-family:var(--sans);font-size:var(--text-body-sm);font-weight:600;line-height:1.55;color:var(--ink)}
 .front-news-item:hover .headline{color:var(--accent-ink)}
+/* The editable placement above the newsroom. Its top edge is the grid's top edge, so it
+   lines up with "Today's institutional observations" in the other column. */
+.front-announcement{display:flex;flex-direction:column;gap:4px;margin:0 0 18px;padding:13px 15px 12px;border:1px solid var(--border);border-left:2px solid var(--signal);border-radius:10px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 7%,var(--panel)) 0%,var(--panel) 62%);text-decoration:none;color:inherit}
+.front-announcement:hover{border-color:var(--border-strong);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 11%,var(--panel)) 0%,var(--panel) 62%)}
+.front-announcement-label{font:9.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink)}
+.front-announcement strong{font-family:var(--serif-display);font-size:17px;font-weight:600;line-height:1.4;color:var(--ink);overflow-wrap:anywhere}
+.front-announcement-body{font-size:12px;line-height:1.65;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.front-announcement-cta{display:inline-flex;align-items:center;gap:5px;margin-top:3px;font:11px var(--mono);color:var(--accent-ink)}
+.front-announcement-cta svg{width:12px;height:12px}
 .front-ob-grid.solo-news{grid-template-columns:1fr}
 .front-ob-grid.solo-news .front-news-rail{border-left:0;margin-left:0;padding-left:0}
 @media (max-width:980px){
@@ -1930,6 +1939,17 @@ td{padding-block:13px}
 .news-field>span{font:11px var(--mono);color:var(--muted);letter-spacing:.04em}
 .news-field input,.news-field select,.news-field textarea{font:13px var(--sans);padding:9px 11px;border:1px solid var(--border-control);border-radius:8px;background:var(--panel-2);color:var(--ink);width:100%}
 .news-field textarea{resize:vertical;line-height:1.65}
+.announcement-admin-list{display:flex;flex-direction:column;gap:14px}
+.announcement-admin-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.announcement-admin-head>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.announcement-admin-head b{font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.announcement-admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.announcement-admin-state{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.announcement-admin-state label{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.announcement-admin-state input[type="checkbox"]{width:auto;accent-color:var(--accent)}
+.announcement-admin-state small{color:var(--faint);line-height:1.5}
+.announcement-admin-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+@media (max-width:620px){.announcement-admin-grid{grid-template-columns:1fr}}
 .news-image-list{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
 .news-image-row{display:grid;grid-template-columns:140px minmax(0,1fr) auto;gap:12px;align-items:start;padding-bottom:10px;border-bottom:1px solid var(--border)}
 .news-image-row img{width:140px;height:auto;border:1px solid var(--border);border-radius:8px;background:var(--panel-2)}

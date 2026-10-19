@@ -11,6 +11,7 @@ import { isFormalAuthConfigured } from "@/lib/auth-config";
 import OAuthSignOutButton from "./_components/OAuthSignOutButton";
 import MobileNav, { type MobileNavItem } from "./_components/MobileNav";
 import SearchOverlay from "./_components/SearchOverlay";
+import LanguageSwitch from "./_components/LanguageSwitch";
 import { TlinesMark } from "./_components/Icon";
 import TopbarScroll from "./_components/TopbarScroll";
 import NavigationProgress from "./_components/NavigationProgress";
@@ -178,21 +179,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     ["corrections", tr(locale, "Corrections", "更正机制")],
     ["financial-disclaimer", tr(locale, "Financial disclaimer", "金融免责声明")],
   ];
-  // A plain <a>, not <Link>: the two languages share this root layout, and a client-side
-  // navigation across locales would swap the page content but leave the chrome (nav, this
-  // button, <html lang>) rendered in the previous language — the reader ends up on /zh with
-  // an English navbar whose Home still points at /en. A full document load re-renders the
-  // whole layout in the target language, so each language stays a clean, self-contained set.
-  const languageSwitch = pathname.startsWith("/admin") ? null : (
-    <a
-      className="minibtn"
-      href={localePath(locale === "en" ? "zh-CN" : "en", pathname || "/")}
-      hrefLang={locale === "en" ? "zh-CN" : "en"}
-      aria-label={tr(locale, "Switch to Chinese", "切换到英文")}
-    >
-      {locale === "en" ? "中文" : "EN"}
-    </a>
-  );
+  // A plain anchor, not a router link: the two languages share this root layout, and a
+  // client-side navigation across locales would swap the page content but leave the chrome
+  // (nav, this button, <html lang>) rendered in the previous language. The client component
+  // reads the current pathname so the target is correct after every client navigation too.
+  const showLanguageSwitch = !pathname.startsWith("/admin");
+  const languageSwitch = showLanguageSwitch ? (
+    <LanguageSwitch
+      locale={locale}
+      label={locale === "en" ? "中文" : "EN"}
+      ariaLabel={tr(locale, "Switch to Chinese", "切换到英文")}
+    />
+  ) : null;
 
   return (
     <html lang={locale} suppressHydrationWarning>

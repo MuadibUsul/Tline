@@ -31,6 +31,17 @@ test("takes at most the requested number of houses", () => {
   assert.equal(selectDiverseObservations(rows, { take: 5, zh: true }).length, 5);
 });
 
+test("a prolific house cannot occupy the whole window", () => {
+  const rows = [
+    ...Array.from({ length: 20 }, (_, index) => row(`a${index}`, "prolific", "我们维持该资产的看多观点，并上调目标价。")),
+    ...["b", "c", "d", "e", "f"].map((id) => row(id, id, "我们预计该资产在未来十二个月仍有上行空间。")),
+  ];
+  const picked = selectDiverseObservations(rows, { take: 5, zh: true });
+  assert.equal(picked.length, 5);
+  assert.equal(new Set(picked.map((item) => item.institutionId)).size, 5);
+  assert.equal(picked[0].institutionId, "prolific");
+});
+
 test("an English page judges the English text", () => {
   const rows = [{ id: "x", institutionId: "i1", viewEn: "Table 1 62.3 10.0 3.0 1.1 9.1 5.1", viewZh: "我们维持对黄金的看多观点，年底目标价3,400美元。" }];
   assert.equal(selectDiverseObservations(rows, { take: 5, zh: false }).length, 0);

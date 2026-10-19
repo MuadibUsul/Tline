@@ -13,6 +13,13 @@ test("real views with figures pass; layout fragments do not", () => {
   assert.equal(looksLikeViewFragment("因此，在贸易和地缘政治紧张局势——以及其对预期通胀和购买力状况所产生的影响——开始降温之前，潜在买家的这种观望态度预计将拖累住房需求。-30 -20 -10 0 10 20 NL（St."), true);
   assert.equal(looksLikeViewFragment("Johns）63.2 10.0 3.0 1.1 卖家 9.1 5.1 3.7 7.0 -8.1 1.7"), true);
   assert.equal(looksLikeViewFragment("短句"), true);
+  assert.equal(looksLikeViewFragment("• Headline inflation expected to pick up to 3.6–3.7% y/y, activity remains firm."), true);
+  assert.equal(looksLikeViewFragment("1 Westpac新西兰经济研究：下调2027前景预期。我们已更新对新西兰未来一年的经济展望。"), true);
+  assert.equal(looksLikeViewFragment("图表 1：JCI抛售超过新冠疫情时期的回撤幅度 来源：Bloomberg、MUFG GMR。"), true);
+  assert.equal(looksLikeViewFragment("“但这只是让其他拥有机器的人得以奴役他们”——弗兰克·赫伯特，《沙丘》 ► 美国9月通胀走高。"), true);
+  assert.equal(looksLikeViewFragment("因此，我们维持对USD/IDR进一步上行的偏向，现有预测为Q4 2026达18,350、Q1 2027达18,500。"), false);
+  assert.equal(looksLikeViewFragment("Commodity Spot Prices** Foreign Exchange Cross Rates Fixed Income Yields Stock Market"), true);
+  assert.equal(looksLikeViewFragment("Danske Bank / Nordic Outlook 1 Euro area 3 September 2026 Important disclosures"), true);
 });
 
 test("the language a reader sees decides whether a view needs rewriting", () => {

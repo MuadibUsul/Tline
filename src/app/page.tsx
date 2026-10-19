@@ -64,16 +64,32 @@ export default async function Home() {
     .filter((asset) => !isLegacyNonAssetAlias(asset.ticker) && asset.reports >= 2 && asset.institutions >= 2);
 
   if (redesignAtLeast("home")) {
-    const [featured, watchRows, themes, figureRow, news] = await Promise.all([
+    const [featured, watchInstitutions, themes, figureRow, news] = await Promise.all([
       featuredFeed(5, locale),
-      // A wide window in, a diverse selection out: one clean view per house (lib/observations).
-      prisma.atomicView.findMany({
-        where: { reviewStatus: "ok", article: publicationReadyWhere() },
-        orderBy: { createdAt: "desc" },
-        take: 80,
+      // One candidate per institution, not the latest 80 views globally: a single report can
+      // contain dozens of AtomicView rows and would otherwise fill the whole window.
+      prisma.institution.findMany({
+        where: {
+          articles: {
+            some: publicationReadyWhere({ atomicViews: { some: { reviewStatus: "ok" } } }),
+          },
+        },
         select: {
-          id: true, viewEn: true, viewZh: true, assetTicker: true,
-          article: { select: { slug: true, publishedAt: true, institutionId: true, institution: { select: { slug: true, name: true } } } },
+          id: true, name: true, slug: true,
+          articles: {
+            where: publicationReadyWhere({ atomicViews: { some: { reviewStatus: "ok" } } }),
+            orderBy: { publishedAt: "desc" },
+            take: 1,
+            select: {
+              slug: true, publishedAt: true,
+              atomicViews: {
+                where: { reviewStatus: "ok" },
+                orderBy: [{ importance: "desc" }, { position: "asc" }],
+                take: 12,
+                select: { id: true, viewEn: true, viewZh: true, assetTicker: true, importance: true, createdAt: true },
+              },
+            },
+          },
         },
       }),
       loadPublicThemes(),
@@ -85,6 +101,25 @@ export default async function Home() {
       // The rail beside the observations: the desk's latest, already limited to this language.
       listPublishedNews(locale, 6),
     ]);
+    // Every house contributes only its latest eligible report's views for consideration.
+    // Sort by report recency first so "today" stays today; within a house, the selector
+    // then takes the highest-importance view that reads as a sentence, not table debris.
+    const watchCandidates = watchInstitutions.flatMap((institution) => {
+      const article = institution.articles[0];
+      if (!article) return [];
+      return article.atomicViews.map((view) => ({
+        ...view,
+        article: {
+          slug: article.slug,
+          publishedAt: article.publishedAt,
+          institutionId: institution.id,
+          institution: { slug: institution.slug, name: institution.name },
+        },
+      }));
+    }).sort((a, b) =>
+      b.article.publishedAt.getTime() - a.article.publishedAt.getTime()
+      || b.importance - a.importance
+      || b.createdAt.getTime() - a.createdAt.getTime());
     // Featured reports lead; when nothing is picked yet the stream carries the cover itself.
     const lead = featured.length ? featured : feed.slice(0, 5);
     const leadIds = new Set(lead.map((row) => row.id));
@@ -95,7 +130,7 @@ export default async function Home() {
         pulse={pulse}
         lead={lead}
         secondary={secondary}
-        watch={selectDiverseObservations(watchRows.map((row) => ({ ...row, institutionId: row.article.institutionId })), { take: 5, zh: locale === "zh-CN" }).map((row) => ({
+        watch={selectDiverseObservations(watchCandidates.map((row) => ({ ...row, institutionId: row.article.institutionId })), { take: 5, zh: locale === "zh-CN" }).map((row) => ({
           id: row.id,
           view: (locale === "zh-CN" ? row.viewZh || row.viewEn : row.viewEn || row.viewZh) ?? "",
           viewIsFallback: locale === "zh-CN" && !row.viewZh,

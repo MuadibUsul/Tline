@@ -30,6 +30,13 @@ export function looksLikeViewFragment(text: string): boolean {
   // A complete view can be short ("美股盈利预期仍有上修空间，维持超配。"), but a handful of
   // characters is a label, not a claim.
   if (clean.length < 12) return true;
+  // Page furniture that extraction sometimes keeps: list bullets, page headers such as
+  // "1 Westpac ...：", chart captions, and inline bullet markers used by some publishers.
+  if (/^[•●►▪◦]\s*/.test(clean) || clean.includes("►")) return true;
+  if (/^(?:图表|图|表|Figure|Table)\s*\d+/i.test(clean)) return true;
+  if (/^(?:来源|Source)\s*[:：]/i.test(clean)) return true;
+  if (/^\d{1,2}\s+[^│：:]{0,40}(?:│|：|:)/.test(clean)) return true;
+  if (clean.includes("**") || /important disclosures/i.test(clean)) return true;
   const digits = (clean.match(/\d/g) ?? []).length;
   if (digits / clean.length > 0.35) return true;
   if (AXIS_RUN.test(clean)) return true;

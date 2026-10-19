@@ -341,7 +341,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
     : false;
 
   return (
-    <main className="wrap" style={{ maxWidth: publisherPdf ? 1080 : 820 }}>
+    <main className="wrap research-detail">
       <JsonLd data={reportJsonLd({
         slug: a.slug,
         title: heading,

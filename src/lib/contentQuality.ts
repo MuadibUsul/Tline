@@ -40,7 +40,7 @@ const DOC_SIZE_LABEL = /\b(?:pdf|document|file)\b[^a-z]{0,20}\b\d+\s*(?:kb|mb|k|
  * body markers are explicit, so this is a hard stop rather than a model judgement.
  */
 const PLACEHOLDER_TITLE = /^(?:article\s+)?coming\s+soon$|^(?:文章|内容)?即将发布$|^敬请期待$/i;
-const PLACEHOLDER_BODY = /\barticle\s+coming\s+soon\b|(?:文章|内容)?即将发布|敬请期待/i;
+const PLACEHOLDER_BODY = /\barticle\s+coming\s+soon\b|(?:文章|内容)即将发布|敬请期待/i;
 const HAN = /\p{Script=Han}/u;
 const COMMON_COMPOUNDS = new Set(["viewpoint", "investment", "institution", "institutional", "research", "outlook", "forecast", "consensus", "economics", "strategy"]);
 

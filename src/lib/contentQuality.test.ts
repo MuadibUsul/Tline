@@ -85,6 +85,8 @@ test("placeholder pages are withheld without a model call", () => {
   assert.equal(bodyOnly.indexable, false);
   assert.ok(bodyOnly.issues.includes("placeholder_content"));
   assert.equal(contentQuality({ ...valid, title: "What's coming soon in markets" }, "en").indexable, true);
+  // A normal data preview is not a placeholder page.
+  assert.equal(contentQuality({ ...valid, title: "CPI preview", rawText: "美国CPI数据即将发布，市场关注核心通胀与住房分项。" + "机构预计核心通胀将回落，并给出未来十二个月的目标路径。".repeat(20) }, "en").indexable, true);
 });
 
 test("missing essential content is not generated as a public SEO page", () => {

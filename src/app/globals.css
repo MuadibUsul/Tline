@@ -1660,6 +1660,14 @@ body{background-color:var(--bg);background-image:radial-gradient(circle at 76% -
 .section-t{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px;font-size:14px;font-weight:700;color:var(--ink)}
 .section-t::before{content:"";width:18px;height:2px;flex:none;background:var(--signal)}
 .section-t>span:first-child{margin-right:auto}
+.section-t-report{justify-content:flex-end}
+.section-t-report::before{margin-right:auto}
+.section-t-report>span:first-child{margin-right:0}
+.report-downloads{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
+@media(max-width:720px){
+  .section-t-report{flex-wrap:wrap}
+  .report-downloads{order:3;width:100%;justify-content:flex-start}
+}
 .card,.fcard,.research-card,.tbl-wrap,.rowlist{box-shadow:var(--shadow)}
 input,select,textarea{min-height:40px;border:1px solid var(--border-control);border-radius:var(--radius-sm);background:var(--panel);transition:border-color 150ms ease-out,box-shadow 150ms ease-out}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--focus-ring);outline-offset:1px;border-color:var(--accent);box-shadow:none}

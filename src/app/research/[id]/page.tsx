@@ -467,7 +467,20 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
       </section>
 
       <section className="blk">
-        <div className="section-t">{publisherPdf ? tr(locale, "The report", "研报原件") : tr(locale, "Complete Research", "完整研报正文")}</div>
+        <div className="section-t section-t-report">
+          {downloadDocuments.length > 0 && (
+            <div className="report-downloads">
+              {downloadDocuments.map((document) => (
+                <a key={document.id} href={localePath(locale, `/api/documents/${document.id}`)} className={`minibtn ${document.kind === "source_native" ? "p" : ""}`}>
+                  {document.kind === "source_native"
+                    ? tr(locale, "Download institution PDF", "下载机构原始 PDF")
+                    : tr(locale, "Download English PDF", "下载英文 PDF")}
+                </a>
+              ))}
+            </div>
+          )}
+          <span>{publisherPdf ? tr(locale, "The report", "研报原件") : tr(locale, "Complete Research", "完整研报正文")}</span>
+        </div>
         {publisherPdf && (
           <PdfPreview
             src={`/api/documents/${publisherPdf.id}?inline=1`}
@@ -476,14 +489,6 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
               failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
             }}
           />
-        )}
-        {publisherPdf && locale === "zh-CN" && usableTranslation && (
-          // Kept, but behind a disclosure: the document above is the report, and this is
-          // a reading aid beside it.
-          <details className="article-original mt-18">
-            <summary>完整中文译文</summary>
-            <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} tables={a.tables} />
-          </details>
         )}
         {!publisherPdf && locale === "en" && a.rawText && (
           <div className="mb-22">
@@ -506,18 +511,6 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
         )}
-        {!publisherPdf && locale === "zh-CN" && usableTranslation && a.rawText && (
-          <details className="article-original">
-            <summary>{nativeChinese ? "完整中文原文" : "完整英文原文"}</summary>
-            <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
-          </details>
-        )}
-        {a.disclaimerText && (
-          <details className="article-original">
-            <summary>{tr(locale, "Publisher disclaimer", "机构免责声明")}</summary>
-            <div className="prose article-body mt-12">{a.disclaimerText}</div>
-          </details>
-        )}
         {!publisherPdf && previewDocument && (
           <details className="pdf-preview">
             <summary>{tr(locale, "Preview PDF", "预览 PDF")}</summary>
@@ -530,15 +523,6 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             />
           </details>
         )}
-        <div className="act">
-          {downloadDocuments.map((document) => (
-            <a key={document.id} href={localePath(locale, `/api/documents/${document.id}`)} className={`minibtn ${document.kind === "source_native" ? "p" : ""}`}>
-              {document.kind === "source_native"
-                ? tr(locale, "Download institution PDF", "下载机构原始 PDF")
-                : tr(locale, "Download English PDF", "下载英文 PDF")}
-            </a>
-          ))}
-        </div>
       </section>
 
       {(keyArgs.length > 0 || risks.length > 0) && <section className="blk">

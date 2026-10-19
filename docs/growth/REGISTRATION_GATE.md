@@ -70,3 +70,11 @@ Sitemap URLs: 4381（2191 English / 2190 Chinese）
 - P3 高级能力（高级比较、历史变化、笔记）没有新空壳 CTA；只接已有收藏/关注/看板入口。
 - `signup_start`/`auth_return_success`/`first_value_action` 尚未逐事件接入；当前有 `gate_view`、`gate_dismiss`、`gate_cta_click`、`gate_eligible`。后续接入时应继续避免 PII 和未同意的追踪。
 - 10% A/B 的统计显著性评估需要生产流量；当前只实现会话 bucket 和开关。
+
+## 发布记录
+
+- 2026-10-19：注册墙与语言一致性修复发布，commit `8602a49`，镜像 `sha-8602a49`。
+- 6 容器 healthy，`/api/health` 200。
+- 生产 SEO baseline（sample 30）：0 failures、2 known warnings、12 sitemap shards、4389 URLs。
+- `npm test`：696 项通过。
+- 回滚镜像：`sha-c92dd31`、`sha-76d1093`。

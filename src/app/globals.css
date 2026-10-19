@@ -1263,6 +1263,7 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 
 
 .citation-card{margin:20px 0;padding:20px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:var(--shadow)}
+.citation-card>.section-t{margin-right:-20px}
 
 .citation-card h2{font:600 17px var(--sans)}
 .citation-card p{color:var(--ink-2)}
@@ -1319,7 +1320,7 @@ section.blk{padding:26px 0;border-bottom:1px solid var(--border)}
 @media(max-width:520px){
   .ctile{padding:11px 12px}.ctile .s{font-size:24px}.feed{gap:8px}.fitem,.research-card{padding:14px}
   .research-card h2{margin:7px 0 5px;-webkit-line-clamp:2}.research-card p{-webkit-line-clamp:3}.research-card-actions{padding-top:10px}
-  .citation-card{padding:15px;margin-inline:-2px}.citation-facts,.citation-evidence{grid-template-columns:1fr;gap:6px}.key-number-grid{grid-template-columns:1fr}
+  .citation-card{padding:15px;margin-inline:-2px}.citation-card>.section-t{margin-right:-15px}.citation-facts,.citation-evidence{grid-template-columns:1fr;gap:6px}.key-number-grid{grid-template-columns:1fr}
   .footer{align-items:flex-start}.footer-links{justify-content:flex-start}
 }
 

@@ -73,6 +73,20 @@ test("an analysis without structured arrays is not by itself grounds for noindex
   assert.equal(contentQuality({ ...valid, analysis: { ...analysis, summary: "" } }, "en").indexable, false);
 });
 
+test("placeholder pages are withheld without a model call", () => {
+  const titleOnly = contentQuality({ ...valid, title: "ARTICLE COMING SOON" }, "en");
+  assert.equal(titleOnly.indexable, false);
+  assert.ok(titleOnly.issues.includes("placeholder_content"));
+  const bodyOnly = contentQuality({
+    ...valid,
+    title: "Eco Week",
+    rawText: "Home > Eco Week > October 19, 2026. ARTICLE COMING SOON 10/19/2026 PDF. " + "Navigation and subscription links. ".repeat(20),
+  }, "en");
+  assert.equal(bodyOnly.indexable, false);
+  assert.ok(bodyOnly.issues.includes("placeholder_content"));
+  assert.equal(contentQuality({ ...valid, title: "What's coming soon in markets" }, "en").indexable, true);
+});
+
 test("missing essential content is not generated as a public SEO page", () => {
   const result = contentQuality({ ...valid, rawText: null }, "en");
   assert.equal(result.eligibility, "NOT_GENERATED");

@@ -34,6 +34,13 @@ const BAD_TITLE = /^(?:untitled|title|document|report|research|go to article|dow
  */
 const NOISE_TITLE = /^(?:pdf|document|attachment|file)\b|^(?:download|view|open|read|get|fetch|see)\s+(?:the\s+|this\s+)?(?:pdf|document|attachment|file)\b|(?:^|\b)(?:of entire text|full document|entire document)\b|uploaded (?:document|file)|^untitled\b/i;
 const DOC_SIZE_LABEL = /\b(?:pdf|document|file)\b[^a-z]{0,20}\b\d+\s*(?:kb|mb|k|m)\b/i;
+/**
+ * A placeholder page, not a report. BNP's Eco Week pages arrive as an HTML shell with
+ * "ARTICLE COMING SOON" plus navigation; the source PDF is the same shell. The title and
+ * body markers are explicit, so this is a hard stop rather than a model judgement.
+ */
+const PLACEHOLDER_TITLE = /^(?:article\s+)?coming\s+soon$|^(?:文章|内容)?即将发布$|^敬请期待$/i;
+const PLACEHOLDER_BODY = /\barticle\s+coming\s+soon\b|(?:文章|内容)?即将发布|敬请期待/i;
 const HAN = /\p{Script=Han}/u;
 const COMMON_COMPOUNDS = new Set(["viewpoint", "investment", "institution", "institutional", "research", "outlook", "forecast", "consensus", "economics", "strategy"]);
 
@@ -111,6 +118,7 @@ export function contentQuality(article: IndexableArticleInput, locale: Locale): 
     : article.analysis?.summary.trim();
 
   if (title.length < 8 || title.length > 180 || isNoiseTitle(title)) issues.push("abnormal_title");
+  if (PLACEHOLDER_TITLE.test(title) || PLACEHOLDER_BODY.test(body.slice(0, 2000))) issues.push("placeholder_content");
   if (MOJIBAKE.test(`${title}\n${body.slice(0, 5000)}`) || hasBrokenWord(`${title}\n${body.slice(0, 5000)}`)) issues.push("garbled_or_broken_words");
   if (body.length < 300) issues.push("thin_content");
   if (!summary) issues.push("empty_summary");

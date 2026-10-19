@@ -1,5 +1,11 @@
 import { looksLikeViewFragment } from "./viewQuality";
 
+function isChineseText(text: string): boolean {
+  const letters = text.match(/\p{L}/gu)?.length ?? 0;
+  const han = text.match(/\p{Script=Han}/gu)?.length ?? 0;
+  return letters > 0 && han / letters >= 0.2;
+}
+
 /**
  * The homepage's "institutional observations" selection.
  *
@@ -30,6 +36,9 @@ export function selectDiverseObservations<T extends ObservationCandidate>(
     if (seenInstitutions.has(row.institutionId)) continue;
     const text = ((options.zh ? row.viewZh : row.viewEn) ?? "").trim();
     if (!text) continue;
+    // The field name is not proof of its language: some translated rows contain the
+    // English extraction verbatim. Require the script the reader's page is in.
+    if (options.zh ? !isChineseText(text) : isChineseText(text)) continue;
     if (looksLikeViewFragment(text)) continue;
     seenInstitutions.add(row.institutionId);
     picked.push(row);

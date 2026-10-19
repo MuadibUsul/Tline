@@ -59,6 +59,22 @@ test("an English page never falls back to a Chinese-only view", () => {
   assert.deepEqual(selectDiverseObservations(rows, { take: 5, zh: false }).map((item) => item.id), ["b"]);
 });
 
+test("a Chinese page rejects an English string stored in viewZh", () => {
+  const rows = [
+    { id: "stored-en", institutionId: "a", viewEn: "The deal is expected to close in 2028.", viewZh: "The deal is expected to close in 2028." },
+    { id: "zh", institutionId: "b", viewEn: "We stay overweight equities.", viewZh: "我们维持对股票的超配观点，并预计盈利继续增长。" },
+  ];
+  assert.deepEqual(selectDiverseObservations(rows, { take: 5, zh: true }).map((item) => item.id), ["zh"]);
+});
+
+test("an English page rejects a Chinese string stored in viewEn", () => {
+  const rows = [
+    { id: "stored-zh", institutionId: "a", viewEn: "我们维持对股票的超配观点，并预计盈利继续增长。", viewZh: "我们维持对股票的超配观点，并预计盈利继续增长。" },
+    { id: "en", institutionId: "b", viewEn: "We stay overweight equities and expect earnings to keep growing.", viewZh: "我们维持对股票的超配观点。" },
+  ];
+  assert.deepEqual(selectDiverseObservations(rows, { take: 5, zh: false }).map((item) => item.id), ["en"]);
+});
+
 test("an English page judges the English text", () => {
   const rows = [{ id: "x", institutionId: "i1", viewEn: "Table 1 62.3 10.0 3.0 1.1 9.1 5.1", viewZh: "我们维持对黄金的看多观点，年底目标价3,400美元。" }];
   assert.equal(selectDiverseObservations(rows, { take: 5, zh: false }).length, 0);

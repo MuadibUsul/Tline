@@ -42,6 +42,23 @@ test("a prolific house cannot occupy the whole window", () => {
   assert.equal(picked[0].institutionId, "prolific");
 });
 
+test("a Chinese page never falls back to an English-only view", () => {
+  const rows = [
+    { id: "a", institutionId: "a", viewEn: "The deal is expected to close in 2028.", viewZh: "" },
+    { id: "b", institutionId: "b", viewEn: "English only", viewZh: "我们维持对黄金的看多观点，年底目标价3,400美元。" },
+  ];
+  const picked = selectDiverseObservations(rows, { take: 5, zh: true });
+  assert.deepEqual(picked.map((item) => item.id), ["b"]);
+});
+
+test("an English page never falls back to a Chinese-only view", () => {
+  const rows = [
+    { id: "a", institutionId: "a", viewEn: "", viewZh: "我们维持对黄金的看多观点，年底目标价3,400美元。" },
+    { id: "b", institutionId: "b", viewEn: "We stay overweight equities into year-end.", viewZh: "" },
+  ];
+  assert.deepEqual(selectDiverseObservations(rows, { take: 5, zh: false }).map((item) => item.id), ["b"]);
+});
+
 test("an English page judges the English text", () => {
   const rows = [{ id: "x", institutionId: "i1", viewEn: "Table 1 62.3 10.0 3.0 1.1 9.1 5.1", viewZh: "我们维持对黄金的看多观点，年底目标价3,400美元。" }];
   assert.equal(selectDiverseObservations(rows, { take: 5, zh: false }).length, 0);

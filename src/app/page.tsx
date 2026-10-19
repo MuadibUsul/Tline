@@ -132,8 +132,8 @@ export default async function Home() {
         secondary={secondary}
         watch={selectDiverseObservations(watchCandidates.map((row) => ({ ...row, institutionId: row.article.institutionId })), { take: 5, zh: locale === "zh-CN" }).map((row) => ({
           id: row.id,
-          view: (locale === "zh-CN" ? row.viewZh || row.viewEn : row.viewEn || row.viewZh) ?? "",
-          viewIsFallback: locale === "zh-CN" && !row.viewZh,
+          view: (locale === "zh-CN" ? row.viewZh : row.viewEn) ?? "",
+          viewIsFallback: false,
           assetTicker: row.assetTicker,
           institution: row.article.institution.name,
           institutionSlug: row.article.institution.slug,

@@ -6,7 +6,9 @@ import { looksLikeViewFragment } from "./viewQuality";
  * Two rules, both learned from the first real render (2026-10-17): the block must show
  * different houses — five consecutive rows from one bank's weekly is not a market
  * observation board — and each row must read as a sentence, not a fragment of the
- * source's table layout. Rows arrive in display priority order (newest report first,
+ * source's table layout. On a Chinese page only Chinese text is eligible, and on an
+ * English page only English text is; a missing language is a skip, never an invisible
+ * cross-language fallback. Rows arrive in display priority order (newest report first,
  * then importance); the first clean view a house contributes is its entry, and a house
  * never appears twice.
  */
@@ -26,7 +28,8 @@ export function selectDiverseObservations<T extends ObservationCandidate>(
   for (const row of rows) {
     if (picked.length >= options.take) break;
     if (seenInstitutions.has(row.institutionId)) continue;
-    const text = ((options.zh ? row.viewZh || row.viewEn : row.viewEn || row.viewZh) ?? "").trim();
+    const text = ((options.zh ? row.viewZh : row.viewEn) ?? "").trim();
+    if (!text) continue;
     if (looksLikeViewFragment(text)) continue;
     seenInstitutions.add(row.institutionId);
     picked.push(row);

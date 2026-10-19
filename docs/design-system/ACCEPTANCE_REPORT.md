@@ -3,7 +3,7 @@
 - 基线：`33c21be`
 - 日期：2026-10-18
 - 范围：公共站点主要页面 + 登录页 + 管理后台设计系统页
-- 环境：本地生产构建 + 2026-10-18 生产发布（镜像 `sha-bf43a00`）
+- 环境：本地生产构建 + 2026-10-18 生产发布（镜像 `sha-62c101c`）
 
 ## 1. 结论
 
@@ -118,22 +118,23 @@ Phase A（Token 层）与 Phase B（P0/P1 修复）已完成并通过本地验�
 
 **已部署**。2026-10-18 在生产主机本地构建并发布：
 
-- 发布 commit：`bf43a00`（此前修复：`15c3bbf`、`ffb99eb`、`da6feb0`）
-- 运行镜像：`ghcr.io/muadibusul/tline:sha-bf43a00`
-- `.deploy-tag`：`sha-bf43a00`
-- 回滚镜像：`sha-15c3bbf`、`sha-ffb99eb`、`sha-da6feb0`（保留在主机）
+- 发布 commit：`62c101c`（此前修复：`bf43a00`、`15c3bbf`、`ffb99eb`、`da6feb0`）
+- 运行镜像：`ghcr.io/muadibusul/tline:sha-62c101c`
+- `.deploy-tag`：`sha-62c101c`
+- 回滚镜像：`sha-bf43a00`、`sha-15c3bbf`、`sha-ffb99eb`（保留在主机）
 - 六容器 healthy；`/api/health` 返回 `200 {"status":"ok"}`
 - 生产复测：320/390/768/981/1440 无横向溢出；首页唯一 h1；深色主按钮 `rgb(8,9,10)` on `rgb(124,138,255)`；主题刷新保持；首页/登录页 axe 0 violations。
 - 研究卡片：同一行三张卡片高度一致、按钮同一底边（308/308/308 与 333/333/333），390 单列仍按内容高度。
 - 首页机构观察：不再取全站最新 80 条 view；每家从最新可公开研报中选 importance 最高的可读观点，再按研报时间选 5 家。生产实测 5 行、机构分别为 MUFG、Westpac、Natixis、Scotiabank、UBS，日期 10-19 至 10-16；320/390 无溢出。
 - 研报详情：section 标题恢复右侧对齐；“下载机构原始 PDF / 下载英文 PDF”移到标题行右侧；底部完整中文译文、完整原文、机构免责声明折叠块已移除；PDF 页与无 PDF 页均在 320/390 无溢出。
+- 引用卡“可引用研究简报”右缘从 1207px 对齐到 1227px，与“研报原件 / AI 分析 / 本页如何生成”的 1228px 右缘对齐（1px 为卡片边框）。
 
 回滚方式：
 
 ```bash
 cd /home/deploy/tline
-TAG=sha-15c3bbf docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-printf 'sha-15c3bbf' > .deploy-tag
+TAG=sha-bf43a00 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+printf 'sha-bf43a00' > .deploy-tag
 ```
 
 - 无数据库迁移，无需回滚数据；

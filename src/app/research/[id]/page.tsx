@@ -297,7 +297,9 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   // extracted from that same PDF is not repeated underneath it.
   const downloadDocuments = preferredEnglishDocuments(a.documents);
   const publisherPdf = downloadDocuments.find((document) => document.kind === "source_native");
-  const previewDocument = publisherPdf ?? a.documents.find((document) => document.kind === "original_pdf");
+  // A publisher PDF is preferred, but an original/English PDF is still the report. It is
+  // shown as the document, not repeated as extracted text with a "preview" disclosure.
+  const displayPdf = publisherPdf ?? a.documents.find((document) => document.kind === "original_pdf");
 
   const heading = displayTitle(locale === "zh-CN" && usableTranslation ? localizeChineseContent(usableTranslation.title) : a.title);
   const titleParts = splitResearchTitle(heading);
@@ -479,24 +481,24 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
               ))}
             </div>
           )}
-          <span>{publisherPdf ? tr(locale, "The report", "研报原件") : tr(locale, "Complete Research", "完整研报正文")}</span>
+          <span>{displayPdf ? tr(locale, "The report", "研报原件") : tr(locale, "Complete Research", "完整研报正文")}</span>
         </div>
-        {publisherPdf && (
+        {displayPdf && (
           <PdfPreview
-            src={`/api/documents/${publisherPdf.id}?inline=1`}
+            src={`/api/documents/${displayPdf.id}?inline=1`}
             labels={{
               loading: tr(locale, "Loading the document…", "正在载入文档……"),
               failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
             }}
           />
         )}
-        {!publisherPdf && locale === "en" && a.rawText && (
+        {!displayPdf && locale === "en" && a.rawText && (
           <div className="mb-22">
             <div className="mono meta-muted mb-6">{nativeChinese ? "Complete Chinese original" : "Complete English original"}</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
         )}
-        {!publisherPdf && locale === "zh-CN" && usableTranslation && (
+        {!displayPdf && locale === "zh-CN" && usableTranslation && (
           <div className="mb-22">
             <div className="mono meta-muted mb-6">
               完整中文译文
@@ -505,23 +507,11 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             <ArticleBody segments={usableTranslation.segments} fallback={usableTranslation.text} locale={locale} translated figures={a.figures} tables={a.tables} />
           </div>
         )}
-        {!publisherPdf && locale === "zh-CN" && !usableTranslation && a.rawText && (
+        {!displayPdf && locale === "zh-CN" && !usableTranslation && a.rawText && (
           <div className="mb-22">
             <div className="mono meta-muted mb-6">{nativeChinese ? "完整中文原文" : "完整英文原文"}</div>
             <ArticleBody segments={a.segments} fallback={a.rawText} locale={locale} figures={a.figures} tables={a.tables} />
           </div>
-        )}
-        {!publisherPdf && previewDocument && (
-          <details className="pdf-preview">
-            <summary>{tr(locale, "Preview PDF", "预览 PDF")}</summary>
-            <PdfPreview
-              src={`/api/documents/${previewDocument.id}?inline=1`}
-              labels={{
-              loading: tr(locale, "Loading the document…", "正在载入文档……"),
-              failed: tr(locale, "This document could not be displayed. Download it instead.", "该文档无法显示,请改用下载。"),
-            }}
-            />
-          </details>
         )}
       </section>
 
@@ -585,8 +575,8 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             who wrote what, where the original is, when it was last touched, how to dispute it. */}
         <p style={{ color: "var(--muted)", fontSize: 13, maxWidth: "72ch" }}>
           {tr(locale,
-            `Tlines extracted the conclusion, arguments, numbers and risks above from the report published by ${a.institution.name} on ${date}, then structured them for comparison. The publisher's own wording is reachable through the source link on this page${publisherPdf ? " and is displayed in full above" : ""}. Last updated ${formatDate(a.updatedAt, locale)}. `,
-            `本页的结论、论点、数字与风险由 Tlines 从 ${a.institution.name} 于 ${date} 发布的研报中提取并结构化，用于横向比较。机构原文可通过本页来源链接访问${publisherPdf ? "，并已在上方完整展示" : ""}。最后更新于 ${formatDate(a.updatedAt, locale)}。`)}
+            `Tlines extracted the conclusion, arguments, numbers and risks above from the report published by ${a.institution.name} on ${date}, then structured them for comparison. The publisher's own wording is reachable through the source link on this page${displayPdf ? " and is displayed in full above" : ""}. Last updated ${formatDate(a.updatedAt, locale)}. `,
+            `本页的结论、论点、数字与风险由 Tlines 从 ${a.institution.name} 于 ${date} 发布的研报中提取并结构化，用于横向比较。机构原文可通过本页来源链接访问${displayPdf ? "，并已在上方完整展示" : ""}。最后更新于 ${formatDate(a.updatedAt, locale)}。`)}
           <Link href={localePath(locale, "/methodology")}>{tr(locale, "Methodology", "方法论")}</Link>{" · "}
           <Link href={localePath(locale, "/sources")}>{tr(locale, "Source policy", "来源政策")}</Link>{" · "}
           <Link href={localePath(locale, "/ai-usage")}>{tr(locale, "AI usage", "AI 使用说明")}</Link>{" · "}

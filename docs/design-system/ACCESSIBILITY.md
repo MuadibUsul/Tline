@@ -58,7 +58,7 @@
 
 已执行：
 
-- `npm test`（685 项，含 6 项设计 token/内联预算测试）
+- `npm test`（686 项，含 6 项设计 token/内联预算测试）
 - `npm run typecheck`
 - `npm run lint`
 - `TL_REDESIGN=all TLINE_DIST_DIR=.next-verify npm run build`

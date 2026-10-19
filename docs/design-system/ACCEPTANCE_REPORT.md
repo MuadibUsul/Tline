@@ -3,7 +3,7 @@
 - 基线：`33c21be`
 - 日期：2026-10-18
 - 范围：公共站点主要页面 + 登录页 + 管理后台设计系统页
-- 环境：本地生产构建 + 2026-10-18 生产发布（镜像 `sha-ffb99eb`）
+- 环境：本地生产构建 + 2026-10-18 生产发布（镜像 `sha-15c3bbf`）
 
 ## 1. 结论
 
@@ -36,7 +36,7 @@ Phase A（Token 层）与 Phase B（P0/P1 修复）已完成并通过本地验�
 
 | 命令 | 结果 |
 |---|---|
-| `npm test` | **PASS** · 685 tests / 685 pass / 0 fail |
+| `npm test` | **PASS** · 686 tests / 686 pass / 0 fail |
 | `npm run typecheck` | **PASS** |
 | `npm run lint` | **PASS** |
 | `TL_REDESIGN=all TLINE_DIST_DIR=.next-verify npm run build` | **PASS** · compiled successfully，14 个静态页生成 |
@@ -118,20 +118,21 @@ Phase A（Token 层）与 Phase B（P0/P1 修复）已完成并通过本地验�
 
 **已部署**。2026-10-18 在生产主机本地构建并发布：
 
-- 发布 commit：`ffb99eb`（此前视觉版本为 `da6feb0`）
-- 运行镜像：`ghcr.io/muadibusul/tline:sha-ffb99eb`
-- `.deploy-tag`：`sha-ffb99eb`
-- 回滚镜像：`sha-da6feb0`、`sha-33c21be`（保留在主机）
+- 发布 commit：`15c3bbf`（此前修复：`ffb99eb`、`da6feb0`）
+- 运行镜像：`ghcr.io/muadibusul/tline:sha-15c3bbf`
+- `.deploy-tag`：`sha-15c3bbf`
+- 回滚镜像：`sha-ffb99eb`、`sha-da6feb0`、`sha-33c21be`（保留在主机）
 - 六容器 healthy；`/api/health` 返回 `200 {"status":"ok"}`
 - 生产复测：320/390/768/981/1440 无横向溢出；首页唯一 h1；深色主按钮 `rgb(8,9,10)` on `rgb(124,138,255)`；主题刷新保持；首页/登录页 axe 0 violations。
 - 研究卡片：同一行三张卡片高度一致、按钮同一底边（308/308/308 与 333/333/333），390 单列仍按内容高度。
+- 首页机构观察：不再取全站最新 80 条 view；每家从最新可公开研报中选 importance 最高的可读观点，再按研报时间选 5 家。生产实测 5 行、机构分别为 MUFG、Westpac、Natixis、Scotiabank、UBS，日期 10-19 至 10-16；320/390 无溢出。
 
 回滚方式：
 
 ```bash
 cd /home/deploy/tline
-TAG=sha-da6feb0 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-printf 'sha-da6feb0' > .deploy-tag
+TAG=sha-ffb99eb docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+printf 'sha-ffb99eb' > .deploy-tag
 ```
 
 - 无数据库迁移，无需回滚数据；

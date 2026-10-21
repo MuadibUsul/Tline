@@ -72,11 +72,6 @@ const nextConfig = {
       { source: "/api/search", headers: ROBOTS_NOINDEX },
       { source: "/api/social/:path*", headers: ROBOTS_NOINDEX },
       { source: "/api/v1/:path*", headers: ROBOTS_NOINDEX },
-      // A shared document is reachable only by its link; neither the page nor its PDF is
-      // a candidate for an index.
-      { source: "/share/:path*", headers: ROBOTS_NOINDEX },
-      { source: "/zh/share/:path*", headers: ROBOTS_NOINDEX },
-      { source: "/en/share/:path*", headers: ROBOTS_NOINDEX },
     ];
   },
 };

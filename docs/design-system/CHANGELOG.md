@@ -1,5 +1,13 @@
 # 设计系统变更记录
 
+## 2026-10-21 · 独立分享 PDF 页面
+
+- 发布 commit `c5a862e`，镜像 `sha-c5a862e`，`.deploy-tag` 已更新；不改数据库、研报管线或公开列表。
+- 页面：`/zh/share/food-wholesale-wechat-order-automation-7e2d490718`，用现有 PDF 阅读器展示一份食品批发自动接单方案，并附摘要、方案要点、关键数字与风险边界。
+- 仅链接可见：页面与 PDF 都返回 `X-Robots-Tag: noindex, nofollow`，页面另有 `noindex, nofollow, noarchive`；`robots.txt` disallow `/share`、`/zh/share`、`/en/share`；没有加入 sitemap、列表、搜索或 RSS。
+- 未使用研报 schema、公开闸门或 `unlisted` 字段；该 PDF 是静态资源，不进入研报管线。
+- 生产验证：1440 Light/Dark、390、320 无横向溢出，axe WCAG A/AA 0 violations，PDF 1 页正常渲染。
+
 ## 2026-10-21 · Cult UI 参考的组件触感层
 
 - 发布 commit `4729b7f`，镜像 `sha-4729b7f`，`.deploy-tag` 已更新；不改数据、接口、路由或内容。

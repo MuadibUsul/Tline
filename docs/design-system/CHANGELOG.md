@@ -1,5 +1,18 @@
 # 设计系统变更记录
 
+## 2026-10-21 · Cult UI 参考的组件触感层
+
+- 发布 commit `4729b7f`，镜像 `sha-4729b7f`，`.deploy-tag` 已更新；不改数据、接口、路由或内容。
+- 只借用 https://www.cult-ui.com/ 的表面与交互原则，不引入 shadcn/Tailwind/Motion 或第二套组件库：
+  - 首页深色封面、MCP 端点卡加入低对比 dither 点纹，作为“纸张/网点”质感；
+  - 交互卡片 hover 时顶部 signal 细线展开、卡片上移 2px，按钮按下缩放；
+  - 公共主操作改为 pill，后台 `.admin-body` 仍用紧凑控制圆角；
+  - `.card/.fcard/.research-card/.ctile/.news-column-card/.rowlist/.tbl-wrap` 统一到 `--radius-card`；
+  - 输入框 hover、次要按钮 hover 背景、focus 状态沿用既有 token。
+- 未采用参考站的霓虹/玻璃拟态、bento 异宽布局或大面积动画；卡片同宽、中文衬线标题和靛蓝行动色保持不变。
+- 验证：`npm test` 698 通过，lint/build 通过；`design:audit` 98 组合 0 failures；生产首页 Light/Dark/390、研究列表、MCP 页 axe WCAG A/AA 均为 0 violations；320/390/768/1440 无横向溢出；hover 实测 `translateY(-2px)` 与 `rgb(94,106,210)` 顶部线。
+- 回滚镜像：`sha-6d96dc0`。
+
 ## 2026-10-19 · 首页新鲜事恢复 6 条
 
 - 发布 commit `6d96dc0`，主机本地构建镜像 `sha-6d96dc0`，`.deploy-tag` 已更新。

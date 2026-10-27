@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
 import { getPublishedNewsBySlug, newsColumnName, newsDateLabel, newsExcerpt, newsImageAlt, newsImageCaption, newsLocales, newsSources, newsTitle, structuredNewsBody, NEWS_KIND_LABEL, isNewsKind, type NewsImageRecord } from "@/lib/news";
+import { newsReadCounts } from "@/lib/analytics/news";
 import { renderNewsMarkdownBlocks } from "@/lib/newsMarkdown";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, localizedUrl, ogImage } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
@@ -82,6 +83,7 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
   const imagesAt = (position: number) => images.filter((image) => image.position === position);
   const sources = newsSources(post);
   const publishedAt = post.publishedAt;
+  const readCount = (await newsReadCounts([slug]))[slug];
 
   return (
     <main className="wrap news-item">
@@ -116,6 +118,7 @@ export default async function NewsItemPage(props: { params: Promise<{ slug: stri
           </span>
           {publishedAt ? <time className="news-item-date" dateTime={publishedAt.toISOString()}>{newsDateLabel(publishedAt, locale)}</time> : null}
           {post.pinned ? <span className="chip bull">{tr(locale, "Pinned", "置顶")}</span> : null}
+          <span className="chip gray">{readCount?.views ?? 0} {tr(locale, "views", "阅读")}</span>
         </div>
         <h1 className="art-title">{title}</h1>
         {structured.location || structured.dateline || readingMinutes ? (

@@ -7,6 +7,7 @@ import { can } from "@/lib/permissions";
 import { getAdminLocale, localePath, tr } from "@/lib/i18n";
 import { isNewsKind, NEWS_KIND_LABEL } from "@/lib/news";
 import { when } from "@/app/admin/_components/format";
+import { newsPublishStats, newsReadCounts } from "@/lib/analytics/news";
 import NewsForm from "./NewsForm";
 import { createNewsAction, deleteNewsAction, pinNewsAction, publishNewsAction, unpublishNewsAction } from "./actions";
 
@@ -23,6 +24,12 @@ export default async function AdminNewsPage() {
   const locale = await getAdminLocale();
   const posts = await prisma.newsPost.findMany({ orderBy: [{ pinned: "desc" }, { createdAt: "desc" }], take: 100 });
   const columns = await prisma.newsColumn.findMany({ orderBy: { createdAt: "asc" }, select: { slug: true, nameZh: true, nameEn: true } });
+  const [stats, readCounts] = await Promise.all([
+    newsPublishStats(),
+    newsReadCounts(posts.map((post) => post.slug)),
+  ]);
+  const publishedByKind = (kind: string) => stats.byKind.find((item) => item.kind === kind)?.count ?? 0;
+  const last7 = stats.byDay.slice(-7).reduce((sum, item) => sum + item.count, 0);
 
   return (
     <>
@@ -38,6 +45,20 @@ export default async function AdminNewsPage() {
           <Link className="chip gray" href={localePath(locale, "/admin/news/columns")}>{tr(locale, "Columns", "栏目")} →</Link>
         </div>
       </header>
+
+      <section className="blk">
+        <div className="section-t">
+          <span>{tr(locale, "Publishing KPIs", "发布统计")}</span>
+        </div>
+        <div className="tag-row">
+          <span className="chip acc">{stats.published} {tr(locale, "published", "已发布")}</span>
+          <span className="chip gray">{stats.drafts} {tr(locale, "drafts", "草稿")}</span>
+          <span className="chip gray">{tr(locale, "Flash", "快讯")} {publishedByKind("flash")}</span>
+          <span className="chip gray">{tr(locale, "Brief", "短讯")} {publishedByKind("brief")}</span>
+          <span className="chip gray">{tr(locale, "Article", "文章")} {publishedByKind("article")}</span>
+          <span className="chip gray">7d +{last7}</span>
+        </div>
+      </section>
 
       <div className="admin-columns">
         <section className="blk">
@@ -63,6 +84,7 @@ export default async function AdminNewsPage() {
                     </span>
                     <span className={`chip ${published ? "bull" : "gray"}`}>{published ? tr(locale, "Published", "已发布") : tr(locale, "Draft", "草稿")}</span>
                     {post.pinned ? <span className="chip acc">{tr(locale, "Pinned", "置顶")}</span> : null}
+                    {published ? <span className="chip gray">{readCounts[post.slug]?.views ?? 0} {tr(locale, "views", "阅读")}</span> : null}
                   </Link>
                   <form action={publishNewsAction}>
                     <input type="hidden" name="id" value={post.id} />

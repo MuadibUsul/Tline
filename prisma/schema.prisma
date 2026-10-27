@@ -1290,6 +1290,7 @@ model WorkerHeartbeat {
   details    String   @default("{}")
   startedAt  DateTime @default(now())
   lastSeenAt DateTime @updatedAt
+  alertedAt  DateTime? // last time a stale-heartbeat ops alert was sent; cleared on recovery
 
   @@index([lastSeenAt])
 }

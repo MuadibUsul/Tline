@@ -4,6 +4,7 @@ import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { startWorkerHeartbeat } from "./worker-heartbeat.mjs";
+import { sendOpsAlert } from "./ops-alert.mjs";
 
 const intervalMs = Math.max(60_000, Number(process.env.INGEST_INTERVAL_MS || 60_000));
 // Keep analysis/translation close behind discovery. Source polling is publisher-bound,
@@ -164,18 +165,9 @@ async function processPending() {
 }
 
 async function notifyFailure() {
-  const url = process.env.JOB_FAILURE_WEBHOOK_URL;
-  if (!url) return;
-  try {
-    await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ event: "ingest.failed", attempts: retryLimit, timestamp: new Date().toISOString() }),
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch (error) {
-    console.error(JSON.stringify({ event: "scheduler.webhook.failed", error: String(error) }));
-  }
+  await sendOpsAlert(
+    `ingest.failed：scheduler 在 ${retryLimit} 次重试后仍失败 @ ${new Date().toISOString()}`
+  );
 }
 
 async function ingestLoop() {

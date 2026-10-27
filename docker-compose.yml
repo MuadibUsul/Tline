@@ -106,7 +106,7 @@ services:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "scripts/check-worker-health.mjs", "research"]
+      test: ["CMD", "npx", "tsx", "scripts/check-worker-health.mjs", "research"]
       interval: 30s
       timeout: 5s
       start_period: 30s
@@ -143,7 +143,7 @@ services:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "scripts/check-worker-health.mjs", "macro"]
+      test: ["CMD", "npx", "tsx", "scripts/check-worker-health.mjs", "macro"]
       interval: 30s
       timeout: 5s
       start_period: 30s
@@ -170,7 +170,7 @@ services:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "scripts/check-worker-health.mjs", "social"]
+      test: ["CMD", "npx", "tsx", "scripts/check-worker-health.mjs", "social"]
       interval: 30s
       timeout: 5s
       start_period: 30s

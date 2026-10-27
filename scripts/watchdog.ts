@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { pipelineHealth, type PipelineHealth } from "../src/lib/pipelineHealth";
-import { sendOpsAlert } from "./ops-alert.mjs";
+import { sendOpsAlert } from "../src/lib/social/feishu";
 
 /**
  * Reports a pipeline that has gone quiet while appearing healthy.

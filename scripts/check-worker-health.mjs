@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { sendOpsAlert } from "./ops-alert.mjs";
+import { sendOpsAlert } from "../src/lib/social/feishu.ts";
 
 const name = process.argv[2];
 if (!name) process.exit(2);

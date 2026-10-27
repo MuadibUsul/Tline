@@ -4,7 +4,7 @@ import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { startWorkerHeartbeat } from "./worker-heartbeat.mjs";
-import { sendOpsAlert } from "./ops-alert.mjs";
+import { sendOpsAlert } from "../src/lib/social/feishu.ts";
 
 const intervalMs = Math.max(60_000, Number(process.env.INGEST_INTERVAL_MS || 60_000));
 // Keep analysis/translation close behind discovery. Source polling is publisher-bound,

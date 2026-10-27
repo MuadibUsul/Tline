@@ -2,6 +2,7 @@ import "dotenv/config";
 import { spawn } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 import { startWorkerHeartbeat } from "./worker-heartbeat.mjs";
+import { sendOpsAlert } from "../src/lib/social/feishu.ts";
 
 const npm = process.platform === "win32" ? process.execPath : "npm";
 const npmPrefix = process.platform === "win32" ? [process.env.npm_execpath] : [];
@@ -79,11 +80,7 @@ function runCommand(job, attempt) {
 }
 
 async function notify(job) {
-  const url = process.env.JOB_FAILURE_WEBHOOK_URL;
-  if (!url) return;
-  try {
-    await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: "macro.job.failed", job: job.name, attempts: retryLimit, timestamp: new Date().toISOString() }), signal: AbortSignal.timeout(10_000) });
-  } catch (error) { console.error(JSON.stringify({ event: "macro.scheduler.webhook.failed", job: job.name, error: String(error) })); }
+  await sendOpsAlert(`macro.job.failed：${job.name} 在 ${retryLimit} 次重试后仍失败 @ ${new Date().toISOString()}`);
 }
 
 async function runTask(job) {

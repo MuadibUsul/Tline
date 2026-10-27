@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "@/lib/db";
-import { newsPublishStats, newsReadCounts, siteReadTotals } from "./news";
+import { newsPublishStats, newsReadCounts, articleReadCounts, siteReadTotals } from "./news";
 
 const OLD = "1999-01-01";
 
@@ -45,6 +45,19 @@ test("newsReadCounts counts only human news_article views and reads", async () =
   const counts = await newsReadCounts(["a", "b"]);
   assert.deepEqual(counts["a"], { views: 2, reads: 1 });
   assert.deepEqual(counts["b"], { views: 1, reads: 1 });
+});
+
+test("articleReadCounts reuses the same query for research reports", async () => {
+  await clear();
+  await prisma.pageView.createMany({
+    data: [
+      { path: "/research/r1", visitorId: "v1", sessionId: "s1", template: "article", contentId: "r1", trafficClass: "human", isRead: true, day: OLD },
+      // a news view of the same slug must not count as an article view
+      { path: "/news/r1", visitorId: "v2", sessionId: "s2", template: "news_article", contentId: "r1", trafficClass: "human", isRead: true, day: OLD },
+    ],
+  });
+  const counts = await articleReadCounts(["r1"]);
+  assert.deepEqual(counts["r1"], { views: 1, reads: 1 });
 });
 
 test("siteReadTotals counts only human views across the site", async () => {

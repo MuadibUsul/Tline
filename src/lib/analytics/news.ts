@@ -73,17 +73,24 @@ export async function newsPublishStats(days = 14): Promise<NewsPublishStats> {
   };
 }
 
-export interface NewsReadCount {
+export interface ContentReadCount {
   views: number;
   reads: number;
 }
 
-export async function newsReadCounts(slugs: string[]): Promise<Record<string, NewsReadCount>> {
-  const out: Record<string, NewsReadCount> = {};
-  for (const slug of slugs) out[slug] = { views: 0, reads: 0 };
-  if (slugs.length === 0) return out;
+/**
+ * Per-content read counts for any page template (news_article, article, …).
+ * One query shape serves every content type; callers only pick the template.
+ */
+export async function pageReadCounts(
+  template: string,
+  ids: string[]
+): Promise<Record<string, ContentReadCount>> {
+  const out: Record<string, ContentReadCount> = {};
+  for (const id of ids) out[id] = { views: 0, reads: 0 };
+  if (ids.length === 0) return out;
 
-  const base = { template: "news_article", contentId: { in: slugs }, ...HUMAN };
+  const base = { template, contentId: { in: ids }, ...HUMAN };
   const [viewRows, readRows] = await Promise.all([
     prisma.pageView.groupBy({ by: ["contentId"], where: base, _count: { _all: true } }),
     prisma.pageView.groupBy({ by: ["contentId"], where: { ...base, isRead: true }, _count: { _all: true } }),
@@ -95,6 +102,16 @@ export async function newsReadCounts(slugs: string[]): Promise<Record<string, Ne
     if (row.contentId && out[row.contentId]) out[row.contentId].reads = row._count._all;
   }
   return out;
+}
+
+/** News posts: template = "news_article", contentId = slug. */
+export function newsReadCounts(slugs: string[]): Promise<Record<string, ContentReadCount>> {
+  return pageReadCounts("news_article", slugs);
+}
+
+/** Research reports: template = "article", contentId = slug. */
+export function articleReadCounts(slugs: string[]): Promise<Record<string, ContentReadCount>> {
+  return pageReadCounts("article", slugs);
 }
 
 export interface SiteReadTotals {

@@ -21,6 +21,7 @@ docs
 tmp
 .runtime
 .zcode
+artifacts
 *.tsbuildinfo
 ff.json
 _seed.json

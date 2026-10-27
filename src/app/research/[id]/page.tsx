@@ -11,6 +11,7 @@ import { siteUrl } from "@/lib/site";
 import { preferredEnglishDocuments, publicationReadyWhere } from "@/lib/publication";
 import { researchLookupWhere, researchPath, researchRedirectPath } from "@/lib/researchPath";
 import { contentQuality, isNativeChineseArticle } from "@/lib/contentQuality";
+import { articleReadCounts } from "@/lib/analytics/news";
 import { effectiveSummaryZh } from "@/lib/summary";
 import { assetPath } from "@/lib/assetPath";
 import { getArticleTopics, getPeerReports, topicHref } from "@/lib/related";
@@ -293,6 +294,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
   const date = formatDate(a.publishedAt, locale);
   const translation = a.translations[0];
   const usableTranslation = translation ?? null;
+  const readCount = (await articleReadCounts([a.slug]))[a.slug];
 
   // The publisher's own document. Where one exists it is the report — the page around it
   // was navigation and teaser copy — so it is shown open and in full, and the text
@@ -386,6 +388,7 @@ export default async function ResearchPage(props: { params: Promise<{ id: string
             ) : null}
             <div className="art-meta">
               <Byline locale={locale} institution={a.institution.name} institutionSlug={a.institution.slug} publishedAt={a.publishedAt} updatedAt={a.updatedAt} />
+              <span className="chip gray">{readCount?.views ?? 0} {tr(locale, "views", "阅读")}</span>
             </div>
             <div className="art-toolbar">
               <SourceBadge href={a.sourceUrl} locale={locale} />

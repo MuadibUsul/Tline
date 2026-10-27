@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { pipelineHealth, type PipelineHealth } from "../src/lib/pipelineHealth";
+import { sendOpsAlert } from "../src/lib/social/feishu";
 
 /**
  * Reports a pipeline that has gone quiet while appearing healthy.
@@ -16,25 +17,16 @@ import { pipelineHealth, type PipelineHealth } from "../src/lib/pipelineHealth";
  */
 
 async function notify(health: PipelineHealth) {
-  const url = process.env.JOB_FAILURE_WEBHOOK_URL;
-  if (!url) return;
-  try {
-    await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        event: "pipeline.stalled",
-        reasons: health.stalled,
-        articleAgeHours: health.articleAgeHours,
-        viewAgeHours: health.viewAgeHours,
-        sources: `${health.workingSources}/${health.crawlableSources} succeeded in 24h`,
-        timestamp: new Date().toISOString(),
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch (error) {
-    console.error(JSON.stringify({ event: "watchdog.webhook.failed", error: String(error) }));
-  }
+  await sendOpsAlert(
+    [
+      "pipeline.stalled",
+      `reasons: ${health.stalled.join(", ") || "(none)"}`,
+      `articleAgeHours: ${health.articleAgeHours ?? "n/a"}`,
+      `viewAgeHours: ${health.viewAgeHours ?? "n/a"}`,
+      `sources: ${health.workingSources}/${health.crawlableSources} succeeded in 24h`,
+      `@ ${new Date().toISOString()}`,
+    ].join("\n")
+  );
 }
 
 async function main() {

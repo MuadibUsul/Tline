@@ -17,6 +17,7 @@ import TopbarScroll from "./_components/TopbarScroll";
 import NavigationProgress from "./_components/NavigationProgress";
 import Analytics from "./_components/Analytics";
 import CookieConsent from "./_components/CookieConsent";
+import SiteReadTotal from "./_components/SiteReadTotal";
 import { classify } from "@/lib/analytics/agent";
 import { recordBotHit } from "@/lib/analytics/botHits";
 import { redesignAtLeast } from "@/lib/redesign";
@@ -264,6 +265,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
             <div className="site-footer-bottom">
               <span>© {new Date().getFullYear()} Tlines</span>
+              <SiteReadTotal label={tr(locale, "Total reads", "全站阅读数")} />
               <span>{tr(locale, "Research → Data → Signal", "研报 → 数据 → 信号")}</span>
               <nav aria-label={tr(locale, "Legal", "法律与政策")}>
                 {legalLinks.map(([path, label]) => <Link key={path} href={localePath(locale, `/${path}`)}>{label}</Link>)}

@@ -142,6 +142,25 @@ export async function sendFeishuText(text: string) {
   }, settings);
 }
 
+/**
+ * Best-effort operational alert to the same Feishu bot as the review desk.
+ *
+ * Ops alerts must never crash the pipeline they report on, so this swallows
+ * configuration and delivery errors into the log instead of throwing: a
+ * missing bot simply means no alert, a delivery failure keeps the job alive.
+ */
+export async function sendOpsAlert(text: string): Promise<boolean> {
+  try {
+    const settings = await loadFeishuSettings();
+    if (!settings.appId || !settings.receiveId) return false;
+    await sendFeishuText(`[Tlines] ${text}`);
+    return true;
+  } catch (error) {
+    console.error(JSON.stringify({ event: "ops.feishu.failed", error: String(error) }));
+    return false;
+  }
+}
+
 /** An interactive card, built by the caller. Returns the message id so it can be updated. */
 export async function sendFeishuCard(card: unknown): Promise<string> {
   const settings = await loadFeishuSettings();

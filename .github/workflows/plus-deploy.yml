@@ -33,12 +33,12 @@ jobs:
         run: |
           set -Eeuo pipefail
           root=/home/deploy/plus
-          test -d "$root" && test ! -L "$root"
-          test -f "$root/docker-compose.yml"
-          test -r "$root/.env"
-          test -w "$root"
-          grep -Fq 'PLUS_RELEASE_IMAGE' "$root/docker-compose.yml"
-          docker info >/dev/null
+          test -d "$root" && test ! -L "$root" || { echo 'PLUS root missing or symlinked'; exit 1; }
+          test -f "$root/docker-compose.yml" || { echo 'PLUS compose file missing'; exit 1; }
+          test -r "$root/.env" || { echo 'Runner cannot read PLUS .env'; exit 1; }
+          test -w "$root" || { echo 'Runner cannot write PLUS root'; exit 1; }
+          grep -Fq 'PLUS_RELEASE_IMAGE' "$root/docker-compose.yml" || { echo 'PLUS compose image override missing'; exit 1; }
+          docker info >/dev/null || { echo 'Runner cannot access Docker'; exit 1; }
           cd "$root"
           for service in api db brief-worker; do
             container_id="$(docker compose --env-file .env -f docker-compose.yml -p plus ps -q "$service")"

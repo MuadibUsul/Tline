@@ -7,7 +7,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test": "tsx --test --test-concurrency=1 \"src/**/*.test.ts\"",
     "design:audit": "node scripts/design-audit.mjs",
     "db:push": "prisma db push",
     "db:postgres:schema": "node scripts/generate-postgres-schema.mjs",

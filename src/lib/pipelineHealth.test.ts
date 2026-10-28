@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { stallReasons } from "./pipelineHealth";
+import { pipelineAlertSignature, shouldNotifyPipeline, stallReasons } from "./pipelineHealth";
 
 test("a working pipeline reports nothing", () => {
   assert.deepEqual(stallReasons({ articleAgeHours: 0.5, viewAgeHours: 0.6, crawlableSources: 56, workingSources: 10 }), []);
@@ -27,4 +27,20 @@ test("sources that all succeed while returning nothing are reported", () => {
 
 test("an empty corpus is reported rather than read as quiet", () => {
   assert.match(stallReasons({ articleAgeHours: null, viewAgeHours: null, crawlableSources: 56, workingSources: 0 })[0]!, /has ever been stored/);
+});
+
+test("a growing stall duration does not resend the same alert each minute", () => {
+  const now = 10_000_000;
+  const previous = { signature: pipelineAlertSignature(["no research stored for 13.0h"]), notifiedAt: now };
+  assert.equal(shouldNotifyPipeline(["no research stored for 13.1h"], previous, now + 60_000), false);
+  assert.equal(shouldNotifyPipeline(["no research stored for 14.0h"], previous, now + 3_600_000), true);
+});
+
+test("new incidents and new failure reasons alert immediately; healthy passes do not", () => {
+  const now = 10_000_000;
+  const reasons = ["no research stored for 13.0h"];
+  const previous = { signature: pipelineAlertSignature(reasons), notifiedAt: now };
+  assert.equal(shouldNotifyPipeline(reasons, null, now), true);
+  assert.equal(shouldNotifyPipeline([...reasons, "no source has succeeded in 24h"], previous, now), true);
+  assert.equal(shouldNotifyPipeline([], previous, now), false);
 });

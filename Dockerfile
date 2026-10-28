@@ -27,7 +27,8 @@ RUN export DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
     && npm run db:postgres:schema \
     && npx prisma generate --schema prisma/postgresql/schema.prisma \
     && npm run build \
-    && mkdir -p /app/storage \
+    && mkdir -p /app/storage /app/data/cache/http /app/data/cache/robots \
+    && chmod -R u+rwX /app/data/cache \
     && chown -R node:node /app
 
 ENV NODE_ENV=production PORT=3000 PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium

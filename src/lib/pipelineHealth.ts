@@ -8,6 +8,20 @@ export interface PipelineHealth {
   stalled: string[];
 }
 
+export function pipelineAlertSignature(reasons: string[]) {
+  return reasons.map((reason) => reason.replace(/ for \d+(?:\.\d+)?h$/, "")).sort().join("|");
+}
+
+export function shouldNotifyPipeline(
+  reasons: string[],
+  previous: { signature: string; notifiedAt: number } | null,
+  now = Date.now(),
+) {
+  if (!reasons.length) return false;
+  return !previous || previous.signature !== pipelineAlertSignature(reasons)
+    || !Number.isFinite(previous.notifiedAt) || now - previous.notifiedAt >= 3_600_000;
+}
+
 export function stallReasons(
   input: Omit<PipelineHealth, "stalled">,
   stallHours = Math.max(1, Number(process.env.INGEST_STALL_HOURS || 6)),

@@ -1,6 +1,8 @@
 import "dotenv/config";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { prisma } from "../src/lib/db";
-import { pipelineHealth, type PipelineHealth } from "../src/lib/pipelineHealth";
+import { pipelineAlertSignature, pipelineHealth, shouldNotifyPipeline, type PipelineHealth } from "../src/lib/pipelineHealth";
 import { sendOpsAlert } from "../src/lib/social/feishu";
 
 /**
@@ -17,7 +19,7 @@ import { sendOpsAlert } from "../src/lib/social/feishu";
  */
 
 async function notify(health: PipelineHealth) {
-  await sendOpsAlert(
+  return sendOpsAlert(
     [
       "pipeline.stalled",
       `reasons: ${health.stalled.join(", ") || "(none)"}`,
@@ -38,10 +40,18 @@ async function main() {
     sources: { working: health.workingSources, crawlable: health.crawlableSources },
     reasons: health.stalled,
   }));
+  const statePath = path.join(process.env.RUNTIME_DIR || path.join(process.cwd(), ".runtime"), "pipeline-watchdog.json");
   if (health.stalled.length) {
-    await notify(health);
     // A non-zero exit is what a supervisor or an operator's own check can act on.
     process.exitCode = 1;
+    const previous = await readFile(statePath, "utf8").then((text) => JSON.parse(text)).catch(() => null);
+    if (shouldNotifyPipeline(health.stalled, previous) && await notify(health)) {
+      await mkdir(path.dirname(statePath), { recursive: true });
+      await writeFile(statePath, JSON.stringify({ signature: pipelineAlertSignature(health.stalled), notifiedAt: Date.now() }));
+    }
+  } else {
+    // A later incident must alert immediately, even if the previous one recovered recently.
+    await unlink(statePath).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
   }
 }
 

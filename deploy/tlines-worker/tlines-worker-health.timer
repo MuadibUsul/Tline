@@ -1,0 +1,10 @@
+[Unit]
+Description=Check tlines worker health every five minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=tlines-worker-health.service
+
+[Install]
+WantedBy=timers.target

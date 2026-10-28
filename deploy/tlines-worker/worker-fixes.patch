@@ -1,0 +1,792 @@
+--- a/site-monitors/daemon.py
++++ b/site-monitors/daemon.py
+@@ -7,7 +7,7 @@
+   - Site batch (run_batch.py): Asia/Shanghai weekdays every 15 min
+     (:00/:15/:30/:45); also fire once on start if Shanghai weekday.
+   - Preprint (preprint-picks/publish_next.py): every 15 min on
+-    America/Indianapolis clock (:00/:15/:30/:45); silent if no pending.
++    America/Indiana/Indianapolis clock (:00/:15/:30/:45); silent if no pending.
+     Also check once on start.
+   - Morning stages (Shanghai weekdays, once per source per date):
+       arxiv     09:36 → preprint-picks/run_arxiv.py (direct publish)
+@@ -55,7 +55,7 @@
+ MORNING_WINDOW_MIN = 45  # catch-up window after each slot
+ 
+ SHANGHAI = ZoneInfo("Asia/Shanghai")
+-INDY = ZoneInfo("America/Indianapolis")
++INDY = ZoneInfo("America/Indiana/Indianapolis")
+ 
+ # Site batch: every 15 min on Shanghai weekday
+ SITE_MINUTES = (0, 15, 30, 45)
+--- a/site-monitors/tlines_mcp.py
++++ b/site-monitors/tlines_mcp.py
+@@ -2,6 +2,7 @@
+ """Minimal tlines publisher MCP client over HTTP JSON-RPC. No LLM."""
+ from __future__ import annotations
+ import json, os, urllib.request, urllib.error
++from pathlib import Path
+ 
+ URL = "https://tlines.tech/api/mcp/publisher"
+ ACCEPT = "application/json, text/event-stream"
+@@ -72,13 +73,15 @@
+         # unwrap text content JSON if present
+         content = result.get("content") or []
+         texts = [c.get("text", "") for c in content if c.get("type") == "text"]
+-        if texts:
+-            joined = "\n".join(texts)
++        payload = result.get("structuredContent")
++        if payload is None and texts:
+             try:
+-                return json.loads(joined)
+-            except json.JSONDecodeError:
+-                return {"text": joined, "raw": result}
+-        return result
++                payload = json.loads("\n".join(texts))
++            except json.JSONDecodeError as e:
++                raise TlinesError(f"{name}: invalid tool response") from e
++        if result.get("isError") or not isinstance(payload, dict) or payload.get("error"):
++            raise TlinesError(f"{name}: {payload or 'tool failed'}")
++        return payload
+ 
+     def create_and_publish_flash(
+         self,
+@@ -92,6 +95,9 @@
+     ) -> str:
+         # ethan 2026-10-26: publish BOTH zh and en; EN must be real English
+         # (never Arabic / raw untranslated source).
++        from deepseek_polish import assert_simplified_chinese, assert_english
++        assert_simplified_chinese(title_zh, body_zh)
++        assert_english(title_en, body_en)
+         args = {
+             "kind": "flash",
+             "titleZh": title_zh[:300],
+@@ -104,14 +110,30 @@
+             args["titleEn"] = title_en[:300]
+         if body_en:
+             args["bodyEn"] = body_en[:40000]
+-        created = self.call("create_news", args)
+-        nid = created.get("id") or (created.get("news") or {}).get("id")
+-        if not nid and isinstance(created.get("text"), str):
+-            try:
+-                nid = json.loads(created["text"]).get("id")
+-            except Exception:
+-                nid = None
++        # Single scheduler writer; retain the draft id before publishing so a
++        # rejected/timed-out publish retries the same draft after a restart.
++        root = Path(os.environ.get("TLINES_WORKER_ROOT", Path(__file__).resolve().parent.parent))
++        ledger_file = root / "publications.json"
++        ledger = json.loads(ledger_file.read_text()) if ledger_file.exists() else {}
++        identity = column_slug + "\n" + source_url
++        nid = ledger.get(identity)
++        if nid:
++            existing = self.call("get_news", {"id": nid})
++            if existing.get("status") == "published":
++                return nid
++            if existing.get("status") != "draft":
++                raise TlinesError(f"Refusing to republish non-draft {nid}")
++            self.call("update_news", {"id": nid, **args})
++        else:
++            created = self.call("create_news", args)
++            nid = created.get("id")
+         if not nid:
+             raise TlinesError(f"create_news missing id: {created!r}")
+-        self.call("publish_news", {"id": nid})
++        ledger[identity] = nid
++        staging = ledger_file.with_suffix(".tmp")
++        staging.write_text(json.dumps(ledger, ensure_ascii=False), encoding="utf-8")
++        staging.replace(ledger_file)
++        published = self.call("publish_news", {"id": nid})
++        if published.get("id") != nid:
++            raise TlinesError("publish_news did not confirm the requested id")
+         return nid
+--- a/site-monitors/deepseek_polish.py
++++ b/site-monitors/deepseek_polish.py
+@@ -6,7 +6,7 @@
+ import json, os, re, urllib.request, urllib.error
+ 
+ API = "https://api.deepseek.com/chat/completions"
+-MODEL = "deepseek-chat"
++MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-flash")
+ 
+ class DeepSeekError(RuntimeError):
+     pass
+@@ -272,6 +272,7 @@
+     date: str,
+     source_url: str,
+     api_key: str | None = None,
++    is_preprint: bool = False,
+ ) -> dict[str, str]:
+     """Return dict with titleZh, bodyZh, titleEn, bodyEn.
+ 
+@@ -300,11 +301,13 @@
+             "≤400 Chinese characters in bodyZh",
+             "attribute claims to source org; no invented facts",
+             "same quality as arXiv每日精选 flashes",
+-            "site/blog post, not a preprint",
++            "preprint: attribute findings to the paper and named authors; unreviewed findings are not established facts" if is_preprint else "site/blog post, not a preprint",
+         ],
+     }
+     payload = {
+         "model": MODEL,
++        "thinking": {"type": "disabled"},
++        "max_tokens": 2000,
+         "temperature": 0.15,
+         "messages": [
+             {"role": "system", "content": system},
+--- a/preprint-picks/deepseek_polish.py
++++ b/preprint-picks/deepseek_polish.py
+@@ -1,302 +1,13 @@
+-#!/usr/bin/env python3
+-"""DeepSeek polish for preprint flashes — same editorial bar as arXiv每日精选.
+-Fetch/filter stays fixed-code; this module only writes titleZh/bodyZh.
+-"""
+-from __future__ import annotations
+-import json, os, re, urllib.request, urllib.error
++"""Use the worker's existing DeepSeek-only bilingual editorial checks."""
++import importlib.util
++from pathlib import Path
+ 
+-API = "https://api.deepseek.com/chat/completions"
+-MODEL = "deepseek-chat"
+-
+-class DeepSeekError(RuntimeError):
+-    pass
+-
+-
+-# Arabic script — never allowed in titleZh/bodyZh (shared gate with site-monitors).
+-_AR_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
+-_HAN_RE = re.compile(r"[\u4e00-\u9fff]")
+-_LATIN_RE = re.compile(r"[A-Za-z]")
+-
+-
+-def _letter_counts(s: str) -> tuple[int, int, int, int]:
+-    s = s or ""
+-    han = len(_HAN_RE.findall(s))
+-    ar = len(_AR_RE.findall(s))
+-    latin = len(_LATIN_RE.findall(s))
+-    return han, ar, latin, han + ar + latin
+-
+-
+-def _norm_cmp(s: str) -> str:
+-    return re.sub(r"\s+", " ", (s or "").strip().casefold())
+-
+-
+-def assert_simplified_chinese(title_zh: str, body_zh: str, source_title: str = "") -> None:
+-    """Reject polish output that is still Arabic / untranslated English."""
+-    for label, text in (("titleZh", title_zh), ("bodyZh", body_zh)):
+-        han, ar, latin, total = _letter_counts(text)
+-        # ethan 2026-10-27: zh fields may keep Latin/EN proper names, never Arabic script
+-        # (translate or Latin-transliterate; no كيمانول-style leftovers).
+-        if ar:
+-            raise DeepSeekError(
+-                f"language check failed: {label} still Arabic "
+-                f"(ar={ar} han={han} latin={latin}); {label}={text[:160]!r}"
+-            )
+-        if han < 6:
+-            raise DeepSeekError(
+-                f"language check failed: {label} lacks Simplified Chinese "
+-                f"(han={han} ar={ar} latin={latin}); {label}={text[:160]!r}"
+-            )
+-        # Brand/product Latin (Kubernetes, Mission Control, …) is fine in CN titles.
+-        # Only reject when Chinese is thin AND Latin dominates.
+-        if han < 10 and latin > max(han * 3, 24):
+-            raise DeepSeekError(
+-                f"language check failed: {label} looks primarily English/Latin "
+-                f"(han={han} latin={latin}); {label}={text[:160]!r}"
+-            )
+-    src = _norm_cmp(source_title)
+-    tz = _norm_cmp(title_zh)
+-    if src and tz and src == tz:
+-        _, ar_s, latin_s, tot_s = _letter_counts(source_title)
+-        if tot_s and (ar_s / tot_s > 0.08 or latin_s / tot_s > 0.4):
+-            raise DeepSeekError(
+-                f"language check failed: titleZh equals untranslated source title; "
+-                f"titleZh={title_zh[:160]!r}"
+-            )
+-
+-# Keep in lockstep with arXiv cs.AI 每日精选 flash rules (ethan, 2026-10).
+-SYSTEM = """你在写 tlines 快讯，质量必须与「arXiv每日精选」完全同一套标准。
+-
+-硬性规则：
+-1. 只依据用户给出的英文摘要与题名，不添加摘要没有的事实、数字、机构或评价；没有的信息不要编。
+-2. 关键数字必须与摘要一致，可复算的比例/百分点要核对；分不清就不要写那个数。
+-3. 单篇主张用「论文称」「作者称」或「研究称」归因；不要写成已证实的通识，不夸张因果，不加「分析人士认为」等无来源套话，不要写入你自己的判断。
+-4. titleZh：简体中文新闻标题，像路透/彭博一行题，可含关键数字，不超过 80 字；不要英文原题照搬（专有名词可保留原文写法，但标题主体必须是汉字）。
+-5. bodyZh：一整段，必须是简体中文，路透/彭博金融电讯体；以【{tag}】开头；点名主要作者（最多三人，其余用「等」）；400 个汉字为上限（不是凑满目标，宁短勿注水）。
+-6. 输出语言铁律：titleZh 与 bodyZh 始终只能是简体中文。原文为英文时先翻译再改写；禁止把英文或其它外文原句作为 titleZh/bodyZh 输出。
+-7. 若给了 date，正文时间用该日期（已是公历日期则直接用，不要写成「昨天」）；不要自行换算时区除非用户给了带时区的时间。
+-8. 只输出一个 JSON 对象，字段仅 titleZh、bodyZh；不要 markdown 围栏，不要其它键。"""
+-
+-
+-
+-def _eastern_to_western_digits(s: str) -> str:
+-    """Map Arabic-Indic and Extended Arabic-Indic digits to ASCII 0-9."""
+-    table = str.maketrans(
+-        "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹",
+-        "01234567890123456789",
+-    )
+-    return s.translate(table)
+-
+-
+-def _arabic_number_words(s: str) -> set[str]:
+-    """Extract integers written as Arabic ordinal/cardinal words (1–99).
+-
+-    Covers compounds like «الثامن والعشرين» (=28) that DeepSeek correctly
+-    renders as 28 / 28th / 第28届 — without this, number-check false-fails.
+-    """
+-    out: set[str] = set()
+-    ones = {
+-        "اول": 1, "أول": 1, "الأول": 1, "الاول": 1, "الأولى": 1, "الاولى": 1,
+-        "واحد": 1, "واحدة": 1, "حادي": 1, "الحادي": 1, "الحادية": 1,
+-        "ثاني": 2, "الثاني": 2, "الثانية": 2, "اثنين": 2, "اثنان": 2, "اثنتين": 2,
+-        "ثالث": 3, "الثالث": 3, "الثالثة": 3, "ثلاث": 3, "ثلاثة": 3,
+-        "رابع": 4, "الرابع": 4, "الرابعة": 4, "اربع": 4, "أربع": 4,
+-        "اربعة": 4, "أربعة": 4,
+-        "خامس": 5, "الخامس": 5, "الخامسة": 5, "خمس": 5, "خمسة": 5,
+-        "سادس": 6, "السادس": 6, "السادسة": 6, "ست": 6, "ستة": 6,
+-        "سابع": 7, "السابع": 7, "السابعة": 7, "سبع": 7, "سبعة": 7,
+-        "ثامن": 8, "الثامن": 8, "الثامنة": 8, "ثمان": 8, "ثمانية": 8, "ثماني": 8,
+-        "تاسع": 9, "التاسع": 9, "التاسعة": 9, "تسع": 9, "تسعة": 9,
+-        "عاشر": 10, "العاشر": 10, "العاشرة": 10, "عشر": 10, "عشرة": 10,
+-    }
+-    tens = {
+-        "عشرون": 20, "عشرين": 20, "العشرون": 20, "العشرين": 20,
+-        "ثلاثون": 30, "ثلاثين": 30, "الثلاثون": 30, "الثلاثين": 30,
+-        "اربعون": 40, "أربعون": 40, "اربعين": 40, "أربعين": 40,
+-        "الاربعون": 40, "الأربعون": 40, "الاربعين": 40, "الأربعين": 40,
+-        "خمسون": 50, "خمسين": 50, "الخمسون": 50, "الخمسين": 50,
+-        "ستون": 60, "ستين": 60, "الستون": 60, "الستين": 60,
+-        "سبعون": 70, "سبعين": 70, "السبعون": 70, "السبعين": 70,
+-        "ثمانون": 80, "ثمانين": 80, "الثمانون": 80, "الثمانين": 80,
+-        "تسعون": 90, "تسعين": 90, "التسعون": 90, "التسعين": 90,
+-    }
+-    # teens: الحادي عشر … التاسع عشر (also without ال)
+-    teens = {
+-        "الحادي عشر": 11, "الحادية عشر": 11, "حادي عشر": 11,
+-        "الثاني عشر": 12, "الثانية عشر": 12, "ثاني عشر": 12,
+-        "الثالث عشر": 13, "الثالثة عشر": 13, "ثالث عشر": 13,
+-        "الرابع عشر": 14, "الرابعة عشر": 14, "رابع عشر": 14,
+-        "الخامس عشر": 15, "الخامسة عشر": 15, "خامس عشر": 15,
+-        "السادس عشر": 16, "السادسة عشر": 16, "سادس عشر": 16,
+-        "السابع عشر": 17, "السابعة عشر": 17, "سابع عشر": 17,
+-        "الثامن عشر": 18, "الثامنة عشر": 18, "ثامن عشر": 18,
+-        "التاسع عشر": 19, "التاسعة عشر": 19, "تاسع عشر": 19,
+-    }
+-    # Compounds first: ones + و + tens  (الثامن والعشرين)
+-    ones_alt = "|".join(sorted(ones, key=len, reverse=True))
+-    tens_alt = "|".join(sorted(tens, key=len, reverse=True))
+-    for m in re.finditer(rf"({ones_alt})\s*و\s*({tens_alt})", s):
+-        out.add(str(ones[m.group(1)] + tens[m.group(2)]))
+-    for phrase, val in sorted(teens.items(), key=lambda kv: -len(kv[0])):
+-        if phrase in s:
+-            out.add(str(val))
+-    for phrase, val in sorted(tens.items(), key=lambda kv: -len(kv[0])):
+-        if phrase in s:
+-            out.add(str(val))
+-    for phrase, val in sorted(ones.items(), key=lambda kv: -len(kv[0])):
+-        if phrase in s:
+-            out.add(str(val))
+-    return out
+-
+-
+-def _numbers(s: str) -> set[str]:
+-    # normalize percents / decimals / integers for a soft check
+-    # also accept Western thousands separators (4,999 → 4999) and Chinese 万/亿 forms later
+-    s = _eastern_to_western_digits(s or "")
+-    out = set(re.findall(r"\d+(?:\.\d+)?%?", s))
+-    for m in re.findall(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?%?", s):
+-        out.add(m.replace(",", ""))
+-    # Ranges with a shared unit on the right end only: "45-67%" → allow 45% and 67%
+-    # (bare "45" is already extracted; body often writes "45%至67%").
+-    for m in re.finditer(
+-        r"(\d+(?:\.\d+)?)\s*[-–—~至到]\s*(\d+(?:\.\d+)?)(%?)",
+-        s,
+-    ):
+-        a, b, pct = m.group(1), m.group(2), m.group(3)
+-        out.add(a + pct)
+-        out.add(b + pct)
+-        if pct == "%":
+-            out.add(a + "%")
+-            out.add(b + "%")
+-    # "6 of 22" / "6/22" → also allow the complement 16 (missed/remaining)
+-    for m in re.finditer(r"(\d+)\s*(?:of|/)\s*(\d+)", s, re.I):
+-        x, y = int(m.group(1)), int(m.group(2))
+-        if y >= x:
+-            out.add(str(y - x))
+-    # English number-words: "fifteen tasks" → allow 15
+-    _WORDS = {
+-        "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+-        "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+-        "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+-        "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+-        "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
+-        "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+-        "hundred": 100, "thousand": 1000,
+-    }
+-    for m in re.finditer(
+-        r"\b(" + "|".join(sorted(_WORDS, key=len, reverse=True)) + r")\b",
+-        s,
+-        re.I,
+-    ):
+-        out.add(str(_WORDS[m.group(1).lower()]))
+-
+-    # Arabic ordinal/cardinal words (الثامن والعشرين → 28)
+-    out |= _arabic_number_words(s)
+-
+-    # Strip leading zeros so date "05" matches body "5日"
+-    extra = set()
+-    for n in list(out):
+-        pct = n.endswith("%")
+-        core = n[:-1] if pct else n
+-        if re.fullmatch(r"\d+", core) and len(core) > 1 and core.startswith("0"):
+-            stripped = core.lstrip("0") or "0"
+-            extra.add(stripped + ("%" if pct else ""))
+-        # also keep unpadded day/month pieces from ISO dates already covered above
+-    out |= extra
+-    return out
+-
+-
+-def polish_flash(
+-    *,
+-    tag: str,
+-    title: str,
+-    authors: str,
+-    abstract: str,
+-    date: str,
+-    source_url: str,
+-    api_key: str | None = None,
+-) -> tuple[str, str]:
+-    key = api_key or os.environ.get("DEEPSEEK_API_KEY")
+-    if not key:
+-        raise DeepSeekError("DEEPSEEK_API_KEY missing")
+-
+-    system = SYSTEM.format(tag=tag)
+-    user = {
+-        "tag": tag,
+-        "sourceTitle": title,  # English abstract title — output must still be zh
+-        "authors": authors,
+-        "date": date,
+-        "abstract": (abstract or "")[:6000],
+-        "sourceUrl": source_url,
+-        "reminders": [
+-            "titleZh and bodyZh MUST be Simplified Chinese only",
+-            "translate English source then polish — never output EN as titleZh/bodyZh",
+-            "bodyZh must start with 【" + tag + "】",
+-            "≤400 Chinese characters",
+-            "attribute claims; no invented facts",
+-            "same quality as arXiv每日精选 flashes",
+-        ],
+-    }
+-    payload = {
+-        "model": MODEL,
+-        "temperature": 0.15,
+-        "messages": [
+-            {"role": "system", "content": system},
+-            {"role": "user", "content": json.dumps(user, ensure_ascii=False)},
+-        ],
+-        "response_format": {"type": "json_object"},
+-    }
+-    req = urllib.request.Request(
+-        API,
+-        data=json.dumps(payload).encode(),
+-        method="POST",
+-        headers={
+-            "Authorization": f"Bearer {key}",
+-            "Content-Type": "application/json",
+-        },
+-    )
+-    try:
+-        with urllib.request.urlopen(req, timeout=120) as r:
+-            data = json.loads(r.read().decode())
+-    except urllib.error.HTTPError as e:
+-        body = e.read().decode(errors="replace")[:500]
+-        raise DeepSeekError(f"HTTP {e.code}: {body}") from e
+-    except Exception as e:
+-        raise DeepSeekError(str(e)) from e
+-
+-    try:
+-        content = data["choices"][0]["message"]["content"]
+-        # Strip fences / trailing HTML junk some DeepSeek variants append (e.g. </br>)
+-        content = (content or "").strip()
+-        content = re.sub(r"^```(?:json)?\s*", "", content)
+-        content = re.sub(r"\s*```$", "", content)
+-        content = re.sub(r"(</?(?:br|p|div)\s*/?>)+$", "", content, flags=re.I).strip()
+-        # If still not pure JSON, carve out the outermost object
+-        if not content.startswith("{"):
+-            m = re.search(r"\{.*\}", content, re.S)
+-            if m:
+-                content = m.group(0)
+-        obj = json.loads(content)
+-        title_zh = (obj.get("titleZh") or "").strip()
+-        body_zh = (obj.get("bodyZh") or "").strip()
+-    except Exception as e:
+-        raise DeepSeekError(f"bad response: {data!r}") from e
+-
+-    if not title_zh or not body_zh:
+-        raise DeepSeekError(f"empty fields: {obj!r}")
+-    prefix = f"【{tag}】"
+-    if not body_zh.startswith("【"):
+-        body_zh = prefix + body_zh
+-    elif not body_zh.startswith(prefix):
+-        # wrong tag — force correct desk tag
+-        body_zh = prefix + re.sub(r"^【[^】]*】", "", body_zh)
+-
+-    if len(body_zh) > 400:
+-        body_zh = body_zh[:399].rstrip() + "…"
+-
+-    # ethan disabled number-guard 2026-10-27 — too many false positives
+-    # (DEEPSEEK_FAIL invented=[...]). Gate no longer blocks publish after valid JSON.
+-    # Module-level helpers (_numbers, _arabic_number_words, …) kept for possible reuse.
+-
+-    assert_simplified_chinese(title_zh, body_zh, source_title=title)
+-
+-    return title_zh[:300], body_zh
++_path = Path(__file__).resolve().parent.parent / "site-monitors" / "deepseek_polish.py"
++_spec = importlib.util.spec_from_file_location("tlines_bilingual_polish", _path)
++_module = importlib.util.module_from_spec(_spec)
++_spec.loader.exec_module(_module)
++DeepSeekError = _module.DeepSeekError
++def polish_flash(**kwargs):
++    return _module.polish_flash(**kwargs, is_preprint=True)
++assert_simplified_chinese = _module.assert_simplified_chinese
++assert_english = _module.assert_english
+--- a/preprint-picks/tlines_mcp.py
++++ b/preprint-picks/tlines_mcp.py
+@@ -2,6 +2,7 @@
+ """Minimal tlines publisher MCP client over HTTP JSON-RPC. No LLM."""
+ from __future__ import annotations
+ import json, os, urllib.request, urllib.error
++from pathlib import Path
+ 
+ URL = "https://tlines.tech/api/mcp/publisher"
+ ACCEPT = "application/json, text/event-stream"
+@@ -50,7 +51,7 @@
+             "params": {
+                 "protocolVersion": "2024-11-05",
+                 "capabilities": {},
+-                "clientInfo": {"name": "preprint-picks-script", "version": "1.0"},
++                "clientInfo": {"name": "site-monitors-script", "version": "1.0"},
+             },
+         })
+         # best-effort notification
+@@ -72,42 +73,67 @@
+         # unwrap text content JSON if present
+         content = result.get("content") or []
+         texts = [c.get("text", "") for c in content if c.get("type") == "text"]
+-        if texts:
+-            joined = "\n".join(texts)
++        payload = result.get("structuredContent")
++        if payload is None and texts:
+             try:
+-                return json.loads(joined)
+-            except json.JSONDecodeError:
+-                return {"text": joined, "raw": result}
+-        return result
++                payload = json.loads("\n".join(texts))
++            except json.JSONDecodeError as e:
++                raise TlinesError(f"{name}: invalid tool response") from e
++        if result.get("isError") or not isinstance(payload, dict) or payload.get("error"):
++            raise TlinesError(f"{name}: {payload or 'tool failed'}")
++        return payload
+ 
+     def create_and_publish_flash(
+         self,
+         *,
+         column_slug: str,
+         title_zh: str,
+-        title_en: str,
+         body_zh: str,
+         source_url: str,
++        title_en: str = "",
++        body_en: str = "",
+     ) -> str:
+-        created = self.call(
+-            "create_news",
+-            {
+-                "kind": "flash",
+-                "titleZh": title_zh[:300],
+-                "titleEn": title_en[:300],
+-                "bodyZh": body_zh[:40000],
+-                "sourceUrl": source_url,
+-                "sources": [source_url],
+-                "columnSlug": column_slug,
+-            },
+-        )
+-        nid = created.get("id") or (created.get("news") or {}).get("id")
+-        if not nid and isinstance(created.get("text"), str):
+-            try:
+-                nid = json.loads(created["text"]).get("id")
+-            except Exception:
+-                nid = None
++        # ethan 2026-10-26: publish BOTH zh and en; EN must be real English
++        # (never Arabic / raw untranslated source).
++        from deepseek_polish import assert_simplified_chinese, assert_english
++        assert_simplified_chinese(title_zh, body_zh)
++        assert_english(title_en, body_en)
++        args = {
++            "kind": "flash",
++            "titleZh": title_zh[:300],
++            "bodyZh": body_zh[:40000],
++            "sourceUrl": source_url,
++            "sources": [source_url],
++            "columnSlug": column_slug,
++        }
++        if title_en:
++            args["titleEn"] = title_en[:300]
++        if body_en:
++            args["bodyEn"] = body_en[:40000]
++        # Single scheduler writer; retain the draft id before publishing so a
++        # rejected/timed-out publish retries the same draft after a restart.
++        root = Path(os.environ.get("TLINES_WORKER_ROOT", Path(__file__).resolve().parent.parent))
++        ledger_file = root / "publications.json"
++        ledger = json.loads(ledger_file.read_text()) if ledger_file.exists() else {}
++        identity = column_slug + "\n" + source_url
++        nid = ledger.get(identity)
++        if nid:
++            existing = self.call("get_news", {"id": nid})
++            if existing.get("status") == "published":
++                return nid
++            if existing.get("status") != "draft":
++                raise TlinesError(f"Refusing to republish non-draft {nid}")
++            self.call("update_news", {"id": nid, **args})
++        else:
++            created = self.call("create_news", args)
++            nid = created.get("id")
+         if not nid:
+             raise TlinesError(f"create_news missing id: {created!r}")
+-        self.call("publish_news", {"id": nid})
++        ledger[identity] = nid
++        staging = ledger_file.with_suffix(".tmp")
++        staging.write_text(json.dumps(ledger, ensure_ascii=False), encoding="utf-8")
++        staging.replace(ledger_file)
++        published = self.call("publish_news", {"id": nid})
++        if published.get("id") != nid:
++            raise TlinesError("publish_news did not confirm the requested id")
+         return nid
+--- a/preprint-picks/run_arxiv.py
++++ b/preprint-picks/run_arxiv.py
+@@ -143,8 +143,9 @@
+                         TAG, p.get("authors", ""), p["title"], p.get("abstract", ""), p.get("date", "")
+                     )
+                     title_zh = "[dry-run-template] " + title_zh
++                    flash = {"titleZh": title_zh, "bodyZh": body_zh, "titleEn": "[dry-run]", "bodyEn": "[dry-run]"}
+                 else:
+-                    title_zh, body_zh = polish_flash(
++                    flash = polish_flash(
+                         tag=TAG,
+                         title=p["title"],
+                         authors=p.get("authors", ""),
+@@ -152,6 +153,7 @@
+                         date=p.get("date", ""),
+                         source_url=p["url"],
+                     )
++                    title_zh, body_zh = flash["titleZh"], flash["bodyZh"]
+                 break
+             except DeepSeekError as e:
+                 last_err = e
+@@ -162,13 +164,15 @@
+             print(json.dumps(report, ensure_ascii=False, indent=2))
+             print(f"DEEPSEEK_FAIL source=arxiv id={p['id']} error={last_err}")
+             return 2
+-        polished.append((p, title_zh, body_zh))
++        polished.append((p, flash))
+ 
+     client = None if dry_run else TlinesClient()
+-    for p, title_zh, body_zh in polished:
++    for p, flash in polished:
++        title_zh, body_zh = flash["titleZh"], flash["bodyZh"]
+         item = {
+             "titleZh": title_zh,
+-            "titleEn": p["title"][:300],
++            "titleEn": flash["titleEn"],
++            "bodyEn": flash["bodyEn"],
+             "bodyZh": body_zh,
+             "url": p["url"],
+             "id": p["id"],
+@@ -181,8 +185,9 @@
+             nid = client.create_and_publish_flash(
+                 column_slug=COLUMN,
+                 title_zh=title_zh,
+-                title_en=p["title"],
++                title_en=flash["titleEn"],
+                 body_zh=body_zh,
++                body_en=flash["bodyEn"],
+                 source_url=p["url"],
+             )
+             item["newsId"] = nid
+@@ -191,7 +196,7 @@
+             report["errors"].append({"id": p["id"], "error": str(e)})
+ 
+     if not dry_run and report["published"]:
+-        new_ids = [i for i in batch_ids if i not in seen]
++        new_ids = [it["id"] for it in report["published"] if it["id"] not in seen]
+         append_seen(SEEN, new_ids)
+ 
+     print(json.dumps(report, ensure_ascii=False, indent=2))
+--- a/preprint-picks/run_source.py
++++ b/preprint-picks/run_source.py
+@@ -206,8 +206,9 @@
+                     cfg["tag"], p.get("authors", ""), p["title"], p.get("abstract", ""), p.get("date", "")
+                 )
+                 title_zh = "[dry-run-template] " + title_zh
++                flash = {"titleZh": title_zh, "bodyZh": body_zh, "titleEn": "[dry-run]", "bodyEn": "[dry-run]"}
+             else:
+-                title_zh, body_zh = polish_flash(
++                flash = polish_flash(
+                     tag=cfg["tag"],
+                     title=p["title"],
+                     authors=p.get("authors", ""),
+@@ -215,7 +216,8 @@
+                     date=p.get("date", ""),
+                     source_url=p["url"],
+                 )
+-            polished.append((p, title_zh, body_zh))
++                title_zh, body_zh = flash["titleZh"], flash["bodyZh"]
++            polished.append((p, flash))
+         except DeepSeekError as e:
+             report["errors"].append({"stage": "deepseek", "id": p["id"], "error": str(e)})
+             print(json.dumps(report, ensure_ascii=False, indent=2))
+@@ -223,10 +225,12 @@
+             return 2
+ 
+     client = None if dry_run else TlinesClient()
+-    for p, title_zh, body_zh in polished:
++    for p, flash in polished:
++        title_zh, body_zh = flash["titleZh"], flash["bodyZh"]
+         item = {
+             "titleZh": title_zh,
+-            "titleEn": p["title"][:300],
++            "titleEn": flash["titleEn"],
++            "bodyEn": flash["bodyEn"],
+             "bodyZh": body_zh,
+             "url": p["url"],
+             "id": p["id"],
+@@ -239,8 +243,9 @@
+             nid = client.create_and_publish_flash(
+                 column_slug=cfg["column"],
+                 title_zh=title_zh,
+-                title_en=p["title"],
++                title_en=flash["titleEn"],
+                 body_zh=body_zh,
++                body_en=flash["bodyEn"],
+                 source_url=p["url"],
+             )
+             item["newsId"] = nid
+@@ -249,7 +254,7 @@
+             report["errors"].append({"id": p["id"], "error": str(e)})
+ 
+     if not dry_run and report["published"]:
+-        new_ids = [i for i in batch_ids if i not in seen]
++        new_ids = [it["id"] for it in report["published"] if it["id"] not in seen]
+         append_seen(seen_path, new_ids)
+ 
+     print(json.dumps(report, ensure_ascii=False, indent=2))
+--- a/preprint-picks/stage_today.py
++++ b/preprint-picks/stage_today.py
+@@ -21,7 +21,7 @@
+ 
+ SOURCE_ORDER = ["biorxiv", "medrxiv", "techrxiv", "hf"]
+ BJ = ZoneInfo("Asia/Shanghai")
+-INDY = ZoneInfo("America/Indianapolis")
++INDY = ZoneInfo("America/Indiana/Indianapolis")
+ 
+ 
+ def collect_picks(sources: list[str]) -> tuple[list[dict], dict]:
+@@ -75,7 +75,7 @@
+         "# Preprint picks queue — STATE",
+         "",
+         f"- Date (Beijing): {queue.get('dateBeijing', '')}",
+-        f"- Staged at (America/Indianapolis): {queue.get('stagedAtIndy', '')}",
++        f"- Staged at (America/Indiana/Indianapolis): {queue.get('stagedAtIndy', '')}",
+         f"- Cadence: **one flash every 30 minutes**",
+         f"- Total staged: {len(queue['items'])}",
+         f"- Published: {len(published)}",
+@@ -141,7 +141,7 @@
+             prev = json.loads(QUEUE_FILE.read_text(encoding="utf-8"))
+             if prev.get("dateBeijing") == queue["dateBeijing"]:
+                 for it in prev.get("items") or []:
+-                    if it.get("titleZh") and it.get("bodyZh"):
++                    if it.get("status") == "published" or all(it.get(k) for k in ("titleZh", "bodyZh", "titleEn", "bodyEn")):
+                         queue["items"].append(it)
+                         done_ids.add(it["id"])
+                 if done_ids:
+@@ -157,7 +157,7 @@
+         last_err = None
+         for attempt in range(1, 4):
+             try:
+-                title_zh, body_zh = polish_flash(
++                flash = polish_flash(
+                     tag=p["tag"],
+                     title=p["title"],
+                     authors=p.get("authors", ""),
+@@ -165,6 +165,7 @@
+                     date=p.get("date", ""),
+                     source_url=p["url"],
+                 )
++                title_zh, body_zh = flash["titleZh"], flash["bodyZh"]
+                 break
+             except DeepSeekError as e:
+                 last_err = e
+@@ -185,7 +186,8 @@
+             "source": p["source"],
+             "id": p["id"],
+             "url": p["url"],
+-            "titleEn": p["title"][:300],
++            "titleEn": flash["titleEn"],
++            "bodyEn": flash["bodyEn"],
+             "titleZh": title_zh,
+             "bodyZh": body_zh,
+             "date": p.get("date", ""),
+--- a/preprint-picks/publish_next.py
++++ b/preprint-picks/publish_next.py
+@@ -17,7 +17,7 @@
+ QUEUE_DIR = Path(__file__).resolve().parent / "queue"
+ QUEUE_FILE = QUEUE_DIR / "today.json"
+ STATE_FILE = QUEUE_DIR / "STATE.md"
+-INDY = ZoneInfo("America/Indianapolis")
++INDY = ZoneInfo("America/Indiana/Indianapolis")
+ 
+ 
+ def write_state(queue: dict) -> None:
+@@ -27,7 +27,7 @@
+         "# Preprint picks queue — STATE",
+         "",
+         f"- Date (Beijing): {queue.get('dateBeijing', '')}",
+-        f"- Staged at (America/Indianapolis): {queue.get('stagedAtIndy', '')}",
++        f"- Staged at (America/Indiana/Indianapolis): {queue.get('stagedAtIndy', '')}",
+         f"- Cadence: **one flash every 30 minutes**",
+         f"- Total staged: {len(queue['items'])}",
+         f"- Published: {len(published)}",
+@@ -72,12 +72,15 @@
+ 
+     item = queue["items"][pending_idx]
+     try:
++        if not all(item.get(k) for k in ("titleZh", "titleEn", "bodyZh", "bodyEn")):
++            raise TlinesError("Queue item lacks bilingual content; restage it with DeepSeek before publishing")
+         client = TlinesClient()
+         nid = client.create_and_publish_flash(
+             column_slug=item["column"],
+             title_zh=item["titleZh"],
+             title_en=item["titleEn"],
+             body_zh=item["bodyZh"],
++            body_en=item["bodyEn"],
+             source_url=item["url"],
+         )
+     except TlinesError as e:
+--- a/systemd/tlines-worker.service
++++ b/systemd/tlines-worker.service
+@@ -15,6 +15,14 @@
+ ExecStart=/usr/bin/bash /opt/tlines-worker/site-monitors/supervise_daemon.sh
+ Restart=always
+ RestartSec=3
++KillMode=control-group
++TimeoutStopSec=90
++UMask=0077
++ProtectSystem=strict
++ProtectHome=true
++ReadWritePaths=/opt/tlines-worker
++StandardOutput=journal
++StandardError=journal
+ # Locks use /tmp by default (site-monitors-*-20f6c9cc.lock). Local disk OK.
+ # Optional: PrivateTmp=false keeps /tmp locks visible across restarts of same host.
+ PrivateTmp=false

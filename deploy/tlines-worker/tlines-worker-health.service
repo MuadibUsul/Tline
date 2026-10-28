@@ -1,0 +1,12 @@
+[Unit]
+Description=Check tlines worker heartbeat and new failure entries
+
+[Service]
+Type=oneshot
+User=tlines
+ExecStart=/usr/bin/python3 /opt/tlines-worker/worker-health.py
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/tlines-worker
+UMask=0077

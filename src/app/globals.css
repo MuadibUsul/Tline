@@ -2153,11 +2153,15 @@ td{padding-block:13px}
 .news-note p+p{margin-top:5px}
 .news-copy h2{word-break:keep-all;overflow-wrap:anywhere}
 
-/* Newsroom split: the stream keeps an editorial measure; the right rail is reserved. */
+/* Newsroom split: the stream leads; column navigation occupies the right rail. */
 .news-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start}
 .news-main{min-width:0}
-.news-reserved{min-height:420px;align-self:stretch;border-left:1px solid var(--border)}
-@media(max-width:1100px){.news-layout{grid-template-columns:1fr;gap:0}.news-reserved{display:none}}
+.news-main>.news-day:first-child{padding-top:0}
+.news-sidebar{min-width:0;padding-left:24px;border-left:1px solid var(--border)}
+.news-sidebar .section-t{margin:4px 0 14px}
+.news-sidebar .news-columns{grid-template-columns:minmax(0,1fr);margin:0}
+.news-sidebar .news-column-card{min-width:0;overflow-wrap:anywhere}
+@media(max-width:1100px){.news-layout{grid-template-columns:1fr;gap:0}.news-sidebar{margin-top:24px;padding:24px 0 0;border-left:0;border-top:1px solid var(--border)}.news-sidebar .news-columns{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}}
 .news-row.article .news-excerpt{-webkit-line-clamp:3;font-size:13.5px;line-height:1.75}
 .news-read-more{display:inline-flex;align-items:center;min-height:24px;margin-top:5px;font:11px var(--mono);color:var(--accent-ink)}
 .news-read-more:hover{color:var(--accent)}

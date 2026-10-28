@@ -56,21 +56,6 @@ export default async function NewsIndex() {
 
       <div className="news-layout">
         <div className="news-main">
-          {columns.length > 0 && (
-            <section className="news-columns" aria-label={tr(locale, "Ongoing columns", "长期栏目")}>
-              {columns.map((column) => (
-                <Link className="news-column-card" href={localePath(locale, `/news/columns/${column.slug}`)} key={column.slug}>
-                  <span className="eyebrow">{newsCadenceLabel(column.cadence, locale)}</span>
-                  <b>{newsColumnName(column, locale)}</b>
-                  <small>
-                    {column.posts.length} {tr(locale, "editions", "期")}
-                    {column.posts[0]?.publishedAt ? ` · ${tr(locale, "latest", "最新")} ${newsDateLabel(column.posts[0].publishedAt, locale)}` : ""}
-                  </small>
-                </Link>
-              ))}
-            </section>
-          )}
-
           {posts.length === 0 && <div className="empty-state">{tr(locale, "Nothing has been published yet.", "暂无已发布内容。")}</div>}
 
           {[...groups.entries()].map(([key, group]) => (
@@ -82,9 +67,23 @@ export default async function NewsIndex() {
             </section>
           ))}
         </div>
-        {/* Reserved for the next rail (plans, rankings or a live module); the stream stops
-            at the editorial measure instead of stretching across the whole page. */}
-        <aside className="news-reserved" aria-hidden="true" />
+        {columns.length > 0 && (
+          <aside className="news-sidebar" aria-label={tr(locale, "News columns", "快讯栏目")}>
+            <h2 className="section-t"><span>{tr(locale, "Columns", "栏目")}</span></h2>
+            <nav className="news-columns" aria-label={tr(locale, "Ongoing columns", "长期栏目")}>
+              {columns.map((column) => (
+                <Link className="news-column-card" href={localePath(locale, `/news/columns/${column.slug}`)} key={column.slug}>
+                  <span className="eyebrow">{newsCadenceLabel(column.cadence, locale)}</span>
+                  <b>{newsColumnName(column, locale)}</b>
+                  <small>
+                    {column.posts.length} {tr(locale, "editions", "期")}
+                    {column.posts[0]?.publishedAt ? ` · ${tr(locale, "latest", "最新")} ${newsDateLabel(column.posts[0].publishedAt, locale)}` : ""}
+                  </small>
+                </Link>
+              ))}
+            </nav>
+          </aside>
+        )}
       </div>
     </main>
   );

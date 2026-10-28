@@ -1,0 +1,94 @@
+name: Deploy PLUS from VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Inspect the existing PLUS installation or deploy the pinned commit
+        type: choice
+        required: true
+        default: inspect
+        options:
+          - inspect
+          - deploy
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plus-production-deploy
+  cancel-in-progress: false
+
+env:
+  PLUS_SHA: 2dd447154c68be51089d1718796525e6b99311b3
+
+jobs:
+  plus:
+    runs-on: [self-hosted, tline]
+    environment: production
+    timeout-minutes: 60
+    steps:
+      - name: Inspect the existing PLUS installation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          root=/home/deploy/plus
+          test -d "$root" && test ! -L "$root"
+          test -f "$root/docker-compose.yml"
+          test -r "$root/.env"
+          test -w "$root"
+          grep -Fq 'PLUS_RELEASE_IMAGE' "$root/docker-compose.yml"
+          docker info >/dev/null
+          cd "$root"
+          for service in api db brief-worker; do
+            container_id="$(docker compose --env-file .env -f docker-compose.yml -p plus ps -q "$service")"
+            test -n "$container_id"
+            labels="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}:{{index .Config.Labels "com.docker.compose.service"}}' "$container_id")"
+            test "$labels" = "plus:$service"
+            test "$(docker inspect -f '{{.State.Running}}' "$container_id")" = true
+            echo "PLUS $service is running"
+          done
+          command -v python3 >/dev/null
+          command -v npm >/dev/null
+          echo 'PLUS preflight passed; Tline services were not changed.'
+
+      - uses: actions/checkout@v4
+        if: inputs.mode == 'deploy'
+        with:
+          repository: MuadibUsul/jin10plustools
+          ref: 2dd447154c68be51089d1718796525e6b99311b3
+          path: plus-src
+
+      - uses: actions/setup-node@v4
+        if: inputs.mode == 'deploy'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: plus-src/jin10-extension/package-lock.json
+
+      - name: Build and deploy the pinned PLUS commit
+        if: inputs.mode == 'deploy'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cd "$GITHUB_WORKSPACE/plus-src"
+          test "$(git rev-parse HEAD)" = "$PLUS_SHA"
+          cd jin10-extension
+          npm ci
+          npm run build
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile
+
+          dist = Path('dist')
+          target = Path('../jin10-server/app/web/plus-research-extension.zip')
+          with ZipFile(target, 'w', ZIP_DEFLATED) as archive:
+              for source in sorted(dist.rglob('*')):
+                  if source.is_file():
+                      archive.write(source, source.relative_to(dist))
+          PY
+          cd "$GITHUB_WORKSPACE/plus-src"
+          archive="/tmp/plus-release-$PLUS_SHA.tar.gz"
+          tar -czf "$archive" jin10-server skills .dockerignore
+          bash deploy/actions-release.sh "$PLUS_SHA" "$archive"
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://plus.tlines.tech/api/health

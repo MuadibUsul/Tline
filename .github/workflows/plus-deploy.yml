@@ -28,7 +28,22 @@ jobs:
     environment: production
     timeout-minutes: 60
     steps:
+      - name: Discover PLUS project paths
+        if: inputs.mode == 'inspect'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "Runner user: $(id -un)"
+          ls -ld /home/deploy/plus
+          echo 'Compose candidates:'
+          find /home/deploy/plus -maxdepth 3 -type f \( -name 'docker-compose*.yml' -o -name 'compose*.yaml' -o -name 'compose*.yml' \) -print
+          echo 'PLUS containers and compose paths:'
+          docker ps --filter label=com.docker.compose.project=plus --format '{{.Names}}'
+          for container in $(docker ps -q --filter label=com.docker.compose.project=plus); do
+            docker inspect -f '{{.Name}} {{index .Config.Labels "com.docker.compose.service"}} {{index .Config.Labels "com.docker.compose.project.working_dir"}} {{index .Config.Labels "com.docker.compose.project.config_files"}}' "$container"
+          done
       - name: Inspect the existing PLUS installation
+        if: inputs.mode == 'deploy'
         shell: bash
         run: |
           set -Eeuo pipefail

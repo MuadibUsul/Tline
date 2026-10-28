@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { getLocale, localePath, tr, type Locale } from "@/lib/i18n";
-import { listPublishedColumns, listPublishedNews, newsCadenceLabel, newsColumnName, newsDayKey, newsDateLabel } from "@/lib/news";
+import { getLocale, tr, type Locale } from "@/lib/i18n";
+import { listPublishedColumns, listPublishedNews, newsDayKey, newsDateLabel } from "@/lib/news";
 import { JsonLd, breadcrumbJsonLd, canonical, clamp, localizedUrl, ogImage } from "@/lib/seo";
 import NewsRow from "./NewsRow";
+import NewsColumns from "./NewsColumns";
 
 export const dynamic = "force-dynamic";
 
@@ -67,23 +67,7 @@ export default async function NewsIndex() {
             </section>
           ))}
         </div>
-        {columns.length > 0 && (
-          <aside className="news-sidebar" aria-label={tr(locale, "News columns", "快讯栏目")}>
-            <h2 className="section-t"><span>{tr(locale, "Columns", "栏目")}</span></h2>
-            <nav className="news-columns" aria-label={tr(locale, "Ongoing columns", "长期栏目")}>
-              {columns.map((column) => (
-                <Link className="news-column-card" href={localePath(locale, `/news/columns/${column.slug}`)} key={column.slug}>
-                  <span className="eyebrow">{newsCadenceLabel(column.cadence, locale)}</span>
-                  <b>{newsColumnName(column, locale)}</b>
-                  <small>
-                    {column.posts.length} {tr(locale, "editions", "期")}
-                    {column.posts[0]?.publishedAt ? ` · ${tr(locale, "latest", "最新")} ${newsDateLabel(column.posts[0].publishedAt, locale)}` : ""}
-                  </small>
-                </Link>
-              ))}
-            </nav>
-          </aside>
-        )}
+        {columns.length > 0 && <NewsColumns columns={columns} locale={locale} />}
       </div>
     </main>
   );

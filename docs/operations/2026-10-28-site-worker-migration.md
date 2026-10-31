@@ -6,7 +6,7 @@ Veynod task: `vps-migrate-2026-10-27` (claimed by Codex-2).
 
 This is the independent Python news worker, separate from the Next.js website and its Docker schedulers. It is installed at `/opt/tlines-worker` on `server1.tlines.tech` (`104.207.82.85`). User `tlines` owns the worker, state and credentials. Python 3.12.3 is installed; no pip dependencies were added.
 
-**Prepared, not cut over:** `tlines-worker.service` and `tlines-worker-health.timer` are installed but disabled and inactive. The old Grok worker's stopped state has not been confirmed. Starting both publishers risks duplicate posts; the shared publisher key was not revoked because other Grok jobs may use it.
+**Running on the VPS; cutover verification incomplete (checked 2026-10-31):** `tlines-worker.service` and `tlines-worker-health.timer` are enabled and active. The service has run since 2026-10-28 15:45 UTC with `NRestarts=0`. The old Grok worker's stopped state has not been independently confirmed. Running both publishers risks duplicate posts; the shared publisher key was not revoked because other Grok jobs may use it.
 
 The package's previous Veynod holder timed out without a continuation or recorded document changes. Package: `tlines-worker-vps-migrate-2026-10-27.zip`, blob `dc143d1b-58f4-4657-a887-ec55f5bb6d38`, SHA-256 `20fb6016d7cfe73eeeb34c97eb30d816374edd64d658ac201645d08543bb61e1`. Checksum verified both locally and on the VPS.
 
@@ -33,12 +33,18 @@ The code package and `.env` files remain outside this repository. Credential fil
 - Anthropic dry run fetched 62 candidates. HF Papers dry run fetched 40 candidates. Both used the real source fetch paths and performed no publishing.
 - `systemd-analyze verify` passed for the worker and health units.
 
-## Remaining cutover
+## VPS state checked 2026-10-31
 
-1. On the old Grok machine, stop `/cursor/stores/store-20f6c9cc-4c95-490b-baf3-e8fd36cc0435/site-monitors/daemon_ctl.sh` with its `stop` command. Confirm no supervisor, daemon, `run_batch.py`, `run_site.py` or preprint publishing child remains; pause any old per-site/morning routines. The current session has VPS access but no connection to that Grok machine.
-2. If available, transfer the latest seen files, morning state and preprint queue **after stopping** the old worker. Do not overwrite patched Python files or credentials with the old package. The production-backed ledger is an additional duplicate guard, not proof that the old machine is stopped.
-3. From the VPS deploy account: `bash /home/deploy/tlines-worker-cutover.sh --old-worker-stopped`. Use the flag only once the old side's stopped state is established. The script refreshes the DB-backed ledger, runs checks and enables the worker and health timer.
-4. Verify one supervisor and one daemon, `NRestarts=0`, fresh heartbeat, `SITE_BATCH begin` followed by `SITE_BATCH done`, and at least one newly published bilingual news item. Check that a repeated source URL within a worker column appears only once. Do not report a successful cutover based solely on systemd being active.
+- Local `main` and GitHub `main` both point to `445028e9b55798e62bae2e9cb5d0a516e1b3243e`, which includes the migration preparation commit `3289696`. The seven tracked deployment support files match their installed VPS copies byte for byte by SHA-256. The tracked `worker-fixes.patch` passes `git apply --reverse --check` against `/opt/tlines-worker`, confirming that the patch is present in the deployed worker. No worker Python file had a modification time after 2026-10-28. The original worker package is outside Git, and the VPS directory is not a Git checkout, so these checks do not establish complete source provenance for that package.
+- At 2026-10-31 06:56 UTC, the worker and health timer were enabled and active; `MainPID=1575430` and `NRestarts=0`. The health check reported `worker_active=true`, a fresh heartbeat and zero new failure entries. The latest completed site batch visible in `daemon.log` was 2026-10-30 23:45 China time: 30 sources, one failure, followed by `SITE_BATCH done`.
+- These observations establish that the VPS publisher is running. They do not confirm that the old Grok publisher stopped, that a new bilingual item was published, or that a repeated source URL was deduplicated. The Veynod task remained `WAITING_HUMAN` at this check and has not been handed to `REVIEWING`.
+
+## Remaining verification
+
+1. On the old Grok machine, confirm its daemon, supervisor, publishing children and historical routines are stopped. If any remain active, stop them with the old `site-monitors/daemon_ctl.sh stop` procedure and verify again. The current session has VPS access but no connection to that Grok machine.
+2. Check whether the latest seen files, morning state and preprint queue were transferred after the old worker stopped. If this step was missed, compare state with the running VPS worker before changing anything; do not overwrite patched Python files, live state or credentials with the old package. The production-backed ledger is an additional duplicate guard, not proof that the old machine is stopped.
+3. The VPS worker is already active. Do not rerun `/home/deploy/tlines-worker-cutover.sh`; it refuses an active worker. Confirm how the old-to-new cutover was performed before treating it as complete.
+4. Verify one supervisor and one daemon, a completed `SITE_BATCH`, at least one newly published bilingual news item, and that a repeated source URL within a worker column appears only once. Investigate the one failed source in the last observed batch. Do not report a successful cutover based solely on systemd being active.
 5. Hand the Veynod task to `REVIEWING` with these production results; the executor must not mark its own task `DONE`.
 
 ## Operations and rollback
